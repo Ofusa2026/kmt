@@ -1,0 +1,2140 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KMT案件管理システム</title>
+<!-- KMT_VERSION ver.20260409.03 -->
+<style>
+:root {
+  --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
+  --green:#16a34a; --orange:#ea580c; --red:#dc2626; --purple:#7c3aed;
+  --gray-100:#f1f5f9; --gray-200:#e2e8f0; --gray-400:#94a3b8; --gray-700:#334155;
+  --white:#ffffff; --shadow:0 2px 12px rgba(0,0,0,0.08);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--gray-100);color:var(--navy);}
+
+/* ===== SIDEBAR ===== */
+.sidebar{width:220px;background:var(--navy);flex-shrink:0;display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:100;overflow-y:auto;transition:transform 0.2s ease;}
+.sidebar.collapsed{transform:translateX(-220px);}
+#sidebarToggleBtn{position:fixed;top:50%;transform:translateY(-50%);left:220px;z-index:200;background:var(--navy);color:white;border:none;border-radius:0 6px 6px 0;padding:8px 6px;cursor:pointer;font-size:12px;line-height:1;transition:left 0.2s ease;}
+#sidebarToggleBtn.collapsed{left:0;}
+.sidebar-logo{padding:20px 16px 16px;}
+.logo-badge{background:#2563eb;color:white;font-size:11px;font-weight:800;padding:3px 8px;border-radius:4px;display:inline-block;margin-bottom:6px;letter-spacing:1px;}
+.logo-title{color:white;font-size:12px;font-weight:700;line-height:1.4;}
+.logo-ver{color:#475569;font-size:10px;margin-top:2px;}
+.sidebar-section{padding:8px 12px 4px;font-size:10px;color:#475569;font-weight:700;letter-spacing:1px;text-transform:uppercase;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 16px;color:#94a3b8;font-size:13px;cursor:pointer;border-radius:6px;margin:1px 8px;}
+.nav-item:hover,.nav-item.active{background:rgba(255,255,255,0.1);color:white;}
+.nav-item .badge{background:#dc2626;color:white;font-size:10px;padding:1px 6px;border-radius:10px;margin-left:auto;}
+.sidebar-user{padding:12px 16px;border-top:1px solid rgba(255,255,255,0.08);margin-top:auto;}
+.user-avatar{width:32px;height:32px;border-radius:50%;background:#2563eb;display:flex;align-items:center;justify-content:center;color:white;font-size:13px;font-weight:700;flex-shrink:0;}
+.user-info{display:flex;align-items:center;gap:8px;}
+.user-name{color:white;font-size:12px;font-weight:600;}
+.user-role{color:#94a3b8;font-size:10px;}
+
+/* ===== MAIN ===== */
+.main-wrap{margin-left:220px;display:flex;flex-direction:column;min-height:100vh;transition:margin-left 0.2s ease;}
+.main-wrap.collapsed{margin-left:0;}
+.topbar{background:white;border-bottom:1px solid var(--gray-200);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:0;z-index:50;}
+.page-title{font-size:18px;font-weight:800;color:var(--navy);}
+.topbar-actions{display:flex;align-items:center;gap:8px;}
+
+/* ===== BUTTONS ===== */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:.15s;}
+.btn-outline{background:white;border:1.5px solid var(--gray-200);color:var(--navy);}
+.btn-outline:hover{border-color:var(--blue);color:var(--blue);}
+.btn-primary{background:var(--blue);color:white;}
+.btn-primary:hover{background:#1d4ed8;}
+
+/* ===== STATS ===== */
+.stats-row{display:flex;gap:10px;padding:16px 24px 8px;flex-wrap:wrap;}
+.stat-card{background:white;border-radius:8px;padding:10px 14px;box-shadow:var(--shadow);border:1px solid var(--gray-200);cursor:pointer;transition:.15s;flex:1;min-width:120px;}
+.stat-card:hover{border-color:var(--blue);}
+.stat-card.active{border-color:var(--blue);background:var(--blue-light);}
+.stat-label{font-size:11px;color:var(--gray-400);font-weight:600;margin-bottom:4px;}
+.stat-num{font-size:26px;font-weight:800;color:var(--navy);line-height:1;}
+.stat-num.blue{color:var(--blue);}
+.stat-num.green{color:var(--green);}
+.stat-num.orange{color:var(--orange);}
+
+/* ===== FILTERS ===== */
+.filters-section{padding:0 24px 10px;position:sticky;top:56px;z-index:40;background:var(--gray-100);}
+.filters{background:white;border-radius:8px;padding:5px 10px;display:flex;flex-wrap:nowrap;gap:6px;align-items:center;box-shadow:var(--shadow);border:1px solid var(--gray-200);overflow-x:auto;}
+.filter-label{font-size:10px;color:var(--gray-400);font-weight:700;white-space:nowrap;}
+.filter-select{border:1px solid var(--gray-200);border-radius:5px;padding:3px 6px;font-size:11px;color:var(--navy);background:white;cursor:pointer;}
+.filter-select:focus{outline:none;border-color:var(--blue);}
+.search-input{border:1px solid var(--gray-200);border-radius:6px;padding:6px 12px;font-size:12px;flex:1;min-width:160px;}
+.search-input:focus{outline:none;border-color:var(--blue);}
+.filter-sep{width:1px;height:18px;background:var(--gray-200);flex-shrink:0;}
+
+/* ===== TABLE ===== */
+.content-wrap{padding:0 24px 24px;}
+.table-wrap{background:white;border-radius:12px;box-shadow:var(--shadow);border:1px solid var(--gray-200);overflow-x:auto;}
+table{width:100%;border-collapse:collapse;}
+thead th{padding:7px 12px;font-size:11px;color:var(--gray-400);font-weight:700;text-align:left;border-bottom:1px solid var(--gray-200);background:#fafafa;white-space:nowrap;position:sticky;top:0;z-index:10;}
+tbody tr{border-bottom:1px solid var(--gray-200);cursor:pointer;transition:.1s;}
+tbody tr:hover{background:var(--blue-light);}
+tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
+.co-name{font-weight:700;color:var(--navy);}
+.co-no{font-size:11px;color:var(--gray-400);}
+.co-industry{font-size:11px;color:var(--gray-700);}
+.worker-count{font-weight:700;color:var(--blue);font-size:15px;}
+.fee-text{font-size:12px;color:var(--gray-700);}
+
+/* ===== BADGES ===== */
+.st-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap;}
+.st-active{background:#f0fdf4;color:#16a34a;}
+.st-past{background:#f8fafc;color:#64748b;}
+.pay-badge{display:inline-block;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;}
+.pay-furikomi{background:#eff6ff;color:#2563eb;}
+.pay-koza{background:#fff7ed;color:#ea580c;}
+.pay-cash{background:#f0fdf4;color:#16a34a;}
+
+/* ===== PAGINATION ===== */
+.pagination-bar{display:flex;align-items:center;justify-content:center;gap:8px;padding:12px 24px;background:white;border-top:1px solid var(--gray-200);border-radius:0 0 12px 12px;}
+.page-btn{padding:6px 14px;border-radius:8px;border:1px solid var(--gray-200);background:white;cursor:pointer;font-size:12px;font-weight:600;color:var(--navy);transition:.15s;}
+.page-btn:hover{border-color:var(--blue);color:var(--blue);}
+.page-btn.active{background:var(--blue);color:white;border-color:var(--blue);}
+.page-btn:disabled{opacity:0.4;cursor:not-allowed;}
+.page-info{font-size:12px;color:var(--gray-400);font-weight:600;}
+
+/* ===== LOADING ===== */
+.loading-overlay{display:none;position:fixed;inset:0;background:rgba(255,255,255,0.7);z-index:9999;align-items:center;justify-content:center;flex-direction:column;gap:12px;}
+.loading-overlay.show{display:flex;}
+.loading-spinner{width:40px;height:40px;border:4px solid var(--gray-200);border-top-color:var(--blue);border-radius:50%;animation:spin 0.8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.loading-text{font-size:13px;color:var(--gray-700);font-weight:600;}
+
+/* ===== MODAL ===== */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:16px;}
+.modal-overlay.show{display:flex;}
+.modal-box{background:white;border-radius:16px;width:760px;max-width:96vw;max-height:92vh;box-shadow:0 24px 60px rgba(0,0,0,0.2);overflow:hidden;display:flex;flex-direction:column;}
+.modal-header{background:var(--navy);padding:16px 20px;display:flex;align-items:center;gap:10px;flex-shrink:0;}
+.modal-title{color:white;font-size:15px;font-weight:700;}
+.modal-close{margin-left:auto;background:rgba(255,255,255,0.15);border:none;color:white;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;}
+.modal-body{overflow-y:auto;padding:20px;flex:1;}
+.modal-footer{padding:12px 20px;border-top:1px solid var(--gray-200);display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-shrink:0;}
+
+/* モーダル内タブ */
+.modal-tabs{display:flex;border-bottom:1px solid var(--gray-200);background:white;flex-shrink:0;padding:0 20px;}
+.modal-tab{padding:10px 14px;font-size:12px;font-weight:600;color:var(--gray-400);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;}
+.modal-tab.active{color:var(--blue);border-bottom-color:var(--blue);}
+.tab-panel{display:none;}
+.tab-panel.active{display:block;}
+
+/* フォームグリッド */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.form-grid.cols3{grid-template-columns:1fr 1fr 1fr;}
+.form-group{display:flex;flex-direction:column;gap:4px;}
+.form-group.full{grid-column:1/-1;}
+.form-label{font-size:10px;color:var(--gray-400);font-weight:700;}
+.form-input{border:1px solid var(--gray-200);border-radius:6px;padding:7px 10px;font-size:13px;color:var(--navy);width:100%;}
+.form-input:focus{outline:none;border-color:var(--blue);}
+.form-select{border:1px solid var(--gray-200);border-radius:6px;padding:7px 10px;font-size:13px;color:var(--navy);width:100%;background:white;}
+.form-select:focus{outline:none;border-color:var(--blue);}
+.form-textarea{border:1px solid var(--gray-200);border-radius:6px;padding:7px 10px;font-size:13px;color:var(--navy);width:100%;resize:vertical;min-height:80px;}
+.form-textarea:focus{outline:none;border-color:var(--blue);}
+.section-title{font-size:11px;font-weight:800;color:var(--navy);padding:10px 0 6px;border-bottom:1px solid var(--gray-200);margin-bottom:12px;grid-column:1/-1;letter-spacing:0.5px;}
+
+/* トースト */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--navy);color:white;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;opacity:0;transform:translateY(10px);transition:.3s;pointer-events:none;}
+.toast.show{opacity:1;transform:translateY(0);}
+.toast.success{background:var(--green);}
+.toast.error{background:var(--red);}
+
+/* ===== MOBILE ===== */
+@media(max-width:768px){
+  .sidebar{display:none;}
+  .sidebar.mobile-open{display:flex;}
+  #sidebarToggleBtn{display:none;}
+  .main-wrap{margin-left:0 !important;}
+  .stats-row{padding:12px 14px 6px;}
+  .stat-card{min-width:90px;}
+  .filters-section{padding:0 14px 8px;}
+  .content-wrap{padding:0 14px 20px;}
+  .topbar{padding:12px 14px;}
+  .form-grid{grid-template-columns:1fr;}
+  .form-grid.cols3{grid-template-columns:1fr;}
+  .mobile-menu-btn{display:flex !important;}
+  thead th:nth-child(n+5){display:none;}
+  tbody td:nth-child(n+5){display:none;}
+}
+.mobile-menu-btn{display:none;align-items:center;justify-content:center;width:36px;height:36px;border-radius:8px;border:1.5px solid var(--gray-200);background:white;cursor:pointer;font-size:18px;}
+</style>
+</head>
+<body>
+
+<!-- ===== SIDEBAR ===== -->
+<div class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-badge">KMT</div>
+    <div class="logo-title">KMT案件管理システム</div>
+    <div class="logo-ver">ver.20260409.03</div>
+  </div>
+  <div class="sidebar-section">メイン</div>
+  <div class="nav-item active" onclick="showScreen('companies')">🏢 受入企業</div>
+  <div class="nav-item" onclick="showScreen('workers')">👤 外国人材</div>
+  <div class="nav-item" onclick="showScreen('candidates')">📋 候補者</div>
+  <div class="nav-item" onclick="showScreen('jobs')">💼 求人管理</div>
+  <div class="nav-item" onclick="showScreen('introductions')">🤝 紹介案件</div>
+  <div class="sidebar-section">マスタ</div>
+  <div class="nav-item" onclick="showScreen('sending')">✈️ 送り出し機関</div>
+  <div class="nav-item" onclick="showScreen('partners')">🏛️ 提携登録支援機関</div>
+  <div class="sidebar-section">書類</div>
+  <div class="nav-item" onclick="showScreen('resume')">📝 履歴書</div>
+  <div class="sidebar-section">管理</div>
+  <div class="nav-item" onclick="showScreen('fees')">💴 支援委託費</div>
+  <div class="nav-item" onclick="showScreen('sales')">📊 売上管理</div>
+  <div class="nav-item" onclick="showScreen('expenses')">💸 立替管理</div>
+  <div class="nav-item" onclick="showScreen('users')">⚙️ ユーザー設定</div>
+  <div class="sidebar-user">
+    <div class="user-info">
+      <div class="user-avatar" id="userAvatar">K</div>
+      <div>
+        <div class="user-name" id="userName">ログイン中</div>
+        <div class="user-role" id="userRole">KMTスタッフ</div>
+      </div>
+    </div>
+  </div>
+</div>
+<button id="sidebarToggleBtn" onclick="toggleSidebar()">◀</button>
+
+<!-- ===== MAIN ===== -->
+<div class="main-wrap" id="mainWrap">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <button class="mobile-menu-btn" onclick="toggleMobile()">☰</button>
+      <div class="page-title" id="pageTitle">🏢 受入企業</div>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn btn-outline" onclick="loadCompanies()">🔄 更新</button>
+      <button class="btn btn-primary" onclick="openCompanyModal(null)">＋ 新規登録</button>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats-row" id="statsRow">
+    <div class="stat-card active" onclick="filterStat('all')" id="statAll">
+      <div class="stat-label">全企業</div>
+      <div class="stat-num blue" id="cntAll">-</div>
+    </div>
+    <div class="stat-card" onclick="filterStat('active')" id="statActive">
+      <div class="stat-label">支援中</div>
+      <div class="stat-num green" id="cntActive">-</div>
+    </div>
+    <div class="stat-card" onclick="filterStat('past')" id="statPast">
+      <div class="stat-label">過去</div>
+      <div class="stat-num" id="cntPast">-</div>
+    </div>
+    <div class="stat-card" id="statWorkers">
+      <div class="stat-label">在職中外国人</div>
+      <div class="stat-num blue" id="cntWorkers">-</div>
+    </div>
+  </div>
+
+  <!-- FILTERS -->
+  <div class="filters-section">
+    <div class="filters">
+      <span class="filter-label">🔍</span>
+      <input class="search-input" id="searchInput" placeholder="企業名・住所で検索..." oninput="applyFilters()">
+      <div class="filter-sep"></div>
+      <span class="filter-label">業種</span>
+      <select class="filter-select" id="filterIndustry" onchange="applyFilters()">
+        <option value="">すべて</option>
+        <option>農業</option><option>漁業</option><option>建設</option>
+        <option>製造業</option><option>飲食料品製造業</option><option>外食業</option>
+        <option>介護</option><option>ビルクリーニング</option><option>宿泊</option>
+        <option>自動車整備</option><option>航空</option><option>造船・船用工業</option>
+      </select>
+      <span class="filter-label">都道府県</span>
+      <select class="filter-select" id="filterPref" onchange="applyFilters()">
+        <option value="">すべて</option>
+      </select>
+      <span class="filter-label">支払</span>
+      <select class="filter-select" id="filterPayment" onchange="applyFilters()">
+        <option value="">すべて</option>
+        <option>口振</option><option>振込</option><option>現金</option>
+      </select>
+      <span class="filter-label">担当</span>
+      <select class="filter-select" id="filterStaff" onchange="applyFilters()">
+        <option value="">すべて</option>
+      </select>
+      <button class="btn btn-outline" style="font-size:11px;padding:4px 10px;" onclick="clearFilters()">✕ リセット</button>
+    </div>
+  </div>
+
+  <!-- TABLE -->
+  <div class="content-wrap">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>No.</th>
+            <th>企業名</th>
+            <th>業種</th>
+            <th>都道府県</th>
+            <th>担当</th>
+            <th>在職中</th>
+            <th>委託費/人</th>
+            <th>請求サイクル</th>
+            <th>支払方法</th>
+            <th>ステータス</th>
+          </tr>
+        </thead>
+        <tbody id="companyTbody">
+          <tr><td colspan="10" style="text-align:center;padding:40px;color:var(--gray-400);">読み込み中...</td></tr>
+        </tbody>
+      </table>
+      <div class="pagination-bar" id="paginationBar"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 企業モーダル ===== -->
+<div class="modal-overlay" id="companyModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span id="coModalIcon">🏢</span>
+      <span class="modal-title" id="coModalTitle">企業詳細</span>
+      <button class="modal-close" onclick="closeCompanyModal()">✕</button>
+    </div>
+    <div class="modal-tabs" id="coModalTabs">
+      <div class="modal-tab active" onclick="switchCoTab('basic')">基本情報</div>
+      <div class="modal-tab" onclick="switchCoTab('contract')">契約・委託費</div>
+      <div class="modal-tab" onclick="switchCoTab('finance')">財務情報</div>
+      <div class="modal-tab" onclick="switchCoTab('memo')">メモ</div>
+    </div>
+    <div class="modal-body">
+      <!-- 基本情報 -->
+      <div class="tab-panel active" id="tab-basic">
+        <div class="form-grid">
+          <div class="section-title">📋 基本情報</div>
+          <div class="form-group">
+            <label class="form-label">企業番号</label>
+            <input class="form-input" id="co_no" type="number" placeholder="例: 1">
+          </div>
+          <div class="form-group">
+            <label class="form-label">ステータス</label>
+            <select class="form-select" id="co_status">
+              <option value="active">支援中（active）</option>
+              <option value="past">過去（past）</option>
+            </select>
+          </div>
+          <div class="form-group full">
+            <label class="form-label">企業名 *</label>
+            <input class="form-input" id="co_name" placeholder="例: 株式会社○○">
+          </div>
+          <div class="form-group">
+            <label class="form-label">法人格</label>
+            <select class="form-select" id="co_corp_type">
+              <option value="">選択</option>
+              <option>株式会社</option><option>有限会社</option><option>合同会社</option>
+              <option>一般社団法人</option><option>社会福祉法人</option><option>医療法人</option><option>その他</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">業種（特定技能分野）</label>
+            <select class="form-select" id="co_industry">
+              <option value="">選択</option>
+              <option>農業</option><option>漁業</option><option>建設</option>
+              <option>製造業</option><option>飲食料品製造業</option><option>外食業</option>
+              <option>介護</option><option>ビルクリーニング</option><option>宿泊</option>
+              <option>自動車整備</option><option>航空</option><option>造船・船用工業</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">法人番号</label>
+            <input class="form-input" id="co_corp_no" placeholder="13桁">
+          </div>
+          <div class="form-group">
+            <label class="form-label">電話番号</label>
+            <input class="form-input" id="co_tel" placeholder="03-xxxx-xxxx">
+          </div>
+          <div class="section-title">📍 所在地</div>
+          <div class="form-group">
+            <label class="form-label">郵便番号</label>
+            <input class="form-input" id="co_zip" placeholder="123-4567">
+          </div>
+          <div class="form-group">
+            <label class="form-label">都道府県</label>
+            <input class="form-input" id="co_pref" placeholder="東京都">
+          </div>
+          <div class="form-group">
+            <label class="form-label">市区町村</label>
+            <input class="form-input" id="co_city" placeholder="大田区">
+          </div>
+          <div class="form-group">
+            <label class="form-label">番地・建物名</label>
+            <input class="form-input" id="co_address" placeholder="西蒲田7-26-11">
+          </div>
+          <div class="section-title">👤 代表者・担当者</div>
+          <div class="form-group">
+            <label class="form-label">代表者名</label>
+            <input class="form-input" id="co_rep_name" placeholder="山田 太郎">
+          </div>
+          <div class="form-group">
+            <label class="form-label">代表者役職</label>
+            <input class="form-input" id="co_rep_title" placeholder="代表取締役">
+          </div>
+          <div class="form-group">
+            <label class="form-label">KMTメイン担当</label>
+            <input class="form-input" id="co_main_staff" placeholder="担当者名">
+          </div>
+          <div class="form-group">
+            <label class="form-label">KMTサブ担当</label>
+            <input class="form-input" id="co_sub_staff" placeholder="担当者名">
+          </div>
+          <div class="form-group full">
+            <label class="form-label">Googleドライブ URL</label>
+            <input class="form-input" id="co_drive_url" placeholder="https://drive.google.com/...">
+          </div>
+        </div>
+      </div>
+
+      <!-- 契約・委託費 -->
+      <div class="tab-panel" id="tab-contract">
+        <div class="form-grid">
+          <div class="section-title">💴 委託費設定</div>
+          <div class="form-group">
+            <label class="form-label">1人あたり委託費（税抜）</label>
+            <input class="form-input" id="co_fee_per_person" type="number" placeholder="20000">
+          </div>
+          <div class="form-group">
+            <label class="form-label">請求サイクル</label>
+            <select class="form-select" id="co_billing_cycle">
+              <option value="">選択</option>
+              <option>月次</option><option>3ヶ月</option><option>年次</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">支払方法</label>
+            <select class="form-select" id="co_payment_method">
+              <option value="">選択</option>
+              <option>口振</option><option>振込</option><option>現金</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">請求方法</label>
+            <select class="form-select" id="co_invoice_method">
+              <option value="">選択</option>
+              <option>メール</option><option>郵送</option><option>FAX</option>
+            </select>
+          </div>
+          <div class="form-group full">
+            <label class="form-label">請求先（メールアドレス or 住所）</label>
+            <input class="form-input" id="co_invoice_to" placeholder="billing@example.com または 〒xxx-xxxx ...">
+          </div>
+          <div class="form-group">
+            <label class="form-label">請求法人</label>
+            <select class="form-select" id="co_kmt_corp_type">
+              <option value="">選択</option>
+              <option>株式会社KMT請求</option><option>一般社団法人KMT請求</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">口座振替 申込日</label>
+            <input class="form-input" id="co_direct_debit_applied" type="date">
+          </div>
+          <div class="form-group">
+            <label class="form-label">口座振替 登録日</label>
+            <input class="form-input" id="co_direct_debit_registered" type="date">
+          </div>
+        </div>
+      </div>
+
+      <!-- 財務情報 -->
+      <div class="tab-panel" id="tab-finance">
+        <div class="form-grid cols3">
+          <div class="section-title">📈 財務情報（直近3期）</div>
+          <div class="form-group"><label class="form-label">売上高（1期前）</label><input class="form-input" id="co_sales_y1" placeholder="円"></div>
+          <div class="form-group"><label class="form-label">売上高（2期前）</label><input class="form-input" id="co_sales_y2" placeholder="円"></div>
+          <div class="form-group"><label class="form-label">売上高（3期前）</label><input class="form-input" id="co_sales_y3" placeholder="円"></div>
+          <div class="form-group"><label class="form-label">経常利益（1期前）</label><input class="form-input" id="co_ordinary_pl_y1" placeholder="円"></div>
+          <div class="form-group"><label class="form-label">経常利益（2期前）</label><input class="form-input" id="co_ordinary_pl_y2" placeholder="円"></div>
+          <div class="form-group"><label class="form-label">経常利益（3期前）</label><input class="form-input" id="co_ordinary_pl_y3" placeholder="円"></div>
+          <div class="form-group"><label class="form-label">純利益（1期前）</label><input class="form-input" id="co_net_pl_y1" placeholder="円"></div>
+          <div class="form-group"><label class="form-label">純利益（2期前）</label><input class="form-input" id="co_net_pl_y2" placeholder="円"></div>
+          <div class="form-group"><label class="form-label">純利益（3期前）</label><input class="form-input" id="co_net_pl_y3" placeholder="円"></div>
+          <div class="form-group"><label class="form-label">純資産（1期前）</label><input class="form-input" id="co_net_assets_y1" placeholder="円"></div>
+          <div class="form-group"><label class="form-label">純資産（2期前）</label><input class="form-input" id="co_net_assets_y2" placeholder="円"></div>
+          <div class="form-group"><label class="form-label">純資産（3期前）</label><input class="form-input" id="co_net_assets_y3" placeholder="円"></div>
+          <div class="section-title">🏢 企業規模</div>
+          <div class="form-group"><label class="form-label">資本金</label><input class="form-input" id="co_capital" placeholder="円"></div>
+          <div class="form-group"><label class="form-label">従業員数</label><input class="form-input" id="co_employees" placeholder="名"></div>
+          <div class="form-group"><label class="form-label">外国人従業員数</label><input class="form-input" id="co_foreign_employees" placeholder="名"></div>
+        </div>
+      </div>
+
+      <!-- メモ -->
+      <div class="tab-panel" id="tab-memo">
+        <div class="form-grid">
+          <div class="section-title">📝 メモ・備考</div>
+          <div class="form-group full">
+            <label class="form-label">社内メモ</label>
+            <textarea class="form-textarea" id="co_memo" rows="5" placeholder="社内共有メモを入力..."></textarea>
+          </div>
+          <div class="form-group full">
+            <label class="form-label">企業ノート</label>
+            <textarea class="form-textarea" id="co_company_note" rows="5" placeholder="企業に関する特記事項..."></textarea>
+          </div>
+          <div class="form-group full">
+            <label class="form-label">最終訪問日</label>
+            <input class="form-input" id="co_last_visit" type="date">
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeCompanyModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveCompany()">💾 保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-spinner"></div>
+  <div class="loading-text">読み込み中...</div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== SUPABASE CONFIG =====
+const SB_URL = 'https://oyblvyocvdnhcxeeokuw.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95Ymx2eW9jdmRuaGN4ZWVva3V3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQxMTc0NjIsImV4cCI6MjA1OTY5MzQ2Mn0.Ry_2KkMBRqcWVyHlCBFbFkrNgFtEjXTMknhcPyD2dts';
+
+async function sbFetch(path, opts={}) {
+  const res = await fetch(SB_URL + '/rest/v1/' + path, {
+    headers: {
+      'apikey': SB_KEY,
+      'Authorization': 'Bearer ' + SB_KEY,
+      'Content-Type': 'application/json',
+      'Prefer': opts.prefer || 'return=representation',
+      ...opts.headers
+    },
+    ...opts
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || res.statusText);
+  }
+  return opts.method === 'DELETE' ? null : res.json();
+}
+
+// ===== STATE =====
+let allCompanies = [];
+let filteredCompanies = [];
+let currentPage = 1;
+const PAGE_SIZE = 30;
+let editingCoId = null;
+let statFilter = 'all';
+
+// ===== INIT =====
+window.addEventListener('DOMContentLoaded', () => {
+  loadCompanies();
+});
+
+// ===== LOAD =====
+async function loadCompanies() {
+  showLoading(true);
+  try {
+    const data = await sbFetch('companies?select=*&order=company_no.asc.nullslast,name.asc');
+    allCompanies = data || [];
+    buildFilterOptions();
+    updateStats();
+    applyFilters();
+  } catch(e) {
+    showToast('❌ 読み込み失敗: ' + e.message, 'error');
+  }
+  showLoading(false);
+}
+
+function buildFilterOptions() {
+  // 都道府県
+  const prefs = [...new Set(allCompanies.map(c => c.pref).filter(Boolean))].sort();
+  const prefSel = document.getElementById('filterPref');
+  const prefVal = prefSel.value;
+  prefSel.innerHTML = '<option value="">すべて</option>' + prefs.map(p => `<option>${p}</option>`).join('');
+  prefSel.value = prefVal;
+  // 担当
+  const staffs = [...new Set(allCompanies.map(c => c.main_staff).filter(Boolean))].sort();
+  const staffSel = document.getElementById('filterStaff');
+  const staffVal = staffSel.value;
+  staffSel.innerHTML = '<option value="">すべて</option>' + staffs.map(s => `<option>${s}</option>`).join('');
+  staffSel.value = staffVal;
+}
+
+function updateStats() {
+  const active = allCompanies.filter(c => c.status !== 'past').length;
+  const past = allCompanies.filter(c => c.status === 'past').length;
+  document.getElementById('cntAll').textContent = allCompanies.length;
+  document.getElementById('cntActive').textContent = active;
+  document.getElementById('cntPast').textContent = past;
+  document.getElementById('cntWorkers').textContent = '-'; // workers別途取得
+}
+
+function filterStat(type) {
+  statFilter = type;
+  ['All','Active','Past'].forEach(s => {
+    document.getElementById('stat'+s).classList.toggle('active', type === s.toLowerCase() || (type==='all' && s==='All'));
+  });
+  applyFilters();
+}
+
+function applyFilters() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  const industry = document.getElementById('filterIndustry').value;
+  const pref = document.getElementById('filterPref').value;
+  const payment = document.getElementById('filterPayment').value;
+  const staff = document.getElementById('filterStaff').value;
+
+  filteredCompanies = allCompanies.filter(c => {
+    if (statFilter === 'active' && c.status === 'past') return false;
+    if (statFilter === 'past' && c.status !== 'past') return false;
+    if (q && !((c.name||'').toLowerCase().includes(q) || (c.pref||'').toLowerCase().includes(q) || (c.city||'').toLowerCase().includes(q) || (c.address||'').toLowerCase().includes(q))) return false;
+    if (industry && c.industry !== industry) return false;
+    if (pref && c.pref !== pref) return false;
+    if (payment && c.payment_method !== payment) return false;
+    if (staff && c.main_staff !== staff) return false;
+    return true;
+  });
+  currentPage = 1;
+  renderTable();
+}
+
+function clearFilters() {
+  document.getElementById('searchInput').value = '';
+  document.getElementById('filterIndustry').value = '';
+  document.getElementById('filterPref').value = '';
+  document.getElementById('filterPayment').value = '';
+  document.getElementById('filterStaff').value = '';
+  statFilter = 'all';
+  document.querySelectorAll('.stat-card').forEach((c,i) => c.classList.toggle('active', i===0));
+  applyFilters();
+}
+
+// ===== RENDER TABLE =====
+function renderTable() {
+  const tbody = document.getElementById('companyTbody');
+  const total = filteredCompanies.length;
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const page = filteredCompanies.slice(start, start + PAGE_SIZE);
+
+  if (!page.length) {
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--gray-400);">該当する企業がありません</td></tr>';
+    document.getElementById('paginationBar').innerHTML = '';
+    return;
+  }
+
+  tbody.innerHTML = page.map(c => {
+    const payBadge = c.payment_method === '口振' ? 'pay-koza' : c.payment_method === '振込' ? 'pay-furikomi' : 'pay-cash';
+    const stBadge = c.status === 'past' ? '<span class="st-badge st-past">過去</span>' : '<span class="st-badge st-active">支援中</span>';
+    const fee = c.fee_per_person ? Number(c.fee_per_person).toLocaleString() + '円' : '-';
+    const cycle = c.billing_cycle || '-';
+    return `<tr onclick="openCompanyModal('${c.id}')">
+      <td><span class="co-no">${c.company_no ?? '-'}</span></td>
+      <td><div class="co-name">${esc(c.name)}</div><div class="co-industry">${esc(c.industry||'')}</div></td>
+      <td class="co-industry">${esc(c.industry||'-')}</td>
+      <td>${esc(c.pref||'-')}</td>
+      <td>${esc(c.main_staff||'-')}</td>
+      <td><span class="worker-count">-</span></td>
+      <td class="fee-text">${fee}</td>
+      <td class="fee-text">${cycle}</td>
+      <td>${c.payment_method ? `<span class="pay-badge ${payBadge}">${c.payment_method}</span>` : '-'}</td>
+      <td>${stBadge}</td>
+    </tr>`;
+  }).join('');
+
+  renderPagination(total);
+}
+
+function renderPagination(total) {
+  const pages = Math.ceil(total / PAGE_SIZE);
+  const bar = document.getElementById('paginationBar');
+  if (pages <= 1) { bar.innerHTML = `<span class="page-info">${total}件</span>`; return; }
+  let html = `<button class="page-btn" ${currentPage===1?'disabled':''} onclick="goPage(${currentPage-1})">◀</button>`;
+  const start = Math.max(1, currentPage - 2);
+  const end = Math.min(pages, currentPage + 2);
+  if (start > 1) html += `<button class="page-btn" onclick="goPage(1)">1</button>${start>2?'<span class="page-info">…</span>':''}`;
+  for (let i = start; i <= end; i++) html += `<button class="page-btn ${i===currentPage?'active':''}" onclick="goPage(${i})">${i}</button>`;
+  if (end < pages) html += `${end<pages-1?'<span class="page-info">…</span>':''}<button class="page-btn" onclick="goPage(${pages})">${pages}</button>`;
+  html += `<button class="page-btn" ${currentPage===pages?'disabled':''} onclick="goPage(${currentPage+1})">▶</button>`;
+  html += `<span class="page-info">${total}件 / ${pages}ページ</span>`;
+  bar.innerHTML = html;
+}
+
+function goPage(p) { currentPage = p; renderTable(); window.scrollTo(0,0); }
+
+// ===== MODAL =====
+function openCompanyModal(id) {
+  editingCoId = id;
+  clearCoForm();
+  if (id) {
+    const co = allCompanies.find(c => c.id === id);
+    if (co) fillCoForm(co);
+    document.getElementById('coModalTitle').textContent = '企業詳細 - ' + (co?.name || '');
+    document.getElementById('coModalIcon').textContent = '🏢';
+  } else {
+    document.getElementById('coModalTitle').textContent = '新規企業登録';
+    document.getElementById('coModalIcon').textContent = '➕';
+  }
+  switchCoTab('basic');
+  document.getElementById('companyModal').classList.add('show');
+}
+
+function closeCompanyModal() {
+  document.getElementById('companyModal').classList.remove('show');
+  editingCoId = null;
+}
+
+function switchCoTab(tab) {
+  document.querySelectorAll('.modal-tab').forEach((t, i) => {
+    const tabs = ['basic','contract','finance','memo'];
+    t.classList.toggle('active', tabs[i] === tab);
+  });
+  document.querySelectorAll('.tab-panel').forEach(p => {
+    p.classList.toggle('active', p.id === 'tab-' + tab);
+  });
+}
+
+const CO_FIELDS = [
+  'no','status','name','corp_type','industry','corp_no','tel',
+  'zip','pref','city','address',
+  'rep_name','rep_title','main_staff','sub_staff','drive_url',
+  'fee_per_person','billing_cycle','payment_method','invoice_method','invoice_to','kmt_corp_type','direct_debit_applied','direct_debit_registered',
+  'sales_y1','sales_y2','sales_y3','ordinary_pl_y1','ordinary_pl_y2','ordinary_pl_y3',
+  'net_pl_y1','net_pl_y2','net_pl_y3','net_assets_y1','net_assets_y2','net_assets_y3',
+  'capital','employees','foreign_employees',
+  'memo','company_note','last_visit'
+];
+
+function clearCoForm() { CO_FIELDS.forEach(f => { const el = document.getElementById('co_'+f); if(el) el.value=''; }); }
+
+function fillCoForm(co) {
+  const map = {
+    no:'company_no', status:'status', name:'name', corp_type:'corp_type', industry:'industry',
+    corp_no:'corp_no', tel:'tel', zip:'zip', pref:'pref', city:'city', address:'address',
+    rep_name:'rep_name', rep_title:'rep_title', main_staff:'main_staff', sub_staff:'sub_staff',
+    drive_url:'drive_url', fee_per_person:'fee_per_person', billing_cycle:'billing_cycle',
+    payment_method:'payment_method', invoice_method:'invoice_method', invoice_to:'invoice_to',
+    kmt_corp_type:'kmt_corp_type', direct_debit_applied:'direct_debit_applied',
+    direct_debit_registered:'direct_debit_registered',
+    sales_y1:'sales_y1', sales_y2:'sales_y2', sales_y3:'sales_y3',
+    ordinary_pl_y1:'ordinary_pl_y1', ordinary_pl_y2:'ordinary_pl_y2', ordinary_pl_y3:'ordinary_pl_y3',
+    net_pl_y1:'net_pl_y1', net_pl_y2:'net_pl_y2', net_pl_y3:'net_pl_y3',
+    net_assets_y1:'net_assets_y1', net_assets_y2:'net_assets_y2', net_assets_y3:'net_assets_y3',
+    capital:'capital', employees:'employees', foreign_employees:'foreign_employees',
+    memo:'memo', company_note:'company_note', last_visit:'last_visit'
+  };
+  Object.entries(map).forEach(([key, col]) => {
+    const el = document.getElementById('co_' + key);
+    if (el && co[col] != null) el.value = co[col];
+  });
+}
+
+function getCoFormData() {
+  return {
+    company_no: document.getElementById('co_no').value ? parseInt(document.getElementById('co_no').value) : null,
+    status: document.getElementById('co_status').value || 'active',
+    name: document.getElementById('co_name').value,
+    corp_type: document.getElementById('co_corp_type').value || null,
+    industry: document.getElementById('co_industry').value || null,
+    corp_no: document.getElementById('co_corp_no').value || null,
+    tel: document.getElementById('co_tel').value || null,
+    zip: document.getElementById('co_zip').value || null,
+    pref: document.getElementById('co_pref').value || null,
+    city: document.getElementById('co_city').value || null,
+    address: document.getElementById('co_address').value || null,
+    rep_name: document.getElementById('co_rep_name').value || null,
+    rep_title: document.getElementById('co_rep_title').value || null,
+    main_staff: document.getElementById('co_main_staff').value || null,
+    sub_staff: document.getElementById('co_sub_staff').value || null,
+    drive_url: document.getElementById('co_drive_url').value || null,
+    fee_per_person: document.getElementById('co_fee_per_person').value ? parseInt(document.getElementById('co_fee_per_person').value) : null,
+    billing_cycle: document.getElementById('co_billing_cycle').value || null,
+    payment_method: document.getElementById('co_payment_method').value || null,
+    invoice_method: document.getElementById('co_invoice_method').value || null,
+    invoice_to: document.getElementById('co_invoice_to').value || null,
+    kmt_corp_type: document.getElementById('co_kmt_corp_type').value || null,
+    direct_debit_applied: document.getElementById('co_direct_debit_applied').value || null,
+    direct_debit_registered: document.getElementById('co_direct_debit_registered').value || null,
+    sales_y1: document.getElementById('co_sales_y1').value || null,
+    sales_y2: document.getElementById('co_sales_y2').value || null,
+    sales_y3: document.getElementById('co_sales_y3').value || null,
+    ordinary_pl_y1: document.getElementById('co_ordinary_pl_y1').value || null,
+    ordinary_pl_y2: document.getElementById('co_ordinary_pl_y2').value || null,
+    ordinary_pl_y3: document.getElementById('co_ordinary_pl_y3').value || null,
+    net_pl_y1: document.getElementById('co_net_pl_y1').value || null,
+    net_pl_y2: document.getElementById('co_net_pl_y2').value || null,
+    net_pl_y3: document.getElementById('co_net_pl_y3').value || null,
+    net_assets_y1: document.getElementById('co_net_assets_y1').value || null,
+    net_assets_y2: document.getElementById('co_net_assets_y2').value || null,
+    net_assets_y3: document.getElementById('co_net_assets_y3').value || null,
+    capital: document.getElementById('co_capital').value || null,
+    employees: document.getElementById('co_employees').value || null,
+    foreign_employees: document.getElementById('co_foreign_employees').value || null,
+    memo: document.getElementById('co_memo').value || null,
+    company_note: document.getElementById('co_company_note').value || null,
+    last_visit: document.getElementById('co_last_visit').value || null,
+    updated_at: new Date().toISOString()
+  };
+}
+
+async function saveCompany() {
+  const data = getCoFormData();
+  if (!data.name) { showToast('❌ 企業名は必須です', 'error'); return; }
+  showLoading(true);
+  try {
+    if (editingCoId) {
+      await sbFetch('companies?id=eq.' + editingCoId, { method:'PATCH', body: JSON.stringify(data), prefer:'return=representation' });
+      showToast('✅ 企業情報を更新しました', 'success');
+    } else {
+      await sbFetch('companies', { method:'POST', body: JSON.stringify(data), prefer:'return=representation' });
+      showToast('✅ 企業を登録しました', 'success');
+    }
+    closeCompanyModal();
+    await loadCompanies();
+  } catch(e) {
+    showToast('❌ 保存失敗: ' + e.message, 'error');
+  }
+  showLoading(false);
+}
+
+// ===== SIDEBAR =====
+let sidebarOpen = true;
+function toggleSidebar() {
+  sidebarOpen = !sidebarOpen;
+  document.getElementById('sidebar').classList.toggle('collapsed', !sidebarOpen);
+  document.getElementById('mainWrap').classList.toggle('collapsed', !sidebarOpen);
+  document.getElementById('sidebarToggleBtn').classList.toggle('collapsed', !sidebarOpen);
+  document.getElementById('sidebarToggleBtn').textContent = sidebarOpen ? '◀' : '▶';
+}
+function toggleMobile() {
+  document.getElementById('sidebar').classList.toggle('mobile-open');
+}
+
+// ===== SCREEN SWITCH =====
+function showScreen(name) {
+  showToast('🚧 ' + name + ' 画面は準備中です');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  event.target.closest('.nav-item')?.classList.add('active');
+}
+
+// ===== UTILS =====
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function showLoading(v) { document.getElementById('loadingOverlay').classList.toggle('show', v); }
+
+let toastTimer;
+function showToast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (type ? ' '+type : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// モーダル外クリックで閉じる
+document.getElementById('companyModal').addEventListener('click', function(e) {
+  if (e.target === this) closeCompanyModal();
+});
+
+
+// ===== SCREEN MANAGER =====
+const SCREENS = {
+  companies: { title: '🏢 受入企業', init: loadCompanies },
+  workers:   { title: '👤 外国人材', init: loadWorkers },
+  candidates:{ title: '📋 候補者',   init: loadCandidates },
+  jobs:      { title: '💼 求人管理', init: loadJobs },
+  introductions:{ title: '🤝 紹介案件', init: loadIntroductions },
+  sending:   { title: '✈️ 送り出し機関', init: loadSending },
+  partners:  { title: '🏛️ 提携登録支援機関', init: loadPartners },
+  fees:      { title: '💴 支援委託費', init: loadFees },
+  sales:     { title: '📊 売上管理', init: loadSales },
+  expenses:  { title: '💸 立替管理', init: loadExpenses },
+  users:     { title: '⚙️ ユーザー設定', init: loadUsers },
+  resume:    { title: '📝 履歴書作成', init: loadResumeScreen },
+};
+
+let currentScreen = 'companies';
+
+function showScreen(name) {
+  if (!SCREENS[name]) return;
+  currentScreen = name;
+  document.getElementById('pageTitle').textContent = SCREENS[name].title;
+
+  // nav active
+  document.querySelectorAll('.nav-item').forEach(n => {
+    n.classList.toggle('active', n.getAttribute('onclick')?.includes("'"+name+"'"));
+  });
+
+  // topbar buttons
+  updateTopbarButtons(name);
+
+  // コンテンツ切り替え
+  renderScreenContent(name);
+
+  // データ読み込み
+  SCREENS[name].init();
+
+  // モバイルはサイドバー閉じる
+  document.getElementById('sidebar').classList.remove('mobile-open');
+}
+
+function updateTopbarButtons(name) {
+  const actions = document.querySelector('.topbar-actions');
+  const btnMap = {
+    companies:    `<button class="btn btn-outline" onclick="loadCompanies()">🔄 更新</button><button class="btn btn-primary" onclick="openCompanyModal(null)">＋ 企業登録</button>`,
+    workers:      `<button class="btn btn-outline" onclick="loadWorkers()">🔄 更新</button><button class="btn btn-primary" onclick="openWorkerModal(null)">＋ 人材登録</button>`,
+    candidates:   `<button class="btn btn-outline" onclick="loadCandidates()">🔄 更新</button><button class="btn btn-primary" onclick="openCandidateModal(null)">＋ 候補者登録</button>`,
+    jobs:         `<button class="btn btn-outline" onclick="loadJobs()">🔄 更新</button><button class="btn btn-primary" onclick="openJobModal(null)">＋ 求人登録</button>`,
+    introductions:`<button class="btn btn-outline" onclick="loadIntroductions()">🔄 更新</button><button class="btn btn-primary" onclick="openIntroModal(null)">＋ 紹介案件登録</button>`,
+    sending:      `<button class="btn btn-outline" onclick="loadSending()">🔄 更新</button><button class="btn btn-primary" onclick="openSendingModal(null)">＋ 機関登録</button>`,
+    partners:     `<button class="btn btn-outline" onclick="loadPartners()">🔄 更新</button><button class="btn btn-primary" onclick="openPartnerModal(null)">＋ 機関登録</button>`,
+    fees:         `<button class="btn btn-outline" onclick="loadFees()">🔄 更新</button><button class="btn btn-primary" onclick="openFeeModal(null)">＋ 請求登録</button>`,
+    sales:        `<button class="btn btn-outline" onclick="loadSales()">🔄 更新</button><button class="btn btn-primary" onclick="openSaleModal(null)">＋ 売上登録</button>`,
+    expenses:     `<button class="btn btn-outline" onclick="loadExpenses()">🔄 更新</button><button class="btn btn-primary" onclick="openExpenseModal(null)">＋ 立替登録</button>`,
+    users:        `<button class="btn btn-outline" onclick="loadUsers()">🔄 更新</button><button class="btn btn-primary" onclick="openUserModal(null)">＋ ユーザー追加</button>`,
+    resume:       `<button class="btn btn-outline" onclick="window.print()">🖨️ 印刷</button>`,
+  };
+  actions.innerHTML = btnMap[name] || '';
+}
+
+function renderScreenContent(name) {
+  const statsRow = document.getElementById('statsRow');
+  const filtersSection = document.querySelector('.filters-section');
+  const contentWrap = document.querySelector('.content-wrap');
+
+  // 各画面のHTML
+  const screens = {
+    companies: null, // 既存
+    workers: buildWorkersScreen(),
+    candidates: buildCandidatesScreen(),
+    jobs: buildJobsScreen(),
+    introductions: buildIntroductionsScreen(),
+    sending: buildSendingScreen(),
+    partners: buildPartnersScreen(),
+    fees: buildFeesScreen(),
+    sales: buildSalesScreen(),
+    expenses: buildExpensesScreen(),
+    users: buildUsersScreen(),
+    resume: buildResumeScreen(),
+  };
+
+  if (name === 'companies') {
+    statsRow.style.display = '';
+    filtersSection.style.display = '';
+    contentWrap.innerHTML = `<div class="table-wrap">
+      <table><thead><tr>
+        <th>No.</th><th>企業名</th><th>業種</th><th>都道府県</th>
+        <th>担当</th><th>在職中</th><th>委託費/人</th><th>請求サイクル</th><th>支払方法</th><th>ステータス</th>
+      </tr></thead><tbody id="companyTbody"><tr><td colspan="10" style="text-align:center;padding:40px;color:var(--gray-400)">読み込み中...</td></tr></tbody></table>
+      <div class="pagination-bar" id="paginationBar"></div>
+    </div>`;
+    return;
+  }
+
+  statsRow.style.display = 'none';
+  filtersSection.style.display = 'none';
+  contentWrap.innerHTML = screens[name] || '<div style="padding:40px;text-align:center;color:var(--gray-400)">準備中</div>';
+}
+
+// ==============================
+// 👤 外国人材
+// ==============================
+let allWorkers = [], filteredWorkers = [], workerPage = 1;
+
+function buildWorkersScreen() {
+  return `
+  <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+    <input class="search-input" id="wSearchInput" placeholder="氏名・国籍・企業名で検索..." oninput="applyWorkerFilters()" style="flex:1;min-width:200px;">
+    <select class="filter-select" id="wFilterStatus" onchange="applyWorkerFilters()">
+      <option value="">全ステータス</option>
+      <option>在職中</option><option>申請準備中</option><option>許可待ち</option>
+      <option>入国配属待ち</option><option>一時帰国中</option>
+      <option>退職（転職）</option><option>退職（帰国）</option><option>失踪</option><option>5年満了</option>
+    </select>
+    <select class="filter-select" id="wFilterNationality" onchange="applyWorkerFilters()">
+      <option value="">全国籍</option>
+      <option>インドネシア</option><option>ベトナム</option><option>タイ</option>
+      <option>カンボジア</option><option>ミャンマー</option><option>その他</option>
+    </select>
+    <select class="filter-select" id="wFilterKmt" onchange="applyWorkerFilters()">
+      <option value="">KMT支援区分</option>
+      <option>KMT支援</option><option>KMT支援外</option>
+    </select>
+    <button class="btn btn-outline" style="font-size:11px;padding:4px 10px" onclick="clearWorkerFilters()">✕</button>
+  </div>
+  <div class="table-wrap">
+    <table><thead><tr>
+      <th>氏名</th><th>国籍</th><th>企業名</th><th>分野/職種</th>
+      <th>在留資格</th><th>在留期限</th><th>配属日</th><th>ステータス</th><th>担当</th>
+    </tr></thead>
+    <tbody id="workerTbody"><tr><td colspan="9" style="text-align:center;padding:40px;color:var(--gray-400)">読み込み中...</td></tr></tbody>
+    </table>
+    <div class="pagination-bar" id="workerPagination"></div>
+  </div>`;
+}
+
+async function loadWorkers() {
+  showLoading(true);
+  try {
+    const data = await sbFetch('workers?select=*,companies(name)&order=joined_date.desc.nullslast,name.asc');
+    allWorkers = data || [];
+    applyWorkerFilters();
+  } catch(e) { showToast('❌ ' + e.message, 'error'); }
+  showLoading(false);
+}
+
+function applyWorkerFilters() {
+  if (currentScreen !== 'workers') return;
+  const q = (document.getElementById('wSearchInput')?.value||'').toLowerCase();
+  const status = document.getElementById('wFilterStatus')?.value||'';
+  const nat = document.getElementById('wFilterNationality')?.value||'';
+  const kmt = document.getElementById('wFilterKmt')?.value||'';
+  filteredWorkers = allWorkers.filter(w => {
+    if (q && !((w.name||'').toLowerCase().includes(q) || (w.nationality||'').toLowerCase().includes(q) || (w.companies?.name||'').toLowerCase().includes(q))) return false;
+    if (status && w.status !== status) return false;
+    if (nat && w.nationality !== nat) return false;
+    if (kmt && w.kmt_support !== kmt) return false;
+    return true;
+  });
+  workerPage = 1;
+  renderWorkerTable();
+}
+
+function clearWorkerFilters() {
+  ['wSearchInput','wFilterStatus','wFilterNationality','wFilterKmt'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.value='';
+  });
+  applyWorkerFilters();
+}
+
+const STATUS_COLORS = {
+  '在職中':'st-active','申請準備中':'st-docs','許可待ち':'st-review',
+  '入国配属待ち':'st-submit','一時帰国中':'st-add',
+  '退職（転職）':'st-none','退職（帰国）':'st-none','失踪':'st-danger','5年満了':'st-cert'
+};
+
+function renderWorkerTable() {
+  const tbody = document.getElementById('workerTbody');
+  if (!tbody) return;
+  const total = filteredWorkers.length;
+  const page = filteredWorkers.slice((workerPage-1)*PAGE_SIZE, workerPage*PAGE_SIZE);
+  if (!page.length) { tbody.innerHTML='<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--gray-400)">データなし</td></tr>'; document.getElementById('workerPagination').innerHTML=''; return; }
+  tbody.innerHTML = page.map(w => {
+    const cls = STATUS_COLORS[w.status] || 'st-none';
+    const expiry = w.visa_expiry ? formatDate(w.visa_expiry) : '-';
+    const expWarn = w.visa_expiry && daysDiff(w.visa_expiry) < 120 ? ' style="color:var(--red);font-weight:700"' : '';
+    return `<tr onclick="openWorkerModal('${w.id}')">
+      <td><strong>${esc(w.name)}</strong>${w.name_kana?'<div style="font-size:10px;color:var(--gray-400)">'+esc(w.name_kana)+'</div>':''}</td>
+      <td>${natFlag(w.nationality)} ${esc(w.nationality||'-')}</td>
+      <td style="font-size:12px">${esc(w.companies?.name||'-')}</td>
+      <td style="font-size:11px;color:var(--gray-700)">${esc(w.applicant_field||'')}${w.job_category?'<br>'+esc(w.job_category):''}</td>
+      <td style="font-size:12px">${esc(w.visa_status||'-')}</td>
+      <td${expWarn}>${expiry}</td>
+      <td style="font-size:12px">${w.joined_date?formatDate(w.joined_date):'-'}</td>
+      <td><span class="st-badge ${cls}">${esc(w.status||'-')}</span></td>
+      <td style="font-size:12px">${esc(w.staff||'-')}</td>
+    </tr>`;
+  }).join('');
+  renderGenPagination('workerPagination', total, workerPage, p => { workerPage=p; renderWorkerTable(); });
+}
+
+function openWorkerModal(id) {
+  const w = id ? allWorkers.find(x=>x.id===id) : null;
+  editingWorkerId = id;
+  showGenModal('workerModal', id ? '👤 外国人材詳細' : '👤 外国人材登録', buildWorkerModalBody(w));
+}
+let editingWorkerId = null;
+
+function buildWorkerModalBody(w) {
+  w = w||{};
+  return `
+  <div class="form-grid">
+    <div class="section-title">基本情報</div>
+    <div class="form-group full"><label class="form-label">氏名（ローマ字）*</label><input class="form-input" id="wf_name" value="${esc(w.name||'')}"></div>
+    <div class="form-group"><label class="form-label">フリガナ</label><input class="form-input" id="wf_name_kana" value="${esc(w.name_kana||'')}"></div>
+    <div class="form-group"><label class="form-label">国籍</label>
+      <select class="form-select" id="wf_nationality">
+        ${['','インドネシア','ベトナム','タイ','カンボジア','ミャンマー','その他'].map(n=>`<option ${w.nationality===n?'selected':''}>${n}</option>`).join('')}
+      </select></div>
+    <div class="form-group"><label class="form-label">性別</label>
+      <select class="form-select" id="wf_gender">
+        ${['','男','女'].map(n=>`<option ${w.gender===n?'selected':''}>${n}</option>`).join('')}
+      </select></div>
+    <div class="form-group"><label class="form-label">生年月日</label><input class="form-input" id="wf_birthdate" type="date" value="${w.birthdate||''}"></div>
+    <div class="section-title">所属・就労</div>
+    <div class="form-group full"><label class="form-label">受入企業</label>
+      <select class="form-select" id="wf_company_id">
+        <option value="">選択...</option>
+        ${allCompanies.map(c=>`<option value="${c.id}" ${w.company_id===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}
+      </select></div>
+    <div class="form-group"><label class="form-label">分野</label><input class="form-input" id="wf_applicant_field" value="${esc(w.applicant_field||'')}"></div>
+    <div class="form-group"><label class="form-label">職種</label><input class="form-input" id="wf_job_category" value="${esc(w.job_category||'')}"></div>
+    <div class="form-group"><label class="form-label">配属日</label><input class="form-input" id="wf_joined_date" type="date" value="${w.joined_date||''}"></div>
+    <div class="form-group"><label class="form-label">退職日</label><input class="form-input" id="wf_left_date" type="date" value="${w.left_date||''}"></div>
+    <div class="section-title">在留情報</div>
+    <div class="form-group"><label class="form-label">在留資格</label><input class="form-input" id="wf_visa_status" value="${esc(w.visa_status||'')}"></div>
+    <div class="form-group"><label class="form-label">在留期限</label><input class="form-input" id="wf_visa_expiry" type="date" value="${w.visa_expiry||''}"></div>
+    <div class="form-group"><label class="form-label">在留カード番号</label><input class="form-input" id="wf_residence_card" value="${esc(w.residence_card||'')}"></div>
+    <div class="form-group"><label class="form-label">入国日</label><input class="form-input" id="wf_entry_date" type="date" value="${w.entry_date||''}"></div>
+    <div class="section-title">ステータス</div>
+    <div class="form-group"><label class="form-label">ステータス</label>
+      <select class="form-select" id="wf_status">
+        ${['在職中','申請準備中','許可待ち','入国配属待ち','一時帰国中','退職（転職）','退職（帰国）','失踪','キャンセル','5年満了'].map(s=>`<option ${w.status===s?'selected':''}>${s}</option>`).join('')}
+      </select></div>
+    <div class="form-group"><label class="form-label">KMT支援区分</label>
+      <select class="form-select" id="wf_kmt_support">
+        ${['KMT支援','KMT支援外'].map(s=>`<option ${(w.kmt_support||'KMT支援')===s?'selected':''}>${s}</option>`).join('')}
+      </select></div>
+    <div class="form-group"><label class="form-label">KMT担当</label><input class="form-input" id="wf_staff" value="${esc(w.staff||'')}"></div>
+    <div class="section-title">一時帰国 / 5年満了</div>
+    <div class="form-group"><label class="form-label">一時帰国日</label><input class="form-input" id="wf_return_home_date" type="date" value="${w.return_home_date||''}"></div>
+    <div class="form-group"><label class="form-label">再入国日</label><input class="form-input" id="wf_return_jp_date" type="date" value="${w.return_jp_date||''}"></div>
+    <div class="form-group"><label class="form-label">5年満了日</label><input class="form-input" id="wf_tg2_expiry" type="date" value="${w.tg2_expiry||''}"></div>
+    <div class="form-group"><label class="form-label">5年満了状況</label><input class="form-input" id="wf_tg2_status" value="${esc(w.tg2_status||'')}"></div>
+    <div class="section-title">連絡先</div>
+    <div class="form-group"><label class="form-label">電話番号</label><input class="form-input" id="wf_phone" value="${esc(w.phone||'')}"></div>
+    <div class="form-group"><label class="form-label">メール</label><input class="form-input" id="wf_email" value="${esc(w.email||'')}"></div>
+    <div class="form-group full"><label class="form-label">日本住所</label><input class="form-input" id="wf_jp_address" value="${esc(w.jp_address||'')}"></div>
+    <div class="section-title">メモ</div>
+    <div class="form-group full"><label class="form-label">備考</label><textarea class="form-textarea" id="wf_memo">${esc(w.memo||'')}</textarea></div>
+  </div>
+  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)">
+    <button class="btn btn-outline" onclick="closeGenModal('workerModal')">キャンセル</button>
+    <button class="btn btn-primary" onclick="saveWorker()">💾 保存</button>
+  </div>`;
+}
+
+async function saveWorker() {
+  const data = {
+    name: document.getElementById('wf_name').value,
+    name_kana: document.getElementById('wf_name_kana').value||null,
+    nationality: document.getElementById('wf_nationality').value||null,
+    gender: document.getElementById('wf_gender').value||null,
+    birthdate: document.getElementById('wf_birthdate').value||null,
+    company_id: document.getElementById('wf_company_id').value||null,
+    applicant_field: document.getElementById('wf_applicant_field').value||null,
+    job_category: document.getElementById('wf_job_category').value||null,
+    joined_date: document.getElementById('wf_joined_date').value||null,
+    left_date: document.getElementById('wf_left_date').value||null,
+    visa_status: document.getElementById('wf_visa_status').value||null,
+    visa_expiry: document.getElementById('wf_visa_expiry').value||null,
+    residence_card: document.getElementById('wf_residence_card').value||null,
+    entry_date: document.getElementById('wf_entry_date').value||null,
+    status: document.getElementById('wf_status').value||'在職中',
+    kmt_support: document.getElementById('wf_kmt_support').value||'KMT支援',
+    staff: document.getElementById('wf_staff').value||null,
+    return_home_date: document.getElementById('wf_return_home_date').value||null,
+    return_jp_date: document.getElementById('wf_return_jp_date').value||null,
+    tg2_expiry: document.getElementById('wf_tg2_expiry').value||null,
+    tg2_status: document.getElementById('wf_tg2_status').value||null,
+    phone: document.getElementById('wf_phone').value||null,
+    email: document.getElementById('wf_email').value||null,
+    jp_address: document.getElementById('wf_jp_address').value||null,
+    memo: document.getElementById('wf_memo').value||null,
+    updated_at: new Date().toISOString()
+  };
+  if (!data.name) { showToast('❌ 氏名は必須です', 'error'); return; }
+  showLoading(true);
+  try {
+    if (editingWorkerId) {
+      await sbFetch('workers?id=eq.'+editingWorkerId, {method:'PATCH', body:JSON.stringify(data)});
+      showToast('✅ 更新しました', 'success');
+    } else {
+      await sbFetch('workers', {method:'POST', body:JSON.stringify(data)});
+      showToast('✅ 登録しました', 'success');
+    }
+    closeGenModal('workerModal');
+    await loadWorkers();
+  } catch(e) { showToast('❌ '+e.message,'error'); }
+  showLoading(false);
+}
+
+// ==============================
+// 📋 候補者
+// ==============================
+let allCandidates=[], filteredCandidates=[], candidatePage=1;
+
+function buildCandidatesScreen() {
+  return `
+  <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+    <input class="search-input" id="cSearchInput" placeholder="氏名・国籍で検索..." oninput="applyCandidateFilters()" style="flex:1;min-width:200px;">
+    <select class="filter-select" id="cFilterStatus" onchange="applyCandidateFilters()">
+      <option value="">全ステータス</option>
+      <option>選考中</option><option>内定</option><option>入国待ち</option><option>キャンセル</option>
+    </select>
+    <select class="filter-select" id="cFilterNat" onchange="applyCandidateFilters()">
+      <option value="">全国籍</option>
+      <option>インドネシア</option><option>ベトナム</option><option>タイ</option>
+      <option>カンボジア</option><option>ミャンマー</option><option>その他</option>
+    </select>
+    <button class="btn btn-outline" style="font-size:11px;padding:4px 10px" onclick="clearCandidateFilters()">✕</button>
+  </div>
+  <div class="table-wrap"><table><thead><tr>
+    <th>氏名</th><th>国籍</th><th>日本語Lv</th><th>技能試験</th><th>分野/職種</th>
+    <th>入社可能日</th><th>ステータス</th><th>担当</th>
+  </tr></thead>
+  <tbody id="candidateTbody"><tr><td colspan="8" style="text-align:center;padding:40px;color:var(--gray-400)">読み込み中...</td></tr></tbody>
+  </table><div class="pagination-bar" id="candidatePagination"></div></div>`;
+}
+
+async function loadCandidates() {
+  showLoading(true);
+  try {
+    const data = await sbFetch('candidates?select=*&order=created_at.desc');
+    allCandidates = data||[];
+    applyCandidateFilters();
+  } catch(e) { showToast('❌ '+e.message,'error'); }
+  showLoading(false);
+}
+
+function applyCandidateFilters() {
+  if (currentScreen!=='candidates') return;
+  const q=(document.getElementById('cSearchInput')?.value||'').toLowerCase();
+  const status=document.getElementById('cFilterStatus')?.value||'';
+  const nat=document.getElementById('cFilterNat')?.value||'';
+  filteredCandidates=allCandidates.filter(c=>{
+    if(q && !((c.name||'').toLowerCase().includes(q)||(c.nationality||'').toLowerCase().includes(q))) return false;
+    if(status && c.status!==status) return false;
+    if(nat && c.nationality!==nat) return false;
+    return true;
+  });
+  candidatePage=1;
+  renderCandidateTable();
+}
+function clearCandidateFilters(){ ['cSearchInput','cFilterStatus','cFilterNat'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';}); applyCandidateFilters(); }
+
+function renderCandidateTable() {
+  const tbody=document.getElementById('candidateTbody'); if(!tbody) return;
+  const total=filteredCandidates.length;
+  const page=filteredCandidates.slice((candidatePage-1)*PAGE_SIZE, candidatePage*PAGE_SIZE);
+  if(!page.length){tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--gray-400)">データなし</td></tr>'; document.getElementById('candidatePagination').innerHTML=''; return;}
+  tbody.innerHTML=page.map(c=>{
+    const cls=c.status==='選考中'?'st-docs':c.status==='内定'?'st-active':c.status==='入国待ち'?'st-submit':'st-none';
+    return `<tr onclick="openCandidateModal('${c.id}')">
+      <td><strong>${esc(c.name)}</strong>${c.name_kana?'<div style="font-size:10px;color:var(--gray-400)">'+esc(c.name_kana)+'</div>':''}</td>
+      <td>${natFlag(c.nationality)} ${esc(c.nationality||'-')}</td>
+      <td style="font-size:12px">${esc(c.jp_language_level||'-')}</td>
+      <td style="font-size:11px">${esc(c.skill_exam_1||'-')}</td>
+      <td style="font-size:11px">${esc(c.applicant_field||'')}${c.job_category?'<br>'+esc(c.job_category):''}</td>
+      <td style="font-size:12px">${c.available_from?formatDate(c.available_from):'-'}</td>
+      <td><span class="st-badge ${cls}">${esc(c.status||'-')}</span></td>
+      <td style="font-size:12px">${esc(c.staff||'-')}</td>
+    </tr>`;
+  }).join('');
+  renderGenPagination('candidatePagination', total, candidatePage, p=>{candidatePage=p;renderCandidateTable();});
+}
+
+function openCandidateModal(id) {
+  const c=id?allCandidates.find(x=>x.id===id):null;
+  editingCandidateId=id;
+  showGenModal('candidateModal', id?'📋 候補者詳細':'📋 候補者登録', buildCandidateModalBody(c));
+}
+let editingCandidateId=null;
+
+function buildCandidateModalBody(c) {
+  c=c||{};
+  return `
+  <div class="form-grid">
+    <div class="section-title">基本情報</div>
+    <div class="form-group full"><label class="form-label">氏名（ローマ字）*</label><input class="form-input" id="cf_name" value="${esc(c.name||'')}"></div>
+    <div class="form-group"><label class="form-label">フリガナ</label><input class="form-input" id="cf_name_kana" value="${esc(c.name_kana||'')}"></div>
+    <div class="form-group"><label class="form-label">国籍</label>
+      <select class="form-select" id="cf_nationality">${['','インドネシア','ベトナム','タイ','カンボジア','ミャンマー','その他'].map(n=>`<option ${c.nationality===n?'selected':''}>${n}</option>`).join('')}</select></div>
+    <div class="form-group"><label class="form-label">性別</label>
+      <select class="form-select" id="cf_gender">${['','男','女'].map(n=>`<option ${c.gender===n?'selected':''}>${n}</option>`).join('')}</select></div>
+    <div class="form-group"><label class="form-label">生年月日</label><input class="form-input" id="cf_birthdate" type="date" value="${c.birthdate||''}"></div>
+    <div class="form-group"><label class="form-label">宗教</label><input class="form-input" id="cf_religion" value="${esc(c.religion||'')}"></div>
+    <div class="form-group"><label class="form-label">配偶者</label>
+      <select class="form-select" id="cf_marital_status">${['','有','無'].map(n=>`<option ${c.marital_status===n?'selected':''}>${n}</option>`).join('')}</select></div>
+    <div class="form-group"><label class="form-label">子供（人数）</label><input class="form-input" id="cf_num_children" type="number" value="${c.num_children??''}"></div>
+    <div class="section-title">日本語・技能試験</div>
+    <div class="form-group"><label class="form-label">日本語レベル</label><input class="form-input" id="cf_jp_language_level" value="${esc(c.jp_language_level||'')}" placeholder="N4相当"></div>
+    <div class="form-group"><label class="form-label">日本語詳細（聞き取り・会話）</label><input class="form-input" id="cf_jp_language_detail" value="${esc(c.jp_language_detail||'')}"></div>
+    <div class="form-group"><label class="form-label">技能試験1</label><input class="form-input" id="cf_skill_exam_1" value="${esc(c.skill_exam_1||'')}"></div>
+    <div class="form-group"><label class="form-label">評価調書</label>
+      <select class="form-select" id="cf_hyoka_chosho">${['','有','無'].map(n=>`<option ${c.hyoka_chosho===n?'selected':''}>${n}</option>`).join('')}</select></div>
+    <div class="section-title">希望・就労条件</div>
+    <div class="form-group"><label class="form-label">希望分野</label><input class="form-input" id="cf_applicant_field" value="${esc(c.applicant_field||'')}"></div>
+    <div class="form-group"><label class="form-label">希望職種</label><input class="form-input" id="cf_job_category" value="${esc(c.job_category||'')}"></div>
+    <div class="form-group"><label class="form-label">入社可能日</label><input class="form-input" id="cf_available_from" type="date" value="${c.available_from||''}"></div>
+    <div class="form-group"><label class="form-label">希望給料</label><input class="form-input" id="cf_desired_salary" value="${esc(c.desired_salary||'')}"></div>
+    <div class="form-group"><label class="form-label">残業・夜勤希望</label><input class="form-input" id="cf_overtime_preference" value="${esc(c.overtime_preference||'')}"></div>
+    <div class="form-group"><label class="form-label">一時帰国希望</label><input class="form-input" id="cf_temp_return_wish" value="${esc(c.temp_return_wish||'')}"></div>
+    <div class="form-group full"><label class="form-label">志望動機</label><textarea class="form-textarea" id="cf_motivation">${esc(c.motivation||'')}</textarea></div>
+    <div class="section-title">健康・担当</div>
+    <div class="form-group"><label class="form-label">健康状況</label><input class="form-input" id="cf_health_status" value="${esc(c.health_status||'')}"></div>
+    <div class="form-group"><label class="form-label">ステータス</label>
+      <select class="form-select" id="cf_status">${['選考中','内定','入国待ち','キャンセル'].map(s=>`<option ${c.status===s?'selected':''}>${s}</option>`).join('')}</select></div>
+    <div class="form-group"><label class="form-label">担当</label><input class="form-input" id="cf_staff" value="${esc(c.staff||'')}"></div>
+    <div class="form-group"><label class="form-label">担当者の感想</label><input class="form-input" id="cf_staff_impression" value="${esc(c.staff_impression||'')}"></div>
+    <div class="form-group full"><label class="form-label">メモ</label><textarea class="form-textarea" id="cf_memo">${esc(c.memo||'')}</textarea></div>
+  </div>
+  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)">
+    <button class="btn btn-outline" onclick="closeGenModal('candidateModal')">キャンセル</button>
+    <button class="btn btn-primary" onclick="saveCandidate()">💾 保存</button>
+  </div>`;
+}
+
+async function saveCandidate() {
+  const g=id=>document.getElementById(id)?.value||null;
+  const data={
+    name:g('cf_name'), name_kana:g('cf_name_kana'), nationality:g('cf_nationality'),
+    gender:g('cf_gender'), birthdate:g('cf_birthdate'), religion:g('cf_religion'),
+    marital_status:g('cf_marital_status'),
+    num_children:document.getElementById('cf_num_children')?.value?parseInt(document.getElementById('cf_num_children').value):null,
+    jp_language_level:g('cf_jp_language_level'), jp_language_detail:g('cf_jp_language_detail'),
+    skill_exam_1:g('cf_skill_exam_1'), hyoka_chosho:g('cf_hyoka_chosho'),
+    applicant_field:g('cf_applicant_field'), job_category:g('cf_job_category'),
+    available_from:g('cf_available_from'), desired_salary:g('cf_desired_salary'),
+    overtime_preference:g('cf_overtime_preference'), temp_return_wish:g('cf_temp_return_wish'),
+    motivation:g('cf_motivation'), health_status:g('cf_health_status'),
+    status:g('cf_status')||'選考中', staff:g('cf_staff'),
+    staff_impression:g('cf_staff_impression'), memo:g('cf_memo'),
+    updated_at:new Date().toISOString()
+  };
+  if(!data.name){showToast('❌ 氏名は必須です','error');return;}
+  showLoading(true);
+  try {
+    if(editingCandidateId){await sbFetch('candidates?id=eq.'+editingCandidateId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新しました','success');}
+    else{await sbFetch('candidates',{method:'POST',body:JSON.stringify(data)});showToast('✅ 登録しました','success');}
+    closeGenModal('candidateModal'); await loadCandidates();
+  }catch(e){showToast('❌ '+e.message,'error');}
+  showLoading(false);
+}
+
+// ==============================
+// 💼 求人管理
+// ==============================
+let allJobs=[], filteredJobs=[], jobPage=1;
+
+function buildJobsScreen() {
+  return `
+  <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+    <input class="search-input" id="jSearchInput" placeholder="求人コード・会社名で検索..." oninput="applyJobFilters()" style="flex:1;min-width:200px;">
+    <select class="filter-select" id="jFilterStatus" onchange="applyJobFilters()">
+      <option value="">全ステータス</option>
+      <option>募集中</option><option>新着</option><option>提案中</option><option>保留</option><option>停止</option><option>決定</option><option>募集再開</option>
+    </select>
+    <select class="filter-select" id="jFilterIndustry" onchange="applyJobFilters()">
+      <option value="">全業種</option>
+      <option>農業</option><option>建設</option><option>製造業</option><option>外食</option><option>介護</option><option>宿泊</option><option>その他</option>
+    </select>
+    <button class="btn btn-outline" style="font-size:11px;padding:4px 10px" onclick="clearJobFilters()">✕</button>
+  </div>
+  <div class="table-wrap"><table><thead><tr>
+    <th>求人コード</th><th>会社名</th><th>業種/職種</th><th>国内外</th>
+    <th>紹介費</th><th>優先度</th><th>GLT担当</th><th>募集開始日</th><th>ステータス</th>
+  </tr></thead>
+  <tbody id="jobTbody"><tr><td colspan="9" style="text-align:center;padding:40px;color:var(--gray-400)">読み込み中...</td></tr></tbody>
+  </table><div class="pagination-bar" id="jobPagination"></div></div>`;
+}
+
+async function loadJobs() {
+  showLoading(true);
+  try {
+    const data=await sbFetch('job_openings?select=*,companies(name),partner_support_orgs(name)&order=created_at.desc');
+    allJobs=data||[];
+    applyJobFilters();
+  }catch(e){showToast('❌ '+e.message,'error');}
+  showLoading(false);
+}
+
+function applyJobFilters() {
+  if(currentScreen!=='jobs') return;
+  const q=(document.getElementById('jSearchInput')?.value||'').toLowerCase();
+  const status=document.getElementById('jFilterStatus')?.value||'';
+  const industry=document.getElementById('jFilterIndustry')?.value||'';
+  filteredJobs=allJobs.filter(j=>{
+    if(q && !((j.job_code||'').toLowerCase().includes(q)||(j.title||'').toLowerCase().includes(q)||(j.companies?.name||'').toLowerCase().includes(q))) return false;
+    if(status && j.status!==status) return false;
+    if(industry && j.industry!==industry) return false;
+    return true;
+  });
+  jobPage=1; renderJobTable();
+}
+function clearJobFilters(){['jSearchInput','jFilterStatus','jFilterIndustry'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';}); applyJobFilters();}
+
+function renderJobTable() {
+  const tbody=document.getElementById('jobTbody'); if(!tbody) return;
+  const total=filteredJobs.length;
+  const page=filteredJobs.slice((jobPage-1)*PAGE_SIZE,jobPage*PAGE_SIZE);
+  if(!page.length){tbody.innerHTML='<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--gray-400)">データなし</td></tr>'; document.getElementById('jobPagination').innerHTML=''; return;}
+  const stCls={募集中:'st-active',新着:'st-docs',提案中:'st-review',保留:'st-add',停止:'st-none',決定:'st-cert',募集再開:'st-submit'};
+  const priCls={高:'st-active',中:'st-review',低:'st-none'};
+  tbody.innerHTML=page.map(j=>`<tr onclick="openJobModal('${j.id}')">
+    <td><strong style="color:var(--blue)">${esc(j.job_code||'-')}</strong></td>
+    <td style="font-size:12px">${esc(j.companies?.name||j.partner_support_orgs?.name||j.title||'-')}</td>
+    <td style="font-size:11px">${esc(j.industry||'')}${j.job_type?'<br>'+esc(j.job_type):''}</td>
+    <td style="font-size:12px">${esc(j.location_domestic||'-')}</td>
+    <td style="font-size:12px">${j.referral_fee?Number(j.referral_fee).toLocaleString()+'円':'-'}</td>
+    <td>${j.priority?`<span class="st-badge ${priCls[j.priority]||'st-none'}">${j.priority}</span>`:'-'}</td>
+    <td style="font-size:12px">${esc(j.glt_staff||'-')}</td>
+    <td style="font-size:12px">${j.recruitment_start?formatDate(j.recruitment_start):'-'}</td>
+    <td><span class="st-badge ${stCls[j.status]||'st-none'}">${esc(j.status||'-')}</span></td>
+  </tr>`).join('');
+  renderGenPagination('jobPagination',total,jobPage,p=>{jobPage=p;renderJobTable();});
+}
+
+function openJobModal(id) {
+  const j=id?allJobs.find(x=>x.id===id):null;
+  editingJobId=id;
+  showGenModal('jobModal',id?'💼 求人詳細':'💼 求人登録',buildJobModalBody(j));
+}
+let editingJobId=null;
+
+function buildJobModalBody(j) {
+  j=j||{};
+  return `
+  <div class="form-grid">
+    <div class="section-title">求人基本情報</div>
+    <div class="form-group"><label class="form-label">求人コード</label><input class="form-input" id="jf_code" value="${esc(j.job_code||'')}"></div>
+    <div class="form-group"><label class="form-label">ステータス</label>
+      <select class="form-select" id="jf_status">${['募集中','新着','提案中','保留','停止','決定','募集再開'].map(s=>`<option ${j.status===s?'selected':''}>${s}</option>`).join('')}</select></div>
+    <div class="form-group full"><label class="form-label">求人・会社名（表示用）</label><input class="form-input" id="jf_title" value="${esc(j.title||'')}"></div>
+    <div class="form-group"><label class="form-label">業種（特定技能分野）</label>
+      <select class="form-select" id="jf_industry">${['','農業','漁業','建設','製造業','飲食料品製造業','外食業','介護','ビルクリーニング','宿泊','自動車整備','航空','造船・船用工業'].map(s=>`<option ${j.industry===s?'selected':''}>${s}</option>`).join('')}</select></div>
+    <div class="form-group"><label class="form-label">職種</label><input class="form-input" id="jf_job_type" value="${esc(j.job_type||'')}"></div>
+    <div class="form-group"><label class="form-label">国内/外</label>
+      <select class="form-select" id="jf_location">${['','国内','国外','国内/外'].map(s=>`<option ${j.location_domestic===s?'selected':''}>${s}</option>`).join('')}</select></div>
+    <div class="form-group"><label class="form-label">受入企業</label>
+      <select class="form-select" id="jf_company_id"><option value="">選択...</option>${allCompanies.map(c=>`<option value="${c.id}" ${j.company_id===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div>
+    <div class="section-title">条件</div>
+    <div class="form-group"><label class="form-label">募集国籍</label><input class="form-input" id="jf_target_nationality" value="${esc(j.target_nationality||'')}"></div>
+    <div class="form-group"><label class="form-label">採用予定人数</label><input class="form-input" id="jf_target_count" type="number" value="${j.target_count??''}"></div>
+    <div class="form-group"><label class="form-label">日本語レベル</label><input class="form-input" id="jf_jp_level_req" value="${esc(j.jp_level_req||'')}"></div>
+    <div class="form-group"><label class="form-label">必要資格</label><input class="form-input" id="jf_required_license" value="${esc(j.required_license||'')}"></div>
+    <div class="section-title">給与・住居</div>
+    <div class="form-group"><label class="form-label">給与種別</label>
+      <select class="form-select" id="jf_salary_type">${['','月給','時給'].map(s=>`<option ${j.salary_type===s?'selected':''}>${s}</option>`).join('')}</select></div>
+    <div class="form-group"><label class="form-label">給与額（円）</label><input class="form-input" id="jf_salary_amount" type="number" value="${j.salary_amount??''}"></div>
+    <div class="form-group"><label class="form-label">寮</label>
+      <select class="form-select" id="jf_dormitory">${['','あり','なし'].map(s=>`<option ${j.dormitory_available===s?'selected':''}>${s}</option>`).join('')}</select></div>
+    <div class="form-group"><label class="form-label">年間休日</label><input class="form-input" id="jf_holiday_days" type="number" value="${j.annual_holiday_days??''}"></div>
+    <div class="section-title">紹介費・担当</div>
+    <div class="form-group"><label class="form-label">紹介費（円・税抜）</label><input class="form-input" id="jf_referral_fee" type="number" value="${j.referral_fee??''}"></div>
+    <div class="form-group"><label class="form-label">優先度</label>
+      <select class="form-select" id="jf_priority">${['','高','中','低'].map(s=>`<option ${j.priority===s?'selected':''}>${s}</option>`).join('')}</select></div>
+    <div class="form-group"><label class="form-label">GLT担当</label><input class="form-input" id="jf_glt_staff" value="${esc(j.glt_staff||'')}"></div>
+    <div class="form-group"><label class="form-label">営業担当</label><input class="form-input" id="jf_sales_staff" value="${esc(j.sales_staff||'')}"></div>
+    <div class="form-group"><label class="form-label">募集開始日</label><input class="form-input" id="jf_recruitment_start" type="date" value="${j.recruitment_start||''}"></div>
+    <div class="form-group full"><label class="form-label">STOCKのURL</label><input class="form-input" id="jf_stock_url" value="${esc(j.stock_url||'')}"></div>
+    <div class="form-group full"><label class="form-label">候補者の状況・コメント</label><textarea class="form-textarea" id="jf_progress_note">${esc(j.progress_note||'')}</textarea></div>
+    <div class="form-group full"><label class="form-label">仕事内容</label><textarea class="form-textarea" id="jf_job_description">${esc(j.job_description||'')}</textarea></div>
+  </div>
+  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)">
+    <button class="btn btn-outline" onclick="closeGenModal('jobModal')">キャンセル</button>
+    <button class="btn btn-primary" onclick="saveJob()">💾 保存</button>
+  </div>`;
+}
+
+async function saveJob() {
+  const g=id=>document.getElementById(id)?.value||null;
+  const data={
+    job_code:g('jf_code'), status:g('jf_status')||'募集中', title:g('jf_title'),
+    industry:g('jf_industry'), job_type:g('jf_job_type'), location_domestic:g('jf_location'),
+    company_id:g('jf_company_id'),
+    target_nationality:g('jf_target_nationality'),
+    target_count:document.getElementById('jf_target_count')?.value?parseInt(document.getElementById('jf_target_count').value):null,
+    jp_level_req:g('jf_jp_level_req'), required_license:g('jf_required_license'),
+    salary_type:g('jf_salary_type'),
+    salary_amount:document.getElementById('jf_salary_amount')?.value?parseInt(document.getElementById('jf_salary_amount').value):null,
+    dormitory_available:g('jf_dormitory'),
+    annual_holiday_days:document.getElementById('jf_holiday_days')?.value?parseInt(document.getElementById('jf_holiday_days').value):null,
+    referral_fee:document.getElementById('jf_referral_fee')?.value?parseInt(document.getElementById('jf_referral_fee').value):null,
+    priority:g('jf_priority'), glt_staff:g('jf_glt_staff'), sales_staff:g('jf_sales_staff'),
+    recruitment_start:g('jf_recruitment_start'), stock_url:g('jf_stock_url'),
+    progress_note:g('jf_progress_note'), job_description:g('jf_job_description'),
+    updated_at:new Date().toISOString()
+  };
+  showLoading(true);
+  try {
+    if(editingJobId){await sbFetch('job_openings?id=eq.'+editingJobId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新しました','success');}
+    else{await sbFetch('job_openings',{method:'POST',body:JSON.stringify(data)});showToast('✅ 登録しました','success');}
+    closeGenModal('jobModal'); await loadJobs();
+  }catch(e){showToast('❌ '+e.message,'error');}
+  showLoading(false);
+}
+
+// ==============================
+// 🤝 紹介案件
+// ==============================
+let allIntros=[], filteredIntros=[], introPage=1;
+
+function buildIntroductionsScreen() {
+  return `
+  <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+    <input class="search-input" id="iSearchInput" placeholder="人材名・企業名で検索..." oninput="applyIntroFilters()" style="flex:1;min-width:200px;">
+    <select class="filter-select" id="iFilterStatus" onchange="applyIntroFilters()">
+      <option value="">全ステータス</option>
+      <option>在職中</option><option>申請書類準備中</option><option>許可待ち</option><option>配属待ち</option><option>退職・転職</option>
+    </select>
+    <button class="btn btn-outline" style="font-size:11px;padding:4px 10px" onclick="clearIntroFilters()">✕</button>
+  </div>
+  <div class="table-wrap"><table><thead><tr>
+    <th>決定日</th><th>人材名</th><th>国籍</th><th>受入企業</th>
+    <th>登録支援機関</th><th>職種</th><th>紹介費</th><th>請求タイミング</th><th>担当</th><th>ステータス</th>
+  </tr></thead>
+  <tbody id="introTbody"><tr><td colspan="10" style="text-align:center;padding:40px;color:var(--gray-400)">読み込み中...</td></tr></tbody>
+  </table><div class="pagination-bar" id="introPagination"></div></div>`;
+}
+
+async function loadIntroductions() {
+  showLoading(true);
+  try {
+    const data=await sbFetch('introductions?select=*&order=decision_date.desc');
+    allIntros=data||[];
+    applyIntroFilters();
+  }catch(e){showToast('❌ '+e.message,'error');}
+  showLoading(false);
+}
+
+function applyIntroFilters() {
+  if(currentScreen!=='introductions') return;
+  const q=(document.getElementById('iSearchInput')?.value||'').toLowerCase();
+  const status=document.getElementById('iFilterStatus')?.value||'';
+  filteredIntros=allIntros.filter(i=>{
+    if(q && !((i.worker_name||'').toLowerCase().includes(q)||(i.company_name||'').toLowerCase().includes(q))) return false;
+    if(status && i.status!==status) return false;
+    return true;
+  });
+  introPage=1; renderIntroTable();
+}
+function clearIntroFilters(){['iSearchInput','iFilterStatus'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';}); applyIntroFilters();}
+
+function renderIntroTable() {
+  const tbody=document.getElementById('introTbody'); if(!tbody) return;
+  const total=filteredIntros.length;
+  const page=filteredIntros.slice((introPage-1)*PAGE_SIZE,introPage*PAGE_SIZE);
+  if(!page.length){tbody.innerHTML='<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--gray-400)">データなし</td></tr>'; document.getElementById('introPagination').innerHTML=''; return;}
+  const stCls={'在職中':'st-active','申請書類準備中':'st-docs','許可待ち':'st-review','配属待ち':'st-submit'};
+  tbody.innerHTML=page.map(i=>`<tr onclick="openIntroModal('${i.id}')">
+    <td style="font-size:12px">${i.decision_date?formatDate(i.decision_date):'-'}</td>
+    <td><strong>${esc(i.worker_name||'-')}</strong></td>
+    <td>${natFlag(i.nationality)} ${esc(i.nationality||'-')}</td>
+    <td style="font-size:12px">${esc(i.company_name||'-')}</td>
+    <td style="font-size:11px;color:var(--gray-700)">${esc(i.partner_org_name||'-')}</td>
+    <td style="font-size:12px">${esc(i.job_type||'-')}</td>
+    <td style="font-size:12px">${i.referral_fee?Number(i.referral_fee).toLocaleString()+'円':'-'}</td>
+    <td style="font-size:12px">${esc(i.billing_timing||'-')}</td>
+    <td style="font-size:12px">${esc(i.worker_staff||'-')}</td>
+    <td><span class="st-badge ${stCls[i.status]||'st-none'}">${esc(i.status||'-')}</span></td>
+  </tr>`).join('');
+  renderGenPagination('introPagination',total,introPage,p=>{introPage=p;renderIntroTable();});
+}
+
+function openIntroModal(id) {
+  const i=id?allIntros.find(x=>x.id===id):null;
+  editingIntroId=id;
+  showGenModal('introModal',id?'🤝 紹介案件詳細':'🤝 紹介案件登録',buildIntroModalBody(i));
+}
+let editingIntroId=null;
+
+function buildIntroModalBody(i) {
+  i=i||{};
+  return `
+  <div class="form-grid">
+    <div class="section-title">基本情報</div>
+    <div class="form-group"><label class="form-label">決定日付</label><input class="form-input" id="if_decision_date" type="date" value="${i.decision_date||''}"></div>
+    <div class="form-group"><label class="form-label">ステータス</label>
+      <select class="form-select" id="if_status">${['在職中','申請書類準備中','許可待ち','配属待ち','退職・転職','失踪'].map(s=>`<option ${i.status===s?'selected':''}>${s}</option>`).join('')}</select></div>
+    <div class="form-group full"><label class="form-label">人材名</label><input class="form-input" id="if_worker_name" value="${esc(i.worker_name||'')}"></div>
+    <div class="form-group"><label class="form-label">国籍</label>
+      <select class="form-select" id="if_nationality">${['','インドネシア','ベトナム','タイ','カンボジア','ミャンマー','その他'].map(n=>`<option ${i.nationality===n?'selected':''}>${n}</option>`).join('')}</select></div>
+    <div class="form-group"><label class="form-label">国内/国外</label>
+      <select class="form-select" id="if_domestic">${['','国内','国外'].map(s=>`<option ${i.domestic_or_overseas===s?'selected':''}>${s}</option>`).join('')}</select></div>
+    <div class="form-group full"><label class="form-label">受入企業名</label>
+      <select class="form-select" id="if_company_id"><option value="">選択...</option>${allCompanies.map(c=>`<option value="${c.id}" ${i.company_id===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div>
+    <div class="form-group full"><label class="form-label">登録支援機関名</label><input class="form-input" id="if_partner_org_name" value="${esc(i.partner_org_name||'')}"></div>
+    <div class="form-group"><label class="form-label">職種</label><input class="form-input" id="if_job_type" value="${esc(i.job_type||'')}"></div>
+    <div class="section-title">請求・担当</div>
+    <div class="form-group"><label class="form-label">請求日</label><input class="form-input" id="if_billing_date" type="date" value="${i.billing_date||''}"></div>
+    <div class="form-group"><label class="form-label">請求タイミング</label>
+      <select class="form-select" id="if_billing_timing">${['','配属後','決定時'].map(s=>`<option ${i.billing_timing===s?'selected':''}>${s}</option>`).join('')}</select></div>
+    <div class="form-group"><label class="form-label">請求金額（円）</label><input class="form-input" id="if_referral_fee" type="number" value="${i.referral_fee??''}"></div>
+    <div class="form-group"><label class="form-label">書類担当</label><input class="form-input" id="if_doc_staff" value="${esc(i.doc_staff||'')}"></div>
+    <div class="form-group"><label class="form-label">人材担当</label><input class="form-input" id="if_worker_staff" value="${esc(i.worker_staff||'')}"></div>
+    <div class="form-group"><label class="form-label">配属日</label><input class="form-input" id="if_assignment_date" type="date" value="${i.assignment_date||''}"></div>
+    <div class="form-group"><label class="form-label">入社日（予定）</label><input class="form-input" id="if_join_date" type="date" value="${i.join_date||''}"></div>
+    <div class="form-group full"><label class="form-label">備考</label><textarea class="form-textarea" id="if_notes">${esc(i.notes||'')}</textarea></div>
+  </div>
+  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)">
+    <button class="btn btn-outline" onclick="closeGenModal('introModal')">キャンセル</button>
+    <button class="btn btn-primary" onclick="saveIntro()">💾 保存</button>
+  </div>`;
+}
+
+async function saveIntro() {
+  const g=id=>document.getElementById(id)?.value||null;
+  const data={
+    decision_date:g('if_decision_date'), status:g('if_status')||'申請書類準備中',
+    worker_name:g('if_worker_name'), nationality:g('if_nationality'),
+    domestic_or_overseas:g('if_domestic'), company_id:g('if_company_id'),
+    partner_org_name:g('if_partner_org_name'), job_type:g('if_job_type'),
+    billing_date:g('if_billing_date'), billing_timing:g('if_billing_timing'),
+    referral_fee:document.getElementById('if_referral_fee')?.value?parseInt(document.getElementById('if_referral_fee').value):null,
+    doc_staff:g('if_doc_staff'), worker_staff:g('if_worker_staff'),
+    assignment_date:g('if_assignment_date'), join_date:g('if_join_date'),
+    notes:g('if_notes'), updated_at:new Date().toISOString()
+  };
+  showLoading(true);
+  try {
+    if(editingIntroId){await sbFetch('introductions?id=eq.'+editingIntroId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新しました','success');}
+    else{await sbFetch('introductions',{method:'POST',body:JSON.stringify(data)});showToast('✅ 登録しました','success');}
+    closeGenModal('introModal'); await loadIntroductions();
+  }catch(e){showToast('❌ '+e.message,'error');}
+  showLoading(false);
+}
+
+// ==============================
+// ✈️ 送り出し機関
+// ==============================
+let allSending=[],filteredSending=[],sendingPage=1;
+
+function buildSendingScreen() {
+  return `
+  <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+    <input class="search-input" id="sSearchInput" placeholder="機関名・国で検索..." oninput="applySendingFilters()" style="flex:1;min-width:200px;">
+    <button class="btn btn-outline" style="font-size:11px;padding:4px 10px" onclick="clearSendingFilters()">✕</button>
+  </div>
+  <div class="table-wrap"><table><thead><tr>
+    <th>機関名</th><th>国</th><th>担当者</th><th>メール</th><th>電話</th><th>備考</th>
+  </tr></thead>
+  <tbody id="sendingTbody"><tr><td colspan="6" style="text-align:center;padding:40px;color:var(--gray-400)">読み込み中...</td></tr></tbody>
+  </table><div class="pagination-bar" id="sendingPagination"></div></div>`;
+}
+
+async function loadSending() {
+  showLoading(true);
+  try { const data=await sbFetch('sending_orgs?select=*&order=country.asc,name.asc'); allSending=data||[]; applySendingFilters(); }
+  catch(e){showToast('❌ '+e.message,'error');}
+  showLoading(false);
+}
+function applySendingFilters() {
+  if(currentScreen!=='sending') return;
+  const q=(document.getElementById('sSearchInput')?.value||'').toLowerCase();
+  filteredSending=allSending.filter(s=>!q||((s.name||'').toLowerCase().includes(q)||(s.country||'').toLowerCase().includes(q)));
+  sendingPage=1; renderSendingTable();
+}
+function clearSendingFilters(){const el=document.getElementById('sSearchInput');if(el)el.value='';applySendingFilters();}
+function renderSendingTable() {
+  const tbody=document.getElementById('sendingTbody'); if(!tbody) return;
+  const total=filteredSending.length;
+  const page=filteredSending.slice((sendingPage-1)*PAGE_SIZE,sendingPage*PAGE_SIZE);
+  if(!page.length){tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--gray-400)">データなし</td></tr>'; document.getElementById('sendingPagination').innerHTML=''; return;}
+  tbody.innerHTML=page.map(s=>`<tr onclick="openSendingModal('${s.id}')">
+    <td><strong>${esc(s.name)}</strong></td>
+    <td>${natFlag(s.country)} ${esc(s.country||'-')}</td>
+    <td style="font-size:12px">${esc(s.contact_name||'-')}</td>
+    <td style="font-size:12px">${esc(s.email||'-')}</td>
+    <td style="font-size:12px">${esc(s.tel||'-')}</td>
+    <td style="font-size:11px;color:var(--gray-700)">${esc((s.notes||'').substring(0,40))}</td>
+  </tr>`).join('');
+  renderGenPagination('sendingPagination',total,sendingPage,p=>{sendingPage=p;renderSendingTable();});
+}
+function openSendingModal(id){const s=id?allSending.find(x=>x.id===id):null; editingSendingId=id; showGenModal('sendingModal',id?'✈️ 送り出し機関詳細':'✈️ 送り出し機関登録',buildSendingModalBody(s));}
+let editingSendingId=null;
+function buildSendingModalBody(s){s=s||{}; return `<div class="form-grid">
+  <div class="section-title">基本情報</div>
+  <div class="form-group full"><label class="form-label">機関名 *</label><input class="form-input" id="sf_name" value="${esc(s.name||'')}"></div>
+  <div class="form-group"><label class="form-label">国</label>
+    <select class="form-select" id="sf_country">${['','インドネシア','ベトナム','タイ','カンボジア','ミャンマー','中国','フィリピン','その他'].map(n=>`<option ${s.country===n?'selected':''}>${n}</option>`).join('')}</select></div>
+  <div class="form-group"><label class="form-label">担当者名</label><input class="form-input" id="sf_contact" value="${esc(s.contact_name||'')}"></div>
+  <div class="form-group"><label class="form-label">メール</label><input class="form-input" id="sf_email" value="${esc(s.email||'')}"></div>
+  <div class="form-group"><label class="form-label">電話</label><input class="form-input" id="sf_tel" value="${esc(s.tel||'')}"></div>
+  <div class="form-group full"><label class="form-label">住所</label><input class="form-input" id="sf_address" value="${esc(s.address||'')}"></div>
+  <div class="form-group full"><label class="form-label">備考</label><textarea class="form-textarea" id="sf_notes">${esc(s.notes||'')}</textarea></div>
+</div>
+<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)">
+  <button class="btn btn-outline" onclick="closeGenModal('sendingModal')">キャンセル</button>
+  <button class="btn btn-primary" onclick="saveSending()">💾 保存</button>
+</div>`;}
+async function saveSending(){const g=id=>document.getElementById(id)?.value||null;const data={name:g('sf_name'),country:g('sf_country'),contact_name:g('sf_contact'),email:g('sf_email'),tel:g('sf_tel'),address:g('sf_address'),notes:g('sf_notes'),updated_at:new Date().toISOString()};if(!data.name){showToast('❌ 機関名は必須','error');return;}showLoading(true);try{if(editingSendingId){await sbFetch('sending_orgs?id=eq.'+editingSendingId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新','success');}else{await sbFetch('sending_orgs',{method:'POST',body:JSON.stringify(data)});showToast('✅ 登録','success');}closeGenModal('sendingModal');await loadSending();}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
+
+// ==============================
+// 🏛️ 提携登録支援機関
+// ==============================
+let allPartners=[],filteredPartners=[],partnerPage=1;
+function buildPartnersScreen(){return `<div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;"><input class="search-input" id="pSearchInput" placeholder="機関名で検索..." oninput="applyPartnerFilters()" style="flex:1;min-width:200px;"><select class="filter-select" id="pFilterType" onchange="applyPartnerFilters()"><option value="">全区分</option><option>登録支援機関</option><option>人材紹介会社+登録支援機関</option><option>営業代理店</option></select><button class="btn btn-outline" style="font-size:11px;padding:4px 10px" onclick="clearPartnerFilters()">✕</button></div>
+<div class="table-wrap"><table><thead><tr><th>機関名</th><th>区分</th><th>コード</th><th>主な職種</th><th>KMT請求</th><th>GLT担当</th><th>案件数</th><th>提携開始日</th></tr></thead><tbody id="partnerTbody"><tr><td colspan="8" style="text-align:center;padding:40px;color:var(--gray-400)">読み込み中...</td></tr></tbody></table><div class="pagination-bar" id="partnerPagination"></div></div>`;}
+async function loadPartners(){showLoading(true);try{const data=await sbFetch('partner_support_orgs?select=*&order=name.asc');allPartners=data||[];applyPartnerFilters();}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
+function applyPartnerFilters(){if(currentScreen!=='partners') return;const q=(document.getElementById('pSearchInput')?.value||'').toLowerCase();const type=document.getElementById('pFilterType')?.value||'';filteredPartners=allPartners.filter(p=>(!q||((p.name||'').toLowerCase().includes(q)))&&(!type||p.org_type===type));partnerPage=1;renderPartnerTable();}
+function clearPartnerFilters(){['pSearchInput','pFilterType'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});applyPartnerFilters();}
+function renderPartnerTable(){const tbody=document.getElementById('partnerTbody');if(!tbody)return;const total=filteredPartners.length;const page=filteredPartners.slice((partnerPage-1)*PAGE_SIZE,partnerPage*PAGE_SIZE);if(!page.length){tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--gray-400)">データなし</td></tr>';document.getElementById('partnerPagination').innerHTML='';return;}tbody.innerHTML=page.map(p=>`<tr onclick="openPartnerModal('${p.id}')"><td><strong>${esc(p.name)}</strong></td><td style="font-size:11px">${esc(p.org_type||'-')}</td><td style="color:var(--blue);font-weight:700">${esc(p.job_code||'-')}</td><td style="font-size:11px">${esc(p.main_industry||'-')}</td><td style="font-size:12px">${p.fee_kmt?Number(p.fee_kmt).toLocaleString()+'円':'-'}</td><td style="font-size:12px">${esc(p.glt_staff||'-')}</td><td style="font-size:12px;text-align:center">${p.case_count??'-'}</td><td style="font-size:12px">${p.partnership_start?formatDate(p.partnership_start):'-'}</td></tr>`).join('');renderGenPagination('partnerPagination',total,partnerPage,p2=>{partnerPage=p2;renderPartnerTable();});}
+function openPartnerModal(id){const p=id?allPartners.find(x=>x.id===id):null;editingPartnerId=id;showGenModal('partnerModal',id?'🏛️ 提携登録支援機関詳細':'🏛️ 提携登録支援機関登録',buildPartnerModalBody(p));}
+let editingPartnerId=null;
+function buildPartnerModalBody(p){p=p||{};return `<div class="form-grid"><div class="section-title">基本情報</div><div class="form-group full"><label class="form-label">機関名 *</label><input class="form-input" id="pf_name" value="${esc(p.name||'')}"></div><div class="form-group"><label class="form-label">区分</label><select class="form-select" id="pf_org_type">${['','登録支援機関','人材紹介会社+登録支援機関','営業代理店','その他'].map(s=>`<option ${p.org_type===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">求人票コード</label><input class="form-input" id="pf_job_code" value="${esc(p.job_code||'')}"></div><div class="form-group"><label class="form-label">主な職種</label><input class="form-input" id="pf_industry" value="${esc(p.main_industry||'')}"></div><div class="form-group"><label class="form-label">担当者名</label><input class="form-input" id="pf_contact" value="${esc(p.contact_name||'')}"></div><div class="form-group"><label class="form-label">メール</label><input class="form-input" id="pf_email" value="${esc(p.email||'')}"></div><div class="section-title">請求・担当</div><div class="form-group"><label class="form-label">KMT側請求額（円）</label><input class="form-input" id="pf_fee_kmt" type="number" value="${p.fee_kmt??''}"></div><div class="form-group"><label class="form-label">大房側請求額（円）</label><input class="form-input" id="pf_fee_ofusa" type="number" value="${p.fee_ofusa??''}"></div><div class="form-group"><label class="form-label">請求タイミング</label><select class="form-select" id="pf_billing_timing">${['','配属後','決定時'].map(s=>`<option ${p.billing_timing===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">GLT担当</label><input class="form-input" id="pf_glt_staff" value="${esc(p.glt_staff||'')}"></div><div class="form-group"><label class="form-label">大房担当</label><input class="form-input" id="pf_ofusa_staff" value="${esc(p.ofusa_staff||'')}"></div><div class="form-group"><label class="form-label">提携開始日</label><input class="form-input" id="pf_start_date" type="date" value="${p.partnership_start||''}"></div><div class="form-group full"><label class="form-label">HP</label><input class="form-input" id="pf_website" value="${esc(p.website||'')}"></div><div class="form-group full"><label class="form-label">備考</label><textarea class="form-textarea" id="pf_notes">${esc(p.notes||'')}</textarea></div></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)"><button class="btn btn-outline" onclick="closeGenModal('partnerModal')">キャンセル</button><button class="btn btn-primary" onclick="savePartner()">💾 保存</button></div>`;}
+async function savePartner(){const g=id=>document.getElementById(id)?.value||null;const ni=id=>document.getElementById(id)?.value?parseInt(document.getElementById(id).value):null;const data={name:g('pf_name'),org_type:g('pf_org_type'),job_code:g('pf_job_code'),main_industry:g('pf_industry'),contact_name:g('pf_contact'),email:g('pf_email'),fee_kmt:ni('pf_fee_kmt'),fee_ofusa:ni('pf_fee_ofusa'),billing_timing:g('pf_billing_timing'),glt_staff:g('pf_glt_staff'),ofusa_staff:g('pf_ofusa_staff'),partnership_start:g('pf_start_date'),website:g('pf_website'),notes:g('pf_notes'),updated_at:new Date().toISOString()};if(!data.name){showToast('❌ 機関名は必須','error');return;}showLoading(true);try{if(editingPartnerId){await sbFetch('partner_support_orgs?id=eq.'+editingPartnerId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新','success');}else{await sbFetch('partner_support_orgs',{method:'POST',body:JSON.stringify(data)});showToast('✅ 登録','success');}closeGenModal('partnerModal');await loadPartners();}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
+
+// ==============================
+// 💴 支援委託費
+// ==============================
+let allFees=[],filteredFees=[],feePage=1;
+function buildFeesScreen(){return `<div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;"><input class="search-input" id="feSearchInput" placeholder="企業名で検索..." oninput="applyFeeFilters()" style="flex:1;min-width:200px;"><select class="filter-select" id="feFilterStatus" onchange="applyFeeFilters()"><option value="">全ステータス</option><option>未請求</option><option>請求済</option><option>入金済</option><option>未入金</option></select><input class="filter-select" id="feFilterMonth" type="month" onchange="applyFeeFilters()" style="padding:3px 6px"><button class="btn btn-outline" style="font-size:11px;padding:4px 10px" onclick="clearFeeFilters()">✕</button></div><div class="table-wrap"><table><thead><tr><th>請求月</th><th>企業名</th><th>人数</th><th>単価</th><th>税抜金額</th><th>税込金額</th><th>費用種別</th><th>請求日</th><th>入金日</th><th>ステータス</th></tr></thead><tbody id="feeTbody"><tr><td colspan="10" style="text-align:center;padding:40px;color:var(--gray-400)">読み込み中...</td></tr></tbody></table><div class="pagination-bar" id="feePagination"></div></div>`;}
+async function loadFees(){showLoading(true);try{const data=await sbFetch('support_fees?select=*,companies(name)&order=billing_month.desc,created_at.desc');allFees=data||[];applyFeeFilters();}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
+function applyFeeFilters(){if(currentScreen!=='fees')return;const q=(document.getElementById('feSearchInput')?.value||'').toLowerCase();const status=document.getElementById('feFilterStatus')?.value||'';const month=document.getElementById('feFilterMonth')?.value||'';filteredFees=allFees.filter(f=>{if(q&&!((f.companies?.name||'').toLowerCase().includes(q)))return false;if(status&&f.status!==status)return false;if(month&&!f.billing_month?.startsWith(month))return false;return true;});feePage=1;renderFeeTable();}
+function clearFeeFilters(){['feSearchInput','feFilterStatus','feFilterMonth'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});applyFeeFilters();}
+function renderFeeTable(){const tbody=document.getElementById('feeTbody');if(!tbody)return;const total=filteredFees.length;const page=filteredFees.slice((feePage-1)*PAGE_SIZE,feePage*PAGE_SIZE);if(!page.length){tbody.innerHTML='<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--gray-400)">データなし</td></tr>';document.getElementById('feePagination').innerHTML='';return;}const stCls={未請求:'st-add',請求済:'st-review',入金済:'st-active',未入金:'st-danger'};tbody.innerHTML=page.map(f=>`<tr onclick="openFeeModal('${f.id}')"><td style="font-weight:700">${esc(f.billing_month||'-')}</td><td style="font-size:12px">${esc(f.companies?.name||'-')}</td><td style="text-align:center">${f.worker_count??'-'}</td><td style="font-size:12px">${f.unit_price?Number(f.unit_price).toLocaleString()+'円':'-'}</td><td style="font-weight:700">${f.amount_excl?Number(f.amount_excl).toLocaleString()+'円':'-'}</td><td>${f.amount_incl?Number(f.amount_incl).toLocaleString()+'円':'-'}</td><td style="font-size:11px">${esc(f.fee_type||'-')}</td><td style="font-size:12px">${f.billed_date?formatDate(f.billed_date):'-'}</td><td style="font-size:12px">${f.paid_date?formatDate(f.paid_date):'-'}</td><td><span class="st-badge ${stCls[f.status]||'st-none'}">${esc(f.status||'-')}</span></td></tr>`).join('');renderGenPagination('feePagination',total,feePage,p=>{feePage=p;renderFeeTable();});}
+function openFeeModal(id){const f=id?allFees.find(x=>x.id===id):null;editingFeeId=id;showGenModal('feeModal',id?'💴 委託費詳細':'💴 委託費登録',buildFeeModalBody(f));}
+let editingFeeId=null;
+function buildFeeModalBody(f){f=f||{};const autoCalc=()=>{const wp=parseInt(document.getElementById('ff_worker_count')?.value||0);const up=parseInt(document.getElementById('ff_unit_price')?.value||0);const excl=wp*up;document.getElementById('ff_amount_excl').value=excl||'';document.getElementById('ff_amount_incl').value=excl?Math.round(excl*1.1):'';};return `<div class="form-grid"><div class="section-title">請求情報</div><div class="form-group full"><label class="form-label">企業</label><select class="form-select" id="ff_company_id"><option value="">選択...</option>${allCompanies.map(c=>`<option value="${c.id}" ${f.company_id===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">請求月 (YYYY-MM)</label><input class="form-input" id="ff_billing_month" value="${esc(f.billing_month||'')}" placeholder="2026-04"></div><div class="form-group"><label class="form-label">費用種別</label><select class="form-select" id="ff_fee_type">${['通常委託費','新規委託費','初期費用','その他'].map(s=>`<option ${f.fee_type===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">対象人数</label><input class="form-input" id="ff_worker_count" type="number" value="${f.worker_count??''}" oninput="(${autoCalc.toString()})()"></div><div class="form-group"><label class="form-label">単価（税抜）</label><input class="form-input" id="ff_unit_price" type="number" value="${f.unit_price??''}" oninput="(${autoCalc.toString()})()"></div><div class="form-group"><label class="form-label">金額（税抜）</label><input class="form-input" id="ff_amount_excl" type="number" value="${f.amount_excl??''}"></div><div class="form-group"><label class="form-label">金額（税込）</label><input class="form-input" id="ff_amount_incl" type="number" value="${f.amount_incl??''}"></div><div class="form-group"><label class="form-label">ステータス</label><select class="form-select" id="ff_status">${['未請求','請求済','入金済','未入金'].map(s=>`<option ${f.status===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">請求日</label><input class="form-input" id="ff_billed_date" type="date" value="${f.billed_date||''}"></div><div class="form-group"><label class="form-label">入金日</label><input class="form-input" id="ff_paid_date" type="date" value="${f.paid_date||''}"></div><div class="form-group full"><label class="form-label">備考</label><textarea class="form-textarea" id="ff_notes">${esc(f.notes||'')}</textarea></div></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)"><button class="btn btn-outline" onclick="closeGenModal('feeModal')">キャンセル</button><button class="btn btn-primary" onclick="saveFee()">💾 保存</button></div>`;}
+async function saveFee(){const g=id=>document.getElementById(id)?.value||null;const ni=id=>document.getElementById(id)?.value?parseInt(document.getElementById(id).value):null;const data={company_id:g('ff_company_id'),billing_month:g('ff_billing_month'),fee_type:g('ff_fee_type'),worker_count:ni('ff_worker_count'),unit_price:ni('ff_unit_price'),amount_excl:ni('ff_amount_excl'),amount_incl:ni('ff_amount_incl'),status:g('ff_status')||'未請求',billed_date:g('ff_billed_date'),paid_date:g('ff_paid_date'),notes:g('ff_notes'),updated_at:new Date().toISOString()};if(!data.billing_month){showToast('❌ 請求月は必須','error');return;}showLoading(true);try{if(editingFeeId){await sbFetch('support_fees?id=eq.'+editingFeeId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新','success');}else{await sbFetch('support_fees',{method:'POST',body:JSON.stringify(data)});showToast('✅ 登録','success');}closeGenModal('feeModal');await loadFees();}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
+
+// ==============================
+// 📊 売上管理
+// ==============================
+let allSales=[],filteredSales=[],salePage=1;
+function buildSalesScreen(){return `<div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;"><input class="search-input" id="saSearchInput" placeholder="企業名・項目名で検索..." oninput="applySaleFilters()" style="flex:1;min-width:200px;"><select class="filter-select" id="saFilterCertainty" onchange="applySaleFilters()"><option value="">全確度</option><option>確定</option><option>50%</option><option>期待</option></select><input class="filter-select" id="saFilterMonth" type="month" onchange="applySaleFilters()" style="padding:3px 6px"><button class="btn btn-outline" style="font-size:11px;padding:4px 10px" onclick="clearSaleFilters()">✕</button></div><div class="table-wrap"><table><thead><tr><th>請求月</th><th>企業名</th><th>項目</th><th>単価</th><th>数量</th><th>税抜</th><th>税込</th><th>確度</th><th>カテゴリ</th><th>法人</th></tr></thead><tbody id="saleTbody"><tr><td colspan="10" style="text-align:center;padding:40px;color:var(--gray-400)">読み込み中...</td></tr></tbody></table><div class="pagination-bar" id="salePagination"></div></div>`;}
+async function loadSales(){showLoading(true);try{const data=await sbFetch('sales_forecast?select=*,companies(name)&order=billing_month.desc,created_at.desc');allSales=data||[];applySaleFilters();}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
+function applySaleFilters(){if(currentScreen!=='sales')return;const q=(document.getElementById('saSearchInput')?.value||'').toLowerCase();const cert=document.getElementById('saFilterCertainty')?.value||'';const month=document.getElementById('saFilterMonth')?.value||'';filteredSales=allSales.filter(s=>{if(q&&!((s.companies?.name||'').toLowerCase().includes(q)||(s.item_name||'').toLowerCase().includes(q)))return false;if(cert&&s.certainty!==cert)return false;if(month&&!s.billing_month?.startsWith(month))return false;return true;});salePage=1;renderSaleTable();}
+function clearSaleFilters(){['saSearchInput','saFilterCertainty','saFilterMonth'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});applySaleFilters();}
+function renderSaleTable(){const tbody=document.getElementById('saleTbody');if(!tbody)return;const total=filteredSales.length;const page=filteredSales.slice((salePage-1)*PAGE_SIZE,salePage*PAGE_SIZE);if(!page.length){tbody.innerHTML='<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--gray-400)">データなし</td></tr>';document.getElementById('salePagination').innerHTML='';return;}const cCls={確定:'st-active','50%':'st-review',期待:'st-none'};tbody.innerHTML=page.map(s=>`<tr onclick="openSaleModal('${s.id}')"><td style="font-weight:700">${esc(s.billing_month||'-')}</td><td style="font-size:12px">${esc(s.companies?.name||'-')}</td><td style="font-size:12px">${esc(s.item_name||'-')}</td><td style="font-size:12px">${s.unit_price?Number(s.unit_price).toLocaleString()+'円':'-'}</td><td style="text-align:center">${s.quantity??'-'}</td><td style="font-weight:700">${s.amount_excl?Number(s.amount_excl).toLocaleString()+'円':'-'}</td><td>${s.amount_incl?Number(s.amount_incl).toLocaleString()+'円':'-'}</td><td><span class="st-badge ${cCls[s.certainty]||'st-none'}">${esc(s.certainty||'-')}</span></td><td style="font-size:11px">${esc(s.category||'-')}</td><td style="font-size:11px">${esc(s.kmt_entity||'-')}</td></tr>`).join('');renderGenPagination('salePagination',total,salePage,p=>{salePage=p;renderSaleTable();});}
+function openSaleModal(id){const s=id?allSales.find(x=>x.id===id):null;editingSaleId=id;showGenModal('saleModal',id?'📊 売上詳細':'📊 売上登録',buildSaleModalBody(s));}
+let editingSaleId=null;
+function buildSaleModalBody(s){s=s||{};return `<div class="form-grid"><div class="section-title">売上情報</div><div class="form-group full"><label class="form-label">企業</label><select class="form-select" id="saf_company_id"><option value="">選択...</option>${allCompanies.map(c=>`<option value="${c.id}" ${s.company_id===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">請求月 (YYYY-MM)</label><input class="form-input" id="saf_billing_month" value="${esc(s.billing_month||'')}"></div><div class="form-group"><label class="form-label">請求法人</label><select class="form-select" id="saf_kmt_entity">${['','株式会社KMT','一般社団法人KMT'].map(v=>`<option ${s.kmt_entity===v?'selected':''}>${v}</option>`).join('')}</select></div><div class="form-group full"><label class="form-label">項目名</label><input class="form-input" id="saf_item_name" value="${esc(s.item_name||'')}"></div><div class="form-group"><label class="form-label">単価（円）</label><input class="form-input" id="saf_unit_price" type="number" value="${s.unit_price??''}"></div><div class="form-group"><label class="form-label">数量</label><input class="form-input" id="saf_quantity" type="number" value="${s.quantity??''}"></div><div class="form-group"><label class="form-label">金額（税抜）</label><input class="form-input" id="saf_amount_excl" type="number" value="${s.amount_excl??''}"></div><div class="form-group"><label class="form-label">金額（税込）</label><input class="form-input" id="saf_amount_incl" type="number" value="${s.amount_incl??''}"></div><div class="form-group"><label class="form-label">確度</label><select class="form-select" id="saf_certainty">${['確定','50%','期待'].map(v=>`<option ${s.certainty===v?'selected':''}>${v}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">カテゴリ</label><select class="form-select" id="saf_category">${['委託費','初期費用','紹介費','その他'].map(v=>`<option ${s.category===v?'selected':''}>${v}</option>`).join('')}</select></div><div class="form-group full"><label class="form-label">備考</label><textarea class="form-textarea" id="saf_notes">${esc(s.notes||'')}</textarea></div></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)"><button class="btn btn-outline" onclick="closeGenModal('saleModal')">キャンセル</button><button class="btn btn-primary" onclick="saveSale()">💾 保存</button></div>`;}
+async function saveSale(){const g=id=>document.getElementById(id)?.value||null;const ni=id=>document.getElementById(id)?.value?parseInt(document.getElementById(id).value):null;const data={company_id:g('saf_company_id'),billing_month:g('saf_billing_month'),kmt_entity:g('saf_kmt_entity'),item_name:g('saf_item_name'),unit_price:ni('saf_unit_price'),quantity:ni('saf_quantity'),amount_excl:ni('saf_amount_excl'),amount_incl:ni('saf_amount_incl'),certainty:g('saf_certainty'),category:g('saf_category'),notes:g('saf_notes'),updated_at:new Date().toISOString()};if(!data.billing_month){showToast('❌ 請求月は必須','error');return;}showLoading(true);try{if(editingSaleId){await sbFetch('sales_forecast?id=eq.'+editingSaleId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新','success');}else{await sbFetch('sales_forecast',{method:'POST',body:JSON.stringify(data)});showToast('✅ 登録','success');}closeGenModal('saleModal');await loadSales();}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
+
+// ==============================
+// 💸 立替管理
+// ==============================
+let allExpenses=[],filteredExpenses=[],expensePage=1;
+function buildExpensesScreen(){return `<div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;"><input class="search-input" id="exSearchInput" placeholder="人材名・企業名・名目で検索..." oninput="applyExpenseFilters()" style="flex:1;min-width:200px;"><select class="filter-select" id="exFilterStatus" onchange="applyExpenseFilters()"><option value="">全ステータス</option><option>未請求</option><option>請求済</option><option>入金済</option></select><button class="btn btn-outline" style="font-size:11px;padding:4px 10px" onclick="clearExpenseFilters()">✕</button></div><div class="table-wrap"><table><thead><tr><th>日付</th><th>人材名</th><th>企業名</th><th>名目</th><th>金額</th><th>支払方法</th><th>請求先</th><th>担当</th><th>ステータス</th></tr></thead><tbody id="expenseTbody"><tr><td colspan="9" style="text-align:center;padding:40px;color:var(--gray-400)">読み込み中...</td></tr></tbody></table><div class="pagination-bar" id="expensePagination"></div></div>`;}
+async function loadExpenses(){showLoading(true);try{const data=await sbFetch('expenses?select=*,workers(name),companies(name)&order=expense_date.desc');allExpenses=data||[];applyExpenseFilters();}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
+function applyExpenseFilters(){if(currentScreen!=='expenses')return;const q=(document.getElementById('exSearchInput')?.value||'').toLowerCase();const status=document.getElementById('exFilterStatus')?.value||'';filteredExpenses=allExpenses.filter(e=>{if(q&&!((e.workers?.name||'').toLowerCase().includes(q)||(e.companies?.name||'').toLowerCase().includes(q)||(e.item_name||'').toLowerCase().includes(q)))return false;if(status&&e.status!==status)return false;return true;});expensePage=1;renderExpenseTable();}
+function clearExpenseFilters(){['exSearchInput','exFilterStatus'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});applyExpenseFilters();}
+function renderExpenseTable(){const tbody=document.getElementById('expenseTbody');if(!tbody)return;const total=filteredExpenses.length;const page=filteredExpenses.slice((expensePage-1)*PAGE_SIZE,expensePage*PAGE_SIZE);if(!page.length){tbody.innerHTML='<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--gray-400)">データなし</td></tr>';document.getElementById('expensePagination').innerHTML='';return;}const stCls={未請求:'st-add',請求済:'st-review',入金済:'st-active'};tbody.innerHTML=page.map(e=>`<tr onclick="openExpenseModal('${e.id}')"><td style="font-size:12px">${e.expense_date?formatDate(e.expense_date):'-'}</td><td style="font-size:12px">${esc(e.workers?.name||'-')}</td><td style="font-size:12px">${esc(e.companies?.name||'-')}</td><td>${esc(e.item_name||'-')}</td><td style="font-weight:700">${e.amount?Number(e.amount).toLocaleString()+'円':'-'}</td><td style="font-size:12px">${esc(e.payment_method||'-')}</td><td style="font-size:12px">${esc(e.billed_to||'-')}</td><td style="font-size:12px">${esc(e.staff||'-')}</td><td><span class="st-badge ${stCls[e.status]||'st-none'}">${esc(e.status||'-')}</span></td></tr>`).join('');renderGenPagination('expensePagination',total,expensePage,p=>{expensePage=p;renderExpenseTable();});}
+function openExpenseModal(id){const e=id?allExpenses.find(x=>x.id===id):null;editingExpenseId=id;showGenModal('expenseModal',id?'💸 立替詳細':'💸 立替登録',buildExpenseModalBody(e));}
+let editingExpenseId=null;
+function buildExpenseModalBody(e){e=e||{};return `<div class="form-grid"><div class="section-title">立替情報</div><div class="form-group"><label class="form-label">日付</label><input class="form-input" id="ef_date" type="date" value="${e.expense_date||''}"></div><div class="form-group"><label class="form-label">ステータス</label><select class="form-select" id="ef_status">${['未請求','請求済','入金済'].map(s=>`<option ${e.status===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group full"><label class="form-label">人材</label><select class="form-select" id="ef_worker_id"><option value="">選択...</option>${allWorkers.map(w=>`<option value="${w.id}" ${e.worker_id===w.id?'selected':''}>${esc(w.name)}</option>`).join('')}</select></div><div class="form-group full"><label class="form-label">企業</label><select class="form-select" id="ef_company_id"><option value="">選択...</option>${allCompanies.map(c=>`<option value="${c.id}" ${e.company_id===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div><div class="form-group full"><label class="form-label">名目（航空券等）</label><input class="form-input" id="ef_item_name" value="${esc(e.item_name||'')}"></div><div class="form-group"><label class="form-label">金額（円）</label><input class="form-input" id="ef_amount" type="number" value="${e.amount??''}"></div><div class="form-group"><label class="form-label">支払方法</label><select class="form-select" id="ef_payment_method">${['','立替','クレカ'].map(s=>`<option ${e.payment_method===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">請求先</label><select class="form-select" id="ef_billed_to">${['','企業','本人'].map(s=>`<option ${e.billed_to===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">担当者</label><input class="form-input" id="ef_staff" value="${esc(e.staff||'')}"></div><div class="form-group full"><label class="form-label">備考</label><textarea class="form-textarea" id="ef_notes">${esc(e.notes||'')}</textarea></div></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)"><button class="btn btn-outline" onclick="closeGenModal('expenseModal')">キャンセル</button><button class="btn btn-primary" onclick="saveExpense()">💾 保存</button></div>`;}
+async function saveExpense(){const g=id=>document.getElementById(id)?.value||null;const data={expense_date:g('ef_date'),status:g('ef_status')||'未請求',worker_id:g('ef_worker_id'),company_id:g('ef_company_id'),item_name:g('ef_item_name'),amount:document.getElementById('ef_amount')?.value?parseInt(document.getElementById('ef_amount').value):null,payment_method:g('ef_payment_method'),billed_to:g('ef_billed_to'),staff:g('ef_staff'),notes:g('ef_notes'),updated_at:new Date().toISOString()};showLoading(true);try{if(editingExpenseId){await sbFetch('expenses?id=eq.'+editingExpenseId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新','success');}else{await sbFetch('expenses',{method:'POST',body:JSON.stringify(data)});showToast('✅ 登録','success');}closeGenModal('expenseModal');await loadExpenses();}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
+
+// ==============================
+// ⚙️ ユーザー設定
+// ==============================
+let allUsers=[],filteredUsers=[],userPage=1;
+function buildUsersScreen(){return `<div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;"><input class="search-input" id="uSearchInput" placeholder="名前・メールで検索..." oninput="applyUserFilters()" style="flex:1;min-width:200px;"><button class="btn btn-outline" style="font-size:11px;padding:4px 10px" onclick="clearUserFilters()">✕</button></div><div class="table-wrap"><table><thead><tr><th>名前</th><th>メール</th><th>役割</th><th>チーム</th><th>アクティブ</th></tr></thead><tbody id="userTbody"><tr><td colspan="5" style="text-align:center;padding:40px;color:var(--gray-400)">読み込み中...</td></tr></tbody></table><div class="pagination-bar" id="userPagination"></div></div>`;}
+async function loadUsers(){showLoading(true);try{const data=await sbFetch('users?select=*&order=name.asc');allUsers=data||[];applyUserFilters();}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
+function applyUserFilters(){if(currentScreen!=='users')return;const q=(document.getElementById('uSearchInput')?.value||'').toLowerCase();filteredUsers=allUsers.filter(u=>!q||((u.name||'').toLowerCase().includes(q)||(u.email||'').toLowerCase().includes(q)));userPage=1;renderUserTable();}
+function clearUserFilters(){const el=document.getElementById('uSearchInput');if(el)el.value='';applyUserFilters();}
+function renderUserTable(){const tbody=document.getElementById('userTbody');if(!tbody)return;const total=filteredUsers.length;const page=filteredUsers.slice((userPage-1)*PAGE_SIZE,userPage*PAGE_SIZE);if(!page.length){tbody.innerHTML='<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--gray-400)">データなし</td></tr>';document.getElementById('userPagination').innerHTML='';return;}tbody.innerHTML=page.map(u=>`<tr onclick="openUserModal('${u.id}')"><td><div style="display:flex;align-items:center;gap:8px"><div class="user-avatar" style="width:28px;height:28px;font-size:11px">${(u.name||'?').charAt(0)}</div><strong>${esc(u.name)}</strong></div></td><td style="font-size:12px">${esc(u.email||'-')}</td><td style="font-size:12px">${esc(u.role||'-')}</td><td style="font-size:12px">${esc(u.team||'-')}</td><td><span class="st-badge ${u.is_active!==false?'st-active':'st-none'}">${u.is_active!==false?'有効':'無効'}</span></td></tr>`).join('');renderGenPagination('userPagination',total,userPage,p=>{userPage=p;renderUserTable();});}
+function openUserModal(id){const u=id?allUsers.find(x=>x.id===id):null;editingUserId=id;showGenModal('userModal',id?'⚙️ ユーザー詳細':'⚙️ ユーザー追加',buildUserModalBody(u));}
+let editingUserId=null;
+function buildUserModalBody(u){u=u||{};return `<div class="form-grid"><div class="section-title">ユーザー情報</div><div class="form-group full"><label class="form-label">名前 *</label><input class="form-input" id="uf_name" value="${esc(u.name||'')}"></div><div class="form-group"><label class="form-label">フリガナ</label><input class="form-input" id="uf_name_kana" value="${esc(u.name_kana||'')}"></div><div class="form-group"><label class="form-label">メール</label><input class="form-input" id="uf_email" type="email" value="${esc(u.email||'')}"></div><div class="form-group"><label class="form-label">役割</label><select class="form-select" id="uf_role">${['','管理者','一般','閲覧のみ'].map(s=>`<option ${u.role===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">チーム</label><input class="form-input" id="uf_team" value="${esc(u.team||'')}"></div><div class="form-group"><label class="form-label">アクティブ</label><select class="form-select" id="uf_active"><option value="true" ${u.is_active!==false?'selected':''}>有効</option><option value="false" ${u.is_active===false?'selected':''}>無効</option></select></div></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)"><button class="btn btn-outline" onclick="closeGenModal('userModal')">キャンセル</button><button class="btn btn-primary" onclick="saveUser()">💾 保存</button></div>`;}
+async function saveUser(){const g=id=>document.getElementById(id)?.value||null;const data={name:g('uf_name'),name_kana:g('uf_name_kana'),email:g('uf_email'),role:g('uf_role'),team:g('uf_team'),is_active:document.getElementById('uf_active')?.value!=='false',updated_at:new Date().toISOString()};if(!data.name){showToast('❌ 名前は必須','error');return;}showLoading(true);try{if(editingUserId){await sbFetch('users?id=eq.'+editingUserId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新','success');}else{await sbFetch('users',{method:'POST',body:JSON.stringify(data)});showToast('✅ 登録','success');}closeGenModal('userModal');await loadUsers();}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
+
+
+// ==============================
+// 📝 履歴書
+// ==============================
+
+function buildResumeScreen() {
+  return `
+  <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+    <select class="filter-select" id="resumeCandidateSelect" onchange="loadResume()" style="flex:1;min-width:220px;font-size:13px;padding:6px 10px;">
+      <option value="">── 候補者を選択してください ──</option>
+    </select>
+    <button class="btn btn-outline" onclick="window.print()">🖨️ 印刷 / PDF保存</button>
+  </div>
+  <div id="resumePreviewWrap">
+    <div style="text-align:center;padding:60px;color:var(--gray-400);font-size:14px;">
+      ↑ 候補者を選択すると履歴書がプレビューされます
+    </div>
+  </div>`;
+}
+
+async function loadResumeScreen() {
+  // 候補者リスト取得
+  showLoading(true);
+  try {
+    if (!allCandidates.length) {
+      const data = await sbFetch('candidates?select=id,name,nationality,status&order=name.asc');
+      allCandidates = data || [];
+    }
+    const sel = document.getElementById('resumeCandidateSelect');
+    if (sel) {
+      sel.innerHTML = '<option value="">── 候補者を選択してください ──</option>' +
+        allCandidates.map(c =>
+          `<option value="${c.id}">${natFlag(c.nationality)} ${esc(c.name)}（${esc(c.nationality||'')}）</option>`
+        ).join('');
+    }
+  } catch(e) { showToast('❌ ' + e.message, 'error'); }
+  showLoading(false);
+}
+
+async function loadResume() {
+  const id = document.getElementById('resumeCandidateSelect')?.value;
+  const wrap = document.getElementById('resumePreviewWrap');
+  if (!id || !wrap) return;
+  showLoading(true);
+  try {
+    const data = await sbFetch('candidates?id=eq.' + id + '&select=*&limit=1');
+    const c = data?.[0];
+    if (!c) { wrap.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray-400)">データが見つかりません</div>'; return; }
+    wrap.innerHTML = buildResumeHTML(c);
+  } catch(e) { showToast('❌ ' + e.message, 'error'); }
+  showLoading(false);
+}
+
+function buildResumeHTML(c) {
+  const wh = c.work_history || [];
+  const lic = c.licenses || {};
+  const today = new Date();
+  const dateStr = today.getFullYear() + '年' + (today.getMonth()+1) + '月' + today.getDate() + '日現在';
+
+  const licItems = [
+    {key:'career_up_card', label:'キャリアップカード'},
+    {key:'drivers_license', label:'普通車運転免許'},
+    {key:'forklift', label:'フォークリフト'},
+    {key:'crane', label:'クレーン'},
+    {key:'tamakake', label:'玉掛け'},
+    {key:'gas_welding', label:'ガス溶接'},
+  ];
+
+  return `
+<style>
+@media print {
+  .sidebar, .main-wrap > .topbar, .filters-section,
+  #resumeCandidateSelect, .topbar-actions,
+  button, .stats-row { display: none !important; }
+  .main-wrap { margin-left: 0 !important; }
+  body { background: white !important; }
+  .resume-page { box-shadow: none !important; margin: 0 !important; border: none !important; }
+  @page { margin: 10mm; size: A4; }
+}
+.resume-page {
+  background: white;
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 24px 28px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+  font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic', sans-serif;
+  font-size: 12px;
+  color: #111;
+  line-height: 1.5;
+}
+.resume-date { text-align: right; font-size: 11px; color: #555; margin-bottom: 4px; }
+.resume-title { text-align: center; font-size: 22px; font-weight: 900; letter-spacing: 8px; margin-bottom: 4px; border-bottom: 3px double #333; padding-bottom: 6px; }
+.resume-subtitle { text-align: center; font-size: 11px; color: #777; margin-bottom: 14px; }
+.resume-grid { display: grid; grid-template-columns: 1fr 140px; gap: 12px; margin-bottom: 12px; }
+.resume-info table { width: 100%; border-collapse: collapse; }
+.resume-info td { padding: 4px 8px; border: 1px solid #ccc; font-size: 12px; vertical-align: top; }
+.resume-info td.lbl { background: #f5f5f5; font-weight: 700; width: 90px; white-space: nowrap; color: #333; font-size: 11px; }
+.resume-photo { border: 1px solid #ccc; border-radius: 4px; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #f9f9f9; min-height: 160px; }
+.resume-photo img { width: 100%; height: 100%; object-fit: cover; }
+.resume-photo-placeholder { text-align: center; color: #bbb; font-size: 11px; padding: 10px; }
+.resume-section { margin-bottom: 10px; }
+.resume-section-title { background: #0f2040; color: white; padding: 4px 10px; font-size: 11px; font-weight: 700; letter-spacing: 1px; border-radius: 3px; margin-bottom: 6px; }
+.resume-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.resume-table th { background: #f0f4f8; padding: 4px 8px; border: 1px solid #ccc; font-size: 11px; font-weight: 700; color: #333; white-space: nowrap; }
+.resume-table td { padding: 5px 8px; border: 1px solid #ccc; vertical-align: top; }
+.resume-table td.lbl { background: #f8f9fa; font-weight: 700; width: 90px; color: #333; font-size: 11px; white-space: nowrap; }
+.resume-lic-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.resume-lic-item { border: 1px solid #ccc; border-radius: 4px; padding: 4px 8px; font-size: 11px; display: flex; align-items: center; justify-content: space-between; }
+.resume-lic-item .lic-check { font-size: 14px; }
+.resume-lic-item .has { color: #16a34a; font-weight: 700; }
+.resume-lic-item .none { color: #ccc; }
+.resume-memo-box { border: 1px solid #ccc; border-radius: 4px; padding: 8px 10px; min-height: 48px; font-size: 12px; background: #fafafa; }
+.resume-sign { text-align: right; font-size: 11px; color: #555; margin-top: 10px; padding-top: 6px; border-top: 1px solid #eee; }
+</style>
+
+<div class="resume-page" id="resumeContent">
+  <div class="resume-date">${dateStr}</div>
+  <div class="resume-title">履 歴 書</div>
+  <div class="resume-subtitle">履歴書（KMT用）</div>
+
+  <!-- 基本情報 + 写真 -->
+  <div class="resume-grid">
+    <div class="resume-info">
+      <table>
+        <tr>
+          <td class="lbl">フリガナ</td>
+          <td>${esc(c.name_kana || '')}</td>
+        </tr>
+        <tr>
+          <td class="lbl">氏名</td>
+          <td style="font-size:14px;font-weight:700">${esc(c.name || '')}</td>
+        </tr>
+        <tr>
+          <td class="lbl">生年月日</td>
+          <td>${c.birthdate ? formatDate(c.birthdate) : ''}&nbsp;&nbsp;年齢：${calcAge(c.birthdate)}歳</td>
+        </tr>
+        <tr>
+          <td class="lbl">国籍</td>
+          <td>${natFlag(c.nationality)} ${esc(c.nationality || '')}&nbsp;&nbsp;出身地：${esc(c.birth_place || '')}</td>
+        </tr>
+        <tr>
+          <td class="lbl">性別</td>
+          <td>${esc(c.gender || '')}&nbsp;&nbsp;&nbsp;宗教：${esc(c.religion || '')}</td>
+        </tr>
+        <tr>
+          <td class="lbl">配偶者</td>
+          <td>${esc(c.marital_status || '')}&nbsp;&nbsp;&nbsp;子供：${c.num_children != null ? c.num_children + '人' : ''}</td>
+        </tr>
+        <tr>
+          <td class="lbl">身長 / 体重</td>
+          <td>${c.height_cm ? c.height_cm + 'cm' : ''}&nbsp;&nbsp;${c.weight_kg ? c.weight_kg + 'kg' : ''}&nbsp;&nbsp;靴：${esc(c.shoe_size || '')}</td>
+        </tr>
+      </table>
+    </div>
+    <div class="resume-photo">
+      ${c.photo_url
+        ? `<img src="${esc(c.photo_url)}" alt="顔写真">`
+        : `<div class="resume-photo-placeholder">📷<br>顔写真<br>（未登録）</div>`}
+    </div>
+  </div>
+
+  <!-- 在留・連絡情報 -->
+  <div class="resume-section">
+    <div class="resume-section-title">📋 在留・連絡情報</div>
+    <table class="resume-table">
+      <tr>
+        <td class="lbl">在留資格</td>
+        <td>${esc(c.current_visa_status || '')}</td>
+        <td class="lbl">在留期限</td>
+        <td>${c.current_visa_expiry ? formatDate(c.current_visa_expiry) : ''}</td>
+      </tr>
+      <tr>
+        <td class="lbl">現住所</td>
+        <td colspan="3">${esc(c.home_country_address || c.jp_address || '')}</td>
+      </tr>
+      <tr>
+        <td class="lbl">電話</td>
+        <td>${esc(c.phone || c.cel_phone || '')}</td>
+        <td class="lbl">メール</td>
+        <td>${esc(c.email || '')}</td>
+      </tr>
+      <tr>
+        <td class="lbl">在留カード</td>
+        <td colspan="3">${esc(c.residence_card || '')}</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- 日本語・試験 -->
+  <div class="resume-section">
+    <div class="resume-section-title">📚 日本語・技能試験</div>
+    <table class="resume-table">
+      <tr>
+        <td class="lbl">日本語レベル</td>
+        <td>${esc(c.jp_language_level || '')}</td>
+        <td class="lbl">聞き取り/会話</td>
+        <td>${esc(c.jp_language_detail || '')}</td>
+      </tr>
+      <tr>
+        <td class="lbl">日本語試験</td>
+        <td>${esc(c.jp_exam_1 || '')}</td>
+        <td class="lbl">技能試験</td>
+        <td>${esc(c.skill_exam_1 || '')}</td>
+      </tr>
+      <tr>
+        <td class="lbl">評価調書</td>
+        <td>${esc(c.hyoka_chosho || '')}</td>
+        <td class="lbl">修了予定日</td>
+        <td>${c.completion_date_expected ? formatDate(c.completion_date_expected) : ''}</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- 学歴 -->
+  <div class="resume-section">
+    <div class="resume-section-title">🎓 学歴</div>
+    <table class="resume-table">
+      <tr>
+        <th style="width:100px">入学年月</th>
+        <th style="width:100px">卒業年月</th>
+        <th>学歴（学校名・学科）</th>
+      </tr>
+      <tr>
+        <td></td>
+        <td>${c.completion_date ? formatDate(c.completion_date) : ''}</td>
+        <td>${esc(c.school_name || '')} ${esc(c.major || '')} ${esc(c.major_detail || '')}</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- 職歴 -->
+  <div class="resume-section">
+    <div class="resume-section-title">💼 職歴</div>
+    <table class="resume-table">
+      <tr>
+        <th style="width:180px">勤務期間</th>
+        <th>所属機関</th>
+        <th style="width:100px">勤務地</th>
+        <th style="width:100px">職種</th>
+      </tr>
+      ${wh.length ? wh.map(w => `<tr>
+        <td>${esc(w.period || '')}</td>
+        <td>${esc(w.company || '')}</td>
+        <td>${esc(w.location || '')}</td>
+        <td>${esc(w.job_type || '')}</td>
+      </tr>`).join('') : '<tr><td colspan="4" style="color:#bbb;text-align:center">（職歴なし）</td></tr>'}
+    </table>
+    ${c.resignation_note ? `<div style="font-size:11px;color:#555;margin-top:4px;padding:4px 8px;background:#f9f9f9;border:1px solid #eee;border-radius:3px">退職理由等：${esc(c.resignation_note)}</div>` : ''}
+  </div>
+
+  <!-- 就労希望条件 -->
+  <div class="resume-section">
+    <div class="resume-section-title">✅ 就労希望条件</div>
+    <table class="resume-table">
+      <tr>
+        <td class="lbl">希望分野</td>
+        <td>${esc(c.applicant_field || '')}</td>
+        <td class="lbl">希望職種</td>
+        <td>${esc(c.job_category || '')}</td>
+      </tr>
+      <tr>
+        <td class="lbl">入社可能日</td>
+        <td>${c.available_from ? formatDate(c.available_from) : ''}</td>
+        <td class="lbl">現在の給与</td>
+        <td>${esc(c.current_salary || '')}</td>
+      </tr>
+      <tr>
+        <td class="lbl">手取り(残業なし)</td>
+        <td>${esc(c.net_salary_base || '')}</td>
+        <td class="lbl">手取り(残業あり)</td>
+        <td>${esc(c.net_salary_overtime || '')}</td>
+      </tr>
+      <tr>
+        <td class="lbl">希望給料</td>
+        <td>${esc(c.desired_salary || '')}</td>
+        <td class="lbl">残業・夜勤希望</td>
+        <td>${esc(c.overtime_preference || '')}</td>
+      </tr>
+      <tr>
+        <td class="lbl">面接可能日時</td>
+        <td>${esc(c.interview_availability || '')}</td>
+        <td class="lbl">一時帰国希望</td>
+        <td>${esc(c.temp_return_wish || '')}</td>
+      </tr>
+      <tr>
+        <td class="lbl">家族の同意</td>
+        <td colspan="3">${esc(c.family_consent || '')}</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- 志望動機 -->
+  ${c.motivation ? `<div class="resume-section">
+    <div class="resume-section-title">💬 志望動機</div>
+    <div class="resume-memo-box">${esc(c.motivation)}</div>
+  </div>` : ''}
+
+  <!-- 健康・その他 -->
+  <div class="resume-section">
+    <div class="resume-section-title">🏥 健康・その他</div>
+    <table class="resume-table">
+      <tr>
+        <td class="lbl">健康状況</td>
+        <td>${esc(c.health_status || '')}</td>
+        <td class="lbl">確認事項同意</td>
+        <td>${c.terms_agreed === true ? '✅ 同意している' : c.terms_agreed === false ? '❌ 未同意' : ''}</td>
+      </tr>
+      ${c.candidate_questions ? `<tr><td class="lbl">本人からの質問</td><td colspan="3">${esc(c.candidate_questions)}</td></tr>` : ''}
+    </table>
+  </div>
+
+  <!-- 保有資格 -->
+  <div class="resume-section">
+    <div class="resume-section-title">🏆 保有資格</div>
+    <div class="resume-lic-grid">
+      ${licItems.map(li => `
+        <div class="resume-lic-item">
+          <span>${li.label}</span>
+          <span class="lic-check ${lic[li.key] ? 'has' : 'none'}">${lic[li.key] ? '✓ 有' : '無'}</span>
+        </div>`).join('')}
+    </div>
+    ${lic.other ? `<div style="margin-top:6px;font-size:11px">その他：${esc(lic.other)}</div>` : ''}
+  </div>
+
+  <!-- 担当者記入欄 -->
+  <div class="resume-section">
+    <div class="resume-section-title">📝 担当者記入欄</div>
+    <table class="resume-table">
+      ${c.staff_impression ? `<tr><td class="lbl">担当者の感想</td><td colspan="3">${esc(c.staff_impression)}</td></tr>` : '<tr><td class="lbl">担当者の感想</td><td colspan="3" style="min-height:40px">&nbsp;</td></tr>'}
+      ${c.interview_memo ? `<tr><td class="lbl">企業面接メモ</td><td colspan="3">${esc(c.interview_memo)}</td></tr>` : '<tr><td class="lbl">企業面接メモ</td><td colspan="3" style="min-height:40px">&nbsp;</td></tr>'}
+    </table>
+  </div>
+
+  <div class="resume-sign">
+    KMT案件管理システム | 出力日: ${dateStr}
+  </div>
+</div>`;
+}
+
+function calcAge(birthdate) {
+  if (!birthdate) return '-';
+  const b = new Date(birthdate);
+  const today = new Date();
+  let age = today.getFullYear() - b.getFullYear();
+  const m = today.getMonth() - b.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < b.getDate())) age--;
+  return age;
+}
+
+// ==============================
+// 汎用モーダル・ユーティリティ
+// ==============================
+const MODAL_IDS=['workerModal','candidateModal','jobModal','introModal','sendingModal','partnerModal','feeModal','saleModal','expenseModal','userModal'];
+
+function ensureModals() {
+  MODAL_IDS.forEach(id=>{
+    if(!document.getElementById(id)){
+      const div=document.createElement('div');
+      div.className='modal-overlay'; div.id=id;
+      div.innerHTML=`<div class="modal-box"><div class="modal-header" id="${id}Header"><span class="modal-title" id="${id}Title">詳細</span><button class="modal-close" onclick="closeGenModal('${id}')">✕</button></div><div class="modal-body" id="${id}Body"></div></div>`;
+      div.addEventListener('click',e=>{if(e.target===div)closeGenModal(id);});
+      document.body.appendChild(div);
+    }
+  });
+}
+
+function showGenModal(id, title, bodyHtml) {
+  ensureModals();
+  const modal=document.getElementById(id);
+  const titleEl=document.getElementById(id+'Title');
+  const bodyEl=document.getElementById(id+'Body');
+  if(titleEl) titleEl.textContent=title;
+  if(bodyEl) bodyEl.innerHTML=bodyHtml;
+  modal.classList.add('show');
+}
+
+function closeGenModal(id){const modal=document.getElementById(id);if(modal)modal.classList.remove('show');}
+
+function renderGenPagination(containerId, total, current, onPage) {
+  const el=document.getElementById(containerId); if(!el) return;
+  const pages=Math.ceil(total/PAGE_SIZE);
+  if(pages<=1){el.innerHTML=`<span class="page-info">${total}件</span>`;return;}
+  let html=`<button class="page-btn" ${current===1?'disabled':''} onclick="(${onPage.toString()})(${current-1})">◀</button>`;
+  const s=Math.max(1,current-2),e=Math.min(pages,current+2);
+  if(s>1)html+=`<button class="page-btn" onclick="(${onPage.toString()})(1)">1</button>${s>2?'<span class="page-info">…</span>':''}`;
+  for(let i=s;i<=e;i++)html+=`<button class="page-btn ${i===current?'active':''}" onclick="(${onPage.toString()})(${i})">${i}</button>`;
+  if(e<pages)html+=`${e<pages-1?'<span class="page-info">…</span>':''}<button class="page-btn" onclick="(${onPage.toString()})(${pages})">${pages}</button>`;
+  html+=`<button class="page-btn" ${current===pages?'disabled':''} onclick="(${onPage.toString()})(${current+1})">▶</button><span class="page-info">${total}件</span>`;
+  el.innerHTML=html;
+}
+
+// ==============================
+// 共通ユーティリティ
+// ==============================
+function formatDate(d){if(!d)return'-';const dt=new Date(d);if(isNaN(dt))return d;return dt.getFullYear()+'/'+(dt.getMonth()+1).toString().padStart(2,'0')+'/'+dt.getDate().toString().padStart(2,'0');}
+function daysDiff(d){if(!d)return 9999;return Math.floor((new Date(d)-new Date())/(1000*60*60*24));}
+function natFlag(nat){const m={'インドネシア':'🇮🇩','ベトナム':'🇻🇳','タイ':'🇹🇭','カンボジア':'🇰🇭','ミャンマー':'🇲🇲','中国':'🇨🇳','フィリピン':'🇵🇭'};return m[nat]||'🌏';}
+
+// CSSバッジ追加
+const extraStyle=document.createElement('style');
+extraStyle.textContent='.st-danger{background:#fef2f2;color:#dc2626;}.st-cert{background:#fdf4ff;color:#7c3aed;}';
+document.head.appendChild(extraStyle);
+
+</script>
+</body>
+</html>
