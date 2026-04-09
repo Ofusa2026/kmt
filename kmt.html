@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260409.05 -->
+<!-- KMT_VERSION ver.20260409.07 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -172,7 +172,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260409.05</div>
+    <div class="logo-ver">ver.20260409.07</div>
   </div>
   <div class="sidebar-section">メイン</div>
   <div class="nav-item active" onclick="showScreen('companies')">🏢 受入企業</div>
@@ -885,7 +885,7 @@ const SCREENS = {
   introductions:{ title: '🤝 紹介案件', init: loadIntroductions },
   sending:   { title: '✈️ 送り出し機関', init: loadSending },
   partners:  { title: '🏛️ 提携登録支援機関', init: loadPartners },
-  fees:      { title: '💴 支援委託費', init: loadFees },
+  fees:      { title: '💴 支援委託費', init: initFeesScreen },
   sales:     { title: '📊 売上管理', init: loadSales },
   expenses:  { title: '💸 立替管理', init: loadExpenses },
   users:     { title: '⚙️ ユーザー設定', init: loadUsers },
@@ -927,7 +927,7 @@ function updateTopbarButtons(name) {
     introductions:`<button class="btn btn-outline" onclick="loadIntroductions()">🔄 更新</button><button class="btn btn-primary" onclick="openIntroModal(null)">＋ 紹介案件登録</button>`,
     sending:      `<button class="btn btn-outline" onclick="loadSending()">🔄 更新</button><button class="btn btn-primary" onclick="openSendingModal(null)">＋ 機関登録</button>`,
     partners:     `<button class="btn btn-outline" onclick="loadPartners()">🔄 更新</button><button class="btn btn-primary" onclick="openPartnerModal(null)">＋ 機関登録</button>`,
-    fees:         `<button class="btn btn-outline" onclick="loadFees()">🔄 更新</button><button class="btn btn-primary" onclick="openFeeModal(null)">＋ 請求登録</button>`,
+    fees:         ``,  // 支援委託費は画面内にボタンを持つ
     sales:        `<button class="btn btn-outline" onclick="loadSales()">🔄 更新</button><button class="btn btn-primary" onclick="openSaleModal(null)">＋ 売上登録</button>`,
     expenses:     `<button class="btn btn-outline" onclick="loadExpenses()">🔄 更新</button><button class="btn btn-primary" onclick="openExpenseModal(null)">＋ 立替登録</button>`,
     users:        `<button class="btn btn-outline" onclick="loadUsers()">🔄 更新</button><button class="btn btn-primary" onclick="openUserModal(null)">＋ ユーザー追加</button>`,
@@ -1707,43 +1707,198 @@ async function savePartner(){const g=id=>document.getElementById(id)?.value||nul
 // ==============================
 // 💴 支援委託費
 // ==============================
-let allFees=[],filteredFees=[],feePage=1,feeTotalCount=0;
-function buildFeesScreen(){return `<div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;"><input class="search-input" id="feSearchInput" placeholder="企業名で検索..." oninput="applyFeeFilters()" style="flex:1;min-width:200px;"><select class="filter-select" id="feFilterStatus" onchange="applyFeeFilters()"><option value="">全ステータス</option><option>未請求</option><option>請求済</option><option>入金済</option><option>未入金</option></select><input class="filter-select" id="feFilterMonth" type="month" onchange="applyFeeFilters()" style="padding:3px 6px"><button class="btn btn-outline" style="font-size:11px;padding:4px 10px" onclick="clearFeeFilters()">✕</button></div><div class="table-wrap"><table><thead><tr><th>請求月</th><th>企業名</th><th>人数</th><th>単価</th><th>税抜金額</th><th>税込金額</th><th>費用種別</th><th>請求日</th><th>入金日</th><th>ステータス</th></tr></thead><tbody id="feeTbody"><tr><td colspan="10" style="text-align:center;padding:40px;color:var(--gray-400)">読み込み中...</td></tr></tbody></table><div class="pagination-bar" id="feePagination"></div></div>`;}
+let allFees=[], feePage=1, feeTotalCount=0;
+let feeYear = new Date().getFullYear();
+let feeActiveTab = 'master'; // 'master' or '01'~'12'
+
+function buildFeesScreen() {
+  const currentYear = new Date().getFullYear();
+  const yearOptions = [];
+  for (let y = 2024; y <= currentYear + 1; y++) yearOptions.push(y);
+
+  return `
+  <!-- 年度選択 -->
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap;">
+    <div style="display:flex;align-items:center;gap:6px;">
+      <label style="font-size:12px;font-weight:700;color:var(--gray-700)">年度</label>
+      <select id="feeYearSelect" class="filter-select" style="font-size:13px;padding:5px 10px;font-weight:700;" onchange="onFeeYearChange()">
+        ${yearOptions.map(y=>`<option value="${y}" ${y===feeYear?'selected':''}>${y}年</option>`).join('')}
+      </select>
+    </div>
+    <button class="btn btn-outline" onclick="loadFees()">🔄 更新</button>
+    <button class="btn btn-primary" onclick="openFeeModal(null)" id="feeAddBtn" style="display:none">＋ 請求登録</button>
+  </div>
+
+  <!-- 月タブ -->
+  <div style="display:flex;overflow-x:auto;border-bottom:2px solid var(--gray-200);margin-bottom:12px;gap:0;" id="feeTabBar">
+    <div class="fee-tab active" id="feeTab_master" onclick="switchFeeTab('master')"
+      style="padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;color:var(--gray-400);margin-bottom:-2px;">
+      📋 委託費マスタ
+    </div>
+    ${['01','02','03','04','05','06','07','08','09','10','11','12'].map(m=>`
+    <div class="fee-tab" id="feeTab_${m}" onclick="switchFeeTab('${m}')"
+      style="padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;color:var(--gray-400);margin-bottom:-2px;">
+      ${parseInt(m)}月
+    </div>`).join('')}
+  </div>
+
+  <!-- コンテンツエリア -->
+  <div id="feeContentArea"></div>
+  `;
+}
+
+function onFeeYearChange() {
+  feeYear = parseInt(document.getElementById('feeYearSelect')?.value || new Date().getFullYear());
+  loadFees();
+}
+
+function switchFeeTab(tab) {
+  feeActiveTab = tab;
+  // タブスタイル更新
+  document.querySelectorAll('.fee-tab').forEach(el => {
+    const isActive = el.id === 'feeTab_' + tab;
+    el.style.color = isActive ? 'var(--blue)' : 'var(--gray-400)';
+    el.style.borderBottomColor = isActive ? 'var(--blue)' : 'transparent';
+    el.style.fontWeight = isActive ? '700' : '600';
+  });
+  // 追加ボタン表示制御
+  const addBtn = document.getElementById('feeAddBtn');
+  if (addBtn) addBtn.style.display = tab === 'master' ? 'none' : '';
+  // コンテンツ描画
+  if (tab === 'master') {
+    renderFeeMaster();
+  } else {
+    feePage = 1;
+    loadFees();
+  }
+}
+
 async function loadFees(page) {
+  if (currentScreen !== 'fees') return;
   if (page) feePage = page;
+  if (feeActiveTab === 'master') { renderFeeMaster(); return; }
+
   showLoading(true);
   try {
-    // フィルター条件を組み立て
-    let q = 'select=*,companies(name)&order=billing_month.desc,created_at.desc';
-    const status = document.getElementById('feFilterStatus')?.value||'';
-    const month = document.getElementById('feFilterMonth')?.value||'';
-    const q2 = document.getElementById('feSearchInput')?.value||'';
-    if (status) q += '&status=eq.' + encodeURIComponent(status);
-    if (month) q += '&billing_month=like.' + encodeURIComponent(month + '*');
+    const ym = `${feeYear}-${feeActiveTab}`;
+    let q = `select=*,companies(name)&order=created_at.desc&billing_month=eq.${encodeURIComponent(ym)}`;
     const { data, total } = await sbFetchPage('support_fees', q, feePage, PAGE_SIZE);
     allFees = data || [];
     feeTotalCount = total;
-    renderFeeTableDirect();
+    renderFeeMonthTable(ym);
   } catch(e) { showToast('❌ ' + e.message, 'error'); }
   showLoading(false);
 }
-function applyFeeFilters() { loadFees(1); }
-function clearFeeFilters() {
-  ['feSearchInput','feFilterStatus','feFilterMonth'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-  loadFees(1);
+
+function renderFeeMaster() {
+  const area = document.getElementById('feeContentArea');
+  if (!area) return;
+  // companiesのfee情報を表示（受入企業一覧から取得済みのallCompaniesを使用）
+  const active = allCompanies.filter(c => c.status !== 'past');
+  if (!active.length) {
+    area.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray-400)">受入企業データを読み込み中...<br><small>先に「受入企業」画面を一度開いてください</small></div>';
+    return;
+  }
+  const payBadge = m => m === '口振' ? '<span class="pay-badge pay-koza">口振</span>' : m === '振込' ? '<span class="pay-badge pay-furikomi">振込</span>' : m ? `<span class="pay-badge">${esc(m)}</span>` : '-';
+  area.innerHTML = `
+  <div class="table-wrap">
+    <table><thead><tr>
+      <th>No.</th><th>企業名</th><th>委託費/人（税抜）</th><th>請求サイクル</th><th>支払方法</th><th>請求先</th><th>請求法人</th><th>口座振替申込</th><th>口座振替登録</th>
+    </tr></thead>
+    <tbody>
+      ${active.map(c => `<tr onclick="openCompanyModal('${c.id}')" style="cursor:pointer" title="受入企業画面で編集できます">
+        <td>${c.company_no??'-'}</td>
+        <td><strong>${esc(c.name)}</strong></td>
+        <td style="font-weight:700;color:var(--blue)">${c.fee_per_person ? Number(c.fee_per_person).toLocaleString()+'円' : '<span style=color:var(--gray-400)>未設定</span>'}</td>
+        <td>${esc(c.billing_cycle||'-')}</td>
+        <td>${payBadge(c.payment_method)}</td>
+        <td style="font-size:11px">${esc(c.invoice_to||c.invoice_method||'-')}</td>
+        <td style="font-size:11px">${esc(c.kmt_corp_type||'-')}</td>
+        <td style="font-size:12px">${c.direct_debit_applied?formatDate(c.direct_debit_applied):'-'}</td>
+        <td style="font-size:12px">${c.direct_debit_registered?formatDate(c.direct_debit_registered):'-'}</td>
+      </tr>`).join('')}
+    </tbody></table>
+  </div>
+  <div style="margin-top:8px;font-size:11px;color:var(--gray-400);text-align:right">※ 金額・支払方法の編集は「🏢 受入企業」メニューから行ってください</div>`;
 }
-function renderFeeTableDirect() {
-  const tbody=document.getElementById('feeTbody'); if(!tbody) return;
-  if(!allFees.length){tbody.innerHTML='<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--gray-400)">データなし</td></tr>';document.getElementById('feePagination').innerHTML='';return;}
-  const stCls={未請求:'st-add',請求済:'st-review',入金済:'st-active',未入金:'st-danger'};
-  tbody.innerHTML=allFees.map(f=>`<tr onclick="openFeeModal('${f.id}')"><td style="font-weight:700">${esc(f.billing_month||'-')}</td><td style="font-size:12px">${esc(f.companies?.name||'-')}</td><td style="text-align:center">${f.worker_count??'-'}</td><td style="font-size:12px">${f.unit_price?Number(f.unit_price).toLocaleString()+'円':'-'}</td><td style="font-weight:700">${f.amount_excl?Number(f.amount_excl).toLocaleString()+'円':'-'}</td><td>${f.amount_incl?Number(f.amount_incl).toLocaleString()+'円':'-'}</td><td style="font-size:11px">${esc(f.fee_type||'-')}</td><td style="font-size:12px">${f.billed_date?formatDate(f.billed_date):'-'}</td><td style="font-size:12px">${f.paid_date?formatDate(f.paid_date):'-'}</td><td><span class="st-badge ${stCls[f.status]||'st-none'}">${esc(f.status||'-')}</span></td></tr>`).join('');
+
+function renderFeeMonthTable(ym) {
+  const area = document.getElementById('feeContentArea');
+  if (!area) return;
+  const stCls = {未請求:'st-add', 請求済:'st-review', 入金済:'st-active', 未入金:'st-danger'};
+
+  // 月の合計を計算
+  const totalExcl = allFees.reduce((s, f) => s + (f.amount_excl||0), 0);
+  const totalIncl = allFees.reduce((s, f) => s + (f.amount_incl||0), 0);
+  const paidCount = allFees.filter(f => f.status === '入金済').length;
+
+  area.innerHTML = `
+  <!-- サマリ -->
+  <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
+    <div class="stat-card" style="min-width:120px">
+      <div class="stat-label">${ym} 件数</div>
+      <div class="stat-num blue">${feeTotalCount}</div>
+    </div>
+    <div class="stat-card" style="min-width:140px">
+      <div class="stat-label">合計（税抜）</div>
+      <div class="stat-num" style="font-size:18px">${totalExcl.toLocaleString()}円</div>
+    </div>
+    <div class="stat-card" style="min-width:140px">
+      <div class="stat-label">合計（税込）</div>
+      <div class="stat-num" style="font-size:18px">${totalIncl.toLocaleString()}円</div>
+    </div>
+    <div class="stat-card" style="min-width:100px">
+      <div class="stat-label">入金済</div>
+      <div class="stat-num green">${paidCount}</div>
+    </div>
+  </div>
+
+  <!-- テーブル -->
+  <div class="table-wrap">
+    <table><thead><tr>
+      <th>企業名</th><th>人数</th><th>単価</th><th>税抜</th><th>税込</th>
+      <th>費用種別</th><th>請求日</th><th>入金日</th><th>ステータス</th>
+    </tr></thead>
+    <tbody>
+    ${allFees.length ? allFees.map(f => `
+      <tr onclick="openFeeModal('${f.id}')">
+        <td style="font-weight:600">${esc(f.companies?.name||'-')}</td>
+        <td style="text-align:center">${f.worker_count??'-'}</td>
+        <td style="font-size:12px">${f.unit_price?Number(f.unit_price).toLocaleString()+'円':'-'}</td>
+        <td style="font-weight:700">${f.amount_excl?Number(f.amount_excl).toLocaleString()+'円':'-'}</td>
+        <td>${f.amount_incl?Number(f.amount_incl).toLocaleString()+'円':'-'}</td>
+        <td style="font-size:11px">${esc(f.fee_type||'-')}</td>
+        <td style="font-size:12px">${f.billed_date?formatDate(f.billed_date):'-'}</td>
+        <td style="font-size:12px">${f.paid_date?formatDate(f.paid_date):'-'}</td>
+        <td><span class="st-badge ${stCls[f.status]||'st-none'}">${esc(f.status||'-')}</span></td>
+      </tr>`).join('') :
+      `<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--gray-400)">${ym} のデータがありません</td></tr>`}
+    </tbody></table>
+    <div class="pagination-bar" id="feePagination"></div>
+  </div>`;
   renderGenPagination('feePagination', feeTotalCount, feePage, p => loadFees(p));
 }
-// applyFeeFilters/clearFeeFilters/renderFeeTable → loadFees()に統合
+
+function applyFeeFilters() { loadFees(1); }
+function clearFeeFilters() { loadFees(1); }
+
 function openFeeModal(id){const f=id?allFees.find(x=>x.id===id):null;editingFeeId=id;showGenModal('feeModal',id?'💴 委託費詳細':'💴 委託費登録',buildFeeModalBody(f));}
 let editingFeeId=null;
 function buildFeeModalBody(f){f=f||{};const autoCalc=()=>{const wp=parseInt(document.getElementById('ff_worker_count')?.value||0);const up=parseInt(document.getElementById('ff_unit_price')?.value||0);const excl=wp*up;document.getElementById('ff_amount_excl').value=excl||'';document.getElementById('ff_amount_incl').value=excl?Math.round(excl*1.1):'';};return `<div class="form-grid"><div class="section-title">請求情報</div><div class="form-group full"><label class="form-label">企業</label><select class="form-select" id="ff_company_id"><option value="">選択...</option>${allCompanies.map(c=>`<option value="${c.id}" ${f.company_id===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">請求月 (YYYY-MM)</label><input class="form-input" id="ff_billing_month" value="${esc(f.billing_month||'')}" placeholder="2026-04"></div><div class="form-group"><label class="form-label">費用種別</label><select class="form-select" id="ff_fee_type">${['通常委託費','新規委託費','初期費用','その他'].map(s=>`<option ${f.fee_type===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">対象人数</label><input class="form-input" id="ff_worker_count" type="number" value="${f.worker_count??''}" oninput="(${autoCalc.toString()})()"></div><div class="form-group"><label class="form-label">単価（税抜）</label><input class="form-input" id="ff_unit_price" type="number" value="${f.unit_price??''}" oninput="(${autoCalc.toString()})()"></div><div class="form-group"><label class="form-label">金額（税抜）</label><input class="form-input" id="ff_amount_excl" type="number" value="${f.amount_excl??''}"></div><div class="form-group"><label class="form-label">金額（税込）</label><input class="form-input" id="ff_amount_incl" type="number" value="${f.amount_incl??''}"></div><div class="form-group"><label class="form-label">ステータス</label><select class="form-select" id="ff_status">${['未請求','請求済','入金済','未入金'].map(s=>`<option ${f.status===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">請求日</label><input class="form-input" id="ff_billed_date" type="date" value="${f.billed_date||''}"></div><div class="form-group"><label class="form-label">入金日</label><input class="form-input" id="ff_paid_date" type="date" value="${f.paid_date||''}"></div><div class="form-group full"><label class="form-label">備考</label><textarea class="form-textarea" id="ff_notes">${esc(f.notes||'')}</textarea></div></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)"><button class="btn btn-outline" onclick="closeGenModal('feeModal')">キャンセル</button><button class="btn btn-primary" onclick="saveFee()">💾 保存</button></div>`;}
-async function saveFee(){const g=id=>document.getElementById(id)?.value||null;const ni=id=>document.getElementById(id)?.value?parseInt(document.getElementById(id).value):null;const data={company_id:g('ff_company_id'),billing_month:g('ff_billing_month'),fee_type:g('ff_fee_type'),worker_count:ni('ff_worker_count'),unit_price:ni('ff_unit_price'),amount_excl:ni('ff_amount_excl'),amount_incl:ni('ff_amount_incl'),status:g('ff_status')||'未請求',billed_date:g('ff_billed_date'),paid_date:g('ff_paid_date'),notes:g('ff_notes'),updated_at:new Date().toISOString()};if(!data.billing_month){showToast('❌ 請求月は必須','error');return;}showLoading(true);try{if(editingFeeId){await sbFetch('support_fees?id=eq.'+editingFeeId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新','success');}else{await sbFetch('support_fees',{method:'POST',body:JSON.stringify(data)});showToast('✅ 登録','success');}closeGenModal('feeModal');await loadFees();}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
+async function initFeesScreen() {
+  // 年度を今年に初期化
+  feeYear = new Date().getFullYear();
+  feeActiveTab = 'master';
+  // 年度セレクト更新
+  const sel = document.getElementById('feeYearSelect');
+  if (sel) sel.value = feeYear;
+  // 企業データがなければ取得
+  if (!allCompanies.length) await loadCompanies();
+  // マスタタブをアクティブに
+  switchFeeTab('master');
+}
+
+async function saveFee(){const g=id=>document.getElementById(id)?.value||null;const ni=id=>document.getElementById(id)?.value?parseInt(document.getElementById(id).value):null;const data={company_id:g('ff_company_id'),billing_month:g('ff_billing_month'),fee_type:g('ff_fee_type'),worker_count:ni('ff_worker_count'),unit_price:ni('ff_unit_price'),amount_excl:ni('ff_amount_excl'),amount_incl:ni('ff_amount_incl'),status:g('ff_status')||'未請求',billed_date:g('ff_billed_date'),paid_date:g('ff_paid_date'),notes:g('ff_notes'),updated_at:new Date().toISOString()};if(!data.billing_month){showToast('❌ 請求月は必須','error');return;}showLoading(true);try{if(editingFeeId){await sbFetch('support_fees?id=eq.'+editingFeeId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新','success');}else{await sbFetch('support_fees',{method:'POST',body:JSON.stringify(data)});showToast('✅ 登録','success');}closeGenModal('feeModal');await loadFees(feePage);}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
 
 // ==============================
 // 📊 売上管理
@@ -1845,30 +2000,214 @@ async function saveUser(){const g=id=>document.getElementById(id)?.value||null;c
 
 function buildResumeScreen() {
   return `
-  <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
-    <select class="filter-select" id="resumeCandidateSelect" onchange="loadResume()" style="flex:1;min-width:220px;font-size:13px;padding:6px 10px;">
-      <option value="">── 候補者を選択してください ──</option>
-    </select>
-    <button class="btn btn-outline" onclick="window.print()">🖨️ 印刷 / PDF保存</button>
-  </div>
-  <div id="resumePreviewWrap">
-    <div style="text-align:center;padding:60px;color:var(--gray-400);font-size:14px;">
-      ↑ 候補者を選択すると履歴書がプレビューされます
+  <div style="display:flex;gap:0;height:calc(100vh - 110px);overflow:hidden;">
+    <!-- 左：編集パネル -->
+    <div id="resumeEditPanel" style="width:340px;flex-shrink:0;overflow-y:auto;border-right:1px solid var(--gray-200);padding:14px;background:white;display:flex;flex-direction:column;gap:10px;">
+      <div>
+        <label class="form-label" style="margin-bottom:4px;display:block;">候補者を選択</label>
+        <select id="resumeCandidateSelect" class="form-select" onchange="loadResume()" style="width:100%;font-size:13px;">
+          <option value="">── 候補者を選択 ──</option>
+        </select>
+      </div>
+      <div id="resumeFormBody" style="display:none">
+        <!-- 基本情報 -->
+        <div class="section-title" style="font-size:11px;font-weight:800;color:var(--navy);padding:8px 0 4px;border-bottom:1px solid var(--gray-200);margin-bottom:8px;grid-column:1/-1;">👤 基本情報</div>
+        <div class="form-group" style="margin-bottom:8px"><label class="form-label">氏名（ローマ字）</label><input class="form-input" id="rf_name" oninput="previewResume()"></div>
+        <div class="form-group" style="margin-bottom:8px"><label class="form-label">フリガナ</label><input class="form-input" id="rf_name_kana" oninput="previewResume()"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div class="form-group"><label class="form-label">国籍</label>
+            <select class="form-select" id="rf_nationality" onchange="previewResume()">
+              ${['','インドネシア','ベトナム','タイ','カンボジア','ミャンマー','その他'].map(n=>`<option>${n}</option>`).join('')}
+            </select></div>
+          <div class="form-group"><label class="form-label">性別</label>
+            <select class="form-select" id="rf_gender" onchange="previewResume()">
+              ${['','男','女'].map(n=>`<option>${n}</option>`).join('')}
+            </select></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div class="form-group"><label class="form-label">生年月日</label><input class="form-input" id="rf_birthdate" type="date" oninput="previewResume()"></div>
+          <div class="form-group"><label class="form-label">出身地</label><input class="form-input" id="rf_birth_place" oninput="previewResume()"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div class="form-group"><label class="form-label">宗教</label><input class="form-input" id="rf_religion" oninput="previewResume()"></div>
+          <div class="form-group"><label class="form-label">配偶者</label>
+            <select class="form-select" id="rf_marital_status" onchange="previewResume()">
+              ${['','有','無'].map(n=>`<option>${n}</option>`).join('')}
+            </select></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">
+          <div class="form-group"><label class="form-label">子供(人)</label><input class="form-input" id="rf_num_children" type="number" oninput="previewResume()"></div>
+          <div class="form-group"><label class="form-label">身長(cm)</label><input class="form-input" id="rf_height_cm" type="number" oninput="previewResume()"></div>
+          <div class="form-group"><label class="form-label">体重(kg)</label><input class="form-input" id="rf_weight_kg" type="number" oninput="previewResume()"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div class="form-group"><label class="form-label">靴サイズ</label><input class="form-input" id="rf_shoe_size" oninput="previewResume()"></div>
+          <div class="form-group"><label class="form-label">顔写真URL</label><input class="form-input" id="rf_photo_url" oninput="previewResume()"></div>
+        </div>
+
+        <!-- 在留・連絡 -->
+        <div class="section-title" style="font-size:11px;font-weight:800;color:var(--navy);padding:8px 0 4px;border-bottom:1px solid var(--gray-200);margin:4px 0 8px;">📋 在留・連絡</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div class="form-group"><label class="form-label">在留資格</label><input class="form-input" id="rf_current_visa_status" oninput="previewResume()"></div>
+          <div class="form-group"><label class="form-label">在留期限</label><input class="form-input" id="rf_current_visa_expiry" type="date" oninput="previewResume()"></div>
+        </div>
+        <div class="form-group" style="margin-bottom:8px"><label class="form-label">在留カード番号</label><input class="form-input" id="rf_residence_card" oninput="previewResume()"></div>
+        <div class="form-group" style="margin-bottom:8px"><label class="form-label">現住所</label><input class="form-input" id="rf_home_country_address" oninput="previewResume()"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div class="form-group"><label class="form-label">電話</label><input class="form-input" id="rf_phone" oninput="previewResume()"></div>
+          <div class="form-group"><label class="form-label">メール</label><input class="form-input" id="rf_email" oninput="previewResume()"></div>
+        </div>
+
+        <!-- 日本語・試験 -->
+        <div class="section-title" style="font-size:11px;font-weight:800;color:var(--navy);padding:8px 0 4px;border-bottom:1px solid var(--gray-200);margin:4px 0 8px;">📚 日本語・試験</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div class="form-group"><label class="form-label">日本語レベル</label><input class="form-input" id="rf_jp_language_level" placeholder="N4相当" oninput="previewResume()"></div>
+          <div class="form-group"><label class="form-label">聞き取り/会話</label><input class="form-input" id="rf_jp_language_detail" placeholder="聞き取り:△ 会話:△" oninput="previewResume()"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div class="form-group"><label class="form-label">日本語試験</label><input class="form-input" id="rf_jp_exam_1" oninput="previewResume()"></div>
+          <div class="form-group"><label class="form-label">技能試験</label><input class="form-input" id="rf_skill_exam_1" oninput="previewResume()"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div class="form-group"><label class="form-label">評価調書</label>
+            <select class="form-select" id="rf_hyoka_chosho" onchange="previewResume()">
+              ${['','有','無'].map(n=>`<option>${n}</option>`).join('')}
+            </select></div>
+          <div class="form-group"><label class="form-label">修了予定日</label><input class="form-input" id="rf_completion_date_expected" type="date" oninput="previewResume()"></div>
+        </div>
+
+        <!-- 学歴 -->
+        <div class="section-title" style="font-size:11px;font-weight:800;color:var(--navy);padding:8px 0 4px;border-bottom:1px solid var(--gray-200);margin:4px 0 8px;">🎓 学歴</div>
+        <div class="form-group" style="margin-bottom:8px"><label class="form-label">学校名</label><input class="form-input" id="rf_school_name" oninput="previewResume()"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div class="form-group"><label class="form-label">卒業年月</label><input class="form-input" id="rf_completion_date" type="date" oninput="previewResume()"></div>
+          <div class="form-group"><label class="form-label">専攻</label><input class="form-input" id="rf_major" oninput="previewResume()"></div>
+        </div>
+
+        <!-- 職歴 -->
+        <div class="section-title" style="font-size:11px;font-weight:800;color:var(--navy);padding:8px 0 4px;border-bottom:1px solid var(--gray-200);margin:4px 0 8px;">
+          💼 職歴
+          <button class="btn btn-outline" style="font-size:10px;padding:2px 8px;margin-left:8px;float:right" onclick="addWorkHistory()">＋ 追加</button>
+        </div>
+        <div id="rf_work_history_list" style="margin-bottom:8px"></div>
+        <div class="form-group" style="margin-bottom:8px"><label class="form-label">退職理由・状況</label><input class="form-input" id="rf_resignation_note" oninput="previewResume()"></div>
+
+        <!-- 就労希望 -->
+        <div class="section-title" style="font-size:11px;font-weight:800;color:var(--navy);padding:8px 0 4px;border-bottom:1px solid var(--gray-200);margin:4px 0 8px;">✅ 就労希望</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div class="form-group"><label class="form-label">希望分野</label><input class="form-input" id="rf_applicant_field" oninput="previewResume()"></div>
+          <div class="form-group"><label class="form-label">希望職種</label><input class="form-input" id="rf_job_category" oninput="previewResume()"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div class="form-group"><label class="form-label">入社可能日</label><input class="form-input" id="rf_available_from" type="date" oninput="previewResume()"></div>
+          <div class="form-group"><label class="form-label">希望給料</label><input class="form-input" id="rf_desired_salary" placeholder="18万円以上" oninput="previewResume()"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div class="form-group"><label class="form-label">手取り(残業なし)</label><input class="form-input" id="rf_net_salary_base" oninput="previewResume()"></div>
+          <div class="form-group"><label class="form-label">手取り(残業あり)</label><input class="form-input" id="rf_net_salary_overtime" oninput="previewResume()"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div class="form-group"><label class="form-label">残業・夜勤</label><input class="form-input" id="rf_overtime_preference" oninput="previewResume()"></div>
+          <div class="form-group"><label class="form-label">一時帰国希望</label><input class="form-input" id="rf_temp_return_wish" oninput="previewResume()"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div class="form-group"><label class="form-label">面接可能日時</label><input class="form-input" id="rf_interview_availability" oninput="previewResume()"></div>
+          <div class="form-group"><label class="form-label">家族の同意</label><input class="form-input" id="rf_family_consent" oninput="previewResume()"></div>
+        </div>
+        <div class="form-group" style="margin-bottom:8px"><label class="form-label">志望動機</label><textarea class="form-textarea" id="rf_motivation" rows="3" oninput="previewResume()"></textarea></div>
+
+        <!-- 健康・その他 -->
+        <div class="section-title" style="font-size:11px;font-weight:800;color:var(--navy);padding:8px 0 4px;border-bottom:1px solid var(--gray-200);margin:4px 0 8px;">🏥 健康・その他</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div class="form-group"><label class="form-label">健康状況</label><input class="form-input" id="rf_health_status" oninput="previewResume()"></div>
+          <div class="form-group"><label class="form-label">本人からの質問</label><input class="form-input" id="rf_candidate_questions" oninput="previewResume()"></div>
+        </div>
+
+        <!-- 保有資格 -->
+        <div class="section-title" style="font-size:11px;font-weight:800;color:var(--navy);padding:8px 0 4px;border-bottom:1px solid var(--gray-200);margin:4px 0 8px;">🏆 保有資格</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
+          ${[
+            {key:'career_up_card',label:'キャリアアップカード'},
+            {key:'drivers_license',label:'普通車運転免許'},
+            {key:'forklift',label:'フォークリフト'},
+            {key:'crane',label:'クレーン'},
+            {key:'tamakake',label:'玉掛け'},
+            {key:'gas_welding',label:'ガス溶接'},
+          ].map(li=>`<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;padding:4px 8px;border:1px solid var(--gray-200);border-radius:6px">
+            <input type="checkbox" id="rf_lic_${li.key}" onchange="previewResume()"> ${li.label}
+          </label>`).join('')}
+        </div>
+        <div class="form-group" style="margin-bottom:8px"><label class="form-label">その他資格</label><input class="form-input" id="rf_lic_other" oninput="previewResume()"></div>
+
+        <!-- 担当者 -->
+        <div class="section-title" style="font-size:11px;font-weight:800;color:var(--navy);padding:8px 0 4px;border-bottom:1px solid var(--gray-200);margin:4px 0 8px;">📝 担当者記入欄</div>
+        <div class="form-group" style="margin-bottom:8px"><label class="form-label">担当者の感想</label><textarea class="form-textarea" id="rf_staff_impression" rows="2" oninput="previewResume()"></textarea></div>
+        <div class="form-group" style="margin-bottom:8px"><label class="form-label">企業面接メモ</label><textarea class="form-textarea" id="rf_interview_memo" rows="2" oninput="previewResume()"></textarea></div>
+
+        <!-- 保存ボタン -->
+        <div style="padding:12px 0;border-top:1px solid var(--gray-200);display:flex;gap:8px;margin-top:8px">
+          <button class="btn btn-primary" style="flex:1" onclick="saveResume()">💾 保存</button>
+          <button class="btn btn-outline" onclick="window.print()">🖨️ 印刷</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右：プレビュー -->
+    <div style="flex:1;overflow-y:auto;padding:16px;background:#f8fafc;">
+      <div id="resumePreviewWrap">
+        <div style="text-align:center;padding:80px;color:var(--gray-400);font-size:14px;">
+          ← 候補者を選択してください
+        </div>
+      </div>
     </div>
   </div>`;
 }
 
+// 職歴の行を描画
+let _workHistory = [];
+
+function renderWorkHistoryInputs() {
+  const list = document.getElementById('rf_work_history_list');
+  if (!list) return;
+  list.innerHTML = _workHistory.map((w, i) => `
+    <div style="border:1px solid var(--gray-200);border-radius:6px;padding:8px;margin-bottom:6px;position:relative">
+      <button onclick="removeWorkHistory(${i})" style="position:absolute;top:4px;right:4px;background:none;border:none;color:var(--gray-400);cursor:pointer;font-size:14px">✕</button>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:4px">
+        <input class="form-input" style="font-size:11px" placeholder="勤務期間" value="${esc(w.period||'')}" oninput="updateWorkHistory(${i},'period',this.value)">
+        <input class="form-input" style="font-size:11px" placeholder="職種" value="${esc(w.job_type||'')}" oninput="updateWorkHistory(${i},'job_type',this.value)">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
+        <input class="form-input" style="font-size:11px" placeholder="会社名・機関名" value="${esc(w.company||'')}" oninput="updateWorkHistory(${i},'company',this.value)">
+        <input class="form-input" style="font-size:11px" placeholder="勤務地" value="${esc(w.location||'')}" oninput="updateWorkHistory(${i},'location',this.value)">
+      </div>
+    </div>`).join('');
+}
+
+function addWorkHistory() {
+  _workHistory.push({period:'',company:'',location:'',job_type:''});
+  renderWorkHistoryInputs();
+  previewResume();
+}
+
+function removeWorkHistory(i) {
+  _workHistory.splice(i, 1);
+  renderWorkHistoryInputs();
+  previewResume();
+}
+
+function updateWorkHistory(i, key, val) {
+  _workHistory[i][key] = val;
+  previewResume();
+}
+
 async function loadResumeScreen() {
-  // 候補者リスト取得
   showLoading(true);
   try {
-    if (!allCandidates.length) {
-      const data = await sbFetch('candidates?select=id,name,nationality,status&order=name.asc');
-      allCandidates = data || [];
-    }
+    const data = await sbFetch('candidates?select=id,name,nationality,status&order=name.asc');
+    allCandidates = data || [];
     const sel = document.getElementById('resumeCandidateSelect');
     if (sel) {
-      sel.innerHTML = '<option value="">── 候補者を選択してください ──</option>' +
+      sel.innerHTML = '<option value="">── 候補者を選択 ──</option>' +
         allCandidates.map(c =>
           `<option value="${c.id}">${natFlag(c.nationality)} ${esc(c.name)}（${esc(c.nationality||'')}）</option>`
         ).join('');
@@ -1879,20 +2218,120 @@ async function loadResumeScreen() {
 
 async function loadResume() {
   const id = document.getElementById('resumeCandidateSelect')?.value;
-  const wrap = document.getElementById('resumePreviewWrap');
-  if (!id || !wrap) return;
+  if (!id) return;
   showLoading(true);
   try {
     const data = await sbFetch('candidates?id=eq.' + id + '&select=*&limit=1');
     const c = data?.[0];
-    if (!c) { wrap.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray-400)">データが見つかりません</div>'; return; }
-    wrap.innerHTML = buildResumeHTML(c);
+    if (!c) { showToast('❌ 候補者データが見つかりません', 'error'); return; }
+    // フォームにデータをセット
+    fillResumeForm(c);
+    // フォームを表示
+    document.getElementById('resumeFormBody').style.display = '';
+    // プレビュー更新
+    previewResume();
   } catch(e) { showToast('❌ ' + e.message, 'error'); }
   showLoading(false);
 }
 
+function fillResumeForm(c) {
+  const g = (id, val) => { const el=document.getElementById(id); if(el) el.value = val??''; };
+  g('rf_name', c.name); g('rf_name_kana', c.name_kana); g('rf_nationality', c.nationality);
+  g('rf_gender', c.gender); g('rf_birthdate', c.birthdate); g('rf_birth_place', c.birth_place);
+  g('rf_religion', c.religion); g('rf_marital_status', c.marital_status);
+  g('rf_num_children', c.num_children); g('rf_height_cm', c.height_cm); g('rf_weight_kg', c.weight_kg);
+  g('rf_shoe_size', c.shoe_size); g('rf_photo_url', c.photo_url);
+  g('rf_current_visa_status', c.current_visa_status); g('rf_current_visa_expiry', c.current_visa_expiry);
+  g('rf_residence_card', c.residence_card); g('rf_home_country_address', c.home_country_address||c.jp_address);
+  g('rf_phone', c.phone||c.cel_phone); g('rf_email', c.email);
+  g('rf_jp_language_level', c.jp_language_level); g('rf_jp_language_detail', c.jp_language_detail);
+  g('rf_jp_exam_1', c.jp_exam_1); g('rf_skill_exam_1', c.skill_exam_1); g('rf_hyoka_chosho', c.hyoka_chosho);
+  g('rf_completion_date_expected', c.completion_date_expected);
+  g('rf_school_name', c.school_name); g('rf_completion_date', c.completion_date); g('rf_major', c.major);
+  g('rf_resignation_note', c.resignation_note);
+  g('rf_applicant_field', c.applicant_field); g('rf_job_category', c.job_category);
+  g('rf_available_from', c.available_from); g('rf_desired_salary', c.desired_salary);
+  g('rf_net_salary_base', c.net_salary_base); g('rf_net_salary_overtime', c.net_salary_overtime);
+  g('rf_overtime_preference', c.overtime_preference); g('rf_temp_return_wish', c.temp_return_wish);
+  g('rf_interview_availability', c.interview_availability); g('rf_family_consent', c.family_consent);
+  g('rf_motivation', c.motivation); g('rf_health_status', c.health_status);
+  g('rf_candidate_questions', c.candidate_questions);
+  g('rf_staff_impression', c.staff_impression); g('rf_interview_memo', c.interview_memo);
+  // 保有資格
+  const lic = c.licenses||{};
+  ['career_up_card','drivers_license','forklift','crane','tamakake','gas_welding'].forEach(k => {
+    const el=document.getElementById('rf_lic_'+k); if(el) el.checked=!!lic[k];
+  });
+  g('rf_lic_other', lic.other);
+  // 職歴
+  _workHistory = Array.isArray(c.work_history) ? [...c.work_history] : [];
+  renderWorkHistoryInputs();
+}
+
+function getResumeFormData() {
+  const g = id => document.getElementById(id)?.value||null;
+  const gb = id => { const el=document.getElementById(id); return el?el.value:null; };
+  const lic = {};
+  ['career_up_card','drivers_license','forklift','crane','tamakake','gas_welding'].forEach(k => {
+    const el=document.getElementById('rf_lic_'+k); if(el) lic[k]=el.checked;
+  });
+  lic.other = g('rf_lic_other');
+  return {
+    name: g('rf_name'), name_kana: g('rf_name_kana'), nationality: g('rf_nationality'),
+    gender: g('rf_gender'), birthdate: g('rf_birthdate'), birth_place: g('rf_birth_place'),
+    religion: g('rf_religion'), marital_status: g('rf_marital_status'),
+    num_children: document.getElementById('rf_num_children')?.value ? parseInt(document.getElementById('rf_num_children').value) : null,
+    height_cm: document.getElementById('rf_height_cm')?.value ? parseInt(document.getElementById('rf_height_cm').value) : null,
+    weight_kg: document.getElementById('rf_weight_kg')?.value ? parseInt(document.getElementById('rf_weight_kg').value) : null,
+    shoe_size: g('rf_shoe_size'), photo_url: g('rf_photo_url'),
+    current_visa_status: g('rf_current_visa_status'), current_visa_expiry: g('rf_current_visa_expiry'),
+    residence_card: g('rf_residence_card'), home_country_address: g('rf_home_country_address'),
+    phone: g('rf_phone'), email: g('rf_email'),
+    jp_language_level: g('rf_jp_language_level'), jp_language_detail: g('rf_jp_language_detail'),
+    jp_exam_1: g('rf_jp_exam_1'), skill_exam_1: g('rf_skill_exam_1'), hyoka_chosho: g('rf_hyoka_chosho'),
+    completion_date_expected: g('rf_completion_date_expected'),
+    school_name: g('rf_school_name'), completion_date: g('rf_completion_date'), major: g('rf_major'),
+    work_history: _workHistory,
+    resignation_note: g('rf_resignation_note'),
+    applicant_field: g('rf_applicant_field'), job_category: g('rf_job_category'),
+    available_from: g('rf_available_from'), desired_salary: g('rf_desired_salary'),
+    net_salary_base: g('rf_net_salary_base'), net_salary_overtime: g('rf_net_salary_overtime'),
+    overtime_preference: g('rf_overtime_preference'), temp_return_wish: g('rf_temp_return_wish'),
+    interview_availability: g('rf_interview_availability'), family_consent: g('rf_family_consent'),
+    motivation: g('rf_motivation'), health_status: g('rf_health_status'),
+    candidate_questions: g('rf_candidate_questions'),
+    staff_impression: g('rf_staff_impression'), interview_memo: g('rf_interview_memo'),
+    licenses: lic,
+    updated_at: new Date().toISOString()
+  };
+}
+
+async function saveResume() {
+  const id = document.getElementById('resumeCandidateSelect')?.value;
+  if (!id) { showToast('❌ 候補者を選択してください', 'error'); return; }
+  const data = getResumeFormData();
+  showLoading(true);
+  try {
+    await sbFetch('candidates?id=eq.' + id, { method:'PATCH', body: JSON.stringify(data) });
+    showToast('✅ 保存しました', 'success');
+    // 候補者一覧も更新
+    const idx = allCandidates.findIndex(c => c.id === id);
+    if (idx >= 0) allCandidates[idx] = { ...allCandidates[idx], ...data };
+  } catch(e) { showToast('❌ ' + e.message, 'error'); }
+  showLoading(false);
+}
+
+// リアルタイムプレビュー
+function previewResume() {
+  const wrap = document.getElementById('resumePreviewWrap');
+  if (!wrap) return;
+  const data = getResumeFormData();
+  // 候補者IDをダミーとして渡す（IDは不要）
+  wrap.innerHTML = buildResumeHTML(data);
+}
+
 function buildResumeHTML(c) {
-  const wh = c.work_history || [];
+  const wh = Array.isArray(c.work_history) ? c.work_history : (c.work_history || []);
   const lic = c.licenses || {};
   const today = new Date();
   const dateStr = today.getFullYear() + '年' + (today.getMonth()+1) + '月' + today.getDate() + '日現在';
@@ -1910,49 +2349,40 @@ function buildResumeHTML(c) {
 <style>
 @media print {
   .sidebar, .main-wrap > .topbar, .filters-section,
-  #resumeCandidateSelect, .topbar-actions,
-  button, .stats-row { display: none !important; }
+  #resumeEditPanel, .topbar-actions, button, .stats-row { display: none !important; }
   .main-wrap { margin-left: 0 !important; }
   body { background: white !important; }
   .resume-page { box-shadow: none !important; margin: 0 !important; border: none !important; }
   @page { margin: 10mm; size: A4; }
 }
 .resume-page {
-  background: white;
-  max-width: 820px;
-  margin: 0 auto;
-  padding: 24px 28px;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+  background: white; max-width: 760px; margin: 0 auto; padding: 20px 24px;
+  border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);
   font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic', sans-serif;
-  font-size: 12px;
-  color: #111;
-  line-height: 1.5;
+  font-size: 12px; color: #111; line-height: 1.5;
 }
 .resume-date { text-align: right; font-size: 11px; color: #555; margin-bottom: 4px; }
-.resume-title { text-align: center; font-size: 22px; font-weight: 900; letter-spacing: 8px; margin-bottom: 4px; border-bottom: 3px double #333; padding-bottom: 6px; }
-.resume-subtitle { text-align: center; font-size: 11px; color: #777; margin-bottom: 14px; }
-.resume-grid { display: grid; grid-template-columns: 1fr 140px; gap: 12px; margin-bottom: 12px; }
+.resume-title { text-align: center; font-size: 20px; font-weight: 900; letter-spacing: 8px; margin-bottom: 4px; border-bottom: 3px double #333; padding-bottom: 6px; }
+.resume-subtitle { text-align: center; font-size: 11px; color: #777; margin-bottom: 12px; }
+.resume-grid { display: grid; grid-template-columns: 1fr 130px; gap: 10px; margin-bottom: 10px; }
 .resume-info table { width: 100%; border-collapse: collapse; }
-.resume-info td { padding: 4px 8px; border: 1px solid #ccc; font-size: 12px; vertical-align: top; }
-.resume-info td.lbl { background: #f5f5f5; font-weight: 700; width: 90px; white-space: nowrap; color: #333; font-size: 11px; }
-.resume-photo { border: 1px solid #ccc; border-radius: 4px; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #f9f9f9; min-height: 160px; }
+.resume-info td { padding: 3px 7px; border: 1px solid #ccc; font-size: 11px; vertical-align: top; }
+.resume-info td.lbl { background: #f5f5f5; font-weight: 700; width: 80px; white-space: nowrap; color: #333; font-size: 10px; }
+.resume-photo { border: 1px solid #ccc; border-radius: 4px; display: flex; align-items: center; justify-content: center; background: #f9f9f9; min-height: 150px; }
 .resume-photo img { width: 100%; height: 100%; object-fit: cover; }
 .resume-photo-placeholder { text-align: center; color: #bbb; font-size: 11px; padding: 10px; }
-.resume-section { margin-bottom: 10px; }
-.resume-section-title { background: #0f2040; color: white; padding: 4px 10px; font-size: 11px; font-weight: 700; letter-spacing: 1px; border-radius: 3px; margin-bottom: 6px; }
-.resume-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.resume-table th { background: #f0f4f8; padding: 4px 8px; border: 1px solid #ccc; font-size: 11px; font-weight: 700; color: #333; white-space: nowrap; }
-.resume-table td { padding: 5px 8px; border: 1px solid #ccc; vertical-align: top; }
-.resume-table td.lbl { background: #f8f9fa; font-weight: 700; width: 90px; color: #333; font-size: 11px; white-space: nowrap; }
-.resume-lic-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
-.resume-lic-item { border: 1px solid #ccc; border-radius: 4px; padding: 4px 8px; font-size: 11px; display: flex; align-items: center; justify-content: space-between; }
-.resume-lic-item .lic-check { font-size: 14px; }
+.resume-section { margin-bottom: 8px; }
+.resume-section-title { background: #0f2040; color: white; padding: 3px 8px; font-size: 10px; font-weight: 700; letter-spacing: 1px; border-radius: 3px; margin-bottom: 5px; }
+.resume-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.resume-table th { background: #f0f4f8; padding: 3px 7px; border: 1px solid #ccc; font-size: 10px; font-weight: 700; color: #333; white-space: nowrap; }
+.resume-table td { padding: 4px 7px; border: 1px solid #ccc; vertical-align: top; }
+.resume-table td.lbl { background: #f8f9fa; font-weight: 700; width: 80px; color: #333; font-size: 10px; white-space: nowrap; }
+.resume-lic-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
+.resume-lic-item { border: 1px solid #ccc; border-radius: 3px; padding: 3px 6px; font-size: 10px; display: flex; align-items: center; justify-content: space-between; }
 .resume-lic-item .has { color: #16a34a; font-weight: 700; }
 .resume-lic-item .none { color: #ccc; }
-.resume-memo-box { border: 1px solid #ccc; border-radius: 4px; padding: 8px 10px; min-height: 48px; font-size: 12px; background: #fafafa; }
-.resume-sign { text-align: right; font-size: 11px; color: #555; margin-top: 10px; padding-top: 6px; border-top: 1px solid #eee; }
+.resume-memo-box { border: 1px solid #ccc; border-radius: 3px; padding: 6px 8px; min-height: 36px; font-size: 11px; background: #fafafa; }
+.resume-sign { text-align: right; font-size: 10px; color: #555; margin-top: 8px; padding-top: 5px; border-top: 1px solid #eee; }
 </style>
 
 <div class="resume-page" id="resumeContent">
@@ -1960,234 +2390,100 @@ function buildResumeHTML(c) {
   <div class="resume-title">履 歴 書</div>
   <div class="resume-subtitle">履歴書（KMT用）</div>
 
-  <!-- 基本情報 + 写真 -->
   <div class="resume-grid">
     <div class="resume-info">
       <table>
-        <tr>
-          <td class="lbl">フリガナ</td>
-          <td>${esc(c.name_kana || '')}</td>
-        </tr>
-        <tr>
-          <td class="lbl">氏名</td>
-          <td style="font-size:14px;font-weight:700">${esc(c.name || '')}</td>
-        </tr>
-        <tr>
-          <td class="lbl">生年月日</td>
-          <td>${c.birthdate ? formatDate(c.birthdate) : ''}&nbsp;&nbsp;年齢：${calcAge(c.birthdate)}歳</td>
-        </tr>
-        <tr>
-          <td class="lbl">国籍</td>
-          <td>${natFlag(c.nationality)} ${esc(c.nationality || '')}&nbsp;&nbsp;出身地：${esc(c.birth_place || '')}</td>
-        </tr>
-        <tr>
-          <td class="lbl">性別</td>
-          <td>${esc(c.gender || '')}&nbsp;&nbsp;&nbsp;宗教：${esc(c.religion || '')}</td>
-        </tr>
-        <tr>
-          <td class="lbl">配偶者</td>
-          <td>${esc(c.marital_status || '')}&nbsp;&nbsp;&nbsp;子供：${c.num_children != null ? c.num_children + '人' : ''}</td>
-        </tr>
-        <tr>
-          <td class="lbl">身長 / 体重</td>
-          <td>${c.height_cm ? c.height_cm + 'cm' : ''}&nbsp;&nbsp;${c.weight_kg ? c.weight_kg + 'kg' : ''}&nbsp;&nbsp;靴：${esc(c.shoe_size || '')}</td>
-        </tr>
+        <tr><td class="lbl">フリガナ</td><td>${esc(c.name_kana||'')}</td></tr>
+        <tr><td class="lbl">氏名</td><td style="font-size:13px;font-weight:700">${esc(c.name||'')}</td></tr>
+        <tr><td class="lbl">生年月日</td><td>${c.birthdate?formatDate(c.birthdate):''}&nbsp;年齢：${calcAge(c.birthdate)}歳</td></tr>
+        <tr><td class="lbl">国籍</td><td>${natFlag(c.nationality)} ${esc(c.nationality||'')}&nbsp;出身地：${esc(c.birth_place||'')}</td></tr>
+        <tr><td class="lbl">性別</td><td>${esc(c.gender||'')}&nbsp;&nbsp;宗教：${esc(c.religion||'')}</td></tr>
+        <tr><td class="lbl">配偶者</td><td>${esc(c.marital_status||'')}&nbsp;&nbsp;子供：${c.num_children!=null?c.num_children+'人':''}</td></tr>
+        <tr><td class="lbl">身長/体重</td><td>${c.height_cm?c.height_cm+'cm':''}　${c.weight_kg?c.weight_kg+'kg':''}　靴：${esc(c.shoe_size||'')}</td></tr>
       </table>
     </div>
     <div class="resume-photo">
-      ${c.photo_url
-        ? `<img src="${esc(c.photo_url)}" alt="顔写真">`
-        : `<div class="resume-photo-placeholder">📷<br>顔写真<br>（未登録）</div>`}
+      ${c.photo_url?`<img src="${esc(c.photo_url)}" alt="顔写真">`:`<div class="resume-photo-placeholder">📷<br>顔写真<br>（未登録）</div>`}
     </div>
   </div>
 
-  <!-- 在留・連絡情報 -->
   <div class="resume-section">
     <div class="resume-section-title">📋 在留・連絡情報</div>
     <table class="resume-table">
-      <tr>
-        <td class="lbl">在留資格</td>
-        <td>${esc(c.current_visa_status || '')}</td>
-        <td class="lbl">在留期限</td>
-        <td>${c.current_visa_expiry ? formatDate(c.current_visa_expiry) : ''}</td>
-      </tr>
-      <tr>
-        <td class="lbl">現住所</td>
-        <td colspan="3">${esc(c.home_country_address || c.jp_address || '')}</td>
-      </tr>
-      <tr>
-        <td class="lbl">電話</td>
-        <td>${esc(c.phone || c.cel_phone || '')}</td>
-        <td class="lbl">メール</td>
-        <td>${esc(c.email || '')}</td>
-      </tr>
-      <tr>
-        <td class="lbl">在留カード</td>
-        <td colspan="3">${esc(c.residence_card || '')}</td>
-      </tr>
+      <tr><td class="lbl">在留資格</td><td>${esc(c.current_visa_status||'')}</td><td class="lbl">在留期限</td><td>${c.current_visa_expiry?formatDate(c.current_visa_expiry):''}</td></tr>
+      <tr><td class="lbl">現住所</td><td colspan="3">${esc(c.home_country_address||c.jp_address||'')}</td></tr>
+      <tr><td class="lbl">電話</td><td>${esc(c.phone||c.cel_phone||'')}</td><td class="lbl">メール</td><td>${esc(c.email||'')}</td></tr>
+      <tr><td class="lbl">在留カード</td><td colspan="3">${esc(c.residence_card||'')}</td></tr>
     </table>
   </div>
 
-  <!-- 日本語・試験 -->
   <div class="resume-section">
     <div class="resume-section-title">📚 日本語・技能試験</div>
     <table class="resume-table">
-      <tr>
-        <td class="lbl">日本語レベル</td>
-        <td>${esc(c.jp_language_level || '')}</td>
-        <td class="lbl">聞き取り/会話</td>
-        <td>${esc(c.jp_language_detail || '')}</td>
-      </tr>
-      <tr>
-        <td class="lbl">日本語試験</td>
-        <td>${esc(c.jp_exam_1 || '')}</td>
-        <td class="lbl">技能試験</td>
-        <td>${esc(c.skill_exam_1 || '')}</td>
-      </tr>
-      <tr>
-        <td class="lbl">評価調書</td>
-        <td>${esc(c.hyoka_chosho || '')}</td>
-        <td class="lbl">修了予定日</td>
-        <td>${c.completion_date_expected ? formatDate(c.completion_date_expected) : ''}</td>
-      </tr>
+      <tr><td class="lbl">日本語レベル</td><td>${esc(c.jp_language_level||'')}</td><td class="lbl">聞き取り/会話</td><td>${esc(c.jp_language_detail||'')}</td></tr>
+      <tr><td class="lbl">日本語試験</td><td>${esc(c.jp_exam_1||'')}</td><td class="lbl">技能試験</td><td>${esc(c.skill_exam_1||'')}</td></tr>
+      <tr><td class="lbl">評価調書</td><td>${esc(c.hyoka_chosho||'')}</td><td class="lbl">修了予定日</td><td>${c.completion_date_expected?formatDate(c.completion_date_expected):''}</td></tr>
     </table>
   </div>
 
-  <!-- 学歴 -->
   <div class="resume-section">
     <div class="resume-section-title">🎓 学歴</div>
     <table class="resume-table">
-      <tr>
-        <th style="width:100px">入学年月</th>
-        <th style="width:100px">卒業年月</th>
-        <th>学歴（学校名・学科）</th>
-      </tr>
-      <tr>
-        <td></td>
-        <td>${c.completion_date ? formatDate(c.completion_date) : ''}</td>
-        <td>${esc(c.school_name || '')} ${esc(c.major || '')} ${esc(c.major_detail || '')}</td>
-      </tr>
+      <tr><th style="width:90px">卒業年月</th><th>学校名・学科</th></tr>
+      <tr><td>${c.completion_date?formatDate(c.completion_date):''}</td><td>${esc(c.school_name||'')} ${esc(c.major||'')}</td></tr>
     </table>
   </div>
 
-  <!-- 職歴 -->
   <div class="resume-section">
     <div class="resume-section-title">💼 職歴</div>
     <table class="resume-table">
-      <tr>
-        <th style="width:180px">勤務期間</th>
-        <th>所属機関</th>
-        <th style="width:100px">勤務地</th>
-        <th style="width:100px">職種</th>
-      </tr>
-      ${wh.length ? wh.map(w => `<tr>
-        <td>${esc(w.period || '')}</td>
-        <td>${esc(w.company || '')}</td>
-        <td>${esc(w.location || '')}</td>
-        <td>${esc(w.job_type || '')}</td>
-      </tr>`).join('') : '<tr><td colspan="4" style="color:#bbb;text-align:center">（職歴なし）</td></tr>'}
+      <tr><th style="width:160px">勤務期間</th><th>所属機関</th><th style="width:90px">勤務地</th><th style="width:90px">職種</th></tr>
+      ${wh.length?wh.map(w=>`<tr><td>${esc(w.period||'')}</td><td>${esc(w.company||'')}</td><td>${esc(w.location||'')}</td><td>${esc(w.job_type||'')}</td></tr>`).join(''):'<tr><td colspan="4" style="color:#bbb;text-align:center">（職歴なし）</td></tr>'}
     </table>
-    ${c.resignation_note ? `<div style="font-size:11px;color:#555;margin-top:4px;padding:4px 8px;background:#f9f9f9;border:1px solid #eee;border-radius:3px">退職理由等：${esc(c.resignation_note)}</div>` : ''}
+    ${c.resignation_note?`<div style="font-size:10px;color:#555;margin-top:3px;padding:3px 6px;background:#f9f9f9;border:1px solid #eee;border-radius:2px">退職理由：${esc(c.resignation_note)}</div>`:''}
   </div>
 
-  <!-- 就労希望条件 -->
   <div class="resume-section">
     <div class="resume-section-title">✅ 就労希望条件</div>
     <table class="resume-table">
-      <tr>
-        <td class="lbl">希望分野</td>
-        <td>${esc(c.applicant_field || '')}</td>
-        <td class="lbl">希望職種</td>
-        <td>${esc(c.job_category || '')}</td>
-      </tr>
-      <tr>
-        <td class="lbl">入社可能日</td>
-        <td>${c.available_from ? formatDate(c.available_from) : ''}</td>
-        <td class="lbl">現在の給与</td>
-        <td>${esc(c.current_salary || '')}</td>
-      </tr>
-      <tr>
-        <td class="lbl">手取り(残業なし)</td>
-        <td>${esc(c.net_salary_base || '')}</td>
-        <td class="lbl">手取り(残業あり)</td>
-        <td>${esc(c.net_salary_overtime || '')}</td>
-      </tr>
-      <tr>
-        <td class="lbl">希望給料</td>
-        <td>${esc(c.desired_salary || '')}</td>
-        <td class="lbl">残業・夜勤希望</td>
-        <td>${esc(c.overtime_preference || '')}</td>
-      </tr>
-      <tr>
-        <td class="lbl">面接可能日時</td>
-        <td>${esc(c.interview_availability || '')}</td>
-        <td class="lbl">一時帰国希望</td>
-        <td>${esc(c.temp_return_wish || '')}</td>
-      </tr>
-      <tr>
-        <td class="lbl">家族の同意</td>
-        <td colspan="3">${esc(c.family_consent || '')}</td>
-      </tr>
+      <tr><td class="lbl">希望分野</td><td>${esc(c.applicant_field||'')}</td><td class="lbl">希望職種</td><td>${esc(c.job_category||'')}</td></tr>
+      <tr><td class="lbl">入社可能日</td><td>${c.available_from?formatDate(c.available_from):''}</td><td class="lbl">希望給料</td><td>${esc(c.desired_salary||'')}</td></tr>
+      <tr><td class="lbl">手取(残業なし)</td><td>${esc(c.net_salary_base||'')}</td><td class="lbl">手取(残業あり)</td><td>${esc(c.net_salary_overtime||'')}</td></tr>
+      <tr><td class="lbl">残業・夜勤</td><td>${esc(c.overtime_preference||'')}</td><td class="lbl">一時帰国希望</td><td>${esc(c.temp_return_wish||'')}</td></tr>
+      <tr><td class="lbl">面接可能日時</td><td>${esc(c.interview_availability||'')}</td><td class="lbl">家族の同意</td><td>${esc(c.family_consent||'')}</td></tr>
     </table>
   </div>
 
-  <!-- 志望動機 -->
-  ${c.motivation ? `<div class="resume-section">
-    <div class="resume-section-title">💬 志望動機</div>
-    <div class="resume-memo-box">${esc(c.motivation)}</div>
-  </div>` : ''}
+  ${c.motivation?`<div class="resume-section"><div class="resume-section-title">💬 志望動機</div><div class="resume-memo-box">${esc(c.motivation)}</div></div>`:''}
 
-  <!-- 健康・その他 -->
   <div class="resume-section">
     <div class="resume-section-title">🏥 健康・その他</div>
     <table class="resume-table">
-      <tr>
-        <td class="lbl">健康状況</td>
-        <td>${esc(c.health_status || '')}</td>
-        <td class="lbl">確認事項同意</td>
-        <td>${c.terms_agreed === true ? '✅ 同意している' : c.terms_agreed === false ? '❌ 未同意' : ''}</td>
-      </tr>
-      ${c.candidate_questions ? `<tr><td class="lbl">本人からの質問</td><td colspan="3">${esc(c.candidate_questions)}</td></tr>` : ''}
+      <tr><td class="lbl">健康状況</td><td>${esc(c.health_status||'')}</td><td class="lbl">本人の質問</td><td>${esc(c.candidate_questions||'')}</td></tr>
     </table>
   </div>
 
-  <!-- 保有資格 -->
   <div class="resume-section">
     <div class="resume-section-title">🏆 保有資格</div>
     <div class="resume-lic-grid">
-      ${licItems.map(li => `
-        <div class="resume-lic-item">
-          <span>${li.label}</span>
-          <span class="lic-check ${lic[li.key] ? 'has' : 'none'}">${lic[li.key] ? '✓ 有' : '無'}</span>
-        </div>`).join('')}
+      ${licItems.map(li=>`<div class="resume-lic-item"><span>${li.label}</span><span class="${lic[li.key]?'has':'none'}">${lic[li.key]?'✓ 有':'無'}</span></div>`).join('')}
     </div>
-    ${lic.other ? `<div style="margin-top:6px;font-size:11px">その他：${esc(lic.other)}</div>` : ''}
+    ${lic.other?`<div style="margin-top:4px;font-size:10px">その他：${esc(lic.other)}</div>`:''}
   </div>
 
-  <!-- 担当者記入欄 -->
   <div class="resume-section">
     <div class="resume-section-title">📝 担当者記入欄</div>
     <table class="resume-table">
-      ${c.staff_impression ? `<tr><td class="lbl">担当者の感想</td><td colspan="3">${esc(c.staff_impression)}</td></tr>` : '<tr><td class="lbl">担当者の感想</td><td colspan="3" style="min-height:40px">&nbsp;</td></tr>'}
-      ${c.interview_memo ? `<tr><td class="lbl">企業面接メモ</td><td colspan="3">${esc(c.interview_memo)}</td></tr>` : '<tr><td class="lbl">企業面接メモ</td><td colspan="3" style="min-height:40px">&nbsp;</td></tr>'}
+      <tr><td class="lbl">担当者の感想</td><td colspan="3" style="min-height:32px">${esc(c.staff_impression||'　')}</td></tr>
+      <tr><td class="lbl">企業面接メモ</td><td colspan="3" style="min-height:32px">${esc(c.interview_memo||'　')}</td></tr>
     </table>
   </div>
 
-  <div class="resume-sign">
-    KMT案件管理システム | 出力日: ${dateStr}
-  </div>
+  <div class="resume-sign">KMT案件管理システム | 出力日: ${dateStr}</div>
 </div>`;
 }
 
-function calcAge(birthdate) {
-  if (!birthdate) return '-';
-  const b = new Date(birthdate);
-  const today = new Date();
-  let age = today.getFullYear() - b.getFullYear();
-  const m = today.getMonth() - b.getMonth();
-  if (m < 0 || (m === 0 && today.getDate() < b.getDate())) age--;
-  return age;
-}
+
 
 // ==============================
 // 汎用モーダル・ユーティリティ
