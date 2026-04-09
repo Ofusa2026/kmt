@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260409.04 -->
+<!-- KMT_VERSION ver.20260409.05 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -172,7 +172,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260409.04</div>
+    <div class="logo-ver">ver.20260409.05</div>
   </div>
   <div class="sidebar-section">メイン</div>
   <div class="nav-item active" onclick="showScreen('companies')">🏢 受入企業</div>
@@ -511,21 +511,51 @@ const SB_URL = 'https://oyblvyocvdnhcxeeokuw.supabase.co';
 const SB_KEY = 'sb_publishable_4eI_7HdWRTnYaUpm7-mlRQ_4P3ialza';
 
 async function sbFetch(path, opts={}) {
-  const res = await fetch(SB_URL + '/rest/v1/' + path, {
+  const headers = {
+    'apikey': SB_KEY,
+    'Authorization': 'Bearer ' + SB_KEY,
+    'Content-Type': 'application/json',
+    'Prefer': opts.prefer || 'return=representation',
+    ...opts.headers
+  };
+  // ページネーション用: countも返す
+  if (opts.count) headers['Prefer'] = (headers['Prefer'] ? headers['Prefer'] + ',' : '') + 'count=exact';
+  const res = await fetch(SB_URL + '/rest/v1/' + path, { headers, ...opts });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || res.statusText);
+  }
+  if (opts.method === 'DELETE') return null;
+  const data = await res.json();
+  if (opts.count) {
+    const total = parseInt(res.headers.get('content-range')?.split('/')[1] || '0');
+    return { data, total };
+  }
+  return data;
+}
+
+// サーバーサイドページネーション用fetch
+async function sbFetchPage(table, query, page, pageSize) {
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+  const res = await fetch(SB_URL + '/rest/v1/' + table + '?' + query, {
     headers: {
       'apikey': SB_KEY,
       'Authorization': 'Bearer ' + SB_KEY,
       'Content-Type': 'application/json',
-      'Prefer': opts.prefer || 'return=representation',
-      ...opts.headers
-    },
-    ...opts
+      'Prefer': 'count=exact',
+      'Range': from + '-' + to,
+      'Range-Unit': 'items'
+    }
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.message || res.statusText);
   }
-  return opts.method === 'DELETE' ? null : res.json();
+  const data = await res.json();
+  const range = res.headers.get('content-range') || '';
+  const total = parseInt(range.split('/')[1] || '0');
+  return { data, total };
 }
 
 // ===== STATE =====
@@ -1677,12 +1707,39 @@ async function savePartner(){const g=id=>document.getElementById(id)?.value||nul
 // ==============================
 // 💴 支援委託費
 // ==============================
-let allFees=[],filteredFees=[],feePage=1;
+let allFees=[],filteredFees=[],feePage=1,feeTotalCount=0;
 function buildFeesScreen(){return `<div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;"><input class="search-input" id="feSearchInput" placeholder="企業名で検索..." oninput="applyFeeFilters()" style="flex:1;min-width:200px;"><select class="filter-select" id="feFilterStatus" onchange="applyFeeFilters()"><option value="">全ステータス</option><option>未請求</option><option>請求済</option><option>入金済</option><option>未入金</option></select><input class="filter-select" id="feFilterMonth" type="month" onchange="applyFeeFilters()" style="padding:3px 6px"><button class="btn btn-outline" style="font-size:11px;padding:4px 10px" onclick="clearFeeFilters()">✕</button></div><div class="table-wrap"><table><thead><tr><th>請求月</th><th>企業名</th><th>人数</th><th>単価</th><th>税抜金額</th><th>税込金額</th><th>費用種別</th><th>請求日</th><th>入金日</th><th>ステータス</th></tr></thead><tbody id="feeTbody"><tr><td colspan="10" style="text-align:center;padding:40px;color:var(--gray-400)">読み込み中...</td></tr></tbody></table><div class="pagination-bar" id="feePagination"></div></div>`;}
-async function loadFees(){showLoading(true);try{const data=await sbFetch('support_fees?select=*,companies(name)&order=billing_month.desc,created_at.desc');allFees=data||[];applyFeeFilters();}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
-function applyFeeFilters(){if(currentScreen!=='fees')return;const q=(document.getElementById('feSearchInput')?.value||'').toLowerCase();const status=document.getElementById('feFilterStatus')?.value||'';const month=document.getElementById('feFilterMonth')?.value||'';filteredFees=allFees.filter(f=>{if(q&&!((f.companies?.name||'').toLowerCase().includes(q)))return false;if(status&&f.status!==status)return false;if(month&&!f.billing_month?.startsWith(month))return false;return true;});feePage=1;renderFeeTable();}
-function clearFeeFilters(){['feSearchInput','feFilterStatus','feFilterMonth'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});applyFeeFilters();}
-function renderFeeTable(){const tbody=document.getElementById('feeTbody');if(!tbody)return;const total=filteredFees.length;const page=filteredFees.slice((feePage-1)*PAGE_SIZE,feePage*PAGE_SIZE);if(!page.length){tbody.innerHTML='<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--gray-400)">データなし</td></tr>';document.getElementById('feePagination').innerHTML='';return;}const stCls={未請求:'st-add',請求済:'st-review',入金済:'st-active',未入金:'st-danger'};tbody.innerHTML=page.map(f=>`<tr onclick="openFeeModal('${f.id}')"><td style="font-weight:700">${esc(f.billing_month||'-')}</td><td style="font-size:12px">${esc(f.companies?.name||'-')}</td><td style="text-align:center">${f.worker_count??'-'}</td><td style="font-size:12px">${f.unit_price?Number(f.unit_price).toLocaleString()+'円':'-'}</td><td style="font-weight:700">${f.amount_excl?Number(f.amount_excl).toLocaleString()+'円':'-'}</td><td>${f.amount_incl?Number(f.amount_incl).toLocaleString()+'円':'-'}</td><td style="font-size:11px">${esc(f.fee_type||'-')}</td><td style="font-size:12px">${f.billed_date?formatDate(f.billed_date):'-'}</td><td style="font-size:12px">${f.paid_date?formatDate(f.paid_date):'-'}</td><td><span class="st-badge ${stCls[f.status]||'st-none'}">${esc(f.status||'-')}</span></td></tr>`).join('');renderGenPagination('feePagination',total,feePage,p=>{feePage=p;renderFeeTable();});}
+async function loadFees(page) {
+  if (page) feePage = page;
+  showLoading(true);
+  try {
+    // フィルター条件を組み立て
+    let q = 'select=*,companies(name)&order=billing_month.desc,created_at.desc';
+    const status = document.getElementById('feFilterStatus')?.value||'';
+    const month = document.getElementById('feFilterMonth')?.value||'';
+    const q2 = document.getElementById('feSearchInput')?.value||'';
+    if (status) q += '&status=eq.' + encodeURIComponent(status);
+    if (month) q += '&billing_month=like.' + encodeURIComponent(month + '*');
+    const { data, total } = await sbFetchPage('support_fees', q, feePage, PAGE_SIZE);
+    allFees = data || [];
+    feeTotalCount = total;
+    renderFeeTableDirect();
+  } catch(e) { showToast('❌ ' + e.message, 'error'); }
+  showLoading(false);
+}
+function applyFeeFilters() { loadFees(1); }
+function clearFeeFilters() {
+  ['feSearchInput','feFilterStatus','feFilterMonth'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  loadFees(1);
+}
+function renderFeeTableDirect() {
+  const tbody=document.getElementById('feeTbody'); if(!tbody) return;
+  if(!allFees.length){tbody.innerHTML='<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--gray-400)">データなし</td></tr>';document.getElementById('feePagination').innerHTML='';return;}
+  const stCls={未請求:'st-add',請求済:'st-review',入金済:'st-active',未入金:'st-danger'};
+  tbody.innerHTML=allFees.map(f=>`<tr onclick="openFeeModal('${f.id}')"><td style="font-weight:700">${esc(f.billing_month||'-')}</td><td style="font-size:12px">${esc(f.companies?.name||'-')}</td><td style="text-align:center">${f.worker_count??'-'}</td><td style="font-size:12px">${f.unit_price?Number(f.unit_price).toLocaleString()+'円':'-'}</td><td style="font-weight:700">${f.amount_excl?Number(f.amount_excl).toLocaleString()+'円':'-'}</td><td>${f.amount_incl?Number(f.amount_incl).toLocaleString()+'円':'-'}</td><td style="font-size:11px">${esc(f.fee_type||'-')}</td><td style="font-size:12px">${f.billed_date?formatDate(f.billed_date):'-'}</td><td style="font-size:12px">${f.paid_date?formatDate(f.paid_date):'-'}</td><td><span class="st-badge ${stCls[f.status]||'st-none'}">${esc(f.status||'-')}</span></td></tr>`).join('');
+  renderGenPagination('feePagination', feeTotalCount, feePage, p => loadFees(p));
+}
+// applyFeeFilters/clearFeeFilters/renderFeeTable → loadFees()に統合
 function openFeeModal(id){const f=id?allFees.find(x=>x.id===id):null;editingFeeId=id;showGenModal('feeModal',id?'💴 委託費詳細':'💴 委託費登録',buildFeeModalBody(f));}
 let editingFeeId=null;
 function buildFeeModalBody(f){f=f||{};const autoCalc=()=>{const wp=parseInt(document.getElementById('ff_worker_count')?.value||0);const up=parseInt(document.getElementById('ff_unit_price')?.value||0);const excl=wp*up;document.getElementById('ff_amount_excl').value=excl||'';document.getElementById('ff_amount_incl').value=excl?Math.round(excl*1.1):'';};return `<div class="form-grid"><div class="section-title">請求情報</div><div class="form-group full"><label class="form-label">企業</label><select class="form-select" id="ff_company_id"><option value="">選択...</option>${allCompanies.map(c=>`<option value="${c.id}" ${f.company_id===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">請求月 (YYYY-MM)</label><input class="form-input" id="ff_billing_month" value="${esc(f.billing_month||'')}" placeholder="2026-04"></div><div class="form-group"><label class="form-label">費用種別</label><select class="form-select" id="ff_fee_type">${['通常委託費','新規委託費','初期費用','その他'].map(s=>`<option ${f.fee_type===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">対象人数</label><input class="form-input" id="ff_worker_count" type="number" value="${f.worker_count??''}" oninput="(${autoCalc.toString()})()"></div><div class="form-group"><label class="form-label">単価（税抜）</label><input class="form-input" id="ff_unit_price" type="number" value="${f.unit_price??''}" oninput="(${autoCalc.toString()})()"></div><div class="form-group"><label class="form-label">金額（税抜）</label><input class="form-input" id="ff_amount_excl" type="number" value="${f.amount_excl??''}"></div><div class="form-group"><label class="form-label">金額（税込）</label><input class="form-input" id="ff_amount_incl" type="number" value="${f.amount_incl??''}"></div><div class="form-group"><label class="form-label">ステータス</label><select class="form-select" id="ff_status">${['未請求','請求済','入金済','未入金'].map(s=>`<option ${f.status===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">請求日</label><input class="form-input" id="ff_billed_date" type="date" value="${f.billed_date||''}"></div><div class="form-group"><label class="form-label">入金日</label><input class="form-input" id="ff_paid_date" type="date" value="${f.paid_date||''}"></div><div class="form-group full"><label class="form-label">備考</label><textarea class="form-textarea" id="ff_notes">${esc(f.notes||'')}</textarea></div></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)"><button class="btn btn-outline" onclick="closeGenModal('feeModal')">キャンセル</button><button class="btn btn-primary" onclick="saveFee()">💾 保存</button></div>`;}
@@ -1691,12 +1748,37 @@ async function saveFee(){const g=id=>document.getElementById(id)?.value||null;co
 // ==============================
 // 📊 売上管理
 // ==============================
-let allSales=[],filteredSales=[],salePage=1;
+let allSales=[],filteredSales=[],salePage=1,saleTotalCount=0;
 function buildSalesScreen(){return `<div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;"><input class="search-input" id="saSearchInput" placeholder="企業名・項目名で検索..." oninput="applySaleFilters()" style="flex:1;min-width:200px;"><select class="filter-select" id="saFilterCertainty" onchange="applySaleFilters()"><option value="">全確度</option><option>確定</option><option>50%</option><option>期待</option></select><input class="filter-select" id="saFilterMonth" type="month" onchange="applySaleFilters()" style="padding:3px 6px"><button class="btn btn-outline" style="font-size:11px;padding:4px 10px" onclick="clearSaleFilters()">✕</button></div><div class="table-wrap"><table><thead><tr><th>請求月</th><th>企業名</th><th>項目</th><th>単価</th><th>数量</th><th>税抜</th><th>税込</th><th>確度</th><th>カテゴリ</th><th>法人</th></tr></thead><tbody id="saleTbody"><tr><td colspan="10" style="text-align:center;padding:40px;color:var(--gray-400)">読み込み中...</td></tr></tbody></table><div class="pagination-bar" id="salePagination"></div></div>`;}
-async function loadSales(){showLoading(true);try{const data=await sbFetch('sales_forecast?select=*,companies(name)&order=billing_month.desc,created_at.desc');allSales=data||[];applySaleFilters();}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
-function applySaleFilters(){if(currentScreen!=='sales')return;const q=(document.getElementById('saSearchInput')?.value||'').toLowerCase();const cert=document.getElementById('saFilterCertainty')?.value||'';const month=document.getElementById('saFilterMonth')?.value||'';filteredSales=allSales.filter(s=>{if(q&&!((s.companies?.name||'').toLowerCase().includes(q)||(s.item_name||'').toLowerCase().includes(q)))return false;if(cert&&s.certainty!==cert)return false;if(month&&!s.billing_month?.startsWith(month))return false;return true;});salePage=1;renderSaleTable();}
-function clearSaleFilters(){['saSearchInput','saFilterCertainty','saFilterMonth'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});applySaleFilters();}
-function renderSaleTable(){const tbody=document.getElementById('saleTbody');if(!tbody)return;const total=filteredSales.length;const page=filteredSales.slice((salePage-1)*PAGE_SIZE,salePage*PAGE_SIZE);if(!page.length){tbody.innerHTML='<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--gray-400)">データなし</td></tr>';document.getElementById('salePagination').innerHTML='';return;}const cCls={確定:'st-active','50%':'st-review',期待:'st-none'};tbody.innerHTML=page.map(s=>`<tr onclick="openSaleModal('${s.id}')"><td style="font-weight:700">${esc(s.billing_month||'-')}</td><td style="font-size:12px">${esc(s.companies?.name||'-')}</td><td style="font-size:12px">${esc(s.item_name||'-')}</td><td style="font-size:12px">${s.unit_price?Number(s.unit_price).toLocaleString()+'円':'-'}</td><td style="text-align:center">${s.quantity??'-'}</td><td style="font-weight:700">${s.amount_excl?Number(s.amount_excl).toLocaleString()+'円':'-'}</td><td>${s.amount_incl?Number(s.amount_incl).toLocaleString()+'円':'-'}</td><td><span class="st-badge ${cCls[s.certainty]||'st-none'}">${esc(s.certainty||'-')}</span></td><td style="font-size:11px">${esc(s.category||'-')}</td><td style="font-size:11px">${esc(s.kmt_entity||'-')}</td></tr>`).join('');renderGenPagination('salePagination',total,salePage,p=>{salePage=p;renderSaleTable();});}
+async function loadSales(page) {
+  if (page) salePage = page;
+  showLoading(true);
+  try {
+    let q = 'select=*,companies(name)&order=billing_month.desc,created_at.desc';
+    const cert = document.getElementById('saFilterCertainty')?.value||'';
+    const month = document.getElementById('saFilterMonth')?.value||'';
+    if (cert) q += '&certainty=eq.' + encodeURIComponent(cert);
+    if (month) q += '&billing_month=like.' + encodeURIComponent(month + '*');
+    const { data, total } = await sbFetchPage('sales_forecast', q, salePage, PAGE_SIZE);
+    allSales = data || [];
+    saleTotalCount = total;
+    renderSaleTableDirect();
+  } catch(e) { showToast('❌ ' + e.message, 'error'); }
+  showLoading(false);
+}
+function applySaleFilters() { loadSales(1); }
+function clearSaleFilters() {
+  ['saSearchInput','saFilterCertainty','saFilterMonth'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  loadSales(1);
+}
+function renderSaleTableDirect() {
+  const tbody=document.getElementById('saleTbody'); if(!tbody) return;
+  if(!allSales.length){tbody.innerHTML='<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--gray-400)">データなし</td></tr>';document.getElementById('salePagination').innerHTML='';return;}
+  const cCls={確定:'st-active','50%':'st-review',期待:'st-none'};
+  tbody.innerHTML=allSales.map(s=>`<tr onclick="openSaleModal('${s.id}')"><td style="font-weight:700">${esc(s.billing_month||'-')}</td><td style="font-size:12px">${esc(s.companies?.name||'-')}</td><td style="font-size:12px">${esc(s.item_name||'-')}</td><td style="font-size:12px">${s.unit_price?Number(s.unit_price).toLocaleString()+'円':'-'}</td><td style="text-align:center">${s.quantity??'-'}</td><td style="font-weight:700">${s.amount_excl?Number(s.amount_excl).toLocaleString()+'円':'-'}</td><td>${s.amount_incl?Number(s.amount_incl).toLocaleString()+'円':'-'}</td><td><span class="st-badge ${cCls[s.certainty]||'st-none'}">${esc(s.certainty||'-')}</span></td><td style="font-size:11px">${esc(s.category||'-')}</td><td style="font-size:11px">${esc(s.kmt_entity||'-')}</td></tr>`).join('');
+  renderGenPagination('salePagination', saleTotalCount, salePage, p => loadSales(p));
+}
+// applySaleFilters/clearSaleFilters/renderSaleTable → loadSales()に統合
 function openSaleModal(id){const s=id?allSales.find(x=>x.id===id):null;editingSaleId=id;showGenModal('saleModal',id?'📊 売上詳細':'📊 売上登録',buildSaleModalBody(s));}
 let editingSaleId=null;
 function buildSaleModalBody(s){s=s||{};return `<div class="form-grid"><div class="section-title">売上情報</div><div class="form-group full"><label class="form-label">企業</label><select class="form-select" id="saf_company_id"><option value="">選択...</option>${allCompanies.map(c=>`<option value="${c.id}" ${s.company_id===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">請求月 (YYYY-MM)</label><input class="form-input" id="saf_billing_month" value="${esc(s.billing_month||'')}"></div><div class="form-group"><label class="form-label">請求法人</label><select class="form-select" id="saf_kmt_entity">${['','株式会社KMT','一般社団法人KMT'].map(v=>`<option ${s.kmt_entity===v?'selected':''}>${v}</option>`).join('')}</select></div><div class="form-group full"><label class="form-label">項目名</label><input class="form-input" id="saf_item_name" value="${esc(s.item_name||'')}"></div><div class="form-group"><label class="form-label">単価（円）</label><input class="form-input" id="saf_unit_price" type="number" value="${s.unit_price??''}"></div><div class="form-group"><label class="form-label">数量</label><input class="form-input" id="saf_quantity" type="number" value="${s.quantity??''}"></div><div class="form-group"><label class="form-label">金額（税抜）</label><input class="form-input" id="saf_amount_excl" type="number" value="${s.amount_excl??''}"></div><div class="form-group"><label class="form-label">金額（税込）</label><input class="form-input" id="saf_amount_incl" type="number" value="${s.amount_incl??''}"></div><div class="form-group"><label class="form-label">確度</label><select class="form-select" id="saf_certainty">${['確定','50%','期待'].map(v=>`<option ${s.certainty===v?'selected':''}>${v}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">カテゴリ</label><select class="form-select" id="saf_category">${['委託費','初期費用','紹介費','その他'].map(v=>`<option ${s.category===v?'selected':''}>${v}</option>`).join('')}</select></div><div class="form-group full"><label class="form-label">備考</label><textarea class="form-textarea" id="saf_notes">${esc(s.notes||'')}</textarea></div></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)"><button class="btn btn-outline" onclick="closeGenModal('saleModal')">キャンセル</button><button class="btn btn-primary" onclick="saveSale()">💾 保存</button></div>`;}
@@ -1705,12 +1787,38 @@ async function saveSale(){const g=id=>document.getElementById(id)?.value||null;c
 // ==============================
 // 💸 立替管理
 // ==============================
-let allExpenses=[],filteredExpenses=[],expensePage=1;
+let allExpenses=[],filteredExpenses=[],expensePage=1,expenseTotalCount=0;
 function buildExpensesScreen(){return `<div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;"><input class="search-input" id="exSearchInput" placeholder="人材名・企業名・名目で検索..." oninput="applyExpenseFilters()" style="flex:1;min-width:200px;"><select class="filter-select" id="exFilterStatus" onchange="applyExpenseFilters()"><option value="">全ステータス</option><option>未請求</option><option>請求済</option><option>入金済</option></select><button class="btn btn-outline" style="font-size:11px;padding:4px 10px" onclick="clearExpenseFilters()">✕</button></div><div class="table-wrap"><table><thead><tr><th>日付</th><th>人材名</th><th>企業名</th><th>名目</th><th>金額</th><th>支払方法</th><th>請求先</th><th>担当</th><th>ステータス</th></tr></thead><tbody id="expenseTbody"><tr><td colspan="9" style="text-align:center;padding:40px;color:var(--gray-400)">読み込み中...</td></tr></tbody></table><div class="pagination-bar" id="expensePagination"></div></div>`;}
-async function loadExpenses(){showLoading(true);try{const data=await sbFetch('expenses?select=*,workers(name),companies(name)&order=expense_date.desc');allExpenses=data||[];applyExpenseFilters();}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
-function applyExpenseFilters(){if(currentScreen!=='expenses')return;const q=(document.getElementById('exSearchInput')?.value||'').toLowerCase();const status=document.getElementById('exFilterStatus')?.value||'';filteredExpenses=allExpenses.filter(e=>{if(q&&!((e.workers?.name||'').toLowerCase().includes(q)||(e.companies?.name||'').toLowerCase().includes(q)||(e.item_name||'').toLowerCase().includes(q)))return false;if(status&&e.status!==status)return false;return true;});expensePage=1;renderExpenseTable();}
-function clearExpenseFilters(){['exSearchInput','exFilterStatus'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});applyExpenseFilters();}
-function renderExpenseTable(){const tbody=document.getElementById('expenseTbody');if(!tbody)return;const total=filteredExpenses.length;const page=filteredExpenses.slice((expensePage-1)*PAGE_SIZE,expensePage*PAGE_SIZE);if(!page.length){tbody.innerHTML='<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--gray-400)">データなし</td></tr>';document.getElementById('expensePagination').innerHTML='';return;}const stCls={未請求:'st-add',請求済:'st-review',入金済:'st-active'};tbody.innerHTML=page.map(e=>`<tr onclick="openExpenseModal('${e.id}')"><td style="font-size:12px">${e.expense_date?formatDate(e.expense_date):'-'}</td><td style="font-size:12px">${esc(e.workers?.name||'-')}</td><td style="font-size:12px">${esc(e.companies?.name||'-')}</td><td>${esc(e.item_name||'-')}</td><td style="font-weight:700">${e.amount?Number(e.amount).toLocaleString()+'円':'-'}</td><td style="font-size:12px">${esc(e.payment_method||'-')}</td><td style="font-size:12px">${esc(e.billed_to||'-')}</td><td style="font-size:12px">${esc(e.staff||'-')}</td><td><span class="st-badge ${stCls[e.status]||'st-none'}">${esc(e.status||'-')}</span></td></tr>`).join('');renderGenPagination('expensePagination',total,expensePage,p=>{expensePage=p;renderExpenseTable();});}
+async function loadExpenses(page) {
+  if (page) expensePage = page;
+  showLoading(true);
+  try {
+    let q = 'select=*,workers(name),companies(name)&order=expense_date.desc';
+    const status = document.getElementById('exFilterStatus')?.value||'';
+    if (status) q += '&status=eq.' + encodeURIComponent(status);
+    const { data, total } = await sbFetchPage('expenses', q, expensePage, PAGE_SIZE);
+    allExpenses = data || [];
+    expenseTotalCount = total;
+    renderExpenseTableDirect();
+  } catch(e) { showToast('❌ ' + e.message, 'error'); }
+  showLoading(false);
+}
+function applyExpenseFilters() { loadExpenses(1); }
+function clearExpenseFilters() {
+  ['exSearchInput','exFilterStatus'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  loadExpenses(1);
+}
+function renderExpenseTableDirect() {
+  const tbody=document.getElementById('expenseTbody'); if(!tbody) return;
+  if(!allExpenses.length){tbody.innerHTML='<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--gray-400)">データなし</td></tr>';document.getElementById('expensePagination').innerHTML='';return;}
+  const stCls={未請求:'st-add',請求済:'st-review',入金済:'st-active'};
+  // クライアント側テキスト検索（名前等）
+  const q=(document.getElementById('exSearchInput')?.value||'').toLowerCase();
+  const rows = q ? allExpenses.filter(e=>(e.workers?.name||'').toLowerCase().includes(q)||(e.companies?.name||'').toLowerCase().includes(q)||(e.item_name||'').toLowerCase().includes(q)) : allExpenses;
+  tbody.innerHTML=rows.map(e=>`<tr onclick="openExpenseModal('${e.id}')"><td style="font-size:12px">${e.expense_date?formatDate(e.expense_date):'-'}</td><td style="font-size:12px">${esc(e.workers?.name||'-')}</td><td style="font-size:12px">${esc(e.companies?.name||'-')}</td><td>${esc(e.item_name||'-')}</td><td style="font-weight:700">${e.amount?Number(e.amount).toLocaleString()+'円':'-'}</td><td style="font-size:12px">${esc(e.payment_method||'-')}</td><td style="font-size:12px">${esc(e.billed_to||'-')}</td><td style="font-size:12px">${esc(e.staff||'-')}</td><td><span class="st-badge ${stCls[e.status]||'st-none'}">${esc(e.status||'-')}</span></td></tr>`).join('');
+  renderGenPagination('expensePagination', expenseTotalCount, expensePage, p => loadExpenses(p));
+}
+// applyExpenseFilters/clearExpenseFilters/renderExpenseTable → loadExpenses()に統合
 function openExpenseModal(id){const e=id?allExpenses.find(x=>x.id===id):null;editingExpenseId=id;showGenModal('expenseModal',id?'💸 立替詳細':'💸 立替登録',buildExpenseModalBody(e));}
 let editingExpenseId=null;
 function buildExpenseModalBody(e){e=e||{};return `<div class="form-grid"><div class="section-title">立替情報</div><div class="form-group"><label class="form-label">日付</label><input class="form-input" id="ef_date" type="date" value="${e.expense_date||''}"></div><div class="form-group"><label class="form-label">ステータス</label><select class="form-select" id="ef_status">${['未請求','請求済','入金済'].map(s=>`<option ${e.status===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group full"><label class="form-label">人材</label><select class="form-select" id="ef_worker_id"><option value="">選択...</option>${allWorkers.map(w=>`<option value="${w.id}" ${e.worker_id===w.id?'selected':''}>${esc(w.name)}</option>`).join('')}</select></div><div class="form-group full"><label class="form-label">企業</label><select class="form-select" id="ef_company_id"><option value="">選択...</option>${allCompanies.map(c=>`<option value="${c.id}" ${e.company_id===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div><div class="form-group full"><label class="form-label">名目（航空券等）</label><input class="form-input" id="ef_item_name" value="${esc(e.item_name||'')}"></div><div class="form-group"><label class="form-label">金額（円）</label><input class="form-input" id="ef_amount" type="number" value="${e.amount??''}"></div><div class="form-group"><label class="form-label">支払方法</label><select class="form-select" id="ef_payment_method">${['','立替','クレカ'].map(s=>`<option ${e.payment_method===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">請求先</label><select class="form-select" id="ef_billed_to">${['','企業','本人'].map(s=>`<option ${e.billed_to===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">担当者</label><input class="form-input" id="ef_staff" value="${esc(e.staff||'')}"></div><div class="form-group full"><label class="form-label">備考</label><textarea class="form-textarea" id="ef_notes">${esc(e.notes||'')}</textarea></div></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)"><button class="btn btn-outline" onclick="closeGenModal('expenseModal')">キャンセル</button><button class="btn btn-primary" onclick="saveExpense()">💾 保存</button></div>`;}
