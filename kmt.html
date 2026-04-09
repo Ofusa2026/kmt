@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260409.03 -->
+<!-- KMT_VERSION ver.20260409.04 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -172,7 +172,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260409.03</div>
+    <div class="logo-ver">ver.20260409.04</div>
   </div>
   <div class="sidebar-section">メイン</div>
   <div class="nav-item active" onclick="showScreen('companies')">🏢 受入企業</div>
@@ -508,7 +508,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
 <script>
 // ===== SUPABASE CONFIG =====
 const SB_URL = 'https://oyblvyocvdnhcxeeokuw.supabase.co';
-const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95Ymx2eW9jdmRuaGN4ZWVva3V3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQxMTc0NjIsImV4cCI6MjA1OTY5MzQ2Mn0.Ry_2KkMBRqcWVyHlCBFbFkrNgFtEjXTMknhcPyD2dts';
+const SB_KEY = 'sb_publishable_4eI_7HdWRTnYaUpm7-mlRQ_4P3ialza';
 
 async function sbFetch(path, opts={}) {
   const res = await fetch(SB_URL + '/rest/v1/' + path, {
