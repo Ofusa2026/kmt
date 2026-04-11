@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260411.12 -->
+<!-- KMT_VERSION ver.20260412.01 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -172,7 +172,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260411.12</div>
+    <div class="logo-ver">ver.20260412.01</div>
   </div>
   <div class="nav-item active" onclick="showScreen('ofusa_view')" style="background:rgba(37,99,235,0.2);color:#93c5fd;margin:8px 8px 4px;border-radius:6px;">📊 案件進捗確認</div>
   <div style="height:1px;background:rgba(255,255,255,0.08);margin:4px 16px 8px;"></div>
@@ -972,17 +972,14 @@ function buildNewRequestModalBody() {
   <div class="form-grid">
 
     <div class="section-title">基本情報</div>
-    <div class="form-group">
-      <label class="form-label">1. paku番号</label>
-      <input class="form-input" id="nr_paku" placeholder="例: 210">
-    </div>
+    <div style="display:none"><input id="nr_paku" value=""></div>
     <div class="form-group">
       <label class="form-label">2. 依頼受領日</label>
       <input class="form-input" id="nr_received_date" type="date">
     </div>
     <div class="form-group">
       <label class="form-label">3. 大房行政書士法人 担当MG</label>
-      <input class="form-input" id="nr_ohfusa_mg" placeholder="担当MG名">
+      <input class="form-input" id="nr_ohfusa_mg" placeholder="担当MG名" value="坂齊">
     </div>
     <div class="form-group">
       <label class="form-label">4. 登録支援機関名</label>
@@ -1191,7 +1188,6 @@ function copyNewRequest() {
   const g = id => document.getElementById(id)?.value || '';
   const lines = [
     '【新規依頼】',
-    '1. paku: ' + g('nr_paku'),
     '2. 依頼受領日: ' + g('nr_received_date'),
     '3. 大房担当MG: ' + g('nr_ohfusa_mg'),
     '4. 登録支援機関名: ' + g('nr_support_org'),
