@@ -5,7 +5,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260412.07 -->
+<!-- KMT_VERSION ver.20260412.08 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -165,8 +165,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
 }
 .mobile-menu-btn{display:none;align-items:center;justify-content:center;width:36px;height:36px;border-radius:8px;border:1.5px solid var(--gray-200);background:white;cursor:pointer;font-size:18px;}
 </style>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+
 <style>
 #companyMapWrap { display:none; height:calc(100vh - 170px); border-radius:12px; overflow:hidden; box-shadow:var(--shadow); border:1px solid var(--gray-200); }
 #companyMap { width:100%; height:100%; }
@@ -182,7 +181,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260412.07</div>
+    <div class="logo-ver">ver.20260412.08</div>
   </div>
   <div class="nav-item active" onclick="showScreen('ofusa_view')" style="background:rgba(37,99,235,0.2);color:#93c5fd;margin:8px 8px 4px;border-radius:6px;">📊 案件進捗確認</div>
   <div class="nav-item" onclick="showScreen('decision_report')" style="color:#86efac;margin:2px 8px 4px;border-radius:6px;">📋 決定報告</div>
@@ -2020,7 +2019,6 @@ function renderScreenContent(name) {
   // 各画面のHTML
   const screens = {
     companies: null, // 既存
-    map_view: buildMapViewScreen(),
     workers: buildWorkersScreen(),
     candidates: buildCandidatesScreen(),
     jobs: buildJobsScreen(),
@@ -2039,6 +2037,7 @@ function renderScreenContent(name) {
   if (name === 'companies') {
     statsRow.style.display = '';
     filtersSection.style.display = '';
+    contentWrap.style.padding = '';
     contentWrap.innerHTML = `<div class="table-wrap">
       <table><thead><tr>
         <th>No.</th><th>企業名</th><th>業種</th><th>都道府県</th>
@@ -2049,8 +2048,17 @@ function renderScreenContent(name) {
     return;
   }
 
+  if (name === 'map_view') {
+    statsRow.style.display = 'none';
+    filtersSection.style.display = 'none';
+    contentWrap.style.padding = '0';
+    contentWrap.innerHTML = buildMapViewScreen();
+    return;
+  }
+
   statsRow.style.display = 'none';
   filtersSection.style.display = 'none';
+  contentWrap.style.padding = '';
   contentWrap.innerHTML = screens[name] || '<div style="padding:40px;text-align:center;color:var(--gray-400)">準備中</div>';
 }
 
