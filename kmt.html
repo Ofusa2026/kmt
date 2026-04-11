@@ -2,9 +2,10 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260412.05 -->
+<!-- KMT_VERSION ver.20260412.07 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -164,6 +165,15 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
 }
 .mobile-menu-btn{display:none;align-items:center;justify-content:center;width:36px;height:36px;border-radius:8px;border:1.5px solid var(--gray-200);background:white;cursor:pointer;font-size:18px;}
 </style>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+#companyMapWrap { display:none; height:calc(100vh - 170px); border-radius:12px; overflow:hidden; box-shadow:var(--shadow); border:1px solid var(--gray-200); }
+#companyMap { width:100%; height:100%; }
+.map-popup-name { font-weight:700; font-size:13px; color:#0f2040; }
+.map-popup-info { font-size:11px; color:#475569; margin-top:2px; }
+.map-popup-link { font-size:11px; color:#2563eb; cursor:pointer; margin-top:4px; display:inline-block; }
+</style>
 </head>
 <body>
 
@@ -172,13 +182,14 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260412.05</div>
+    <div class="logo-ver">ver.20260412.07</div>
   </div>
   <div class="nav-item active" onclick="showScreen('ofusa_view')" style="background:rgba(37,99,235,0.2);color:#93c5fd;margin:8px 8px 4px;border-radius:6px;">📊 案件進捗確認</div>
   <div class="nav-item" onclick="showScreen('decision_report')" style="color:#86efac;margin:2px 8px 4px;border-radius:6px;">📋 決定報告</div>
   <div style="height:1px;background:rgba(255,255,255,0.08);margin:4px 16px 8px;"></div>
   <div class="sidebar-section">メイン</div>
   <div class="nav-item" onclick="showScreen('companies')">🏢 所属機関</div>
+  <div class="nav-item" onclick="showScreen('map_view')">🗺️ 所属機関マップ</div>
   <div class="nav-item" onclick="showScreen('workers')">👤 外国人材</div>
   <div class="nav-item" onclick="showScreen('candidates')">📋 候補者</div>
   <div class="nav-item" onclick="showScreen('jobs')">💼 求人管理</div>
@@ -271,8 +282,12 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
     </div>
   </div>
 
+  <!-- MAP -->
+  <div class="content-wrap" id="companyMapWrap">
+    <div id="companyMap"></div>
+  </div>
   <!-- TABLE -->
-  <div class="content-wrap">
+  <div class="content-wrap" id="companyTableWrap">
     <div class="table-wrap">
       <table>
         <thead>
@@ -1492,7 +1507,6 @@ function buildDecisionReportScreen() {
           <div class="form-group"><label class="form-label">光熱費等</label><input class="form-input" id="sl_utility_fee" placeholder="例: 実費"></div>
           <div class="form-group full"><label class="form-label">備考（〜と一緒など）</label><input class="form-input" id="sl_condition_note" placeholder="例: 直近のXXさんと一緒"></div>
           <div class="section-title">■ その他</div>
-          <div class="form-group full"><label class="form-label">STOCK URL</label><input class="form-input" id="sl_url" placeholder="https://www.stock-app.jp/..."></div>
           <div class="form-group"><label class="form-label">KMT担当</label><input class="form-input" id="sl_kmt_staff" placeholder="例: Ahyu Wibowo アヒュ"></div>
           <div class="form-group"><label class="form-label">大房担当</label><input class="form-input" id="sl_ohfusa_staff" placeholder="例: 金丸"></div>
         </div>
@@ -1690,13 +1704,228 @@ function copySoloReport() {
     condNote ? '(' + condNote + ')と一緒など' : '',
     '',
     '■その他',
-    g('sl_url'),
     '@KMT ' + g('sl_kmt_staff') + ' @大房行政書士法人（' + g('sl_ohfusa_staff') + '）',
     '書類の作成＆グループ作成をよろしくお願いします！',
   ].filter(v => v !== null && v !== undefined).join('\n');
   navigator.clipboard.writeText(text)
     .then(() => showToast('✅ テキストをコピーしました', 'success'))
     .catch(() => showToast('❌ コピー失敗', 'error'));
+}
+
+// ==============================
+// 🗺️ マップモード（所属機関）
+// ==============================
+// ==============================
+// 🗺️ 所属機関マップ
+// ==============================
+let mapInstance = null;
+let mapMarkers = [];
+
+function buildMapViewScreen() {
+  return `
+  <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;align-items:center;">
+    <input class="search-input" id="mapSearchInput" placeholder="機関名・都道府県で絞り込み..." oninput="filterMapMarkers()" style="flex:1;min-width:200px;">
+    <select class="filter-select" id="mapFilterPref" onchange="filterMapMarkers()">
+      <option value="">全都道府県</option>
+    </select>
+    <select class="filter-select" id="mapFilterStatus" onchange="filterMapMarkers()">
+      <option value="">全ステータス</option>
+      <option value="active">支援中</option>
+      <option value="past">過去</option>
+    </select>
+    <div id="mapCount" style="font-size:12px;color:var(--gray-400);font-weight:600;"></div>
+  </div>
+  <div style="display:flex;gap:12px;height:calc(100vh - 200px);">
+    <!-- 地図 -->
+    <div id="leafletMap" style="flex:1;border-radius:10px;border:1px solid var(--gray-200);min-height:400px;z-index:1;"></div>
+    <!-- 右サイドリスト -->
+    <div id="mapSideList" style="width:220px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;flex-shrink:0;"></div>
+  </div>`;
+}
+
+async function loadMapView() {
+  // Leaflet JSを動的ロード
+  if (!window.L) {
+    await new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
+      s.onload = resolve;
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+
+  // 企業データがなければ取得
+  if (!allCompanies.length) {
+    showLoading(true);
+    try {
+      const data = await sbFetch('companies?select=*&order=company_no.asc.nullslast,name.asc');
+      allCompanies = data || [];
+    } catch(e) { showToast('❌ ' + e.message, 'error'); }
+    showLoading(false);
+  }
+
+  // 都道府県フィルター生成
+  const prefs = [...new Set(allCompanies.map(c => c.pref).filter(Boolean))].sort();
+  const prefSel = document.getElementById('mapFilterPref');
+  if (prefSel) {
+    prefSel.innerHTML = '<option value="">全都道府県</option>' + prefs.map(p => `<option>${p}</option>`).join('');
+  }
+
+  // 地図初期化
+  const mapEl = document.getElementById('leafletMap');
+  if (!mapEl) return;
+
+  if (mapInstance) {
+    mapInstance.remove();
+    mapInstance = null;
+  }
+
+  mapInstance = L.map('leafletMap').setView([36.5, 136.0], 5);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 18,
+  }).addTo(mapInstance);
+
+  mapMarkers = [];
+  await geocodeAndPlotCompanies();
+}
+
+async function geocodeAndPlotCompanies() {
+  if (!mapInstance) return;
+  mapMarkers.forEach(m => m.marker && mapInstance.removeLayer(m.marker));
+  mapMarkers = [];
+
+  const companies = getFilteredMapCompanies();
+  document.getElementById('mapCount').textContent = companies.length + '件表示中';
+
+  // サイドリスト更新
+  renderMapSideList(companies);
+
+  // ジオコーディング（住所→座標）を順番に実行
+  for (const c of companies) {
+    const addr = [c.pref, c.city, c.address].filter(Boolean).join('');
+    if (!addr) continue;
+
+    try {
+      const res = await fetch(
+        'https://nominatim.openstreetmap.org/search?format=json&q=' +
+        encodeURIComponent(addr + ' 日本') + '&limit=1&accept-language=ja',
+        { headers: { 'User-Agent': 'KMT-System/1.0' } }
+      );
+      const data = await res.json();
+      if (data && data[0]) {
+        const lat = parseFloat(data[0].lat);
+        const lng = parseFloat(data[0].lon);
+        const isActive = c.status !== 'past';
+        const color = isActive ? '#2563eb' : '#94a3b8';
+
+        // カスタムアイコン
+        const icon = L.divIcon({
+          className: '',
+          html: `<div style="
+            background:${color};
+            width:12px;height:12px;
+            border-radius:50%;
+            border:2px solid white;
+            box-shadow:0 1px 4px rgba(0,0,0,0.4);
+          "></div>`,
+          iconSize: [12, 12],
+          iconAnchor: [6, 6],
+        });
+
+        const marker = L.marker([lat, lng], { icon })
+          .addTo(mapInstance)
+          .bindPopup(`
+            <div style="min-width:180px;font-family:-apple-system,sans-serif;">
+              <div style="font-size:13px;font-weight:700;color:#0f2040;margin-bottom:4px;">${esc(c.name)}</div>
+              <div style="font-size:11px;color:#64748b;margin-bottom:2px;">📍 ${esc(addr)}</div>
+              ${c.industry ? `<div style="font-size:11px;color:#64748b;margin-bottom:2px;">🏭 ${esc(c.industry)}</div>` : ''}
+              ${c.fee_per_person ? `<div style="font-size:11px;color:#64748b;margin-bottom:2px;">💴 ${Number(c.fee_per_person).toLocaleString()}円/人</div>` : ''}
+              ${c.main_staff ? `<div style="font-size:11px;color:#64748b;margin-bottom:6px;">👤 ${esc(c.main_staff)}</div>` : ''}
+              <div style="font-size:11px;">
+                <span style="background:${isActive?'#eff6ff':'#f8fafc'};color:${isActive?'#2563eb':'#64748b'};padding:2px 7px;border-radius:10px;font-weight:600;">
+                  ${isActive ? '支援中' : '過去'}
+                </span>
+              </div>
+              <div style="margin-top:8px;">
+                <button onclick="openCompanyModal('${c.id}')"
+                  style="background:#2563eb;color:white;border:none;border-radius:5px;padding:4px 10px;font-size:11px;cursor:pointer;width:100%;">
+                  詳細を開く
+                </button>
+              </div>
+            </div>
+          `, { maxWidth: 220 });
+
+        mapMarkers.push({ id: c.id, marker, lat, lng });
+
+        // Nominatimのレートリミット対策（1秒待機）
+        await new Promise(r => setTimeout(r, 1000));
+      }
+    } catch(e) {
+      // ジオコーディング失敗は無視
+    }
+  }
+
+  // 全マーカーにフィット
+  if (mapMarkers.length > 0) {
+    const group = L.featureGroup(mapMarkers.map(m => m.marker));
+    mapInstance.fitBounds(group.getBounds().pad(0.1));
+  }
+}
+
+function getFilteredMapCompanies() {
+  const q = (document.getElementById('mapSearchInput')?.value || '').toLowerCase();
+  const pref = document.getElementById('mapFilterPref')?.value || '';
+  const status = document.getElementById('mapFilterStatus')?.value || '';
+  return allCompanies.filter(c => {
+    if (q && !((c.name||'').toLowerCase().includes(q) || (c.pref||'').toLowerCase().includes(q))) return false;
+    if (pref && c.pref !== pref) return false;
+    if (status && c.status !== status) return false;
+    return true;
+  });
+}
+
+function filterMapMarkers() {
+  const companies = getFilteredMapCompanies();
+  document.getElementById('mapCount').textContent = companies.length + '件表示中';
+  renderMapSideList(companies);
+
+  const visibleIds = new Set(companies.map(c => c.id));
+  mapMarkers.forEach(m => {
+    if (!mapInstance) return;
+    if (visibleIds.has(m.id)) {
+      if (!mapInstance.hasLayer(m.marker)) mapInstance.addLayer(m.marker);
+    } else {
+      if (mapInstance.hasLayer(m.marker)) mapInstance.removeLayer(m.marker);
+    }
+  });
+}
+
+function renderMapSideList(companies) {
+  const list = document.getElementById('mapSideList');
+  if (!list) return;
+  list.innerHTML = companies.map(c => {
+    const isActive = c.status !== 'past';
+    return `<div onclick="focusMapMarker('${c.id}')"
+      style="background:white;border:1px solid var(--gray-200);border-radius:8px;padding:8px 10px;cursor:pointer;transition:.15s;"
+      onmouseover="this.style.borderColor='var(--blue)'" onmouseout="this.style.borderColor='var(--gray-200)'">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">
+        <div style="width:8px;height:8px;border-radius:50%;background:${isActive?'#2563eb':'#94a3b8'};flex-shrink:0;"></div>
+        <div style="font-size:12px;font-weight:700;color:var(--navy);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(c.name)}</div>
+      </div>
+      <div style="font-size:10px;color:var(--gray-400);">${esc(c.pref||'')} ${esc(c.city||'')}</div>
+      ${c.industry ? `<div style="font-size:10px;color:var(--gray-400);">${esc(c.industry)}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function focusMapMarker(companyId) {
+  const m = mapMarkers.find(x => x.id === companyId);
+  if (m && mapInstance) {
+    mapInstance.setView([m.lat, m.lng], 14);
+    m.marker.openPopup();
+  }
 }
 
 // ===== UTILS =====
@@ -1721,6 +1950,7 @@ document.getElementById('companyModal').addEventListener('click', function(e) {
 // ===== SCREEN MANAGER =====
 const SCREENS = {
   companies: { title: '🏢 所属機関', init: loadCompanies },
+  map_view:  { title: '🗺️ 所属機関マップ', init: loadMapView },
   workers:   { title: '👤 外国人材', init: loadWorkers },
   candidates:{ title: '📋 候補者',   init: loadCandidates },
   jobs:      { title: '💼 求人管理', init: loadJobs },
@@ -1764,7 +1994,7 @@ function showScreen(name) {
 function updateTopbarButtons(name) {
   const actions = document.querySelector('.topbar-actions');
   const btnMap = {
-    companies:    `<button class="btn btn-outline" onclick="loadCompanies()">🔄 更新</button><button class="btn btn-primary" onclick="openCompanyModal(null)">＋ 企業登録</button>`,
+
     workers:      `<button class="btn btn-outline" onclick="loadWorkers()">🔄 更新</button><button class="btn btn-primary" onclick="openWorkerModal(null)">＋ 人材登録</button>`,
     candidates:   `<button class="btn btn-outline" onclick="loadCandidates()">🔄 更新</button><button class="btn btn-primary" onclick="openCandidateModal(null)">＋ 候補者登録</button>`,
     jobs:         `<button class="btn btn-outline" onclick="loadJobs()">🔄 更新</button><button class="btn btn-primary" onclick="openJobModal(null)">＋ 求人登録</button>`,
@@ -1790,6 +2020,7 @@ function renderScreenContent(name) {
   // 各画面のHTML
   const screens = {
     companies: null, // 既存
+    map_view: buildMapViewScreen(),
     workers: buildWorkersScreen(),
     candidates: buildCandidatesScreen(),
     jobs: buildJobsScreen(),
