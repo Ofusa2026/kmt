@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260412.03 -->
+<!-- KMT_VERSION ver.20260412.05 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -172,7 +172,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260412.03</div>
+    <div class="logo-ver">ver.20260412.05</div>
   </div>
   <div class="nav-item active" onclick="showScreen('ofusa_view')" style="background:rgba(37,99,235,0.2);color:#93c5fd;margin:8px 8px 4px;border-radius:6px;">📊 案件進捗確認</div>
   <div class="nav-item" onclick="showScreen('decision_report')" style="color:#86efac;margin:2px 8px 4px;border-radius:6px;">📋 決定報告</div>
@@ -1415,15 +1415,46 @@ function buildDecisionReportScreen() {
             <textarea class="form-textarea" id="ot_persons" rows="4" placeholder="AYE SAUNG OO&#10;KHIN YAMONE&#10;PHYO PHYO NYEIN&#10;THAZIN OO"></textarea>
           </div>
           <div class="section-title">■ 請求条件</div>
-          <div class="form-group"><label class="form-label">紹介料</label><input class="form-input" id="ot_referral_fee" placeholder="例: 7.5万円"></div>
+          <div class="form-group"><label class="form-label">紹介料</label>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <input class="form-input" id="ot_referral_fee" type="number" placeholder="例: 75000" style="flex:1;">
+              <span style="font-size:13px;white-space:nowrap;color:var(--gray-700)">円（税抜）</span>
+            </div></div>
           <div class="form-group"><label class="form-label">請求書送付担当（@KMT）</label><input class="form-input" id="ot_invoice_staff" value="白井"></div>
           <div class="section-title">■ 雇用条件</div>
-          <div class="form-group"><label class="form-label">入社希望日</label><input class="form-input" id="ot_join_date" placeholder="許可下りる次第"></div>
+          <div class="form-group"><label class="form-label">入社希望日</label>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;">
+                <input type="radio" name="ot_join_type" value="許可降り次第" onchange="document.getElementById('ot_join_date').style.display='none'" checked>許可降り次第
+              </label>
+              <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;">
+                <input type="radio" name="ot_join_type" value="日付指定" onchange="document.getElementById('ot_join_date').style.display=''">日付指定
+              </label>
+              <input class="form-input" id="ot_join_date" type="date" style="display:none;width:auto;flex:1;">
+            </div></div>
           <div class="form-group"><label class="form-label">月給</label><input class="form-input" id="ot_salary" placeholder="例: 231,300（夜勤込み）"></div>
-          <div class="form-group"><label class="form-label">★ 目標申請日</label><input class="form-input" id="ot_target_date" placeholder="例: 準備出来次第"></div>
-          <div class="form-group"><label class="form-label">在留期限</label><input class="form-input" id="ot_expire" placeholder="例: ー"></div>
+          <div class="form-group"><label class="form-label">★ 目標申請日</label>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;">
+                <input type="radio" name="ot_target_type" value="準備出来次第" onchange="document.getElementById('ot_target_date').style.display='none'" checked>準備出来次第
+              </label>
+              <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;">
+                <input type="radio" name="ot_target_type" value="日付指定" onchange="document.getElementById('ot_target_date').style.display=''">日付指定
+              </label>
+              <input class="form-input" id="ot_target_date" type="date" style="display:none;width:auto;flex:1;">
+            </div></div>
+          <div class="form-group"><label class="form-label">在留期限</label>
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+              <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;">
+                <input type="radio" name="ot_expire_type" value="ー" onchange="document.getElementById('ot_expire').style.display='none';document.getElementById('ot_expire_disp').textContent='ー'" checked>ー
+              </label>
+              <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;">
+                <input type="radio" name="ot_expire_type" value="日付" onchange="document.getElementById('ot_expire').style.display=''">日付指定
+              </label>
+              <input class="form-input" id="ot_expire" type="date" style="display:none;width:auto;flex:1;">
+            </div></div>
           <div class="section-title">■ その他</div>
-          <div class="form-group full"><label class="form-label">その他・備考</label><textarea class="form-textarea" id="ot_note" rows="3" placeholder="認定申請&#10;法人は特定技能受け入れ経験(あり）（インドネシア人）"></textarea></div>
+          <div class="form-group full"><label class="form-label">その他・備考</label><textarea class="form-textarea" id="ot_note" rows="3" placeholder="例）認定申請&#10;例）法人は特定技能受け入れ経験(あり）（インドネシア人）"></textarea></div>
           <div class="form-group"><label class="form-label">大房担当</label><input class="form-input" id="ot_ohfusa_staff" placeholder="例: 宮澤"></div>
         </div>
         <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid var(--gray-200);">
@@ -1588,27 +1619,39 @@ function copyOtherReport() {
   const persons = g('ot_persons').split('\n').filter(s => s.trim());
   const personLines = persons.map((p, i) => `${'①②③④⑤⑥⑦⑧⑨⑩'[i] || (i+1)+'.'} ${p.trim()}`).join('\n');
   const count = persons.length || parseInt(g('ot_count')) || 0;
-  const text = [
+  const joinDate = (()=>{ const r=document.querySelector('input[name="ot_join_type"]:checked'); if(r&&r.value==='日付指定'){const d=g('ot_join_date');return d||'日付未入力';} return '許可降り次第'; })();
+  const targetDate = (()=>{ const r=document.querySelector('input[name="ot_target_type"]:checked'); if(r&&r.value==='日付指定'){const d=g('ot_target_date');return d||'日付未入力';} return '準備出来次第'; })();
+  const expireDate = (()=>{ const r=document.querySelector('input[name="ot_expire_type"]:checked'); if(r&&r.value==='日付'){const d=g('ot_expire');return d||'日付未入力';} return 'ー'; })();
+  const refFee = (()=>{ const v=parseInt(g('ot_referral_fee')||'0'); return v?v.toLocaleString()+'円（税抜）':''; })();
+  const noteText = g('ot_note');
+  const parts = [
     '決定報告(紹介)',
     '登録支援機関：' + g('ot_support_org'),
     '企業名：' + g('ot_company'),
     '(' + count + ')名採用決定です！',
+    '',
     '■請求条件',
-    '紹介料：' + g('ot_referral_fee'),
+    '紹介料：' + refFee,
     '請求書送付担当：メール @KMT' + g('ot_invoice_staff') + '　お願いいたします。',
+    '',
     '■人材名',
     personLines,
     '国籍：' + g('ot_nationality'),
     '申請内容：' + g('ot_app_type'),
+    '',
     '■雇用条件',
-    '入社希望日：' + (g('ot_join_date') || '許可下りる次第'),
+    '入社希望日：' + joinDate,
     '月給：' + g('ot_salary') + '円',
-    '★目標申請日：' + (g('ot_target_date') || '準備出来次第'),
-    '在留期限：' + (g('ot_expire') || 'ー'),
-    g('ot_note') ? '■その他\n' + g('ot_note') : '',
+    '★目標申請日：' + targetDate,
+    '在留期限：' + expireDate,
+    noteText ? '' : null,
+    noteText ? '■その他' : null,
+    noteText || null,
+    '',
     '@大房行政書士法人(' + g('ot_ohfusa_staff') + ')',
     'グループ作成と申請準備の方よろしくお願いします。🙇',
-  ].filter(Boolean).join('\n');
+  ].filter(v => v !== null).join('\n');
+  const text = parts;
   navigator.clipboard.writeText(text)
     .then(() => showToast('✅ テキストをコピーしました', 'success'))
     .catch(() => showToast('❌ コピー失敗', 'error'));
@@ -1624,10 +1667,12 @@ function copySoloReport() {
     '番号：' + g('sl_number'),
     '登録支援機関名：なし（単独）',
     '(' + count + ')名採用決定です！',
+    '',
     '■請求条件',
     '初期費用＋申請費用：(' + g('sl_initial_fee') + ')万（税抜）',
     '請求書送付担当：メール @KMT' + g('sl_invoice_staff') + '　お願いいたします。',
     '支援委託費：なし',
+    '',
     '■本人ステータス',
     '名前：' + g('sl_person_name'),
     '国籍：' + g('sl_nationality'),
@@ -1636,17 +1681,19 @@ function copySoloReport() {
     '★目標申請日：' + (g('sl_target_date') || '準備出来次第'),
     '在留期限：(' + (g('sl_expire') || '―') + ')',
     '一時帰国有の場合出国予定：(' + (g('sl_temp_return') || '―') + ')',
+    '',
     '■雇用条件',
     '入社希望日：' + (g('sl_join_date') || 'なるべく早い希望です'),
     '基本給：' + g('sl_base_salary') + '円',
     '居住費：' + g('sl_housing_fee') + '円',
     '光熱費等：' + (g('sl_utility_fee') || '実費'),
     condNote ? '(' + condNote + ')と一緒など' : '',
+    '',
     '■その他',
     g('sl_url'),
     '@KMT ' + g('sl_kmt_staff') + ' @大房行政書士法人（' + g('sl_ohfusa_staff') + '）',
     '書類の作成＆グループ作成をよろしくお願いします！',
-  ].filter(Boolean).join('\n');
+  ].filter(v => v !== null && v !== undefined).join('\n');
   navigator.clipboard.writeText(text)
     .then(() => showToast('✅ テキストをコピーしました', 'success'))
     .catch(() => showToast('❌ コピー失敗', 'error'));
