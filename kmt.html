@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260411.03 -->
+<!-- KMT_VERSION ver.20260411.06 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -172,7 +172,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260411.03</div>
+    <div class="logo-ver">ver.20260411.06</div>
   </div>
   <div class="nav-item active" onclick="showScreen('ofusa_view')" style="background:rgba(37,99,235,0.2);color:#93c5fd;margin:8px 8px 4px;border-radius:6px;">📊 案件進捗確認</div>
   <div style="height:1px;background:rgba(255,255,255,0.08);margin:4px 16px 8px;"></div>
@@ -511,6 +511,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
 // ===== SUPABASE CONFIG =====
 const SB_URL = 'https://oyblvyocvdnhcxeeokuw.supabase.co';
 const SB_KEY = 'sb_publishable_4eI_7HdWRTnYaUpm7-mlRQ_4P3ialza';
+const KMT_REQUEST_GAS_URL = 'https://script.google.com/macros/s/AKfycbx5aKU_kjfJjl08yeLo62TcV7hNyut_ORXLuDx8ksbGlZEoMbBzj6t_eL7XfEmBBkIw/exec';
 
 async function sbFetch(path, opts={}) {
   const headers = {
@@ -942,7 +943,7 @@ function buildNewRequestModalBody() {
         <option>農業</option><option>漁業</option><option>建設</option>
         <option>製造業</option><option>飲食料品製造業</option><option>外食業</option>
         <option>介護</option><option>ビルクリーニング</option><option>宿泊</option>
-        <option>自動車整備</option><option>航空</option><option>造船・船用工業</option>
+        <option>自動車整備</option><option>自動車運送</option><option>航空</option><option>造船・船用工業</option>
       </select>
     </div>
     <div class="section-title">案件・人材情報</div>
@@ -954,9 +955,13 @@ function buildNewRequestModalBody() {
       <label class="form-label">10. 人材名</label>
       <input class="form-input" id="nr_person_name" placeholder="例: NGUYEN VAN A">
     </div>
-    <div class="form-group">
+    <div class="form-group full">
       <label class="form-label">11. 企業名</label>
-      <input class="form-input" id="nr_company_name" placeholder="例: 株式会社○○">
+      <select class="form-select" id="nr_company_name">
+        <option value="">選択...</option>
+        ${allCompanies.filter(c=>c.status!=='past').map(c=>`<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('')}
+      </select>
+      <div style="font-size:10px;color:var(--orange);margin-top:3px;">⚠️ 新規企業の場合は事前に「受入企業」メニューで登録してください</div>
     </div>
     <div class="form-group">
       <label class="form-label">12. 在留期限</label>
@@ -1007,9 +1012,9 @@ function buildNewRequestModalBody() {
       <label class="form-label">22. 人材紹介料（税抜）</label>
       <input class="form-input" id="nr_referral_fee" placeholder="例: 60,000円">
     </div>
-    <div class="form-group">
+    <div class="form-group" style="display:none">
       <label class="form-label">23. 進捗状況</label>
-      <input class="form-input" id="nr_progress_status" placeholder="例: 企業押印中">
+      <input class="form-input" id="nr_progress_status">
     </div>
     <div class="form-group">
       <label class="form-label">24. 申請・対応目標日</label>
@@ -1030,6 +1035,7 @@ function buildNewRequestModalBody() {
   <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)">
     <button class="btn btn-outline" onclick="closeGenModal('newRequestModal')">キャンセル</button>
     <button class="btn btn-outline" onclick="copyNewRequest()">📋 テキストコピー</button>
+    <button class="btn btn-primary" onclick="submitNewRequest()">📤 スプレッドシートに送信</button>
   </div>`;
 }
 
@@ -1059,7 +1065,6 @@ function copyNewRequest() {
     `20. 支援委託費（税抜）: ${g('nr_support_fee')}`,
     `21. 進捗: ${g('nr_progress')}`,
     `22. 人材紹介料（税抜）: ${g('nr_referral_fee')}`,
-    `23. 進捗状況: ${g('nr_progress_status')}`,
     `24. 申請・対応目標日: ${g('nr_target_date')}`,
     `25. 交付方法: ${g('nr_delivery')}`,
     `26. コメント: ${g('nr_comment')}`,
@@ -1070,6 +1075,66 @@ function copyNewRequest() {
   }).catch(() => {
     showToast('❌ コピー失敗', 'error');
   });
+}
+
+async function submitNewRequest() {
+  const g = id => document.getElementById(id)?.value || '';
+  const data = {
+    paku:            g('nr_paku'),
+    received_date:   g('nr_received_date'),
+    ohfusa_mg:       g('nr_ohfusa_mg'),
+    support_org:     g('nr_support_org'),
+    visa_type:       g('nr_visa_type'),
+    app_type:        g('nr_app_type'),
+    experience:      g('nr_experience'),
+    field:           g('nr_field'),
+    case_name:       g('nr_case_name'),
+    person_name:     g('nr_person_name'),
+    company_name:    g('nr_company_name'),
+    expire_date:     g('nr_expire_date'),
+    tokurei:         g('nr_tokurei'),
+    temp_return:     g('nr_temp_return'),
+    total_period:    g('nr_total_period'),
+    nationality:     g('nr_nationality'),
+    current_visa:    g('nr_current_visa'),
+    ginou_end:       g('nr_ginou_end'),
+    support_staff:   g('nr_support_staff'),
+    support_fee:     g('nr_support_fee'),
+    progress:        g('nr_progress'),
+    referral_fee:    g('nr_referral_fee'),
+    target_date:     g('nr_target_date'),
+    delivery:        g('nr_delivery'),
+    comment:         g('nr_comment'),
+  };
+
+  // 必須チェック
+  if (!data.case_name && !data.person_name) {
+    showToast('❌ 案件名または人材名を入力してください', 'error');
+    return;
+  }
+
+  if (!KMT_REQUEST_GAS_URL) {
+    showToast('❌ GAS URLが未設定です（設定後に再度お試しください）', 'error');
+    return;
+  }
+
+  showLoading(true);
+  try {
+    const res = await fetch(KMT_REQUEST_GAS_URL, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    const result = await res.json();
+    if (result.success) {
+      showToast('✅ スプレッドシートに送信しました', 'success');
+      closeGenModal('newRequestModal');
+    } else {
+      showToast('❌ 送信失敗: ' + (result.error || '不明なエラー'), 'error');
+    }
+  } catch(e) {
+    showToast('❌ 送信エラー: ' + e.message, 'error');
+  }
+  showLoading(false);
 }
 
 // ===== UTILS =====
