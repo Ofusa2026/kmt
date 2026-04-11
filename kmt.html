@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260411.01 -->
+<!-- KMT_VERSION ver.20260411.03 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -172,7 +172,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260411.01</div>
+    <div class="logo-ver">ver.20260411.03</div>
   </div>
   <div class="nav-item active" onclick="showScreen('ofusa_view')" style="background:rgba(37,99,235,0.2);color:#93c5fd;margin:8px 8px 4px;border-radius:6px;">📊 案件進捗確認</div>
   <div style="height:1px;background:rgba(255,255,255,0.08);margin:4px 16px 8px;"></div>
@@ -878,6 +878,200 @@ function loadOfusaView() {
   // iframeはbuildOfusaViewScreenで既にsrcセット済み
 }
 
+// ==============================
+// 📋 新規依頼モーダル
+// ==============================
+function openNewRequestModal() {
+  ensureModals();
+  showGenModal('newRequestModal', '📋 新規依頼', buildNewRequestModalBody());
+}
+
+function buildNewRequestModalBody() {
+  return `
+  <div style="font-size:11px;color:var(--gray-400);margin-bottom:12px;">※ 必要事項を入力してください。入力後は担当者に共有してください。</div>
+  <div class="form-grid">
+    <div class="section-title">基本情報</div>
+    <div class="form-group">
+      <label class="form-label">1. paku番号</label>
+      <input class="form-input" id="nr_paku" placeholder="例: 210">
+    </div>
+    <div class="form-group">
+      <label class="form-label">2. 依頼受領日</label>
+      <input class="form-input" id="nr_received_date" type="date">
+    </div>
+    <div class="form-group">
+      <label class="form-label">3. 大房行政書士法人 担当MG</label>
+      <input class="form-input" id="nr_ohfusa_mg" placeholder="担当MG名">
+    </div>
+    <div class="form-group">
+      <label class="form-label">4. 登録支援機関名</label>
+      <input class="form-input" id="nr_support_org" placeholder="例: 株式会社KMT">
+    </div>
+    <div class="section-title">区分情報</div>
+    <div class="form-group">
+      <label class="form-label">5. 【A区分】希望在留資格</label>
+      <select class="form-select" id="nr_visa_type">
+        <option value="">選択</option>
+        <option>特定技能1号</option>
+        <option>特定技能2号</option>
+        <option>特定活動</option>
+        <option>技人国</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">6. 【B区分】認定・変更・更新</label>
+      <select class="form-select" id="nr_app_type">
+        <option value="">選択</option>
+        <option>認定</option>
+        <option>変更</option>
+        <option>更新</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">7. 【C区分】特定技能受入経験</label>
+      <select class="form-select" id="nr_experience">
+        <option value="">選択</option>
+        <option>有</option>
+        <option>無</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">8. 【D区分】申請分野</label>
+      <select class="form-select" id="nr_field">
+        <option value="">選択</option>
+        <option>農業</option><option>漁業</option><option>建設</option>
+        <option>製造業</option><option>飲食料品製造業</option><option>外食業</option>
+        <option>介護</option><option>ビルクリーニング</option><option>宿泊</option>
+        <option>自動車整備</option><option>航空</option><option>造船・船用工業</option>
+      </select>
+    </div>
+    <div class="section-title">案件・人材情報</div>
+    <div class="form-group full">
+      <label class="form-label">9. 案件名</label>
+      <input class="form-input" id="nr_case_name" placeholder="例: 【変更】210.らあめん花月嵐R8-①（ベトナム1名）">
+    </div>
+    <div class="form-group">
+      <label class="form-label">10. 人材名</label>
+      <input class="form-input" id="nr_person_name" placeholder="例: NGUYEN VAN A">
+    </div>
+    <div class="form-group">
+      <label class="form-label">11. 企業名</label>
+      <input class="form-input" id="nr_company_name" placeholder="例: 株式会社○○">
+    </div>
+    <div class="form-group">
+      <label class="form-label">12. 在留期限</label>
+      <input class="form-input" id="nr_expire_date" type="date">
+    </div>
+    <div class="form-group">
+      <label class="form-label">13. 特例期間</label>
+      <input class="form-input" id="nr_tokurei" placeholder="例: 2026-06-30">
+    </div>
+    <div class="form-group">
+      <label class="form-label">14. 一時帰国日（※ある場合）</label>
+      <input class="form-input" id="nr_temp_return" type="date">
+    </div>
+    <div class="form-group">
+      <label class="form-label">15. 特定技能通算期間</label>
+      <input class="form-input" id="nr_total_period" placeholder="例: 2年3ヶ月">
+    </div>
+    <div class="form-group">
+      <label class="form-label">16. 人材国籍</label>
+      <select class="form-select" id="nr_nationality">
+        <option value="">選択</option>
+        <option>インドネシア</option><option>ベトナム</option><option>タイ</option>
+        <option>カンボジア</option><option>ミャンマー</option><option>その他</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">17. 現在の在留資格</label>
+      <input class="form-input" id="nr_current_visa" placeholder="例: 技能実習3号">
+    </div>
+    <div class="form-group">
+      <label class="form-label">18. 技能実習修了日（技能実習のみ）</label>
+      <input class="form-input" id="nr_ginou_end" type="date">
+    </div>
+    <div class="section-title">費用・担当</div>
+    <div class="form-group">
+      <label class="form-label">19. 支援担当者</label>
+      <input class="form-input" id="nr_support_staff" placeholder="例: ニサ">
+    </div>
+    <div class="form-group">
+      <label class="form-label">20. 支援委託費（税抜）</label>
+      <input class="form-input" id="nr_support_fee" placeholder="例: 20,000円">
+    </div>
+    <div class="form-group">
+      <label class="form-label">21. 進捗</label>
+      <input class="form-input" id="nr_progress" placeholder="例: 書類準備中">
+    </div>
+    <div class="form-group">
+      <label class="form-label">22. 人材紹介料（税抜）</label>
+      <input class="form-input" id="nr_referral_fee" placeholder="例: 60,000円">
+    </div>
+    <div class="form-group">
+      <label class="form-label">23. 進捗状況</label>
+      <input class="form-input" id="nr_progress_status" placeholder="例: 企業押印中">
+    </div>
+    <div class="form-group">
+      <label class="form-label">24. 申請・対応目標日</label>
+      <input class="form-input" id="nr_target_date" type="date">
+    </div>
+    <div class="form-group">
+      <label class="form-label">25. 交付方法</label>
+      <select class="form-select" id="nr_delivery">
+        <option value="">選択</option>
+        <option>窓口</option><option>郵送</option><option>オンライン</option>
+      </select>
+    </div>
+    <div class="form-group full">
+      <label class="form-label">26. コメント</label>
+      <textarea class="form-textarea" id="nr_comment" rows="3" placeholder="特記事項・連絡事項など"></textarea>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)">
+    <button class="btn btn-outline" onclick="closeGenModal('newRequestModal')">キャンセル</button>
+    <button class="btn btn-outline" onclick="copyNewRequest()">📋 テキストコピー</button>
+  </div>`;
+}
+
+function copyNewRequest() {
+  const g = id => document.getElementById(id)?.value || '';
+  const lines = [
+    `【新規依頼】`,
+    `1. paku: ${g('nr_paku')}`,
+    `2. 依頼受領日: ${g('nr_received_date')}`,
+    `3. 大房担当MG: ${g('nr_ohfusa_mg')}`,
+    `4. 登録支援機関名: ${g('nr_support_org')}`,
+    `5. 【A区分】希望在留資格: ${g('nr_visa_type')}`,
+    `6. 【B区分】認定・変更・更新: ${g('nr_app_type')}`,
+    `7. 【C区分】特定技能受入経験: ${g('nr_experience')}`,
+    `8. 【D区分】申請分野: ${g('nr_field')}`,
+    `9. 案件名: ${g('nr_case_name')}`,
+    `10. 人材名: ${g('nr_person_name')}`,
+    `11. 企業名: ${g('nr_company_name')}`,
+    `12. 在留期限: ${g('nr_expire_date')}`,
+    `13. 特例期間: ${g('nr_tokurei')}`,
+    `14. 一時帰国日: ${g('nr_temp_return')}`,
+    `15. 特定技能通算期間: ${g('nr_total_period')}`,
+    `16. 人材国籍: ${g('nr_nationality')}`,
+    `17. 現在の在留資格: ${g('nr_current_visa')}`,
+    `18. 技能実習修了日: ${g('nr_ginou_end')}`,
+    `19. 支援担当者: ${g('nr_support_staff')}`,
+    `20. 支援委託費（税抜）: ${g('nr_support_fee')}`,
+    `21. 進捗: ${g('nr_progress')}`,
+    `22. 人材紹介料（税抜）: ${g('nr_referral_fee')}`,
+    `23. 進捗状況: ${g('nr_progress_status')}`,
+    `24. 申請・対応目標日: ${g('nr_target_date')}`,
+    `25. 交付方法: ${g('nr_delivery')}`,
+    `26. コメント: ${g('nr_comment')}`,
+  ].filter(l => !l.endsWith(': ')).join('\n');
+
+  navigator.clipboard.writeText(lines).then(() => {
+    showToast('✅ クリップボードにコピーしました', 'success');
+  }).catch(() => {
+    showToast('❌ コピー失敗', 'error');
+  });
+}
+
 // ===== UTILS =====
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function showLoading(v) { document.getElementById('loadingOverlay').classList.toggle('show', v); }
@@ -953,7 +1147,7 @@ function updateTopbarButtons(name) {
     sales:        `<button class="btn btn-outline" onclick="loadSales()">🔄 更新</button><button class="btn btn-primary" onclick="openSaleModal(null)">＋ 売上登録</button>`,
     expenses:     `<button class="btn btn-outline" onclick="loadExpenses()">🔄 更新</button><button class="btn btn-primary" onclick="openExpenseModal(null)">＋ 立替登録</button>`,
     users:        `<button class="btn btn-outline" onclick="loadUsers()">🔄 更新</button><button class="btn btn-primary" onclick="openUserModal(null)">＋ ユーザー追加</button>`,
-    ofusa_view:   `<button class="btn btn-outline" onclick="document.getElementById('ofusaIframe').src=document.getElementById('ofusaIframe').src">🔄 更新</button><a href="https://ofusa2026.github.io/org-view/share.html?token=370ea355-f962-4ce1-884c-2fa274b72b8e" target="_blank" class="btn btn-outline">↗️ 別タブで開く</a>`,
+    ofusa_view:   `<button class="btn btn-primary" onclick="openNewRequestModal()">＋ 新規依頼</button><button class="btn btn-outline" onclick="document.getElementById('ofusaIframe').src=document.getElementById('ofusaIframe').src">🔄 更新</button><a href="https://ofusa2026.github.io/org-view/share.html?token=370ea355-f962-4ce1-884c-2fa274b72b8e" target="_blank" class="btn btn-outline">↗️ 別タブで開く</a>`,
     resume:       `<button class="btn btn-outline" onclick="window.print()">🖨️ 印刷</button>`,
   };
   actions.innerHTML = btnMap[name] || '';
@@ -2512,7 +2706,7 @@ function buildResumeHTML(c) {
 // ==============================
 // 汎用モーダル・ユーティリティ
 // ==============================
-const MODAL_IDS=['workerModal','candidateModal','jobModal','introModal','sendingModal','partnerModal','feeModal','saleModal','expenseModal','userModal'];
+const MODAL_IDS=['workerModal','candidateModal','jobModal','introModal','sendingModal','partnerModal','feeModal','saleModal','expenseModal','userModal','newRequestModal'];
 
 function ensureModals() {
   MODAL_IDS.forEach(id=>{
