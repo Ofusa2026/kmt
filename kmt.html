@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260411.07 -->
+<!-- KMT_VERSION ver.20260411.12 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -172,12 +172,12 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260411.07</div>
+    <div class="logo-ver">ver.20260411.12</div>
   </div>
   <div class="nav-item active" onclick="showScreen('ofusa_view')" style="background:rgba(37,99,235,0.2);color:#93c5fd;margin:8px 8px 4px;border-radius:6px;">📊 案件進捗確認</div>
   <div style="height:1px;background:rgba(255,255,255,0.08);margin:4px 16px 8px;"></div>
   <div class="sidebar-section">メイン</div>
-  <div class="nav-item" onclick="showScreen('companies')">🏢 受入企業</div>
+  <div class="nav-item" onclick="showScreen('companies')">🏢 所属機関</div>
   <div class="nav-item" onclick="showScreen('workers')">👤 外国人材</div>
   <div class="nav-item" onclick="showScreen('candidates')">📋 候補者</div>
   <div class="nav-item" onclick="showScreen('jobs')">💼 求人管理</div>
@@ -317,7 +317,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
         <div class="form-grid">
           <div class="section-title">📋 基本情報</div>
           <div class="form-group">
-            <label class="form-label">企業番号</label>
+            <label class="form-label">機関番号</label>
             <input class="form-input" id="co_no" type="number" placeholder="例: 1">
           </div>
           <div class="form-group">
@@ -328,15 +328,16 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
             </select>
           </div>
           <div class="form-group full">
-            <label class="form-label">企業名 *</label>
+            <label class="form-label">機関名 *</label>
             <input class="form-input" id="co_name" placeholder="例: 株式会社○○">
           </div>
           <div class="form-group">
-            <label class="form-label">法人格</label>
+            <label class="form-label">企業カテゴリー</label>
             <select class="form-select" id="co_corp_type">
               <option value="">選択</option>
-              <option>株式会社</option><option>有限会社</option><option>合同会社</option>
-              <option>一般社団法人</option><option>社会福祉法人</option><option>医療法人</option><option>その他</option>
+              <option>個人</option>
+              <option>法人(大)</option>
+              <option>法人(中小)</option>
             </select>
           </div>
           <div class="form-group">
@@ -346,7 +347,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
               <option>農業</option><option>漁業</option><option>建設</option>
               <option>製造業</option><option>飲食料品製造業</option><option>外食業</option>
               <option>介護</option><option>ビルクリーニング</option><option>宿泊</option>
-              <option>自動車整備</option><option>航空</option><option>造船・船用工業</option>
+              <option>自動車整備</option><option>自動車運送</option><option>航空</option><option>造船・船用工業</option>
             </select>
           </div>
           <div class="form-group">
@@ -357,7 +358,8 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
             <label class="form-label">電話番号</label>
             <input class="form-input" id="co_tel" placeholder="03-xxxx-xxxx">
           </div>
-          <div class="section-title">📍 所在地</div>
+
+          <div class="section-title">📍 本社所在地</div>
           <div class="form-group">
             <label class="form-label">郵便番号</label>
             <input class="form-input" id="co_zip" placeholder="123-4567">
@@ -374,6 +376,37 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
             <label class="form-label">番地・建物名</label>
             <input class="form-input" id="co_address" placeholder="西蒲田7-26-11">
           </div>
+
+          <div class="section-title">🏭 就業場所</div>
+          <div class="form-group full" style="grid-column:1/-1">
+            <button type="button" class="btn btn-outline" style="font-size:11px;padding:4px 12px;margin-bottom:6px;"
+              onclick="copyMainAddressToWorkplace()">📋 基本情報と同一</button>
+          </div>
+          <div class="form-group full">
+            <label class="form-label">事業所名</label>
+            <input class="form-input" id="co_workplace_name" placeholder="例: ○○工場 第一製造部">
+          </div>
+          <div class="form-group">
+            <label class="form-label">事業所郵便番号</label>
+            <input class="form-input" id="co_workplace_zip" placeholder="123-4567">
+          </div>
+          <div class="form-group">
+            <label class="form-label">事業所都道府県</label>
+            <input class="form-input" id="co_workplace_pref" placeholder="東京都">
+          </div>
+          <div class="form-group">
+            <label class="form-label">事業所市区町村</label>
+            <input class="form-input" id="co_workplace_city" placeholder="大田区">
+          </div>
+          <div class="form-group">
+            <label class="form-label">事業所番地・建物名</label>
+            <input class="form-input" id="co_workplace_address" placeholder="西蒲田7-26-11">
+          </div>
+          <div class="form-group">
+            <label class="form-label">事業所電話番号</label>
+            <input class="form-input" id="co_workplace_tel" placeholder="03-xxxx-xxxx">
+          </div>
+
           <div class="section-title">👤 代表者・担当者</div>
           <div class="form-group">
             <label class="form-label">代表者名</label>
@@ -384,12 +417,26 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
             <input class="form-input" id="co_rep_title" placeholder="代表取締役">
           </div>
           <div class="form-group">
+            <label class="form-label">担当者名</label>
+            <input class="form-input" id="co_contact_name" placeholder="鈴木 花子">
+          </div>
+          <div class="form-group">
+            <label class="form-label">担当者連絡先</label>
+            <input class="form-input" id="co_contact_tel" placeholder="090-xxxx-xxxx">
+          </div>
+          <div class="form-group full">
+            <label class="form-label">担当者メール</label>
+            <input class="form-input" id="co_contact_email" placeholder="tantosha@example.com">
+          </div>
+
+          <div class="section-title">🏢 KMT担当</div>
+          <div class="form-group">
             <label class="form-label">KMTメイン担当</label>
-            <input class="form-input" id="co_main_staff" placeholder="担当者名">
+            <input class="form-input" id="co_main_staff" placeholder="例: ニサ">
           </div>
           <div class="form-group">
             <label class="form-label">KMTサブ担当</label>
-            <input class="form-input" id="co_sub_staff" placeholder="担当者名">
+            <input class="form-input" id="co_sub_staff" placeholder="例: ウスマン">
           </div>
           <div class="form-group full">
             <label class="form-label">Googleドライブ URL</label>
@@ -410,8 +457,12 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
             <label class="form-label">請求サイクル</label>
             <select class="form-select" id="co_billing_cycle">
               <option value="">選択</option>
-              <option>月次</option><option>3ヶ月</option><option>年次</option>
+              <option>月次</option><option>2ヶ月</option><option>3ヶ月</option><option>6ヶ月</option><option>年次</option>
             </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">請求開始月 (YYYY-MM)</label>
+            <input class="form-input" id="co_billing_start_month" type="month" placeholder="2024-04">
           </div>
           <div class="form-group">
             <label class="form-label">支払方法</label>
@@ -712,10 +763,10 @@ function openCompanyModal(id) {
   if (id) {
     const co = allCompanies.find(c => c.id === id);
     if (co) fillCoForm(co);
-    document.getElementById('coModalTitle').textContent = '企業詳細 - ' + (co?.name || '');
+    document.getElementById('coModalTitle').textContent = '所属機関詳細 - ' + (co?.name || '');
     document.getElementById('coModalIcon').textContent = '🏢';
   } else {
-    document.getElementById('coModalTitle').textContent = '新規企業登録';
+    document.getElementById('coModalTitle').textContent = '新規所属機関登録';
     document.getElementById('coModalIcon').textContent = '➕';
   }
   switchCoTab('basic');
@@ -740,8 +791,9 @@ function switchCoTab(tab) {
 const CO_FIELDS = [
   'no','status','name','corp_type','industry','corp_no','tel',
   'zip','pref','city','address',
-  'rep_name','rep_title','main_staff','sub_staff','drive_url',
-  'fee_per_person','billing_cycle','payment_method','invoice_method','invoice_to','kmt_corp_type','direct_debit_applied','direct_debit_registered',
+  'workplace_name','workplace_zip','workplace_pref','workplace_city','workplace_address','workplace_tel',
+  'rep_name','rep_title','contact_name','contact_tel','contact_email','main_staff','sub_staff','drive_url',
+  'fee_per_person','billing_cycle','billing_start_month','payment_method','invoice_method','invoice_to','kmt_corp_type','direct_debit_applied','direct_debit_registered',
   'sales_y1','sales_y2','sales_y3','ordinary_pl_y1','ordinary_pl_y2','ordinary_pl_y3',
   'net_pl_y1','net_pl_y2','net_pl_y3','net_assets_y1','net_assets_y2','net_assets_y3',
   'capital','employees','foreign_employees',
@@ -755,7 +807,11 @@ function fillCoForm(co) {
     no:'company_no', status:'status', name:'name', corp_type:'corp_type', industry:'industry',
     corp_no:'corp_no', tel:'tel', zip:'zip', pref:'pref', city:'city', address:'address',
     rep_name:'rep_name', rep_title:'rep_title', main_staff:'main_staff', sub_staff:'sub_staff',
-    drive_url:'drive_url', fee_per_person:'fee_per_person', billing_cycle:'billing_cycle',
+    workplace_name:'workplace_name', workplace_zip:'workplace_zip',
+    workplace_pref:'workplace_pref', workplace_city:'workplace_city',
+    workplace_address:'workplace_address', workplace_tel:'workplace_tel',
+    contact_name:'contact_name', contact_tel:'contact_tel', contact_email:'contact_email',
+    drive_url:'drive_url', fee_per_person:'fee_per_person', billing_cycle:'billing_cycle', billing_start_month:'billing_start_month',
     payment_method:'payment_method', invoice_method:'invoice_method', invoice_to:'invoice_to',
     kmt_corp_type:'kmt_corp_type', direct_debit_applied:'direct_debit_applied',
     direct_debit_registered:'direct_debit_registered',
@@ -785,13 +841,23 @@ function getCoFormData() {
     pref: document.getElementById('co_pref').value || null,
     city: document.getElementById('co_city').value || null,
     address: document.getElementById('co_address').value || null,
+    workplace_name: document.getElementById('co_workplace_name').value || null,
+    workplace_zip: document.getElementById('co_workplace_zip').value || null,
+    workplace_pref: document.getElementById('co_workplace_pref').value || null,
+    workplace_city: document.getElementById('co_workplace_city').value || null,
+    workplace_address: document.getElementById('co_workplace_address').value || null,
+    workplace_tel: document.getElementById('co_workplace_tel').value || null,
     rep_name: document.getElementById('co_rep_name').value || null,
     rep_title: document.getElementById('co_rep_title').value || null,
+    contact_name: document.getElementById('co_contact_name').value || null,
+    contact_tel: document.getElementById('co_contact_tel').value || null,
+    contact_email: document.getElementById('co_contact_email').value || null,
     main_staff: document.getElementById('co_main_staff').value || null,
     sub_staff: document.getElementById('co_sub_staff').value || null,
     drive_url: document.getElementById('co_drive_url').value || null,
     fee_per_person: document.getElementById('co_fee_per_person').value ? parseInt(document.getElementById('co_fee_per_person').value) : null,
     billing_cycle: document.getElementById('co_billing_cycle').value || null,
+    billing_start_month: document.getElementById('co_billing_start_month').value || null,
     payment_method: document.getElementById('co_payment_method').value || null,
     invoice_method: document.getElementById('co_invoice_method').value || null,
     invoice_to: document.getElementById('co_invoice_to').value || null,
@@ -820,9 +886,21 @@ function getCoFormData() {
   };
 }
 
+function copyMainAddressToWorkplace() {
+  const g = id => document.getElementById(id)?.value || '';
+  const s = (id, val) => { const el = document.getElementById(id); if(el) el.value = val; };
+  s('co_workplace_name', g('co_name'));
+  s('co_workplace_zip',  g('co_zip'));
+  s('co_workplace_pref', g('co_pref'));
+  s('co_workplace_city', g('co_city'));
+  s('co_workplace_address', g('co_address'));
+  s('co_workplace_tel',  g('co_tel'));
+  showToast('✅ 基本情報を就業場所に反映しました', 'success');
+}
+
 async function saveCompany() {
   const data = getCoFormData();
-  if (!data.name) { showToast('❌ 企業名は必須です', 'error'); return; }
+  if (!data.name) { showToast('❌ 機関名は必須です', 'error'); return; }
   showLoading(true);
   try {
     if (editingCoId) {
@@ -958,7 +1036,7 @@ function buildNewRequestModalBody() {
         <option value="">選択...</option>
         ${companies.map(c=>`<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('')}
       </select>
-      <div style="font-size:10px;color:var(--orange);margin-top:3px;">⚠️ 新規企業の場合は事前に「受入企業」メニューで登録してください</div>
+      <div style="font-size:10px;color:var(--orange);margin-top:3px;">⚠️ 新規所属機関の場合は事前に「所属機関」メニューで登録してください</div>
     </div>
     <div class="form-group">
       <label class="form-label">12. 在留期限</label>
@@ -1249,7 +1327,7 @@ document.getElementById('companyModal').addEventListener('click', function(e) {
 
 // ===== SCREEN MANAGER =====
 const SCREENS = {
-  companies: { title: '🏢 受入企業', init: loadCompanies },
+  companies: { title: '🏢 所属機関', init: loadCompanies },
   workers:   { title: '👤 外国人材', init: loadWorkers },
   candidates:{ title: '📋 候補者',   init: loadCandidates },
   jobs:      { title: '💼 求人管理', init: loadJobs },
@@ -1257,7 +1335,7 @@ const SCREENS = {
   sending:   { title: '✈️ 送り出し機関', init: loadSending },
   partners:  { title: '🏛️ 提携登録支援機関', init: loadPartners },
   fees:      { title: '💴 支援委託費', init: initFeesScreen },
-  sales:     { title: '📊 売上管理', init: loadSales },
+  sales:     { title: '📊 売上管理', init: initSalesScreen },
   expenses:  { title: '💸 立替管理', init: loadExpenses },
   users:     { title: '⚙️ ユーザー設定', init: loadUsers },
   ofusa_view:{ title: '📊 案件進捗確認', init: loadOfusaView },
@@ -1300,7 +1378,7 @@ function updateTopbarButtons(name) {
     sending:      `<button class="btn btn-outline" onclick="loadSending()">🔄 更新</button><button class="btn btn-primary" onclick="openSendingModal(null)">＋ 機関登録</button>`,
     partners:     `<button class="btn btn-outline" onclick="loadPartners()">🔄 更新</button><button class="btn btn-primary" onclick="openPartnerModal(null)">＋ 機関登録</button>`,
     fees:         ``,  // 支援委託費は画面内にボタンを持つ
-    sales:        `<button class="btn btn-outline" onclick="loadSales()">🔄 更新</button><button class="btn btn-primary" onclick="openSaleModal(null)">＋ 売上登録</button>`,
+    sales:        ``,  // 売上管理は画面内にボタンを持つ
     expenses:     `<button class="btn btn-outline" onclick="loadExpenses()">🔄 更新</button><button class="btn btn-primary" onclick="openExpenseModal(null)">＋ 立替登録</button>`,
     users:        `<button class="btn btn-outline" onclick="loadUsers()">🔄 更新</button><button class="btn btn-primary" onclick="openUserModal(null)">＋ ユーザー追加</button>`,
     ofusa_view:   `<button class="btn btn-primary" onclick="openNewRequestModal()">＋ 新規依頼</button><button class="btn btn-outline" onclick="document.getElementById('ofusaIframe').src=document.getElementById('ofusaIframe').src">🔄 更新</button><a href="https://ofusa2026.github.io/org-view/share.html?token=370ea355-f962-4ce1-884c-2fa274b72b8e" target="_blank" class="btn btn-outline">↗️ 別タブで開く</a>`,
@@ -1451,6 +1529,13 @@ function renderWorkerTable() {
   renderGenPagination('workerPagination', total, workerPage, p => { workerPage=p; renderWorkerTable(); });
 }
 
+function onWorkerWorkplaceChange() {
+  const sel = document.getElementById('wf_workplace_name');
+  const custom = document.getElementById('wf_workplace_name_custom');
+  if (!sel || !custom) return;
+  custom.style.display = sel.value === '__custom__' ? '' : 'none';
+}
+
 function openWorkerModal(id) {
   const w = id ? allWorkers.find(x=>x.id===id) : null;
   editingWorkerId = id;
@@ -1508,6 +1593,16 @@ function buildWorkerModalBody(w) {
     <div class="form-group"><label class="form-label">電話番号</label><input class="form-input" id="wf_phone" value="${esc(w.phone||'')}"></div>
     <div class="form-group"><label class="form-label">メール</label><input class="form-input" id="wf_email" value="${esc(w.email||'')}"></div>
     <div class="form-group full"><label class="form-label">日本住所</label><input class="form-input" id="wf_jp_address" value="${esc(w.jp_address||'')}"></div>
+    <div class="section-title">📁 ファイル・就業場所</div>
+    <div class="form-group full"><label class="form-label">Googleドライブ フォルダURL</label><input class="form-input" id="wf_drive_url" value="${esc(w.drive_url||'')}" placeholder="https://drive.google.com/..."></div>
+    <div class="form-group full"><label class="form-label">就業場所名</label>
+      <select class="form-select" id="wf_workplace_name" onchange="onWorkerWorkplaceChange()">
+        <option value="">選択...</option>
+        ${allCompanies.filter(c=>c.status!=='past'&&c.workplace_name).map(c=>`<option value="${esc(c.workplace_name)}" ${w.workplace_name===c.workplace_name?'selected':''}>${esc(c.name)} - ${esc(c.workplace_name)}</option>`).join('')}
+        <option value="__custom__" ${w.workplace_name&&!allCompanies.find(c=>c.workplace_name===w.workplace_name)?'selected':''}>その他（直接入力）</option>
+      </select>
+      <input class="form-input" id="wf_workplace_name_custom" style="margin-top:4px;${w.workplace_name&&!allCompanies.find(c=>c.workplace_name===w.workplace_name)?'':'display:none'}" value="${esc(w.workplace_name||'')}" placeholder="事業所名を入力">
+    </div>
     <div class="section-title">メモ</div>
     <div class="form-group full"><label class="form-label">備考</label><textarea class="form-textarea" id="wf_memo">${esc(w.memo||'')}</textarea></div>
   </div>
@@ -1540,6 +1635,10 @@ async function saveWorker() {
     return_jp_date: document.getElementById('wf_return_jp_date').value||null,
     tg2_expiry: document.getElementById('wf_tg2_expiry').value||null,
     tg2_status: document.getElementById('wf_tg2_status').value||null,
+    drive_url: document.getElementById('wf_drive_url').value||null,
+    workplace_name: (document.getElementById('wf_workplace_name')?.value==='__custom__'
+      ? document.getElementById('wf_workplace_name_custom')?.value||null
+      : document.getElementById('wf_workplace_name')?.value||null),
     phone: document.getElementById('wf_phone').value||null,
     email: document.getElementById('wf_email').value||null,
     jp_address: document.getElementById('wf_jp_address').value||null,
@@ -2155,10 +2254,50 @@ async function loadFees(page) {
   showLoading(true);
   try {
     const ym = `${feeYear}-${feeActiveTab}`;
-    let q = `select=*,companies(name)&order=created_at.desc&billing_month=eq.${encodeURIComponent(ym)}`;
-    const { data, total } = await sbFetchPage('support_fees', q, feePage, PAGE_SIZE);
-    allFees = data || [];
-    feeTotalCount = total;
+
+    // 1. DBに保存済みのレコードを取得（billing_monthで絞り込み・全件）
+    const saved = await sbFetch(`support_fees?select=*,companies(name)&billing_month=eq.${encodeURIComponent(ym)}&order=created_at.asc`);
+    allFees = saved || [];
+
+    // 2. マスタ企業（支援中）からその月に請求対象になるべき企業を生成
+    //    billing_cycle: 月次 → 毎月、3ヶ月 → 3の倍数月、年次 → 1月のみ
+    const month = parseInt(feeActiveTab); // 1〜12
+    const activeCompanies = allCompanies.filter(c => c.status !== 'past' && c.fee_per_person);
+    const masterRows = activeCompanies.filter(c => {
+      const cycle = c.billing_cycle || '月次';
+      if (cycle === '月次') return true;
+      if (cycle === '3ヶ月') return month % 3 === 0; // 3,6,9,12月
+      if (cycle === '年次') return month === 1;
+      return true;
+    });
+
+    // 3. DBに未登録の企業を「仮行」として追加
+    //    仮行: id=null, _draft=true
+    const savedCompanyIds = new Set(allFees.map(f => f.company_id));
+    const draftRows = masterRows
+      .filter(c => !savedCompanyIds.has(c.id))
+      .map(c => ({
+        _draft: true,
+        id: null,
+        company_id: c.id,
+        companies: { name: c.name },
+        billing_month: ym,
+        worker_count: null,
+        unit_price: c.fee_per_person || null,
+        amount_excl: null,
+        amount_incl: null,
+        fee_type: '通常委託費',
+        status: '未請求',
+        billed_date: null,
+        paid_date: null,
+        notes: '',
+        payment_method: c.payment_method || '',
+        billing_cycle: c.billing_cycle || '月次',
+      }));
+
+    // 4. 保存済み＋仮行をマージして表示（保存済み優先・上に）
+    allFees = [...allFees, ...draftRows];
+    feeTotalCount = allFees.length;
     renderFeeMonthTable(ym);
   } catch(e) { showToast('❌ ' + e.message, 'error'); }
   showLoading(false);
@@ -2170,95 +2309,146 @@ function renderFeeMaster() {
   // companiesのfee情報を表示（受入企業一覧から取得済みのallCompaniesを使用）
   const active = allCompanies.filter(c => c.status !== 'past');
   if (!active.length) {
-    area.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray-400)">受入企業データを読み込み中...<br><small>先に「受入企業」画面を一度開いてください</small></div>';
+    area.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray-400)">所属機関データを読み込み中...<br><small>先に「受入企業」画面を一度開いてください</small></div>';
     return;
   }
   const payBadge = m => m === '口振' ? '<span class="pay-badge pay-koza">口振</span>' : m === '振込' ? '<span class="pay-badge pay-furikomi">振込</span>' : m ? `<span class="pay-badge">${esc(m)}</span>` : '-';
   area.innerHTML = `
   <div class="table-wrap">
     <table><thead><tr>
-      <th>No.</th><th>企業名</th><th>委託費/人（税抜）</th><th>請求サイクル</th><th>支払方法</th><th>請求先</th><th>請求法人</th><th>口座振替申込</th><th>口座振替登録</th>
+      <th>No.</th><th>企業名</th><th>委託費/人（税抜）</th><th>請求サイクル</th><th>請求開始月</th><th>支払方法</th><th>請求先</th><th>請求法人</th>
     </tr></thead>
     <tbody>
-      ${active.map(c => `<tr onclick="openCompanyModal('${c.id}')" style="cursor:pointer" title="受入企業画面で編集できます">
+      ${active.map(c => `<tr onclick="openCompanyModal('${c.id}')" style="cursor:pointer" title="所属機関画面で編集できます">
         <td>${c.company_no??'-'}</td>
         <td><strong>${esc(c.name)}</strong></td>
         <td style="font-weight:700;color:var(--blue)">${c.fee_per_person ? Number(c.fee_per_person).toLocaleString()+'円' : '<span style=color:var(--gray-400)>未設定</span>'}</td>
         <td>${esc(c.billing_cycle||'-')}</td>
+        <td style="font-size:12px">${c.billing_start_month||'<span style=color:var(--gray-400)>未設定</span>'}</td>
         <td>${payBadge(c.payment_method)}</td>
         <td style="font-size:11px">${esc(c.invoice_to||c.invoice_method||'-')}</td>
         <td style="font-size:11px">${esc(c.kmt_corp_type||'-')}</td>
-        <td style="font-size:12px">${c.direct_debit_applied?formatDate(c.direct_debit_applied):'-'}</td>
-        <td style="font-size:12px">${c.direct_debit_registered?formatDate(c.direct_debit_registered):'-'}</td>
       </tr>`).join('')}
     </tbody></table>
   </div>
-  <div style="margin-top:8px;font-size:11px;color:var(--gray-400);text-align:right">※ 金額・支払方法の編集は「🏢 受入企業」メニューから行ってください</div>`;
+  <div style="margin-top:8px;font-size:11px;color:var(--gray-400);text-align:right">※ 金額・支払方法の編集は「🏢 所属機関」メニューから行ってください</div>`;
 }
 
 function renderFeeMonthTable(ym) {
   const area = document.getElementById('feeContentArea');
   if (!area) return;
   const stCls = {未請求:'st-add', 請求済:'st-review', 入金済:'st-active', 未入金:'st-danger'};
+  const payBadge = m => m==='口振'?'<span class="pay-badge pay-koza">口振</span>':m==='振込'?'<span class="pay-badge pay-furikomi">振込</span>':m?`<span class="pay-badge">${esc(m)}</span>`:'-';
 
-  // 月の合計を計算
+  // マスタからその月に請求すべき企業を自動計算
+  const masterCompanies = allCompanies.filter(c => c.status !== 'past' && c.fee_per_person && isBillingMonth(c, ym));
+
+  // DBから取得済みの実績データをcompany_idでマップ化
+  const feeMap = {};
+  allFees.forEach(f => { if(f.company_id) feeMap[f.company_id] = f; });
+
+  // 合計計算
   const totalExcl = allFees.reduce((s, f) => s + (f.amount_excl||0), 0);
   const totalIncl = allFees.reduce((s, f) => s + (f.amount_incl||0), 0);
   const paidCount = allFees.filter(f => f.status === '入金済').length;
+  const masterTotalExcl = masterCompanies.reduce((s, c) => s + (c.fee_per_person||0), 0);
 
   area.innerHTML = `
-  <!-- サマリ -->
   <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
-    <div class="stat-card" style="min-width:120px">
-      <div class="stat-label">${ym} 件数</div>
-      <div class="stat-num blue">${feeTotalCount}</div>
+    <div class="stat-card" style="min-width:110px">
+      <div class="stat-label">請求予定企業数</div>
+      <div class="stat-num blue">${masterCompanies.length}</div>
     </div>
-    <div class="stat-card" style="min-width:140px">
-      <div class="stat-label">合計（税抜）</div>
-      <div class="stat-num" style="font-size:18px">${totalExcl.toLocaleString()}円</div>
+    <div class="stat-card" style="min-width:150px">
+      <div class="stat-label">予定合計（税抜）</div>
+      <div class="stat-num" style="font-size:18px">${masterTotalExcl.toLocaleString()}円</div>
     </div>
-    <div class="stat-card" style="min-width:140px">
-      <div class="stat-label">合計（税込）</div>
-      <div class="stat-num" style="font-size:18px">${totalIncl.toLocaleString()}円</div>
+    <div class="stat-card" style="min-width:150px">
+      <div class="stat-label">実績合計（税抜）</div>
+      <div class="stat-num green" style="font-size:18px">${totalExcl.toLocaleString()}円</div>
     </div>
     <div class="stat-card" style="min-width:100px">
       <div class="stat-label">入金済</div>
       <div class="stat-num green">${paidCount}</div>
     </div>
   </div>
-
-  <!-- テーブル -->
   <div class="table-wrap">
     <table><thead><tr>
-      <th>企業名</th><th>人数</th><th>単価</th><th>税抜</th><th>税込</th>
-      <th>費用種別</th><th>請求日</th><th>入金日</th><th>ステータス</th>
-    </tr></thead>
-    <tbody>
-    ${allFees.length ? allFees.map(f => `
-      <tr onclick="openFeeModal('${f.id}')">
-        <td style="font-weight:600">${esc(f.companies?.name||'-')}</td>
-        <td style="text-align:center">${f.worker_count??'-'}</td>
-        <td style="font-size:12px">${f.unit_price?Number(f.unit_price).toLocaleString()+'円':'-'}</td>
-        <td style="font-weight:700">${f.amount_excl?Number(f.amount_excl).toLocaleString()+'円':'-'}</td>
-        <td>${f.amount_incl?Number(f.amount_incl).toLocaleString()+'円':'-'}</td>
-        <td style="font-size:11px">${esc(f.fee_type||'-')}</td>
-        <td style="font-size:12px">${f.billed_date?formatDate(f.billed_date):'-'}</td>
-        <td style="font-size:12px">${f.paid_date?formatDate(f.paid_date):'-'}</td>
-        <td><span class="st-badge ${stCls[f.status]||'st-none'}">${esc(f.status||'-')}</span></td>
-      </tr>`).join('') :
-      `<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--gray-400)">${ym} のデータがありません</td></tr>`}
+      <th>企業名</th><th>サイクル</th><th>単価/人</th><th>支払方法</th>
+      <th>人数</th><th>税抜（実績）</th><th>税込（実績）</th><th>請求日</th><th>入金日</th><th>ステータス</th>
+    </tr></thead><tbody>
+    ${masterCompanies.length ? masterCompanies.map(c => {
+      const f = feeMap[c.id];
+      const stBadge = f ? `<span class="st-badge ${stCls[f.status]||'st-none'}">${esc(f.status||'-')}</span>` : '<span class="st-badge st-add">未登録</span>';
+      const rowStyle = f && f.status === '入金済' ? 'background:#f0fdf4;' : !f ? 'background:#fffbeb;' : '';
+      const clickFn = f ? `openFeeModal('${f.id}')` : `openFeeModalForCompany('${c.id}','${ym}')`;
+      return `<tr onclick="${clickFn}" style="cursor:pointer;${rowStyle}">
+        <td style="font-weight:600">${esc(c.name)}</td>
+        <td style="font-size:11px">${esc(c.billing_cycle||'月次')}</td>
+        <td style="color:var(--blue);font-weight:700">${Number(c.fee_per_person).toLocaleString()}円</td>
+        <td>${payBadge(c.payment_method)}</td>
+        <td style="text-align:center">${f?.worker_count??'<span style=color:var(--gray-400)>-</span>'}</td>
+        <td style="font-weight:700">${f?.amount_excl?Number(f.amount_excl).toLocaleString()+'円':'<span style=color:var(--gray-400)>-</span>'}</td>
+        <td>${f?.amount_incl?Number(f.amount_incl).toLocaleString()+'円':'<span style=color:var(--gray-400)>-</span>'}</td>
+        <td style="font-size:12px">${f?.billed_date?formatDate(f.billed_date):'<span style=color:var(--gray-400)>-</span>'}</td>
+        <td style="font-size:12px">${f?.paid_date?formatDate(f.paid_date):'<span style=color:var(--gray-400)>-</span>'}</td>
+        <td>${stBadge}</td>
+      </tr>`;
+    }).join('') :
+    `<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--gray-400)">
+      ${ym} に請求予定の企業がありません<br>
+      <small style="color:var(--orange)">※ 所属機関の請求開始月・サイクルを設定してください</small>
+    </td></tr>`}
     </tbody></table>
-    <div class="pagination-bar" id="feePagination"></div>
+  </div>
+  <div style="margin-top:8px;font-size:11px;color:var(--gray-400)">
+    🟡 黄色行：実績未登録（クリックで登録）　🟢 緑色行：入金済
   </div>`;
-  renderGenPagination('feePagination', feeTotalCount, feePage, p => loadFees(p));
 }
 
-function applyFeeFilters() { loadFees(1); }
-function clearFeeFilters() { loadFees(1); }
+function openFeeModalForCompany(companyId, billingMonth) {
+  const c = allCompanies.find(x => x.id === companyId);
+  editingFeeId = null;
+  const pseudo = {
+    company_id: companyId,
+    billing_month: billingMonth,
+    unit_price: c?.fee_per_person || null,
+    fee_type: '通常委託費',
+    status: '未請求',
+  };
+  showGenModal('feeModal', '💴 委託費登録', buildFeeModalBody(pseudo));
+}
 
-function openFeeModal(id){const f=id?allFees.find(x=>x.id===id):null;editingFeeId=id;showGenModal('feeModal',id?'💴 委託費詳細':'💴 委託費登録',buildFeeModalBody(f));}
+
+function openFeeModal(id){
+  const f=id?allFees.find(x=>x.id===id):null;
+  editingFeeId=id;
+  editingFeeDraft=null;
+  showGenModal('feeModal',id?'💴 委託費詳細':'💴 委託費登録',buildFeeModalBody(f));
+}
 let editingFeeId=null;
-function buildFeeModalBody(f){f=f||{};const autoCalc=()=>{const wp=parseInt(document.getElementById('ff_worker_count')?.value||0);const up=parseInt(document.getElementById('ff_unit_price')?.value||0);const excl=wp*up;document.getElementById('ff_amount_excl').value=excl||'';document.getElementById('ff_amount_incl').value=excl?Math.round(excl*1.1):'';};return `<div class="form-grid"><div class="section-title">請求情報</div><div class="form-group full"><label class="form-label">企業</label><select class="form-select" id="ff_company_id"><option value="">選択...</option>${allCompanies.map(c=>`<option value="${c.id}" ${f.company_id===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">請求月 (YYYY-MM)</label><input class="form-input" id="ff_billing_month" value="${esc(f.billing_month||'')}" placeholder="2026-04"></div><div class="form-group"><label class="form-label">費用種別</label><select class="form-select" id="ff_fee_type">${['通常委託費','新規委託費','初期費用','その他'].map(s=>`<option ${f.fee_type===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">対象人数</label><input class="form-input" id="ff_worker_count" type="number" value="${f.worker_count??''}" oninput="(${autoCalc.toString()})()"></div><div class="form-group"><label class="form-label">単価（税抜）</label><input class="form-input" id="ff_unit_price" type="number" value="${f.unit_price??''}" oninput="(${autoCalc.toString()})()"></div><div class="form-group"><label class="form-label">金額（税抜）</label><input class="form-input" id="ff_amount_excl" type="number" value="${f.amount_excl??''}"></div><div class="form-group"><label class="form-label">金額（税込）</label><input class="form-input" id="ff_amount_incl" type="number" value="${f.amount_incl??''}"></div><div class="form-group"><label class="form-label">ステータス</label><select class="form-select" id="ff_status">${['未請求','請求済','入金済','未入金'].map(s=>`<option ${f.status===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">請求日</label><input class="form-input" id="ff_billed_date" type="date" value="${f.billed_date||''}"></div><div class="form-group"><label class="form-label">入金日</label><input class="form-input" id="ff_paid_date" type="date" value="${f.paid_date||''}"></div><div class="form-group full"><label class="form-label">備考</label><textarea class="form-textarea" id="ff_notes">${esc(f.notes||'')}</textarea></div></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)"><button class="btn btn-outline" onclick="closeGenModal('feeModal')">キャンセル</button><button class="btn btn-primary" onclick="saveFee()">💾 保存</button></div>`;}
+function buildFeeModalBody(f){f=f||{};const autoCalc=()=>{const wp=parseInt(document.getElementById('ff_worker_count')?.value||0);const up=parseInt(document.getElementById('ff_unit_price')?.value||0);const excl=wp*up;document.getElementById('ff_amount_excl').value=excl||'';document.getElementById('ff_amount_incl').value=excl?Math.round(excl*1.1):'';};return `<div class="form-grid"><div class="section-title">請求情報</div><div class="form-group full"><label class="form-label">企業</label><select class="form-select" id="ff_company_id"><option value="">選択...</option>${allCompanies.map(c=>`<option value="${c.id}" ${f.company_id===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">請求月 (YYYY-MM)</label><input class="form-input" id="ff_billing_month" value="${esc(f.billing_month||`${feeYear}-${feeActiveTab}`)}" placeholder="2026-04"></div><div class="form-group"><label class="form-label">費用種別</label><select class="form-select" id="ff_fee_type">${['通常委託費','新規委託費','初期費用','その他'].map(s=>`<option ${f.fee_type===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">対象人数</label><input class="form-input" id="ff_worker_count" type="number" value="${f.worker_count??''}" oninput="(${autoCalc.toString()})()"></div><div class="form-group"><label class="form-label">単価（税抜）</label><input class="form-input" id="ff_unit_price" type="number" value="${f.unit_price??''}" oninput="(${autoCalc.toString()})()"></div><div class="form-group"><label class="form-label">金額（税抜）</label><input class="form-input" id="ff_amount_excl" type="number" value="${f.amount_excl??''}"></div><div class="form-group"><label class="form-label">金額（税込）</label><input class="form-input" id="ff_amount_incl" type="number" value="${f.amount_incl??''}"></div><div class="form-group"><label class="form-label">ステータス</label><select class="form-select" id="ff_status">${['未請求','請求済','入金済','未入金'].map(s=>`<option ${f.status===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">請求日</label><input class="form-input" id="ff_billed_date" type="date" value="${f.billed_date||''}"></div><div class="form-group"><label class="form-label">入金日</label><input class="form-input" id="ff_paid_date" type="date" value="${f.paid_date||''}"></div><div class="form-group full"><label class="form-label">備考</label><textarea class="form-textarea" id="ff_notes">${esc(f.notes||'')}</textarea></div></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)"><button class="btn btn-outline" onclick="closeGenModal('feeModal')">キャンセル</button><button class="btn btn-primary" onclick="saveFee()">💾 保存</button></div>`;}
+// 指定月がその企業の請求月かどうか判定
+function isBillingMonth(company, ym) {
+  const cycle = company.billing_cycle || '月次';
+  const start = company.billing_start_month; // 'YYYY-MM'
+
+  if (cycle === '月次') return true;
+  if (!start) return false; // 開始月未設定は判定不能
+
+  const [sy, sm] = start.split('-').map(Number);
+  const [ty, tm] = ym.split('-').map(Number);
+
+  // 開始月からの経過月数
+  const diff = (ty - sy) * 12 + (tm - sm);
+  if (diff < 0) return false; // 開始前
+
+  const cycleMap = {'2ヶ月':2, '3ヶ月':3, '6ヶ月':6, '年次':12};
+  const months = cycleMap[cycle];
+  if (!months) return false;
+  return diff % months === 0;
+}
+
 async function initFeesScreen() {
   // 年度を今年に初期化
   feeYear = new Date().getFullYear();
@@ -2277,41 +2467,149 @@ async function saveFee(){const g=id=>document.getElementById(id)?.value||null;co
 // ==============================
 // 📊 売上管理
 // ==============================
-let allSales=[],filteredSales=[],salePage=1,saleTotalCount=0;
-function buildSalesScreen(){return `<div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;"><input class="search-input" id="saSearchInput" placeholder="企業名・項目名で検索..." oninput="applySaleFilters()" style="flex:1;min-width:200px;"><select class="filter-select" id="saFilterCertainty" onchange="applySaleFilters()"><option value="">全確度</option><option>確定</option><option>50%</option><option>期待</option></select><input class="filter-select" id="saFilterMonth" type="month" onchange="applySaleFilters()" style="padding:3px 6px"><button class="btn btn-outline" style="font-size:11px;padding:4px 10px" onclick="clearSaleFilters()">✕</button></div><div class="table-wrap"><table><thead><tr><th>請求月</th><th>企業名</th><th>項目</th><th>単価</th><th>数量</th><th>税抜</th><th>税込</th><th>確度</th><th>カテゴリ</th><th>法人</th></tr></thead><tbody id="saleTbody"><tr><td colspan="10" style="text-align:center;padding:40px;color:var(--gray-400)">読み込み中...</td></tr></tbody></table><div class="pagination-bar" id="salePagination"></div></div>`;}
+let allSales=[], salePage=1, saleTotalCount=0;
+let saleYear = new Date().getFullYear();
+let saleActiveTab = '01';
+
+function buildSalesScreen() {
+  const currentYear = new Date().getFullYear();
+  const yearOptions = [];
+  for (let y = 2024; y <= currentYear + 1; y++) yearOptions.push(y);
+  const currentMonth = String(new Date().getMonth() + 1).padStart(2, '0');
+
+  return `
+  <!-- 年度選択 -->
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap;">
+    <div style="display:flex;align-items:center;gap:6px;">
+      <label style="font-size:12px;font-weight:700;color:var(--gray-700)">年度</label>
+      <select id="saleYearSelect" class="filter-select" style="font-size:13px;padding:5px 10px;font-weight:700;" onchange="onSaleYearChange()">
+        ${yearOptions.map(y=>`<option value="${y}" ${y===saleYear?'selected':''}>${y}年</option>`).join('')}
+      </select>
+    </div>
+    <select class="filter-select" id="saFilterCertainty" onchange="loadSales(1)" style="font-size:12px;">
+      <option value="">全確度</option><option>確定</option><option>50%</option><option>期待</option>
+    </select>
+    <button class="btn btn-outline" onclick="loadSales(1)">🔄 更新</button>
+    <button class="btn btn-primary" onclick="openSaleModal(null)">＋ 売上登録</button>
+  </div>
+
+  <!-- 月タブ -->
+  <div style="display:flex;overflow-x:auto;border-bottom:2px solid var(--gray-200);margin-bottom:12px;" id="saleTabBar">
+    ${['01','02','03','04','05','06','07','08','09','10','11','12'].map(m=>`
+    <div class="sale-tab ${m===currentMonth?'':''}${m===saleActiveTab?' sale-tab-active':''}" id="saleTab_${m}" onclick="switchSaleTab('${m}')"
+      style="padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;border-bottom:2px solid ${m===saleActiveTab?'var(--blue)':'transparent'};color:${m===saleActiveTab?'var(--blue)':'var(--gray-400)'};margin-bottom:-2px;transition:.15s;">
+      ${parseInt(m)}月
+    </div>`).join('')}
+  </div>
+
+  <!-- コンテンツ -->
+  <div id="saleContentArea"></div>`;
+}
+
+function onSaleYearChange() {
+  saleYear = parseInt(document.getElementById('saleYearSelect')?.value || new Date().getFullYear());
+  loadSales(1);
+}
+
+function switchSaleTab(tab) {
+  saleActiveTab = tab;
+  document.querySelectorAll('[id^="saleTab_"]').forEach(el => {
+    const isActive = el.id === 'saleTab_' + tab;
+    el.style.color = isActive ? 'var(--blue)' : 'var(--gray-400)';
+    el.style.borderBottomColor = isActive ? 'var(--blue)' : 'transparent';
+    el.style.fontWeight = isActive ? '700' : '600';
+  });
+  salePage = 1;
+  loadSales(1);
+}
+
+async function initSalesScreen() {
+  saleYear = new Date().getFullYear();
+  saleActiveTab = String(new Date().getMonth() + 1).padStart(2, '0');
+  const sel = document.getElementById('saleYearSelect');
+  if (sel) sel.value = saleYear;
+  switchSaleTab(saleActiveTab);
+}
+
 async function loadSales(page) {
+  if (currentScreen !== 'sales') return;
   if (page) salePage = page;
   showLoading(true);
   try {
-    let q = 'select=*,companies(name)&order=billing_month.desc,created_at.desc';
-    const cert = document.getElementById('saFilterCertainty')?.value||'';
-    const month = document.getElementById('saFilterMonth')?.value||'';
+    const ym = `${saleYear}-${saleActiveTab}`;
+    let q = `select=*,companies(name)&order=created_at.desc&billing_month=eq.${encodeURIComponent(ym)}`;
+    const cert = document.getElementById('saFilterCertainty')?.value || '';
     if (cert) q += '&certainty=eq.' + encodeURIComponent(cert);
-    if (month) q += '&billing_month=like.' + encodeURIComponent(month + '*');
     const { data, total } = await sbFetchPage('sales_forecast', q, salePage, PAGE_SIZE);
     allSales = data || [];
     saleTotalCount = total;
-    renderSaleTableDirect();
+    renderSaleMonthTable(ym);
   } catch(e) { showToast('❌ ' + e.message, 'error'); }
   showLoading(false);
 }
-function applySaleFilters() { loadSales(1); }
-function clearSaleFilters() {
-  ['saSearchInput','saFilterCertainty','saFilterMonth'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-  loadSales(1);
-}
-function renderSaleTableDirect() {
-  const tbody=document.getElementById('saleTbody'); if(!tbody) return;
-  if(!allSales.length){tbody.innerHTML='<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--gray-400)">データなし</td></tr>';document.getElementById('salePagination').innerHTML='';return;}
-  const cCls={確定:'st-active','50%':'st-review',期待:'st-none'};
-  tbody.innerHTML=allSales.map(s=>`<tr onclick="openSaleModal('${s.id}')"><td style="font-weight:700">${esc(s.billing_month||'-')}</td><td style="font-size:12px">${esc(s.companies?.name||'-')}</td><td style="font-size:12px">${esc(s.item_name||'-')}</td><td style="font-size:12px">${s.unit_price?Number(s.unit_price).toLocaleString()+'円':'-'}</td><td style="text-align:center">${s.quantity??'-'}</td><td style="font-weight:700">${s.amount_excl?Number(s.amount_excl).toLocaleString()+'円':'-'}</td><td>${s.amount_incl?Number(s.amount_incl).toLocaleString()+'円':'-'}</td><td><span class="st-badge ${cCls[s.certainty]||'st-none'}">${esc(s.certainty||'-')}</span></td><td style="font-size:11px">${esc(s.category||'-')}</td><td style="font-size:11px">${esc(s.kmt_entity||'-')}</td></tr>`).join('');
+
+function renderSaleMonthTable(ym) {
+  const area = document.getElementById('saleContentArea');
+  if (!area) return;
+  const cCls = {確定:'st-active','50%':'st-review',期待:'st-none'};
+
+  const totalExcl = allSales.reduce((s, f) => s + (f.amount_excl||0), 0);
+  const totalIncl = allSales.reduce((s, f) => s + (f.amount_incl||0), 0);
+  const confirmed = allSales.filter(f => f.certainty === '確定').length;
+
+  area.innerHTML = `
+  <!-- サマリ -->
+  <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
+    <div class="stat-card" style="min-width:100px">
+      <div class="stat-label">${ym} 件数</div>
+      <div class="stat-num blue">${saleTotalCount}</div>
+    </div>
+    <div class="stat-card" style="min-width:150px">
+      <div class="stat-label">合計（税抜）</div>
+      <div class="stat-num" style="font-size:18px">${totalExcl.toLocaleString()}円</div>
+    </div>
+    <div class="stat-card" style="min-width:150px">
+      <div class="stat-label">合計（税込）</div>
+      <div class="stat-num" style="font-size:18px">${totalIncl.toLocaleString()}円</div>
+    </div>
+    <div class="stat-card" style="min-width:100px">
+      <div class="stat-label">確定件数</div>
+      <div class="stat-num green">${confirmed}</div>
+    </div>
+  </div>
+
+  <!-- テーブル -->
+  <div class="table-wrap">
+    <table><thead><tr>
+      <th>企業名</th><th>項目</th><th>単価</th><th>数量</th>
+      <th>税抜</th><th>税込</th><th>確度</th><th>カテゴリ</th><th>法人</th>
+    </tr></thead>
+    <tbody>
+    ${allSales.length ? allSales.map(s => `
+      <tr onclick="openSaleModal('${s.id}')">
+        <td style="font-size:12px;font-weight:600">${esc(s.companies?.name||'-')}</td>
+        <td style="font-size:12px">${esc(s.item_name||'-')}</td>
+        <td style="font-size:12px">${s.unit_price?Number(s.unit_price).toLocaleString()+'円':'-'}</td>
+        <td style="text-align:center">${s.quantity??'-'}</td>
+        <td style="font-weight:700">${s.amount_excl?Number(s.amount_excl).toLocaleString()+'円':'-'}</td>
+        <td>${s.amount_incl?Number(s.amount_incl).toLocaleString()+'円':'-'}</td>
+        <td><span class="st-badge ${cCls[s.certainty]||'st-none'}">${esc(s.certainty||'-')}</span></td>
+        <td style="font-size:11px">${esc(s.category||'-')}</td>
+        <td style="font-size:11px">${esc(s.kmt_entity||'-')}</td>
+      </tr>`).join('') :
+      `<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--gray-400)">${ym} のデータがありません</td></tr>`}
+    </tbody></table>
+    <div class="pagination-bar" id="salePagination"></div>
+  </div>`;
   renderGenPagination('salePagination', saleTotalCount, salePage, p => loadSales(p));
 }
-// applySaleFilters/clearSaleFilters/renderSaleTable → loadSales()に統合
+
+function applySaleFilters() { loadSales(1); }
+function clearSaleFilters() { loadSales(1); }
 function openSaleModal(id){const s=id?allSales.find(x=>x.id===id):null;editingSaleId=id;showGenModal('saleModal',id?'📊 売上詳細':'📊 売上登録',buildSaleModalBody(s));}
 let editingSaleId=null;
 function buildSaleModalBody(s){s=s||{};return `<div class="form-grid"><div class="section-title">売上情報</div><div class="form-group full"><label class="form-label">企業</label><select class="form-select" id="saf_company_id"><option value="">選択...</option>${allCompanies.map(c=>`<option value="${c.id}" ${s.company_id===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">請求月 (YYYY-MM)</label><input class="form-input" id="saf_billing_month" value="${esc(s.billing_month||'')}"></div><div class="form-group"><label class="form-label">請求法人</label><select class="form-select" id="saf_kmt_entity">${['','株式会社KMT','一般社団法人KMT'].map(v=>`<option ${s.kmt_entity===v?'selected':''}>${v}</option>`).join('')}</select></div><div class="form-group full"><label class="form-label">項目名</label><input class="form-input" id="saf_item_name" value="${esc(s.item_name||'')}"></div><div class="form-group"><label class="form-label">単価（円）</label><input class="form-input" id="saf_unit_price" type="number" value="${s.unit_price??''}"></div><div class="form-group"><label class="form-label">数量</label><input class="form-input" id="saf_quantity" type="number" value="${s.quantity??''}"></div><div class="form-group"><label class="form-label">金額（税抜）</label><input class="form-input" id="saf_amount_excl" type="number" value="${s.amount_excl??''}"></div><div class="form-group"><label class="form-label">金額（税込）</label><input class="form-input" id="saf_amount_incl" type="number" value="${s.amount_incl??''}"></div><div class="form-group"><label class="form-label">確度</label><select class="form-select" id="saf_certainty">${['確定','50%','期待'].map(v=>`<option ${s.certainty===v?'selected':''}>${v}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">カテゴリ</label><select class="form-select" id="saf_category">${['委託費','初期費用','紹介費','その他'].map(v=>`<option ${s.category===v?'selected':''}>${v}</option>`).join('')}</select></div><div class="form-group full"><label class="form-label">備考</label><textarea class="form-textarea" id="saf_notes">${esc(s.notes||'')}</textarea></div></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)"><button class="btn btn-outline" onclick="closeGenModal('saleModal')">キャンセル</button><button class="btn btn-primary" onclick="saveSale()">💾 保存</button></div>`;}
-async function saveSale(){const g=id=>document.getElementById(id)?.value||null;const ni=id=>document.getElementById(id)?.value?parseInt(document.getElementById(id).value):null;const data={company_id:g('saf_company_id'),billing_month:g('saf_billing_month'),kmt_entity:g('saf_kmt_entity'),item_name:g('saf_item_name'),unit_price:ni('saf_unit_price'),quantity:ni('saf_quantity'),amount_excl:ni('saf_amount_excl'),amount_incl:ni('saf_amount_incl'),certainty:g('saf_certainty'),category:g('saf_category'),notes:g('saf_notes'),updated_at:new Date().toISOString()};if(!data.billing_month){showToast('❌ 請求月は必須','error');return;}showLoading(true);try{if(editingSaleId){await sbFetch('sales_forecast?id=eq.'+editingSaleId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新','success');}else{await sbFetch('sales_forecast',{method:'POST',body:JSON.stringify(data)});showToast('✅ 登録','success');}closeGenModal('saleModal');await loadSales();}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
+async function saveSale(){const g=id=>document.getElementById(id)?.value||null;const ni=id=>document.getElementById(id)?.value?parseInt(document.getElementById(id).value):null;const data={company_id:g('saf_company_id'),billing_month:g('saf_billing_month'),kmt_entity:g('saf_kmt_entity'),item_name:g('saf_item_name'),unit_price:ni('saf_unit_price'),quantity:ni('saf_quantity'),amount_excl:ni('saf_amount_excl'),amount_incl:ni('saf_amount_incl'),certainty:g('saf_certainty'),category:g('saf_category'),notes:g('saf_notes'),updated_at:new Date().toISOString()};if(!data.billing_month){showToast('❌ 請求月は必須','error');return;}showLoading(true);try{if(editingSaleId){await sbFetch('sales_forecast?id=eq.'+editingSaleId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新','success');}else{await sbFetch('sales_forecast',{method:'POST',body:JSON.stringify(data)});showToast('✅ 登録','success');}closeGenModal('saleModal');await loadSales(salePage);}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
 
 // ==============================
 // 💸 立替管理
