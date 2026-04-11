@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260409.07 -->
+<!-- KMT_VERSION ver.20260411.01 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -172,10 +172,12 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260409.07</div>
+    <div class="logo-ver">ver.20260411.01</div>
   </div>
+  <div class="nav-item active" onclick="showScreen('ofusa_view')" style="background:rgba(37,99,235,0.2);color:#93c5fd;margin:8px 8px 4px;border-radius:6px;">📊 案件進捗確認</div>
+  <div style="height:1px;background:rgba(255,255,255,0.08);margin:4px 16px 8px;"></div>
   <div class="sidebar-section">メイン</div>
-  <div class="nav-item active" onclick="showScreen('companies')">🏢 受入企業</div>
+  <div class="nav-item" onclick="showScreen('companies')">🏢 受入企業</div>
   <div class="nav-item" onclick="showScreen('workers')">👤 外国人材</div>
   <div class="nav-item" onclick="showScreen('candidates')">📋 候補者</div>
   <div class="nav-item" onclick="showScreen('jobs')">💼 求人管理</div>
@@ -857,6 +859,25 @@ function showScreen(name) {
   event.target.closest('.nav-item')?.classList.add('active');
 }
 
+// ==============================
+// 📊 OFUSA案件進捗確認
+// ==============================
+function buildOfusaViewScreen() {
+  return `
+  <div style="height:calc(100vh - 110px);">
+    <iframe
+      id="ofusaIframe"
+      src="https://ofusa2026.github.io/org-view/share.html?token=370ea355-f962-4ce1-884c-2fa274b72b8e"
+      style="width:100%;height:100%;border:none;border-radius:8px;"
+      title="OFUSA案件進捗確認"
+    ></iframe>
+  </div>`;
+}
+
+function loadOfusaView() {
+  // iframeはbuildOfusaViewScreenで既にsrcセット済み
+}
+
 // ===== UTILS =====
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function showLoading(v) { document.getElementById('loadingOverlay').classList.toggle('show', v); }
@@ -889,6 +910,7 @@ const SCREENS = {
   sales:     { title: '📊 売上管理', init: loadSales },
   expenses:  { title: '💸 立替管理', init: loadExpenses },
   users:     { title: '⚙️ ユーザー設定', init: loadUsers },
+  ofusa_view:{ title: '📊 案件進捗確認', init: loadOfusaView },
   resume:    { title: '📝 履歴書作成', init: loadResumeScreen },
 };
 
@@ -931,6 +953,7 @@ function updateTopbarButtons(name) {
     sales:        `<button class="btn btn-outline" onclick="loadSales()">🔄 更新</button><button class="btn btn-primary" onclick="openSaleModal(null)">＋ 売上登録</button>`,
     expenses:     `<button class="btn btn-outline" onclick="loadExpenses()">🔄 更新</button><button class="btn btn-primary" onclick="openExpenseModal(null)">＋ 立替登録</button>`,
     users:        `<button class="btn btn-outline" onclick="loadUsers()">🔄 更新</button><button class="btn btn-primary" onclick="openUserModal(null)">＋ ユーザー追加</button>`,
+    ofusa_view:   `<button class="btn btn-outline" onclick="document.getElementById('ofusaIframe').src=document.getElementById('ofusaIframe').src">🔄 更新</button><a href="https://ofusa2026.github.io/org-view/share.html?token=370ea355-f962-4ce1-884c-2fa274b72b8e" target="_blank" class="btn btn-outline">↗️ 別タブで開く</a>`,
     resume:       `<button class="btn btn-outline" onclick="window.print()">🖨️ 印刷</button>`,
   };
   actions.innerHTML = btnMap[name] || '';
@@ -954,6 +977,7 @@ function renderScreenContent(name) {
     sales: buildSalesScreen(),
     expenses: buildExpensesScreen(),
     users: buildUsersScreen(),
+    ofusa_view: buildOfusaViewScreen(),
     resume: buildResumeScreen(),
   };
 
