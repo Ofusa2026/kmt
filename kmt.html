@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260411.06 -->
+<!-- KMT_VERSION ver.20260411.07 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -172,7 +172,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260411.06</div>
+    <div class="logo-ver">ver.20260411.07</div>
   </div>
   <div class="nav-item active" onclick="showScreen('ofusa_view')" style="background:rgba(37,99,235,0.2);color:#93c5fd;margin:8px 8px 4px;border-radius:6px;">📊 案件進捗確認</div>
   <div style="height:1px;background:rgba(255,255,255,0.08);margin:4px 16px 8px;"></div>
@@ -888,9 +888,11 @@ function openNewRequestModal() {
 }
 
 function buildNewRequestModalBody() {
+  const companies = allCompanies.filter(c=>c.status!=='past');
   return `
-  <div style="font-size:11px;color:var(--gray-400);margin-bottom:12px;">※ 必要事項を入力してください。入力後は担当者に共有してください。</div>
+  <div style="font-size:11px;color:var(--gray-400);margin-bottom:12px;">※ 必要事項を入力してください。</div>
   <div class="form-grid">
+
     <div class="section-title">基本情報</div>
     <div class="form-group">
       <label class="form-label">1. paku番号</label>
@@ -906,34 +908,28 @@ function buildNewRequestModalBody() {
     </div>
     <div class="form-group">
       <label class="form-label">4. 登録支援機関名</label>
-      <input class="form-input" id="nr_support_org" placeholder="例: 株式会社KMT">
+      <input class="form-input" id="nr_support_org" placeholder="例: 株式会社KMT" value="株式会社KMT">
     </div>
+
     <div class="section-title">区分情報</div>
     <div class="form-group">
       <label class="form-label">5. 【A区分】希望在留資格</label>
       <select class="form-select" id="nr_visa_type">
         <option value="">選択</option>
-        <option>特定技能1号</option>
-        <option>特定技能2号</option>
-        <option>特定活動</option>
-        <option>技人国</option>
+        <option>特定技能1号</option><option>特定技能2号</option><option>特定活動</option><option>技人国</option>
       </select>
     </div>
     <div class="form-group">
       <label class="form-label">6. 【B区分】認定・変更・更新</label>
       <select class="form-select" id="nr_app_type">
         <option value="">選択</option>
-        <option>認定</option>
-        <option>変更</option>
-        <option>更新</option>
+        <option>認定</option><option>変更</option><option>更新</option>
       </select>
     </div>
     <div class="form-group">
       <label class="form-label">7. 【C区分】特定技能受入経験</label>
       <select class="form-select" id="nr_experience">
-        <option value="">選択</option>
-        <option>有</option>
-        <option>無</option>
+        <option value="">選択</option><option>有</option><option>無</option>
       </select>
     </div>
     <div class="form-group">
@@ -946,6 +942,7 @@ function buildNewRequestModalBody() {
         <option>自動車整備</option><option>自動車運送</option><option>航空</option><option>造船・船用工業</option>
       </select>
     </div>
+
     <div class="section-title">案件・人材情報</div>
     <div class="form-group full">
       <label class="form-label">9. 案件名</label>
@@ -959,7 +956,7 @@ function buildNewRequestModalBody() {
       <label class="form-label">11. 企業名</label>
       <select class="form-select" id="nr_company_name">
         <option value="">選択...</option>
-        ${allCompanies.filter(c=>c.status!=='past').map(c=>`<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('')}
+        ${companies.map(c=>`<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('')}
       </select>
       <div style="font-size:10px;color:var(--orange);margin-top:3px;">⚠️ 新規企業の場合は事前に「受入企業」メニューで登録してください</div>
     </div>
@@ -995,26 +992,15 @@ function buildNewRequestModalBody() {
       <label class="form-label">18. 技能実習修了日（技能実習のみ）</label>
       <input class="form-input" id="nr_ginou_end" type="date">
     </div>
-    <div class="section-title">費用・担当</div>
+
+    <div class="section-title">担当・進捗</div>
     <div class="form-group">
       <label class="form-label">19. 支援担当者</label>
       <input class="form-input" id="nr_support_staff" placeholder="例: ニサ">
     </div>
     <div class="form-group">
-      <label class="form-label">20. 支援委託費（税抜）</label>
-      <input class="form-input" id="nr_support_fee" placeholder="例: 20,000円">
-    </div>
-    <div class="form-group">
       <label class="form-label">21. 進捗</label>
       <input class="form-input" id="nr_progress" placeholder="例: 書類準備中">
-    </div>
-    <div class="form-group">
-      <label class="form-label">22. 人材紹介料（税抜）</label>
-      <input class="form-input" id="nr_referral_fee" placeholder="例: 60,000円">
-    </div>
-    <div class="form-group" style="display:none">
-      <label class="form-label">23. 進捗状況</label>
-      <input class="form-input" id="nr_progress_status">
     </div>
     <div class="form-group">
       <label class="form-label">24. 申請・対応目標日</label>
@@ -1027,10 +1013,85 @@ function buildNewRequestModalBody() {
         <option>窓口</option><option>郵送</option><option>オンライン</option>
       </select>
     </div>
+
+    <!-- 請求条件グループ -->
+    <div class="section-title">💴 請求条件</div>
+    <div class="form-group">
+      <label class="form-label">初期費用（税抜）</label>
+      <input class="form-input" id="nr_initial_fee" placeholder="例: 50,000円">
+    </div>
+    <div class="form-group">
+      <label class="form-label">20. 支援委託費（税抜）</label>
+      <input class="form-input" id="nr_support_fee" placeholder="例: 20,000円">
+    </div>
+    <div class="form-group">
+      <label class="form-label">請求書送付方法</label>
+      <select class="form-select" id="nr_invoice_method">
+        <option value="メール" selected>メール</option>
+        <option value="郵送">郵送</option>
+        <option value="FAX">FAX</option>
+        <option value="その他">その他</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">請求書送付担当</label>
+      <input class="form-input" id="nr_invoice_staff" value="白井" placeholder="例: 白井">
+    </div>
+
+    <!-- 雇用条件グループ -->
+    <div class="section-title">📋 雇用条件</div>
+    <div class="form-group">
+      <label class="form-label">入社希望日</label>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+        <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;">
+          <input type="radio" name="nr_join_type" value="許可おり次第" id="nr_join_asap" onchange="document.getElementById('nr_join_date').style.display='none'" checked>
+          許可おり次第
+        </label>
+        <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;">
+          <input type="radio" name="nr_join_type" value="日付指定" id="nr_join_date_radio" onchange="document.getElementById('nr_join_date').style.display=''">
+          日付指定
+        </label>
+        <input class="form-input" id="nr_join_date" type="date" style="display:none;width:auto;flex:1;">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">基本給</label>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <input class="form-input" id="nr_base_salary" type="number" placeholder="例: 200000" style="flex:1;">
+        <span style="font-size:13px;color:var(--gray-700)">円</span>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">居住費（控除）</label>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <input class="form-input" id="nr_housing_fee" type="number" placeholder="例: 20000" style="flex:1;">
+        <span style="font-size:13px;color:var(--gray-700)">円</span>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">光熱費等（控除）</label>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <input class="form-input" id="nr_utility_fee" type="number" placeholder="例: 5000" style="flex:1;">
+        <span style="font-size:13px;color:var(--gray-700)">円</span>
+      </div>
+    </div>
     <div class="form-group full">
-      <label class="form-label">26. コメント</label>
+      <label class="form-label">その他雇用条件・備考</label>
+      <textarea class="form-textarea" id="nr_employment_note" rows="2" placeholder="例: 直近で決定したXXさんと同じ条件、など自由記述"></textarea>
+    </div>
+
+    <!-- 非表示フィールド（スプレッドシート送信用） -->
+    <div style="display:none">
+      <input id="nr_referral_fee" value="">
+      <input id="nr_progress_status" value="">
+    </div>
+
+    <div class="section-title">💬 コメント</div>
+    <div class="form-group full">
+      <label class="form-label">26. コメント・特記事項</label>
       <textarea class="form-textarea" id="nr_comment" rows="3" placeholder="特記事項・連絡事項など"></textarea>
     </div>
+
   </div>
   <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)">
     <button class="btn btn-outline" onclick="closeGenModal('newRequestModal')">キャンセル</button>
@@ -1039,36 +1100,59 @@ function buildNewRequestModalBody() {
   </div>`;
 }
 
+function getJoinDate() {
+  const radio = document.querySelector('input[name="nr_join_type"]:checked');
+  if (!radio) return '許可おり次第';
+  if (radio.value === '日付指定') {
+    return document.getElementById('nr_join_date')?.value || '許可おり次第';
+  }
+  return '許可おり次第';
+}
+
 function copyNewRequest() {
   const g = id => document.getElementById(id)?.value || '';
   const lines = [
-    `【新規依頼】`,
-    `1. paku: ${g('nr_paku')}`,
-    `2. 依頼受領日: ${g('nr_received_date')}`,
-    `3. 大房担当MG: ${g('nr_ohfusa_mg')}`,
-    `4. 登録支援機関名: ${g('nr_support_org')}`,
-    `5. 【A区分】希望在留資格: ${g('nr_visa_type')}`,
-    `6. 【B区分】認定・変更・更新: ${g('nr_app_type')}`,
-    `7. 【C区分】特定技能受入経験: ${g('nr_experience')}`,
-    `8. 【D区分】申請分野: ${g('nr_field')}`,
-    `9. 案件名: ${g('nr_case_name')}`,
-    `10. 人材名: ${g('nr_person_name')}`,
-    `11. 企業名: ${g('nr_company_name')}`,
-    `12. 在留期限: ${g('nr_expire_date')}`,
-    `13. 特例期間: ${g('nr_tokurei')}`,
-    `14. 一時帰国日: ${g('nr_temp_return')}`,
-    `15. 特定技能通算期間: ${g('nr_total_period')}`,
-    `16. 人材国籍: ${g('nr_nationality')}`,
-    `17. 現在の在留資格: ${g('nr_current_visa')}`,
-    `18. 技能実習修了日: ${g('nr_ginou_end')}`,
-    `19. 支援担当者: ${g('nr_support_staff')}`,
-    `20. 支援委託費（税抜）: ${g('nr_support_fee')}`,
-    `21. 進捗: ${g('nr_progress')}`,
-    `22. 人材紹介料（税抜）: ${g('nr_referral_fee')}`,
-    `24. 申請・対応目標日: ${g('nr_target_date')}`,
-    `25. 交付方法: ${g('nr_delivery')}`,
-    `26. コメント: ${g('nr_comment')}`,
-  ].filter(l => !l.endsWith(': ')).join('\n');
+    '【新規依頼】',
+    '1. paku: ' + g('nr_paku'),
+    '2. 依頼受領日: ' + g('nr_received_date'),
+    '3. 大房担当MG: ' + g('nr_ohfusa_mg'),
+    '4. 登録支援機関名: ' + g('nr_support_org'),
+    '5. 【A区分】希望在留資格: ' + g('nr_visa_type'),
+    '6. 【B区分】認定・変更・更新: ' + g('nr_app_type'),
+    '7. 【C区分】特定技能受入経験: ' + g('nr_experience'),
+    '8. 【D区分】申請分野: ' + g('nr_field'),
+    '9. 案件名: ' + g('nr_case_name'),
+    '10. 人材名: ' + g('nr_person_name'),
+    '11. 企業名: ' + g('nr_company_name'),
+    '12. 在留期限: ' + g('nr_expire_date'),
+    '13. 特例期間: ' + g('nr_tokurei'),
+    '14. 一時帰国日: ' + g('nr_temp_return'),
+    '15. 特定技能通算期間: ' + g('nr_total_period'),
+    '16. 人材国籍: ' + g('nr_nationality'),
+    '17. 現在の在留資格: ' + g('nr_current_visa'),
+    '18. 技能実習修了日: ' + g('nr_ginou_end'),
+    '19. 支援担当者: ' + g('nr_support_staff'),
+    '20. 支援委託費（税抜）: ' + g('nr_support_fee'),
+    '21. 進捗: ' + g('nr_progress'),
+    '24. 申請・対応目標日: ' + g('nr_target_date'),
+    '25. 交付方法: ' + g('nr_delivery'),
+    '--- 請求条件 ---',
+    '初期費用（税抜）: ' + g('nr_initial_fee'),
+    '請求書送付方法: ' + g('nr_invoice_method'),
+    '請求書送付担当: ' + g('nr_invoice_staff'),
+    '--- 雇用条件 ---',
+    '入社希望日: ' + getJoinDate(),
+    '基本給: ' + (g('nr_base_salary') ? g('nr_base_salary') + '円' : ''),
+    '居住費: ' + (g('nr_housing_fee') ? g('nr_housing_fee') + '円' : ''),
+    '光熱費等: ' + (g('nr_utility_fee') ? g('nr_utility_fee') + '円' : ''),
+    'その他雇用条件: ' + g('nr_employment_note'),
+    '26. コメント: ' + g('nr_comment'),
+  ].filter(l => {
+    const val = l.split(': ').slice(1).join(': ');
+    return val !== '' && l !== '--- 請求条件 ---' && l !== '--- 雇用条件 ---'
+      ? true
+      : l.startsWith('---');
+  }).join('\n');
 
   navigator.clipboard.writeText(lines).then(() => {
     showToast('✅ クリップボードにコピーしました', 'success');
@@ -1080,41 +1164,48 @@ function copyNewRequest() {
 async function submitNewRequest() {
   const g = id => document.getElementById(id)?.value || '';
   const data = {
-    paku:            g('nr_paku'),
-    received_date:   g('nr_received_date'),
-    ohfusa_mg:       g('nr_ohfusa_mg'),
-    support_org:     g('nr_support_org'),
-    visa_type:       g('nr_visa_type'),
-    app_type:        g('nr_app_type'),
-    experience:      g('nr_experience'),
-    field:           g('nr_field'),
-    case_name:       g('nr_case_name'),
-    person_name:     g('nr_person_name'),
-    company_name:    g('nr_company_name'),
-    expire_date:     g('nr_expire_date'),
-    tokurei:         g('nr_tokurei'),
-    temp_return:     g('nr_temp_return'),
-    total_period:    g('nr_total_period'),
-    nationality:     g('nr_nationality'),
-    current_visa:    g('nr_current_visa'),
-    ginou_end:       g('nr_ginou_end'),
-    support_staff:   g('nr_support_staff'),
-    support_fee:     g('nr_support_fee'),
-    progress:        g('nr_progress'),
-    referral_fee:    g('nr_referral_fee'),
-    target_date:     g('nr_target_date'),
-    delivery:        g('nr_delivery'),
-    comment:         g('nr_comment'),
+    paku:             g('nr_paku'),
+    received_date:    g('nr_received_date'),
+    ohfusa_mg:        g('nr_ohfusa_mg'),
+    support_org:      g('nr_support_org'),
+    visa_type:        g('nr_visa_type'),
+    app_type:         g('nr_app_type'),
+    experience:       g('nr_experience'),
+    field:            g('nr_field'),
+    case_name:        g('nr_case_name'),
+    person_name:      g('nr_person_name'),
+    company_name:     g('nr_company_name'),
+    expire_date:      g('nr_expire_date'),
+    tokurei:          g('nr_tokurei'),
+    temp_return:      g('nr_temp_return'),
+    total_period:     g('nr_total_period'),
+    nationality:      g('nr_nationality'),
+    current_visa:     g('nr_current_visa'),
+    ginou_end:        g('nr_ginou_end'),
+    support_staff:    g('nr_support_staff'),
+    support_fee:      g('nr_support_fee'),
+    progress:         g('nr_progress'),
+    referral_fee:     '',
+    target_date:      g('nr_target_date'),
+    delivery:         g('nr_delivery'),
+    comment: [
+      g('nr_comment'),
+      g('nr_initial_fee') ? '初期費用: ' + g('nr_initial_fee') : '',
+      '請求書: ' + g('nr_invoice_method') + '/' + g('nr_invoice_staff'),
+      '入社希望日: ' + getJoinDate(),
+      g('nr_base_salary') ? '基本給: ' + g('nr_base_salary') + '円' : '',
+      g('nr_housing_fee') ? '居住費: ' + g('nr_housing_fee') + '円' : '',
+      g('nr_utility_fee') ? '光熱費等: ' + g('nr_utility_fee') + '円' : '',
+      g('nr_employment_note') ? 'その他: ' + g('nr_employment_note') : '',
+    ].filter(Boolean).join(' / '),
   };
 
-  // 必須チェック
   if (!data.case_name && !data.person_name) {
     showToast('❌ 案件名または人材名を入力してください', 'error');
     return;
   }
-
   if (!KMT_REQUEST_GAS_URL) {
-    showToast('❌ GAS URLが未設定です（設定後に再度お試しください）', 'error');
+    showToast('❌ GAS URLが未設定です', 'error');
     return;
   }
 
