@@ -5,7 +5,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260412.08 -->
+<!-- KMT_VERSION ver.20260412.10 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -181,7 +181,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260412.08</div>
+    <div class="logo-ver">ver.20260412.10</div>
   </div>
   <div class="nav-item active" onclick="showScreen('ofusa_view')" style="background:rgba(37,99,235,0.2);color:#93c5fd;margin:8px 8px 4px;border-radius:6px;">📊 案件進捗確認</div>
   <div class="nav-item" onclick="showScreen('decision_report')" style="color:#86efac;margin:2px 8px 4px;border-radius:6px;">📋 決定報告</div>
@@ -1787,7 +1787,9 @@ async function loadMapView() {
   }).addTo(mapInstance);
 
   mapMarkers = [];
+  showToast('📍 住所から座標を取得中...（しばらくお待ちください）');
   await geocodeAndPlotCompanies();
+  showToast('✅ マップ表示完了', 'success');
 }
 
 async function geocodeAndPlotCompanies() {
@@ -1797,79 +1799,90 @@ async function geocodeAndPlotCompanies() {
 
   const companies = getFilteredMapCompanies();
   document.getElementById('mapCount').textContent = companies.length + '件表示中';
-
-  // サイドリスト更新
   renderMapSideList(companies);
 
-  // ジオコーディング（住所→座標）を順番に実行
+  // 座標キャッシュ（Supabaseのlat/lngカラムがあれば使う、なければAPIで取得）
+  const GSI_URL = 'https://msearch.gsi.go.jp/address-search/AddressSearch?q=';
+
+  const bounds = [];
+  let requestCount = 0;
+
   for (const c of companies) {
-    const addr = [c.pref, c.city, c.address].filter(Boolean).join('');
-    if (!addr) continue;
+    // lat/lngがSupabaseに保存済みならAPIスキップ
+    let lat = c.lat ? parseFloat(c.lat) : null;
+    let lng = c.lng ? parseFloat(c.lng) : null;
 
-    try {
-      const res = await fetch(
-        'https://nominatim.openstreetmap.org/search?format=json&q=' +
-        encodeURIComponent(addr + ' 日本') + '&limit=1&accept-language=ja',
-        { headers: { 'User-Agent': 'KMT-System/1.0' } }
-      );
-      const data = await res.json();
-      if (data && data[0]) {
-        const lat = parseFloat(data[0].lat);
-        const lng = parseFloat(data[0].lon);
-        const isActive = c.status !== 'past';
-        const color = isActive ? '#2563eb' : '#94a3b8';
+    if (!lat || !lng) {
+      const addr = [c.pref, c.city, c.address].filter(Boolean).join('');
+      if (!addr) continue;
 
-        // カスタムアイコン
-        const icon = L.divIcon({
-          className: '',
-          html: `<div style="
-            background:${color};
-            width:12px;height:12px;
-            border-radius:50%;
-            border:2px solid white;
-            box-shadow:0 1px 4px rgba(0,0,0,0.4);
-          "></div>`,
-          iconSize: [12, 12],
-          iconAnchor: [6, 6],
-        });
-
-        const marker = L.marker([lat, lng], { icon })
-          .addTo(mapInstance)
-          .bindPopup(`
-            <div style="min-width:180px;font-family:-apple-system,sans-serif;">
-              <div style="font-size:13px;font-weight:700;color:#0f2040;margin-bottom:4px;">${esc(c.name)}</div>
-              <div style="font-size:11px;color:#64748b;margin-bottom:2px;">📍 ${esc(addr)}</div>
-              ${c.industry ? `<div style="font-size:11px;color:#64748b;margin-bottom:2px;">🏭 ${esc(c.industry)}</div>` : ''}
-              ${c.fee_per_person ? `<div style="font-size:11px;color:#64748b;margin-bottom:2px;">💴 ${Number(c.fee_per_person).toLocaleString()}円/人</div>` : ''}
-              ${c.main_staff ? `<div style="font-size:11px;color:#64748b;margin-bottom:6px;">👤 ${esc(c.main_staff)}</div>` : ''}
-              <div style="font-size:11px;">
-                <span style="background:${isActive?'#eff6ff':'#f8fafc'};color:${isActive?'#2563eb':'#64748b'};padding:2px 7px;border-radius:10px;font-weight:600;">
-                  ${isActive ? '支援中' : '過去'}
-                </span>
-              </div>
-              <div style="margin-top:8px;">
-                <button onclick="openCompanyModal('${c.id}')"
-                  style="background:#2563eb;color:white;border:none;border-radius:5px;padding:4px 10px;font-size:11px;cursor:pointer;width:100%;">
-                  詳細を開く
-                </button>
-              </div>
-            </div>
-          `, { maxWidth: 220 });
-
-        mapMarkers.push({ id: c.id, marker, lat, lng });
-
-        // Nominatimのレートリミット対策（1秒待機）
-        await new Promise(r => setTimeout(r, 1000));
+      try {
+        // 国土地理院API（CORS対応・無料・日本語住所対応）
+        const res = await fetch(GSI_URL + encodeURIComponent(addr));
+        const data = await res.json();
+        if (data && data[0] && data[0].geometry) {
+          lng = data[0].geometry.coordinates[0];
+          lat = data[0].geometry.coordinates[1];
+        }
+        requestCount++;
+        // レートリミット対策（10秒で10回まで）
+        if (requestCount % 8 === 0) await new Promise(r => setTimeout(r, 1200));
+        else await new Promise(r => setTimeout(r, 150));
+      } catch(e) {
+        continue;
       }
-    } catch(e) {
-      // ジオコーディング失敗は無視
     }
+
+    if (!lat || !lng || isNaN(lat) || isNaN(lng)) continue;
+
+    const isActive = c.status !== 'past';
+    const color = isActive ? '#2563eb' : '#94a3b8';
+    const addr = [c.pref, c.city, c.address].filter(Boolean).join(' ');
+
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="
+        background:${color};
+        width:14px;height:14px;
+        border-radius:50%;
+        border:2.5px solid white;
+        box-shadow:0 2px 6px rgba(0,0,0,0.4);
+        cursor:pointer;
+      "></div>`,
+      iconSize: [14, 14],
+      iconAnchor: [7, 7],
+    });
+
+    const marker = L.marker([lat, lng], { icon })
+      .addTo(mapInstance)
+      .bindPopup(`
+        <div style="min-width:190px;font-family:-apple-system,sans-serif;font-size:12px;">
+          <div style="font-size:13px;font-weight:700;color:#0f2040;margin-bottom:5px;">${esc(c.name)}</div>
+          <div style="color:#64748b;margin-bottom:2px;">📍 ${esc(addr)}</div>
+          ${c.industry ? `<div style="color:#64748b;margin-bottom:2px;">🏭 ${esc(c.industry)}</div>` : ''}
+          ${c.fee_per_person ? `<div style="color:#64748b;margin-bottom:2px;">💴 ${Number(c.fee_per_person).toLocaleString()}円/人</div>` : ''}
+          ${c.main_staff ? `<div style="color:#64748b;margin-bottom:6px;">👤 ${esc(c.main_staff)}</div>` : ''}
+          <span style="background:${isActive?'#eff6ff':'#f8fafc'};color:${isActive?'#2563eb':'#64748b'};padding:2px 8px;border-radius:10px;font-weight:600;font-size:11px;">
+            ${isActive ? '支援中' : '過去'}
+          </span>
+          <div style="margin-top:8px;">
+            <button onclick="openCompanyModal('${c.id}')"
+              style="background:#2563eb;color:white;border:none;border-radius:5px;padding:4px 10px;font-size:11px;cursor:pointer;width:100%;">
+              詳細を開く
+            </button>
+          </div>
+        </div>
+      `, { maxWidth: 230 });
+
+    mapMarkers.push({ id: c.id, marker, lat, lng });
+    bounds.push([lat, lng]);
   }
 
   // 全マーカーにフィット
-  if (mapMarkers.length > 0) {
-    const group = L.featureGroup(mapMarkers.map(m => m.marker));
-    mapInstance.fitBounds(group.getBounds().pad(0.1));
+  if (bounds.length > 0) {
+    mapInstance.fitBounds(bounds, { padding: [40, 40] });
+  } else {
+    showToast('⚠️ 住所から座標を取得できませんでした', 'error');
   }
 }
 
