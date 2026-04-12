@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260412.15 -->
+<!-- KMT_VERSION ver.20260412.16 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -172,7 +172,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260412.15</div>
+    <div class="logo-ver">ver.20260412.16</div>
   </div>
   <div class="nav-item active" onclick="showScreen('ofusa_view')" style="background:rgba(37,99,235,0.2);color:#93c5fd;margin:8px 8px 4px;border-radius:6px;">📊 案件進捗確認</div>
   <div class="nav-item" onclick="showScreen('decision_report')" style="color:#86efac;margin:2px 8px 4px;border-radius:6px;">📋 決定報告</div>
@@ -1699,6 +1699,69 @@ function copySoloReport() {
     .catch(() => showToast('❌ コピー失敗', 'error'));
 }
 
+// ==============================
+// 📷 顔写真アップロード
+// ==============================
+async function uploadResumePhoto(input) {
+  const file = input.files?.[0];
+  if (!file) return;
+
+  const status = document.getElementById('photoUploadStatus');
+  if (status) { status.textContent = 'アップロード中...'; status.style.display = ''; }
+
+  try {
+    const ext = file.name.split('.').pop().toLowerCase();
+    const fileName = 'photo_' + Date.now() + '.' + ext;
+    const arrayBuffer = await file.arrayBuffer();
+
+    const res = await fetch(
+      'https://oyblvyocvdnhcxeeokuw.supabase.co/storage/v1/object/photos/' + fileName,
+      {
+        method: 'POST',
+        headers: {
+          'apikey': SB_KEY,
+          'Authorization': 'Bearer ' + SB_KEY,
+          'Content-Type': file.type,
+          'x-upsert': 'true',
+        },
+        body: arrayBuffer,
+      }
+    );
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'アップロード失敗');
+    }
+
+    const publicUrl = 'https://oyblvyocvdnhcxeeokuw.supabase.co/storage/v1/object/public/photos/' + fileName;
+    const urlInput = document.getElementById('rf_photo_url');
+    if (urlInput) urlInput.value = publicUrl;
+
+    updatePhotoThumb(publicUrl);
+    previewResume();
+    if (status) { status.textContent = '✅ アップロード完了'; setTimeout(() => { status.style.display = 'none'; }, 2000); }
+  } catch(e) {
+    showToast('❌ 写真アップロード失敗: ' + e.message, 'error');
+    if (status) status.style.display = 'none';
+  }
+}
+
+function onPhotoUrlInput() {
+  const url = document.getElementById('rf_photo_url')?.value;
+  updatePhotoThumb(url);
+  previewResume();
+}
+
+function updatePhotoThumb(url) {
+  const thumb = document.getElementById('photoPreviewThumb');
+  if (!thumb) return;
+  if (url) {
+    thumb.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.innerHTML='<span style=font-size:20px;color:var(--gray-300)>📷</span>'">`;
+  } else {
+    thumb.innerHTML = '<span style="font-size:20px;color:var(--gray-300)">📷</span>';
+  }
+}
+
 // ===== UTILS =====
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function calcAge(birthdate) {
@@ -3128,7 +3191,18 @@ function buildResumeScreen() {
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
           <div class="form-group"><label class="form-label">靴サイズ</label><input class="form-input" id="rf_shoe_size" oninput="previewResume()"></div>
-          <div class="form-group"><label class="form-label">顔写真URL</label><input class="form-input" id="rf_photo_url" oninput="previewResume()"></div>
+          <div class="form-group">
+            <label class="form-label">顔写真</label>
+            <div style="display:flex;flex-direction:column;gap:6px;">
+              <div id="photoPreviewThumb" style="width:80px;height:100px;border:1px solid var(--gray-200);border-radius:4px;overflow:hidden;background:#f8fafc;display:flex;align-items:center;justify-content:center;">
+                <span style="font-size:20px;color:var(--gray-300)">📷</span>
+              </div>
+              <input type="file" id="rf_photo_file" accept="image/*" style="font-size:11px;" onchange="uploadResumePhoto(this)">
+              <div style="font-size:10px;color:var(--gray-400)">または</div>
+              <input class="form-input" id="rf_photo_url" placeholder="画像URLを直接入力" oninput="onPhotoUrlInput()" style="font-size:11px;">
+              <div id="photoUploadStatus" style="font-size:10px;color:var(--blue);display:none;">アップロード中...</div>
+            </div>
+          </div>
         </div>
 
         <!-- 在留・連絡 -->
@@ -3351,7 +3425,7 @@ function fillResumeForm(c) {
   g('rf_gender', c.gender); g('rf_birthdate', c.birthdate); g('rf_birth_place', c.birth_place);
   g('rf_religion', c.religion); g('rf_marital_status', c.marital_status);
   g('rf_num_children', c.num_children); g('rf_height_cm', c.height_cm); g('rf_weight_kg', c.weight_kg);
-  g('rf_shoe_size', c.shoe_size); g('rf_photo_url', c.photo_url);
+  g('rf_shoe_size', c.shoe_size); g('rf_photo_url', c.photo_url); updatePhotoThumb(c.photo_url||'');
   g('rf_current_visa_status', c.current_visa_status); g('rf_current_visa_expiry', c.current_visa_expiry);
   g('rf_residence_card', c.residence_card); g('rf_home_country_address', c.home_country_address||c.jp_address);
   g('rf_phone', c.phone||c.cel_phone); g('rf_email', c.email);
