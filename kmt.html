@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260412.14 -->
+<!-- KMT_VERSION ver.20260412.15 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -172,7 +172,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260412.14</div>
+    <div class="logo-ver">ver.20260412.15</div>
   </div>
   <div class="nav-item active" onclick="showScreen('ofusa_view')" style="background:rgba(37,99,235,0.2);color:#93c5fd;margin:8px 8px 4px;border-radius:6px;">📊 案件進捗確認</div>
   <div class="nav-item" onclick="showScreen('decision_report')" style="color:#86efac;margin:2px 8px 4px;border-radius:6px;">📋 決定報告</div>
@@ -1701,6 +1701,14 @@ function copySoloReport() {
 
 // ===== UTILS =====
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function calcAge(birthdate) {
+  if (!birthdate) return '?';
+  const b = new Date(birthdate);
+  const t = new Date();
+  let age = t.getFullYear() - b.getFullYear();
+  if (t.getMonth() < b.getMonth() || (t.getMonth() === b.getMonth() && t.getDate() < b.getDate())) age--;
+  return age;
+}
 function showLoading(v) { document.getElementById('loadingOverlay').classList.toggle('show', v); }
 
 let toastTimer;
@@ -3072,9 +3080,19 @@ function buildResumeScreen() {
     <!-- 左：編集パネル -->
     <div id="resumeEditPanel" style="width:340px;flex-shrink:0;overflow-y:auto;border-right:1px solid var(--gray-200);padding:14px;background:white;display:flex;flex-direction:column;gap:10px;">
       <div>
-        <label class="form-label" style="margin-bottom:4px;display:block;">候補者を選択</label>
+        <div style="display:flex;gap:8px;margin-bottom:6px;">
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;font-weight:600;">
+            <input type="radio" name="resumeSourceType" value="candidate" onchange="switchResumeSource()" checked>候補者
+          </label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;font-weight:600;">
+            <input type="radio" name="resumeSourceType" value="worker" onchange="switchResumeSource()">外国人材
+          </label>
+        </div>
         <select id="resumeCandidateSelect" class="form-select" onchange="loadResume()" style="width:100%;font-size:13px;">
           <option value="">── 候補者を選択 ──</option>
+        </select>
+        <select id="resumeWorkerSelect" class="form-select" onchange="loadResume()" style="width:100%;font-size:13px;display:none;">
+          <option value="">── 外国人材を選択 ──</option>
         </select>
       </div>
       <div id="resumeFormBody" style="display:none">
@@ -3271,32 +3289,57 @@ function updateWorkHistory(i, key, val) {
 async function loadResumeScreen() {
   showLoading(true);
   try {
-    const data = await sbFetch('candidates?select=id,name,nationality,status&order=name.asc');
-    allCandidates = data || [];
-    const sel = document.getElementById('resumeCandidateSelect');
-    if (sel) {
-      sel.innerHTML = '<option value="">── 候補者を選択 ──</option>' +
+    // 候補者ロード
+    const cData = await sbFetch('candidates?select=id,name,nationality,status&order=name.asc');
+    allCandidates = cData || [];
+    const cSel = document.getElementById('resumeCandidateSelect');
+    if (cSel) {
+      cSel.innerHTML = '<option value="">── 候補者を選択 ──</option>' +
         allCandidates.map(c =>
           `<option value="${c.id}">${natFlag(c.nationality)} ${esc(c.name)}（${esc(c.nationality||'')}）</option>`
+        ).join('');
+    }
+    // 外国人材ロード
+    if (!allWorkers.length) {
+      const wData = await sbFetch('workers?select=id,name,nationality,company_id,companies(name)&order=name.asc');
+      allWorkers = wData || [];
+    }
+    const wSel = document.getElementById('resumeWorkerSelect');
+    if (wSel) {
+      wSel.innerHTML = '<option value="">── 外国人材を選択 ──</option>' +
+        allWorkers.map(w =>
+          `<option value="${w.id}">${natFlag(w.nationality)} ${esc(w.name)}（${esc(w.companies?.name||'')}）</option>`
         ).join('');
     }
   } catch(e) { showToast('❌ ' + e.message, 'error'); }
   showLoading(false);
 }
 
+function switchResumeSource() {
+  const type = document.querySelector('input[name="resumeSourceType"]:checked')?.value || 'candidate';
+  const cSel = document.getElementById('resumeCandidateSelect');
+  const wSel = document.getElementById('resumeWorkerSelect');
+  if (cSel) cSel.style.display = type === 'candidate' ? '' : 'none';
+  if (wSel) wSel.style.display = type === 'worker' ? '' : 'none';
+  // フォームをリセット
+  document.getElementById('resumeFormBody').style.display = 'none';
+  document.getElementById('resumePreview').innerHTML = '<div style="color:var(--gray-400);margin:auto;">← 選択してください</div>';
+}
+
 async function loadResume() {
-  const id = document.getElementById('resumeCandidateSelect')?.value;
-  if (!id) return;
+  const type = document.querySelector('input[name="resumeSourceType"]:checked')?.value || 'candidate';
+  const selId = type === 'worker'
+    ? document.getElementById('resumeWorkerSelect')?.value
+    : document.getElementById('resumeCandidateSelect')?.value;
+  if (!selId) return;
   showLoading(true);
   try {
-    const data = await sbFetch('candidates?id=eq.' + id + '&select=*&limit=1');
+    const table = type === 'worker' ? 'workers' : 'candidates';
+    const data = await sbFetch(table + '?id=eq.' + selId + '&select=*&limit=1');
     const c = data?.[0];
-    if (!c) { showToast('❌ 候補者データが見つかりません', 'error'); return; }
-    // フォームにデータをセット
+    if (!c) { showToast('❌ データが見つかりません', 'error'); return; }
     fillResumeForm(c);
-    // フォームを表示
     document.getElementById('resumeFormBody').style.display = '';
-    // プレビュー更新
     previewResume();
   } catch(e) { showToast('❌ ' + e.message, 'error'); }
   showLoading(false);
