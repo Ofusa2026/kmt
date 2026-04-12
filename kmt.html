@@ -5,7 +5,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260412.10 -->
+<!-- KMT_VERSION ver.20260412.11 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -181,7 +181,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260412.10</div>
+    <div class="logo-ver">ver.20260412.11</div>
   </div>
   <div class="nav-item active" onclick="showScreen('ofusa_view')" style="background:rgba(37,99,235,0.2);color:#93c5fd;margin:8px 8px 4px;border-radius:6px;">📊 案件進捗確認</div>
   <div class="nav-item" onclick="showScreen('decision_report')" style="color:#86efac;margin:2px 8px 4px;border-radius:6px;">📋 決定報告</div>
@@ -2029,22 +2029,25 @@ function renderScreenContent(name) {
   const filtersSection = document.querySelector('.filters-section');
   const contentWrap = document.querySelector('.content-wrap');
 
-  // 各画面のHTML
-  const screens = {
-    companies: null, // 既存
-    workers: buildWorkersScreen(),
-    candidates: buildCandidatesScreen(),
-    jobs: buildJobsScreen(),
-    introductions: buildIntroductionsScreen(),
-    sending: buildSendingScreen(),
-    partners: buildPartnersScreen(),
-    fees: buildFeesScreen(),
-    sales: buildSalesScreen(),
-    expenses: buildExpensesScreen(),
-    users: buildUsersScreen(),
-    ofusa_view: buildOfusaViewScreen(),
-    decision_report: buildDecisionReportScreen(),
-    resume: buildResumeScreen(),
+  // 各画面のHTML（必要な画面だけ構築）
+  const screenBuilders = {
+    workers: buildWorkersScreen,
+    candidates: buildCandidatesScreen,
+    jobs: buildJobsScreen,
+    introductions: buildIntroductionsScreen,
+    sending: buildSendingScreen,
+    partners: buildPartnersScreen,
+    fees: buildFeesScreen,
+    sales: buildSalesScreen,
+    expenses: buildExpensesScreen,
+    users: buildUsersScreen,
+    ofusa_view: buildOfusaViewScreen,
+    decision_report: buildDecisionReportScreen,
+    resume: buildResumeScreen,
+  };
+  const buildScreen = (n) => {
+    try { return screenBuilders[n] ? screenBuilders[n]() : null; }
+    catch(e) { console.error('buildScreen error:', n, e); return '<div style="padding:40px;text-align:center;color:var(--red)">画面の読み込みに失敗しました: ' + e.message + '</div>'; }
   };
 
   if (name === 'companies') {
@@ -2072,7 +2075,7 @@ function renderScreenContent(name) {
   statsRow.style.display = 'none';
   filtersSection.style.display = 'none';
   contentWrap.style.padding = '';
-  contentWrap.innerHTML = screens[name] || '<div style="padding:40px;text-align:center;color:var(--gray-400)">準備中</div>';
+  contentWrap.innerHTML = buildScreen(name) || '<div style="padding:40px;text-align:center;color:var(--gray-400)">準備中</div>';
 }
 
 // ==============================
