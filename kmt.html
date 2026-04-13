@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260413.21 -->
+<!-- KMT_VERSION ver.20260413.29 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -164,16 +164,55 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
 }
 .mobile-menu-btn{display:none;align-items:center;justify-content:center;width:36px;height:36px;border-radius:8px;border:1.5px solid var(--gray-200);background:white;cursor:pointer;font-size:18px;}
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
 <body>
+
+<!-- ===== ログイン画面 ===== -->
+<div id="loginScreen" style="display:none;position:fixed;inset:0;background:linear-gradient(135deg,#0f2040,#1a56db);z-index:99999;align-items:center;justify-content:center;">
+  <div style="background:white;border-radius:20px;padding:36px 32px;width:360px;box-shadow:0 24px 60px rgba(0,0,0,.3);">
+    <div style="text-align:center;margin-bottom:24px;">
+      <div style="font-size:32px;margin-bottom:8px;">🏢</div>
+      <div style="font-size:18px;font-weight:900;color:#0f2040;">KMT案件管理システム</div>
+      <div style="font-size:12px;color:#64748b;margin-top:4px;">スタッフログイン</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div>
+        <label style="font-size:11px;font-weight:700;color:#475569;display:block;margin-bottom:4px;">メールアドレス</label>
+        <input id="loginEmail" type="email" class="form-input" value="kmt@k-m-t.jp">
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:700;color:#475569;display:block;margin-bottom:4px;">パスワード</label>
+        <input id="loginPassword" type="password" class="form-input" placeholder="パスワードを入力"
+          onkeydown="if(event.key==='Enter') loginStep1()">
+      </div>
+      <div id="loginError" style="display:none;font-size:11px;color:#dc2626;text-align:center;"></div>
+      <button class="btn btn-primary" style="width:100%;padding:10px;" onclick="loginStep1()">→ 次へ</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== ユーザー選択画面 ===== -->
+<div id="userSelectScreen" style="display:none;position:fixed;inset:0;background:linear-gradient(135deg,#0f2040,#1a56db);z-index:99999;align-items:center;justify-content:center;">
+  <div style="background:white;border-radius:20px;padding:36px 32px;width:360px;max-height:80vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,.3);">
+    <div style="text-align:center;margin-bottom:20px;">
+      <div style="font-size:18px;font-weight:900;color:#0f2040;">あなたは誰ですか？</div>
+      <div style="font-size:12px;color:#64748b;margin-top:4px;">自分の名前を選んでください</div>
+    </div>
+    <div id="userSelectList" style="display:flex;flex-direction:column;gap:8px;"></div>
+  </div>
+</div>
 
 <!-- ===== SIDEBAR ===== -->
 <div class="sidebar" id="sidebar">
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260413.21</div>
+    <div class="logo-ver">ver.20260413.29</div>
+    <div id="currentUserBadge" style="font-size:10px;color:#86efac;margin-top:2px;cursor:pointer;" onclick="logoutUser()">👤 読込中...</div>
   </div>
+  <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;color:#86efac;margin:4px 8px;border-radius:6px;background:rgba(134,239,172,0.1);" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
+  <div style="height:1px;background:rgba(255,255,255,0.08);margin:4px 16px 8px;"></div>
   <div class="nav-item active" onclick="showScreen('ofusa_view')" style="background:rgba(37,99,235,0.2);color:#93c5fd;margin:8px 8px 4px;border-radius:6px;">📊 案件進捗確認</div>
   <div class="nav-item" onclick="showScreen('decision_report')" style="color:#86efac;margin:2px 8px 4px;border-radius:6px;">📋 決定報告</div>
   <div style="height:1px;background:rgba(255,255,255,0.08);margin:4px 16px 8px;"></div>
@@ -193,6 +232,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="nav-item" onclick="showScreen('sales')">📊 売上管理</div>
   <div class="nav-item" onclick="showScreen('expenses')">💸 立替管理</div>
   <div class="nav-item" onclick="showScreen('users')">⚙️ ユーザー設定</div>
+  <div class="nav-item" onclick="showScreen('ai_knowledge')" style="color:#a78bfa;">🧠 AI記憶</div>
   <div class="sidebar-user">
     <div class="user-info">
       <div class="user-avatar" id="userAvatar">K</div>
@@ -625,7 +665,10 @@ let statFilter = 'all';
 window.addEventListener('DOMContentLoaded', () => {
   const ver = document.querySelector('.logo-ver')?.textContent || 'unknown';
   console.log('%c KMT案件管理システム ' + ver + ' ', 'background:#0f2040;color:#93c5fd;font-size:14px;font-weight:bold;padding:4px 8px;border-radius:4px;');
-  loadCompanies();
+  initSupabaseClient();
+  // mainWrapを初期非表示
+  document.getElementById('mainWrap').style.display = 'none';
+  initLogin();
 });
 
 // ===== LOAD =====
@@ -1808,7 +1851,8 @@ function printResume() {
     @media print { * { -webkit-print-color-adjust:exact !important;print-color-adjust:exact !important; } }
     .resume-page { box-shadow:none!important;border:none!important;margin:0!important;max-width:100%!important;padding:4mm!important; }
     ${resumeCss}
-  </style></head><body>${wrap.innerHTML}</body></html>`);
+  </style>
+</head><body>${wrap.innerHTML}</body></html>`);
   doc.close();
   const prevTitle = document.title;
   document.title = title;
@@ -1837,7 +1881,8 @@ function printJobFlyer() {
     body{margin:0;padding:14mm;font-family:'Noto Sans JP','Hiragino Sans',sans-serif;background:white;}
     @page{margin:0;size:A4;}
     @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;padding:10mm;}}
-  </style></head><body>${preview.innerHTML}</body></html>`);
+  </style>
+</head><body>${preview.innerHTML}</body></html>`);
   doc.close();
   iframe.onload = () => {
     const prev=document.title; document.title=title;
@@ -2002,6 +2047,625 @@ function previewFlyer() {
 }
 
 
+// ==============================
+// 🧠 AI記憶
+// ==============================
+let allAiKnowledge = [];
+
+function buildAiKnowledgeScreen() {
+  return `
+  <div style="max-width:900px;margin:0 auto;">
+    <!-- フィルター -->
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;">
+      <input class="search-input" id="knSearchInput" placeholder="タイトル・内容で検索..." oninput="renderAiKnowledgeTable()" style="flex:1;min-width:200px;">
+      <select class="filter-select" id="knFilterStatus" onchange="renderAiKnowledgeTable()">
+        <option value="">全ステータス</option>
+        <option value="pending">⏳ 未承認</option>
+        <option value="approved">✅ 承認済み</option>
+      </select>
+      <select class="filter-select" id="knFilterCat" onchange="renderAiKnowledgeTable()">
+        <option value="">全カテゴリ</option>
+        <option>業務ルール</option>
+        <option>会社情報</option>
+        <option>FAQ</option>
+        <option>手続き</option>
+        <option>その他</option>
+      </select>
+      <button class="btn btn-outline" style="font-size:11px;padding:4px 10px" onclick="loadAiKnowledge()">🔄</button>
+    </div>
+    <!-- テーブル -->
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th style="width:100px">カテゴリ</th>
+          <th>タイトル</th>
+          <th style="width:120px">記入者</th>
+          <th style="width:90px">登録日</th>
+          <th style="width:90px">ステータス</th>
+          <th style="width:130px">操作</th>
+        </tr></thead>
+        <tbody id="knTbody"><tr><td colspan="6" style="text-align:center;padding:40px;color:var(--gray-400)">読み込み中...</td></tr></tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+async function loadAiKnowledge() {
+  showLoading(true);
+  try {
+    const data = await sbFetch('ai_knowledge?select=*&order=created_at.desc');
+    allAiKnowledge = data || [];
+    renderAiKnowledgeTable();
+  } catch(e) { showToast('❌ ' + e.message, 'error'); }
+  showLoading(false);
+}
+
+function renderAiKnowledgeTable() {
+  const tbody = document.getElementById('knTbody'); if (!tbody) return;
+  const q = (document.getElementById('knSearchInput')?.value || '').toLowerCase();
+  const status = document.getElementById('knFilterStatus')?.value || '';
+  const cat = document.getElementById('knFilterCat')?.value || '';
+  const filtered = allAiKnowledge.filter(k => {
+    if (q && !(k.title||'').toLowerCase().includes(q) && !(k.content||'').toLowerCase().includes(q)) return false;
+    if (status && k.status !== status) return false;
+    if (cat && k.category !== cat) return false;
+    return true;
+  });
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--gray-400)">データなし</td></tr>';
+    return;
+  }
+  tbody.innerHTML = filtered.map(k => {
+    const isPending = k.status !== 'approved';
+    const statusBadge = isPending
+      ? '<span class="st-badge st-docs">⏳ 未承認</span>'
+      : '<span class="st-badge st-active">✅ 承認済み</span>';
+    return `<tr>
+      <td><span style="font-size:10px;font-weight:700;color:#7c3aed;background:#ede9fe;padding:2px 7px;border-radius:8px;">${esc(k.category||'')}</span></td>
+      <td>
+        <div style="font-weight:700;font-size:12px;color:var(--navy);">${esc(k.title||'')}</div>
+        <div style="font-size:11px;color:var(--gray-400);margin-top:2px;white-space:pre-wrap;max-height:40px;overflow:hidden;">${esc((k.content||'').substring(0,80))}${(k.content||'').length>80?'...':''}</div>
+      </td>
+      <td style="font-size:12px;">${esc(k.author||'-')}</td>
+      <td style="font-size:12px;">${(k.created_at||'').slice(0,10)}</td>
+      <td>${statusBadge}</td>
+      <td>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;">
+          ${isPending ? `<button class="btn btn-outline" style="font-size:10px;padding:2px 8px;background:#059669;color:white;border-color:#059669;" onclick="approveAiKn('${k.id}')">✅ 承認</button>` : ''}
+          <button class="btn btn-outline" style="font-size:10px;padding:2px 8px;" onclick="openAiKnModal('${k.id}')">✏️ 編集</button>
+          <button class="btn btn-outline" style="font-size:10px;padding:2px 8px;color:var(--red);border-color:var(--red);" onclick="deleteAiKn('${k.id}')">削除</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function openAiKnModal(id) {
+  const k = id ? allAiKnowledge.find(x => x.id === id) : null;
+  editingAiKnId = id || null;
+  const cats = ['業務ルール','会社情報','FAQ','手続き','その他'];
+  showGenModal('aiKnModal', id ? '🧠 AI記憶 編集' : '🧠 AI記憶 新規登録', `
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <div class="form-group">
+        <label class="form-label">カテゴリ</label>
+        <select class="form-select" id="kn_cat">
+          ${cats.map(c => `<option ${(k?.category||''===c)?'selected':''}>${c}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">タイトル <span style="color:var(--red)">*</span></label>
+        <input class="form-input" id="kn_title" value="${esc(k?.title||'')}" placeholder="例: 特定技能の在留期限ルール">
+      </div>
+      <div class="form-group">
+        <label class="form-label">内容 <span style="color:var(--red)">*</span></label>
+        <textarea class="form-textarea" id="kn_content" rows="6" placeholder="AIに覚えさせたい内容を詳しく記入...">${esc(k?.content||'')}</textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">記入者</label>
+        <input class="form-input" id="kn_author" value="${esc(k?.author||'')}" placeholder="例: 坂齊">
+      </div>
+      ${id ? `
+      <div class="form-group">
+        <label class="form-label">ステータス</label>
+        <select class="form-select" id="kn_status">
+          <option value="pending" ${k?.status==='pending'?'selected':''}>⏳ 未承認</option>
+          <option value="approved" ${k?.status==='approved'?'selected':''}>✅ 承認済み</option>
+        </select>
+      </div>` : ''}
+      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:8px 12px;font-size:11px;color:#92400e;">
+        💡 <strong>承認済み</strong>の知識のみAIチャットのシステムプロンプトに反映されます
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:8px;border-top:1px solid var(--gray-200);">
+        <button class="btn btn-outline" onclick="closeGenModal('aiKnModal')">キャンセル</button>
+        <button class="btn btn-primary" onclick="saveAiKn()">💾 保存</button>
+      </div>
+    </div>
+  `);
+}
+let editingAiKnId = null;
+
+async function saveAiKn() {
+  const cat = document.getElementById('kn_cat')?.value || 'その他';
+  const title = document.getElementById('kn_title')?.value.trim();
+  const content = document.getElementById('kn_content')?.value.trim();
+  const author = document.getElementById('kn_author')?.value.trim();
+  const status = document.getElementById('kn_status')?.value || 'pending';
+  if (!title || !content) { showToast('⚠️ タイトルと内容は必須です', 'error'); return; }
+  showLoading(true);
+  try {
+    if (editingAiKnId) {
+      await sbFetch('ai_knowledge?id=eq.' + editingAiKnId, { method: 'PATCH', body: JSON.stringify({ category: cat, title, content, author, status, updated_at: new Date().toISOString() }) });
+      showToast('✅ 更新しました', 'success');
+    } else {
+      await sbFetch('ai_knowledge', { method: 'POST', body: JSON.stringify({ category: cat, title, content, author, status: 'pending', created_at: new Date().toISOString() }) });
+      showToast('💾 保存しました（承認待ち）', 'success');
+    }
+    closeGenModal('aiKnModal');
+    await loadAiKnowledge();
+  } catch(e) { showToast('❌ ' + e.message, 'error'); }
+  showLoading(false);
+}
+
+async function approveAiKn(id) {
+  showLoading(true);
+  try {
+    await sbFetch('ai_knowledge?id=eq.' + id, { method: 'PATCH', body: JSON.stringify({ status: 'approved', updated_at: new Date().toISOString() }) });
+    showToast('✅ 承認しました', 'success');
+    await loadAiKnowledge();
+  } catch(e) { showToast('❌ ' + e.message, 'error'); }
+  showLoading(false);
+}
+
+async function deleteAiKn(id) {
+  if (!confirm('この知識を削除しますか？')) return;
+  showLoading(true);
+  try {
+    await sbFetch('ai_knowledge?id=eq.' + id, { method: 'DELETE' });
+    showToast('🗑️ 削除しました', 'success');
+    await loadAiKnowledge();
+  } catch(e) { showToast('❌ ' + e.message, 'error'); }
+  showLoading(false);
+}
+
+// ==============================
+// 🔐 ログイン・ユーザー管理
+// ==============================
+const SHARED_EMAIL = 'kmt@k-m-t.jp';
+const SHARED_PASSWORD = 'kmt2026';
+let currentUser = null; // { id, name, email, role }
+
+function initLogin() {
+  const saved = localStorage.getItem('kmt_current_user');
+  if (saved) {
+    try {
+      currentUser = JSON.parse(saved);
+      onLoginSuccess();
+      return;
+    } catch(e) {}
+  }
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('mainWrap').style.display = 'none';
+}
+
+async function loginStep1() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginError');
+  errEl.style.display = 'none';
+  if (email !== SHARED_EMAIL || password !== SHARED_PASSWORD) {
+    errEl.textContent = 'メールアドレスまたはパスワードが違います';
+    errEl.style.display = '';
+    return;
+  }
+  // ユーザー一覧を取得して選択画面へ
+  showLoading(true);
+  try {
+    const users = await sbFetch('users?select=id,name,role&order=name.asc');
+    const list = document.getElementById('userSelectList');
+    list.innerHTML = (users||[]).map(u => `
+      <button onclick="selectUser('${u.id}','${esc(u.name)}','${esc(u.role||'')}','${email}')"
+        style="width:100%;padding:12px 16px;border:2px solid #e2e8f0;border-radius:10px;background:white;cursor:pointer;text-align:left;font-size:13px;font-weight:700;color:#0f2040;transition:.15s;"
+        onmouseover="this.style.borderColor='#1a56db';this.style.background='#eff6ff';"
+        onmouseout="this.style.borderColor='#e2e8f0';this.style.background='white';">
+        👤 ${esc(u.name)} <span style="font-size:10px;color:#64748b;font-weight:400;">${esc(u.role||'スタッフ')}</span>
+      </button>`).join('');
+    document.getElementById('loginScreen').style.display = 'none';
+    const sel = document.getElementById('userSelectScreen');
+    sel.style.display = 'flex';
+  } catch(e) {
+    errEl.textContent = 'サーバーエラー: ' + e.message;
+    errEl.style.display = '';
+  }
+  showLoading(false);
+}
+
+function selectUser(id, name, role, email) {
+  currentUser = { id, name, email, role };
+  localStorage.setItem('kmt_current_user', JSON.stringify(currentUser));
+  document.getElementById('userSelectScreen').style.display = 'none';
+  onLoginSuccess();
+}
+
+function onLoginSuccess() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('userSelectScreen').style.display = 'none';
+  document.getElementById('mainWrap').style.display = '';
+  const badge = document.getElementById('currentUserBadge');
+  if (badge && currentUser) badge.textContent = '👤 ' + currentUser.name + ' （ログアウト）';
+  loadCompanies();
+  initPushNotification();
+  loadChatUnread();
+}
+
+function logoutUser() {
+  if (!confirm(currentUser?.name + ' としてログアウトしますか？')) return;
+  localStorage.removeItem('kmt_current_user');
+  currentUser = null;
+  location.reload();
+}
+
+// ==============================
+// 💬 チャット
+// ==============================
+let chatRooms = []; // { id, name, type, drive_url, unread }
+let currentRoom = null;
+let chatRealtimeSub = null;
+let chatMessages = [];
+
+function buildChatScreen() {
+  return `
+  <div style="display:flex;gap:0;height:calc(100vh - 110px);overflow:hidden;">
+    <!-- 左：ルーム一覧 -->
+    <div style="width:240px;flex-shrink:0;border-right:1px solid var(--gray-200);background:white;display:flex;flex-direction:column;">
+      <div style="padding:12px;border-bottom:1px solid var(--gray-200);">
+        <input class="search-input" id="chatRoomSearch" placeholder="案件名で検索..." oninput="renderChatRooms()" style="width:100%;font-size:12px;">
+      </div>
+      <div id="chatRoomList" style="flex:1;overflow-y:auto;"></div>
+    </div>
+    <!-- 右：メッセージエリア -->
+    <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+      <!-- ヘッダー -->
+      <div id="chatRoomHeader" style="padding:12px 16px;border-bottom:1px solid var(--gray-200);background:white;display:flex;align-items:center;gap:10px;flex-shrink:0;">
+        <div style="color:var(--gray-400);font-size:13px;">← 案件を選択してください</div>
+      </div>
+      <!-- メッセージ一覧 -->
+      <div id="chatMessageArea" style="flex:1;overflow-y:auto;padding:16px;background:#f8fafc;display:flex;flex-direction:column;gap:10px;">
+      </div>
+      <!-- 入力エリア -->
+      <div id="chatInputArea" style="display:none;padding:10px 14px;border-top:1px solid var(--gray-200);background:white;flex-shrink:0;">
+        <div id="chatFilePreview" style="display:none;padding:6px 10px;background:#f0f9ff;border-radius:6px;margin-bottom:8px;font-size:11px;color:#0369a1;display:flex;align-items:center;gap:8px;">
+          <span id="chatFileName"></span>
+          <button onclick="clearChatFile()" style="background:none;border:none;color:#94a3b8;cursor:pointer;">✕</button>
+        </div>
+        <div style="display:flex;gap:8px;align-items:flex-end;">
+          <label style="cursor:pointer;font-size:18px;color:#94a3b8;flex-shrink:0;padding:4px;"
+            title="ファイルを添付（Driveにアップロード）">
+            📎<input type="file" id="chatFileInput" style="display:none;" onchange="onChatFileSelect(this)">
+          </label>
+          <textarea id="chatTextInput" class="form-textarea" rows="2"
+            placeholder="メッセージを入力... (Shift+Enterで改行)"
+            style="flex:1;resize:none;font-size:13px;padding:8px 10px;"
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey&&!event.isComposing){event.preventDefault();sendChatMessage();}"></textarea>
+          <button class="btn btn-primary" style="flex-shrink:0;align-self:flex-end;" onclick="sendChatMessage()">送信</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+async function loadChatScreen() {
+  showLoading(true);
+  try {
+    // chat_roomsテーブルからチャット開始済みの案件のみ取得
+    const d = await sbFetch('chat_rooms?select=id,worker_id,created_at,workers(id,name,nationality,drive_url,companies(name))&order=created_at.desc');
+    chatRooms = (d||[]).map(r => ({
+      id: r.id, // chat_rooms.id
+      worker_id: r.worker_id,
+      name: r.workers?.name || '',
+      subName: r.workers?.companies?.name || '',
+      nationality: r.workers?.nationality || '',
+      drive_url: r.workers?.drive_url || '',
+      created_at: r.created_at,
+    }));
+    renderChatRooms();
+    loadChatUnread();
+  } catch(e) { showToast('❌ ' + e.message, 'error'); }
+  showLoading(false);
+}
+
+async function startWorkerChat(workerId) {
+  if (!workerId) return;
+  showLoading(true);
+  try {
+    // 既存ルームを確認
+    const existing = await sbFetch('chat_rooms?worker_id=eq.' + workerId + '&select=id&limit=1');
+    let roomId;
+    if (existing && existing.length > 0) {
+      roomId = existing[0].id;
+    } else {
+      // 新規ルーム作成
+      const res = await sbFetch('chat_rooms', {
+        method: 'POST',
+        headers: { 'Prefer': 'return=representation' },
+        body: JSON.stringify({ worker_id: workerId, created_by: currentUser?.name || '' })
+      });
+      roomId = res?.[0]?.id;
+    }
+    if (!roomId) throw new Error('ルーム作成失敗');
+    closeGenModal('workerModal');
+    showScreen('chat');
+    setTimeout(async () => {
+      await loadChatScreen();
+      const room = chatRooms.find(r => r.id === roomId);
+      if (room) openChatRoom(roomId);
+    }, 300);
+    showToast('💬 チャットを開始しました', 'success');
+  } catch(e) { showToast('❌ ' + e.message, 'error'); }
+  showLoading(false);
+}
+
+async function loadChatUnread() {
+  if (!currentUser) return;
+  try {
+    // 各ルームの最新メッセージと既読時刻を比較
+    const [msgs, reads] = await Promise.all([
+      sbFetch('chat_messages?select=room_id,created_at&order=created_at.desc'),
+      sbFetch('chat_read_at?select=room_id,read_at&user_id=eq.' + currentUser.id),
+    ]);
+    const readMap = {};
+    (reads||[]).forEach(r => { readMap[r.room_id] = r.read_at; });
+    // ルームごとの未読数を計算
+    const unreadByRoom = {};
+    (msgs||[]).forEach(m => {
+      const readAt = readMap[m.room_id];
+      if (!readAt || m.created_at > readAt) {
+        unreadByRoom[m.room_id] = (unreadByRoom[m.room_id] || 0) + 1;
+      }
+    });
+    chatRooms.forEach(r => { r.unread = unreadByRoom[r.id] || 0; });
+    const total = Object.values(unreadByRoom).reduce((s,v) => s+v, 0);
+    const badge = document.getElementById('chatUnreadBadge');
+    if (badge) {
+      badge.textContent = total;
+      badge.style.display = total > 0 ? '' : 'none';
+    }
+    renderChatRooms();
+  } catch(e) {}
+}
+
+function renderChatRooms() {
+  const list = document.getElementById('chatRoomList'); if (!list) return;
+  const q = (document.getElementById('chatRoomSearch')?.value || '').toLowerCase();
+  const filtered = chatRooms.filter(r => !q || r.name.toLowerCase().includes(q));
+  if (!filtered.length) {
+    list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--gray-400);font-size:12px;">案件なし</div>';
+    return;
+  }
+  list.innerHTML = filtered.map(r => {
+    const active = currentRoom?.id === r.id;
+    return `<div onclick="openChatRoom('${r.id}')"
+      style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--gray-100);transition:.15s;border-left:3px solid ${active?'var(--blue)':'transparent'};background:${active?'#eff6ff':''};"
+      onmouseover="this.style.background='${active?'#eff6ff':'#f8fafc'}';"
+      onmouseout="this.style.background='${active?'#eff6ff':''}';">
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span style="font-size:14px;">${natFlag(r.nationality||'')}</span>
+        <span style="font-size:12px;font-weight:700;color:var(--navy);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(r.name)}</span>
+        ${r.unread > 0 ? `<span style="background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;flex-shrink:0;">${r.unread}</span>` : ''}
+      </div>
+      <div style="font-size:10px;color:var(--gray-400);margin-top:1px;">${esc(r.subName||'')}</div>
+      <div style="font-size:9px;margin-top:2px;color:${r.drive_url?'#7c3aed':'#94a3b8'};">${r.drive_url?'📁 Drive連携済み':'Drive URL未設定（外国人材詳細で設定）'}</div>
+    </div>`;
+  }).join('');
+}
+
+async function openChatRoom(roomId) {
+  const room = chatRooms.find(r => r.id === roomId);
+  if (!room) return;
+  currentRoom = room;
+  renderChatRooms();
+
+  // ヘッダー更新
+  const header = document.getElementById('chatRoomHeader');
+  header.innerHTML = `
+    <div style="flex:1;">
+      <div style="font-size:14px;font-weight:800;color:var(--navy);">💬 ${esc(room.name)}</div>
+      ${room.drive_url ? `<div style="font-size:10px;color:#7c3aed;">📁 <a href="${esc(room.drive_url)}" target="_blank" style="color:#7c3aed;">Driveフォルダを開く</a></div>` : '<div style="font-size:10px;color:#94a3b8;">Drive URL未設定（求人詳細で設定）</div>'}
+    </div>`;
+
+  // 入力エリア表示
+  document.getElementById('chatInputArea').style.display = '';
+
+  // メッセージ読み込み
+  await loadChatMessages(roomId);
+  await markChatRead(roomId);
+
+  // Realtime購読
+  if (chatRealtimeSub) chatRealtimeSub.unsubscribe();
+  chatRealtimeSub = window._supabaseClient
+    ?.channel('chat_' + roomId)
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: 'chat_room_id=eq.' + roomId },
+      (payload) => {
+        chatMessages.push(payload.new);
+        renderChatMessages();
+        markChatRead(roomId);
+      }
+    ).subscribe();
+}
+
+async function loadChatMessages(roomId) {
+  const area = document.getElementById('chatMessageArea');
+  area.innerHTML = '<div style="text-align:center;padding:20px;color:var(--gray-400);">読み込み中...</div>';
+  try {
+    const data = await sbFetch('chat_messages?chat_room_id=eq.' + roomId + '&order=created_at.asc&limit=200');
+    chatMessages = data || [];
+    renderChatMessages();
+  } catch(e) {
+    area.innerHTML = '<div style="text-align:center;padding:20px;color:var(--red);">❌ ' + e.message + '</div>';
+  }
+}
+
+function renderChatMessages() {
+  const area = document.getElementById('chatMessageArea'); if (!area) return;
+  if (!chatMessages.length) {
+    area.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray-400);font-size:12px;">まだメッセージがありません<br>最初のメッセージを送ってみましょう！</div>';
+    return;
+  }
+  const isMine = name => currentUser?.name === name;
+  area.innerHTML = chatMessages.map(m => {
+    const mine = isMine(m.sender_name);
+    const time = new Date(m.created_at).toLocaleString('ja-JP', {month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
+    return `
+    <div style="display:flex;flex-direction:${mine?'row-reverse':'row'};gap:8px;align-items:flex-end;">
+      ${!mine ? `<div style="font-size:20px;flex-shrink:0;">👤</div>` : ''}
+      <div style="max-width:70%;">
+        ${!mine ? `<div style="font-size:10px;color:var(--gray-400);margin-bottom:3px;">${esc(m.sender_name)}</div>` : ''}
+        <div style="background:${mine?'#1a56db':'white'};color:${mine?'white':'#1a202c'};padding:9px 13px;border-radius:${mine?'14px 4px 14px 14px':'4px 14px 14px 14px'};font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;border:${mine?'none':'1px solid var(--gray-200)'};box-shadow:0 1px 4px rgba(0,0,0,.06);">
+          ${m.file_url ? `<div style="margin-bottom:${m.content?'8px':'0'};">📎 <a href="${esc(m.file_url)}" target="_blank" style="color:${mine?'#bfdbfe':'#1a56db'};font-weight:700;">${esc(m.file_name||'ファイル')}</a></div>` : ''}
+          ${m.content ? esc(m.content) : ''}
+        </div>
+        <div style="font-size:9px;color:var(--gray-400);margin-top:3px;text-align:${mine?'right':'left'};">${time}</div>
+      </div>
+    </div>`;
+  }).join('');
+  area.scrollTop = area.scrollHeight;
+}
+
+async function markChatRead(roomId) {
+  if (!currentUser) return;
+  try {
+    await sbFetch('chat_read_at', {
+      method: 'POST',
+      headers: { 'Prefer': 'resolution=merge-duplicates' },
+      body: JSON.stringify({ user_id: currentUser.id, room_id: roomId, read_at: new Date().toISOString() })
+    });
+    const room = chatRooms.find(r => r.id === roomId);
+    if (room) room.unread = 0;
+    loadChatUnread();
+  } catch(e) {}
+}
+
+let _chatFile = null;
+function onChatFileSelect(input) {
+  const file = input.files[0]; if (!file) return;
+  _chatFile = file;
+  document.getElementById('chatFileName').textContent = '📎 ' + file.name;
+  document.getElementById('chatFilePreview').style.display = 'flex';
+}
+function clearChatFile() {
+  _chatFile = null;
+  document.getElementById('chatFileInput').value = '';
+  document.getElementById('chatFilePreview').style.display = 'none';
+}
+
+async function sendChatMessage() {
+  if (!currentRoom || !currentUser) return;
+  const text = document.getElementById('chatTextInput')?.value.trim();
+  if (!text && !_chatFile) return;
+
+  const btn = document.querySelector('#chatInputArea .btn-primary');
+  if (btn) btn.disabled = true;
+
+  try {
+    let fileUrl = null, fileName = null;
+
+    // ファイルアップロード（GAS経由でDrive）
+    if (_chatFile) {
+      if (!currentRoom.drive_url) {
+        showToast('⚠️ このルームにDrive URLが設定されていません', 'error');
+        if (btn) btn.disabled = false;
+        return;
+      }
+      showToast('📤 Driveにアップロード中...', 'success');
+      fileName = _chatFile.name;
+      const b64 = await new Promise((res, rej) => {
+        const reader = new FileReader();
+        reader.onload = e => res(e.target.result.split(',')[1]);
+        reader.onerror = rej;
+        reader.readAsDataURL(_chatFile);
+      });
+      const gasUrl = localStorage.getItem('kmt_gas_url') || '';
+      if (!gasUrl) {
+        showToast('⚠️ GAS URLが設定されていません（ユーザー設定で登録）', 'error');
+        if (btn) btn.disabled = false;
+        return;
+      }
+      const resp = await fetch(gasUrl, {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'uploadFileToDrive',
+          driveUrl: currentRoom.drive_url,
+          fileName: _chatFile.name,
+          fileData: b64,
+          mimeType: _chatFile.type,
+        })
+      });
+      const result = await resp.json();
+      if (!result.success) throw new Error(result.error || 'アップロード失敗');
+      fileUrl = result.fileUrl;
+      showToast('✅ Driveにアップしました', 'success');
+      clearChatFile();
+    }
+
+    // メッセージ保存
+    await sbFetch('chat_messages', {
+      method: 'POST',
+      body: JSON.stringify({
+        room_id: currentRoom.id,
+        room_type: currentRoom.type,
+        sender_id: currentUser.id,
+        sender_name: currentUser.name,
+        content: text || null,
+        file_url: fileUrl,
+        file_name: fileName,
+        created_at: new Date().toISOString(),
+      })
+    });
+
+    document.getElementById('chatTextInput').value = '';
+
+    // Push通知送信（自分以外に）
+    sendPushToOthers(currentRoom.name, currentUser.name + ': ' + (text || fileName || 'ファイル'));
+
+  } catch(e) {
+    showToast('❌ 送信失敗: ' + e.message, 'error');
+  }
+  if (btn) btn.disabled = false;
+}
+
+// ==============================
+// 🔔 Web Push通知
+// ==============================
+const VAPID_PUBLIC_KEY = ''; // 設定が必要
+
+async function initPushNotification() {
+  if (!('Notification' in window) || !('serviceWorker' in navigator)) return;
+  if (Notification.permission === 'default') {
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') return;
+  }
+  if (Notification.permission !== 'granted') return;
+  // ServiceWorkerなしの簡易通知（同一タブ内）
+}
+
+function sendPushToOthers(roomName, body) {
+  // 同一ページ内の簡易通知
+  if (Notification.permission === 'granted') {
+    new Notification('💬 ' + roomName, {
+      body: body,
+      icon: '/kmt/icon.png',
+    });
+  }
+}
+
+// Supabaseクライアント（Realtimeに使用）
+function initSupabaseClient() {
+  if (window._supabaseClient) return;
+  // CDN版supabaseがロードされていればクライアントを初期化
+  if (typeof supabase !== 'undefined') {
+    window._supabaseClient = supabase.createClient(SB_URL, SB_KEY);
+  }
+}
+
 // ===== 顔写真アップロード =====
 async function uploadResumePhoto(input) {
   const file = input.files?.[0]; if (!file) return;
@@ -2063,6 +2727,8 @@ const SCREENS = {
   decision_report:{ title: '📋 決定報告', init: loadDecisionReport },
   resume:    { title: '📝 履歴書作成', init: loadResumeScreen },
   job_flyer: { title: '📄 求人票作成', init: (id) => loadJobFlyer(id) },
+  ai_knowledge: { title: '🧠 AI記憶', init: loadAiKnowledge },
+  chat: { title: '💬 チャット', init: loadChatScreen },
 };
 
 let currentScreen = 'companies';
@@ -2147,6 +2813,13 @@ function renderScreenContent(name) {
     return;
   }
 
+  if (name === 'ai_knowledge') {
+    statsRow.style.display = 'none';
+    filtersSection.style.display = 'none';
+    contentWrap.style.padding = '';
+    contentWrap.innerHTML = buildAiKnowledgeScreen();
+    return;
+  }
   if (name === 'decision_report') {
     statsRow.style.display = 'none';
     filtersSection.style.display = 'none';
@@ -2348,6 +3021,7 @@ function buildWorkerModalBody(w) {
   </div>
   <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)">
     <button class="btn btn-outline" onclick="closeGenModal('workerModal')">キャンセル</button>
+    <button class="btn btn-outline" style="color:#059669;border-color:#059669;" onclick="startWorkerChat(editingWorkerId)">💬 チャット開始</button>
     <button class="btn btn-primary" onclick="saveWorker()">💾 保存</button>
   </div>`;
 }
@@ -3403,7 +4077,44 @@ async function saveExpense(){const g=id=>document.getElementById(id)?.value||nul
 // ⚙️ ユーザー設定
 // ==============================
 let allUsers=[],filteredUsers=[],userPage=1;
-function buildUsersScreen(){return `<div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;"><input class="search-input" id="uSearchInput" placeholder="名前・メールで検索..." oninput="applyUserFilters()" style="flex:1;min-width:200px;"><button class="btn btn-outline" style="font-size:11px;padding:4px 10px" onclick="clearUserFilters()">✕</button></div><div class="table-wrap"><table><thead><tr><th>名前</th><th>メール</th><th>役割</th><th>チーム</th><th>アクティブ</th></tr></thead><tbody id="userTbody"><tr><td colspan="5" style="text-align:center;padding:40px;color:var(--gray-400)">読み込み中...</td></tr></tbody></table><div class="pagination-bar" id="userPagination"></div></div>`;}
+function buildUsersScreen(){
+  const savedKey = localStorage.getItem('ofusa_apiKey') || '';
+  return `
+  <!-- APIキー設定 -->
+  <div style="background:white;border:1px solid var(--gray-200);border-radius:10px;padding:16px;margin-bottom:16px;max-width:600px;">
+    <div style="font-size:13px;font-weight:800;color:var(--navy);margin-bottom:4px;">🤖 Anthropic APIキー設定</div>
+    <div style="font-size:11px;color:var(--gray-400);margin-bottom:10px;">AIチャット・AI記憶機能に使用します。<a href="https://console.anthropic.com/" target="_blank" style="color:var(--blue);">Anthropic Console</a>で取得してください。</div>
+    <div style="display:flex;gap:8px;">
+      <input class="form-input" id="apiKeyInput" type="password" value="${savedKey}" placeholder="sk-ant-..." style="flex:1;font-size:12px;">
+      <button class="btn btn-primary" onclick="saveApiKey()" style="white-space:nowrap;">💾 保存</button>
+      ${savedKey ? '<button class="btn btn-outline" onclick="clearApiKey()" style="white-space:nowrap;color:var(--red);">削除</button>' : ''}
+    </div>
+    ${savedKey ? '<div style="font-size:10px;color:var(--green);margin-top:6px;">✅ APIキーが設定されています</div>' : '<div style="font-size:10px;color:var(--orange);margin-top:6px;">⚠️ APIキー未設定</div>'}
+  </div>
+  <!-- ユーザー一覧 -->
+  <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;"><input class="search-input" id="uSearchInput" placeholder="名前・メールで検索..." oninput="applyUserFilters()" style="flex:1;min-width:200px;"><button class="btn btn-outline" style="font-size:11px;padding:4px 10px" onclick="clearUserFilters()">✕</button></div>
+  <div class="table-wrap"><table><thead><tr><th>名前</th><th>メール</th><th>役割</th><th>チーム</th><th>アクティブ</th></tr></thead><tbody id="userTbody"><tr><td colspan="5" style="text-align:center;padding:40px;color:var(--gray-400)">読み込み中...</td></tr></tbody></table><div class="pagination-bar" id="userPagination"></div></div>`;
+}
+
+function saveApiKey() {
+  const key = document.getElementById('apiKeyInput')?.value.trim();
+  if (!key) { showToast('⚠️ APIキーを入力してください', 'error'); return; }
+  localStorage.setItem('ofusa_apiKey', key);
+  const gasUrl = document.getElementById('gasUrlInput')?.value.trim();
+  if (gasUrl) localStorage.setItem('kmt_gas_url', gasUrl);
+  showToast('✅ 設定を保存しました', 'success');
+  const cw = document.querySelector('.content-wrap');
+  if (cw) cw.innerHTML = buildUsersScreen();
+  loadUsers();
+}
+function clearApiKey() {
+  if (!confirm('APIキーを削除しますか？')) return;
+  localStorage.removeItem('ofusa_apiKey');
+  showToast('🗑️ APIキーを削除しました', 'success');
+  const cw = document.querySelector('.content-wrap');
+  if (cw) cw.innerHTML = buildUsersScreen();
+  loadUsers();
+}
 async function loadUsers(){showLoading(true);try{const data=await sbFetch('users?select=*&order=name.asc');allUsers=data||[];applyUserFilters();}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
 function applyUserFilters(){if(currentScreen!=='users')return;const q=(document.getElementById('uSearchInput')?.value||'').toLowerCase();filteredUsers=allUsers.filter(u=>!q||((u.name||'').toLowerCase().includes(q)||(u.email||'').toLowerCase().includes(q)));userPage=1;renderUserTable();}
 function clearUserFilters(){const el=document.getElementById('uSearchInput');if(el)el.value='';applyUserFilters();}
@@ -3959,6 +4670,332 @@ const extraStyle=document.createElement('style');
 extraStyle.textContent='.st-danger{background:#fef2f2;color:#dc2626;}.st-cert{background:#fdf4ff;color:#7c3aed;}';
 document.head.appendChild(extraStyle);
 
+</script>
+
+<!-- ===== 🤖 AIチャット ===== -->
+<style>
+#kmt-chat-btn{position:fixed;bottom:24px;right:24px;z-index:9000;width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#1a56db,#7c3aed);color:#fff;border:none;font-size:22px;cursor:pointer;box-shadow:0 4px 20px rgba(26,86,219,.4);display:flex;align-items:center;justify-content:center;transition:.2s;}
+#kmt-chat-btn:hover{transform:scale(1.08);}
+#kmt-chat-panel{position:fixed;bottom:86px;right:24px;width:380px;height:560px;background:#fff;border-radius:18px;box-shadow:0 8px 40px rgba(0,0,0,.2);z-index:8999;display:none;flex-direction:column;overflow:hidden;border:1px solid #e2e8f0;}
+#kmt-chat-panel.open{display:flex;}
+.koc-head{background:linear-gradient(135deg,#0f2040,#1a56db);color:#fff;padding:12px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0;}
+.koc-head-title{font-size:14px;font-weight:800;flex:1;}
+.koc-head-sub{font-size:10px;opacity:.7;}
+.koc-tabs{display:flex;border-bottom:1px solid #e2e8f0;background:#f8fafc;flex-shrink:0;}
+.koc-tab{flex:1;padding:8px;font-size:11px;font-weight:700;cursor:pointer;text-align:center;color:#718096;border:none;background:none;transition:.15s;}
+.koc-tab.active{color:#1a56db;border-bottom:2px solid #1a56db;background:#fff;}
+.koc-quick-btns{display:flex;gap:6px;padding:8px 12px;flex-wrap:wrap;border-bottom:1px solid #f0f4f8;flex-shrink:0;background:#f8fafc;}
+.koc-quick-btn{font-size:10px;padding:4px 8px;border-radius:12px;border:1px solid #c3dafe;background:#eff6ff;color:#1e40af;cursor:pointer;white-space:nowrap;}
+.koc-quick-btn:hover{background:#dbeafe;}
+#koc-chat-tab,#koc-kn-tab{flex:1;overflow:hidden;display:flex;flex-direction:column;}
+#koc-messages{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;}
+.koc-msg{display:flex;gap:8px;align-items:flex-start;}
+.koc-msg.user{flex-direction:row-reverse;}
+.koc-avatar{font-size:16px;flex-shrink:0;}
+.koc-bubble{max-width:82%;padding:8px 11px;border-radius:14px;font-size:12px;line-height:1.6;white-space:pre-wrap;word-break:break-word;}
+.koc-msg.assistant .koc-bubble{background:#f0f4f8;color:#1a202c;border-radius:4px 14px 14px 14px;}
+.koc-msg.user .koc-bubble{background:#1a56db;color:#fff;border-radius:14px 4px 14px 14px;}
+.koc-typing span{display:inline-block;width:5px;height:5px;border-radius:50%;background:#94a3b8;margin:0 2px;animation:koc-bounce .8s infinite;}
+.koc-typing span:nth-child(2){animation-delay:.15s;}
+.koc-typing span:nth-child(3){animation-delay:.3s;}
+@keyframes koc-bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-5px)}}
+.koc-input-area{display:flex;gap:8px;padding:10px 12px;border-top:1px solid #e2e8f0;flex-shrink:0;background:#fff;}
+.koc-input-area textarea{flex:1;border:1.5px solid #e2e8f0;border-radius:10px;padding:7px 10px;font-size:12px;resize:none;outline:none;font-family:inherit;line-height:1.5;}
+.koc-input-area textarea:focus{border-color:#1a56db;}
+.koc-send-btn{width:34px;height:34px;border-radius:50%;border:none;background:#1a56db;color:#fff;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;align-self:flex-end;}
+.koc-send-btn:disabled{background:#93c5fd;cursor:not-allowed;}
+#koc-kn-tab{padding:10px;overflow-y:auto;}
+.koc-kn-item{border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:11px;margin-bottom:6px;}
+.koc-kn-item.pending{border-color:#fcd34d;background:#fffbeb;}
+.koc-kn-item.approved{border-color:#6ee7b7;background:#f0fdf4;}
+</style>
+
+<button id="kmt-chat-btn" onclick="kocToggle()" title="AIアシスタント">🤖</button>
+
+<div id="kmt-chat-panel">
+  <div class="koc-head">
+    <div style="font-size:18px;">🤖</div>
+    <div style="flex:1;">
+      <div class="koc-head-title">KMT AIアシスタント</div>
+      <div class="koc-head-sub">AI記憶の知識を参照して回答します</div>
+    </div>
+    <button onclick="kocToggle()" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;padding:0 4px;">✕</button>
+  </div>
+  <div class="koc-tabs">
+    <button class="koc-tab active" id="koc-tab-chat" onclick="kocSwitchTab('chat')">💬 チャット</button>
+    <button class="koc-tab" id="koc-tab-kn" onclick="kocSwitchTab('kn')">🧠 AI記憶</button>
+  </div>
+  <!-- チャットタブ -->
+  <div id="koc-chat-tab">
+    <div class="koc-quick-btns">
+      <button class="koc-quick-btn" onclick="kocQuick('求人票の書き方を教えて')">💼 求人票</button>
+      <button class="koc-quick-btn" onclick="kocQuick('特定技能の更新手続きを教えて')">📋 更新手続き</button>
+      <button class="koc-quick-btn" onclick="kocQuick('定期報告に必要な書類は？')">📂 定期報告</button>
+      <button class="koc-quick-btn" onclick="kocQuick('直前のAIの回答を記憶して')">🧠 記憶する</button>
+    </div>
+    <div id="koc-messages">
+      <div class="koc-msg assistant">
+        <div class="koc-avatar">🤖</div>
+        <div class="koc-bubble">こんにちは！KMT AIアシスタントです。業務に関する質問、書類作成のサポートなど、なんでもお気軽にどうぞ！<br><small style="opacity:.6;">「記憶して」と送ると、直前の回答をAI記憶に保存できます。</small></div>
+      </div>
+    </div>
+    <div id="koc-attach-preview" style="display:none;padding:5px 12px;background:#f0f9ff;border-top:1px solid #bae6fd;font-size:11px;align-items:center;gap:8px;">
+      <span id="koc-attach-name" style="color:#0369a1;font-weight:700;"></span>
+      <button onclick="kocClearAttach()" style="background:none;border:none;color:#94a3b8;cursor:pointer;">✕</button>
+    </div>
+    <div class="koc-input-area"
+      ondragover="event.preventDefault();this.style.background='#eff6ff';"
+      ondragleave="this.style.background='';"
+      ondrop="event.preventDefault();this.style.background='';kocHandleDrop(event);">
+      <label title="PDF・画像を添付" style="cursor:pointer;font-size:16px;color:#94a3b8;padding:4px;flex-shrink:0;">
+        📎<input type="file" id="koc-file-input" accept="image/*,.pdf" style="display:none;" onchange="kocHandleFile(this.files[0])">
+      </label>
+      <textarea id="koc-input" placeholder="質問・依頼を入力（PDF/画像ドロップ可）..." rows="1"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey&&!event.isComposing){event.preventDefault();kocSend();}"
+        oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,90)+'px'"></textarea>
+      <button class="koc-send-btn" id="koc-send-btn" onclick="kocSend()">➤</button>
+    </div>
+  </div>
+  <!-- AI記憶タブ -->
+  <div id="koc-kn-tab" style="display:none;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+      <span style="font-size:12px;font-weight:700;">承認済み知識 <span id="koc-kn-count" style="color:#7c3aed;"></span></span>
+      <button onclick="showScreen('ai_knowledge')" style="font-size:10px;padding:4px 10px;background:#1a56db;color:#fff;border:none;border-radius:6px;cursor:pointer;">📋 一覧管理</button>
+    </div>
+    <div id="koc-kn-list"><div style="text-align:center;padding:20px;color:#a0aec0;font-size:12px;">読み込み中...</div></div>
+  </div>
+</div>
+
+<script>
+// ===== KMT AIチャット =====
+var _kocHistory = [], _kocLoading = false, _kocAttach = null;
+
+function kocToggle() {
+  var panel = document.getElementById('kmt-chat-panel');
+  panel.classList.toggle('open');
+  if (panel.classList.contains('open')) {
+    if (allAiKnowledge.length === 0) loadAiKnowledge().then(kocRenderKnPanel);
+    else kocRenderKnPanel();
+    setTimeout(() => document.getElementById('koc-input')?.focus(), 100);
+  }
+}
+
+function kocSwitchTab(tab) {
+  document.getElementById('koc-chat-tab').style.display = tab === 'chat' ? 'flex' : 'none';
+  document.getElementById('koc-kn-tab').style.display = tab === 'kn' ? '' : 'none';
+  document.getElementById('koc-tab-chat').classList.toggle('active', tab === 'chat');
+  document.getElementById('koc-tab-kn').classList.toggle('active', tab === 'kn');
+  if (tab === 'kn') kocRenderKnPanel();
+}
+
+function kocRenderKnPanel() {
+  const approved = allAiKnowledge.filter(k => k.status === 'approved');
+  const countEl = document.getElementById('koc-kn-count');
+  if (countEl) countEl.textContent = '(' + approved.length + '件)';
+  const list = document.getElementById('koc-kn-list');
+  if (!list) return;
+  if (!approved.length) { list.innerHTML = '<div style="text-align:center;padding:20px;color:#a0aec0;font-size:12px;">承認済みの知識がありません</div>'; return; }
+  list.innerHTML = approved.map(k => `
+    <div class="koc-kn-item approved">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+        <span style="font-size:9px;font-weight:700;color:#7c3aed;background:#ede9fe;padding:1px 6px;border-radius:8px;">${esc(k.category||'')}</span>
+        <span style="font-size:11px;font-weight:700;color:#1a202c;">${esc(k.title||'')}</span>
+      </div>
+      <div style="font-size:10px;color:#4a5568;white-space:pre-wrap;">${esc((k.content||'').substring(0,100))}${(k.content||'').length>100?'...':''}</div>
+    </div>`).join('');
+}
+
+function kocBuildSystemPrompt() {
+  const approved = allAiKnowledge.filter(k => k.status === 'approved');
+  const lines = [
+    'あなたはKMT（株式会社KMT）および大房行政書士法人の専任AIアシスタントです。',
+    '特定技能外国人の在留管理・人材紹介業務を支援します。日本語で簡潔に回答してください。',
+  ];
+  if (approved.length) {
+    lines.push('', '【蓄積された業務知識（承認済み）】');
+    approved.forEach(k => lines.push('[' + k.category + '] ' + k.title + ': ' + k.content));
+  }
+  return lines.join('\n');
+}
+
+function kocAppendMsg(role, text) {
+  const msgs = document.getElementById('koc-messages');
+  if (!msgs) return null;
+  const div = document.createElement('div');
+  div.className = 'koc-msg ' + role;
+  div.innerHTML = `<div class="koc-avatar">${role==='user'?'👤':'🤖'}</div><div class="koc-bubble">${text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+  return div;
+}
+
+function kocAppendTyping() {
+  const msgs = document.getElementById('koc-messages');
+  const div = document.createElement('div');
+  div.className = 'koc-msg assistant koc-typing-wrap';
+  div.innerHTML = '<div class="koc-avatar">🤖</div><div class="koc-bubble koc-typing"><span></span><span></span><span></span></div>';
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+  return div;
+}
+
+function kocQuick(text) { document.getElementById('koc-input').value = text; kocSend(); }
+
+async function kocSend() {
+  if (_kocLoading) return;
+  const input = document.getElementById('koc-input');
+  const text = input.value.trim();
+  if (!text && !_kocAttach) return;
+
+  // APIキー取得（localStorage）
+  const apiKey = localStorage.getItem('ofusa_apiKey') || localStorage.getItem('kmt_apiKey') || '';
+  if (!apiKey) {
+    kocAppendMsg('assistant', '⚠️ APIキーが設定されていません。\n設定メニュー（ユーザー設定）でAnthropicのAPIキーを入力してください。');
+    return;
+  }
+
+  // 「記憶して」コマンド
+  if (text && /記憶して/.test(text)) {
+    input.value = ''; input.style.height = 'auto';
+    kocAppendMsg('user', text);
+    const prevAssist = _kocHistory.filter(h => h.role === 'assistant').slice(-1)[0]?.content || '';
+    const inlineContent = text.replace(/^記憶して[\s　]*/, '').trim();
+    const saveContent = inlineContent || prevAssist;
+    if (!saveContent) { kocAppendMsg('assistant', '記憶する内容が見つかりません。先にAIと会話してから「記憶して」と送ってください。'); return; }
+    kocShowMemoryConfirm(saveContent);
+    return;
+  }
+
+  input.value = ''; input.style.height = 'auto';
+  const userDisplay = text + (_kocAttach ? '\n📎 ' + _kocAttach.name : '');
+  kocAppendMsg('user', userDisplay);
+
+  // メッセージ構築
+  let userContent;
+  if (_kocAttach) {
+    userContent = [];
+    if (_kocAttach.type === 'pdf') userContent.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: _kocAttach.data } });
+    else userContent.push({ type: 'image', source: { type: 'base64', media_type: _kocAttach.mediaType, data: _kocAttach.data } });
+    userContent.push({ type: 'text', text: text || 'このファイルの内容を日本語で整理してください。' });
+  } else {
+    userContent = text;
+  }
+
+  const messages = _kocHistory.concat([{ role: 'user', content: userContent }]);
+  _kocHistory.push({ role: 'user', content: text });
+  if (_kocHistory.length > 20) _kocHistory = _kocHistory.slice(-20);
+  kocClearAttach();
+
+  _kocLoading = true;
+  document.getElementById('koc-send-btn').disabled = true;
+  const typingEl = kocAppendTyping();
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 2048,
+        system: kocBuildSystemPrompt(),
+        messages: messages.slice(-20)
+      })
+    });
+    const json = await resp.json();
+    const reply = (json.content || []).map(b => b.text || '').join('') || '（応答なし）';
+    typingEl.remove();
+    kocAppendMsg('assistant', reply);
+    _kocHistory.push({ role: 'assistant', content: reply });
+    if (_kocHistory.length > 20) _kocHistory = _kocHistory.slice(-20);
+  } catch(e) {
+    typingEl.remove();
+    kocAppendMsg('assistant', '❌ エラー: ' + e.message);
+  }
+  _kocLoading = false;
+  document.getElementById('koc-send-btn').disabled = false;
+}
+
+function kocShowMemoryConfirm(content) {
+  const existing = document.getElementById('koc-memory-confirm');
+  if (existing) existing.remove();
+  const panel = document.createElement('div');
+  panel.id = 'koc-memory-confirm';
+  panel.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:center;justify-content:center;';
+  panel.innerHTML = `
+    <div style="background:white;border-radius:16px;padding:24px;width:460px;max-width:95vw;max-height:85vh;display:flex;flex-direction:column;gap:12px;box-shadow:0 24px 60px rgba(0,0,0,.25);overflow-y:auto;">
+      <div style="font-size:16px;font-weight:800;color:#0f2040;">🧠 AI記憶に保存</div>
+      <div>
+        <label style="font-size:11px;font-weight:700;color:#475569;display:block;margin-bottom:4px;">カテゴリ</label>
+        <select id="koc-mem-cat" class="form-select" style="font-size:12px;">
+          <option>業務ルール</option><option>会社情報</option><option>FAQ</option><option>手続き</option><option>その他</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:700;color:#475569;display:block;margin-bottom:4px;">タイトル</label>
+        <input id="koc-mem-title" class="form-input" style="font-size:12px;" placeholder="タイトルを入力">
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:700;color:#475569;display:block;margin-bottom:4px;">内容</label>
+        <textarea id="koc-mem-content" class="form-textarea" rows="5" style="font-size:12px;">${content.replace(/</g,'&lt;')}</textarea>
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:700;color:#475569;display:block;margin-bottom:4px;">記入者</label>
+        <input id="koc-mem-author" class="form-input" style="font-size:12px;" placeholder="例: 坂齊">
+      </div>
+      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:8px 12px;font-size:11px;color:#92400e;">
+        💡 保存後は <strong>AI記憶一覧</strong> から承認してください。承認済みのものだけがAIに反映されます。
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button class="btn btn-outline" onclick="document.getElementById('koc-memory-confirm').remove()">キャンセル</button>
+        <button class="btn btn-primary" onclick="kocSaveMemory()">💾 保存（承認待ち）</button>
+      </div>
+    </div>`;
+  document.body.appendChild(panel);
+}
+
+async function kocSaveMemory() {
+  const cat = document.getElementById('koc-mem-cat')?.value || 'その他';
+  const title = document.getElementById('koc-mem-title')?.value.trim();
+  const content = document.getElementById('koc-mem-content')?.value.trim();
+  const author = document.getElementById('koc-mem-author')?.value.trim();
+  if (!title || !content) { showToast('⚠️ タイトルと内容は必須です', 'error'); return; }
+  try {
+    await sbFetch('ai_knowledge', { method: 'POST', body: JSON.stringify({ category: cat, title, content, author, status: 'pending', created_at: new Date().toISOString() }) });
+    showToast('🧠 AI記憶に保存しました（承認待ち）', 'success');
+    document.getElementById('koc-memory-confirm')?.remove();
+    await loadAiKnowledge();
+    kocRenderKnPanel();
+    kocAppendMsg('assistant', '✅ AI記憶に保存しました（承認待ち）\nAI記憶一覧から承認してください。');
+  } catch(e) { showToast('❌ 保存失敗: ' + e.message, 'error'); }
+}
+
+function kocHandleDrop(e) { kocHandleFile(e.dataTransfer.files[0]); }
+function kocHandleFile(file) {
+  if (!file) return;
+  if (!['image/jpeg','image/png','image/gif','image/webp','application/pdf'].includes(file.type)) { showToast('⚠️ PDF・画像ファイルのみ対応'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    const b64 = e.target.result.split(',')[1];
+    _kocAttach = { type: file.type === 'application/pdf' ? 'pdf' : 'image', mediaType: file.type, data: b64, name: file.name };
+    const name = document.getElementById('koc-attach-name');
+    const prev = document.getElementById('koc-attach-preview');
+    if (name) name.textContent = '📎 ' + file.name;
+    if (prev) prev.style.display = 'flex';
+    showToast('📎 ' + file.name + ' を添付しました', 'success');
+  };
+  reader.readAsDataURL(file);
+  document.getElementById('koc-file-input').value = '';
+}
+function kocClearAttach() {
+  _kocAttach = null;
+  const prev = document.getElementById('koc-attach-preview');
+  if (prev) prev.style.display = 'none';
+}
 </script>
 </body>
 </html>
