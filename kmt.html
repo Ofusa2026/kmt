@@ -2,10 +2,9 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260412.11 -->
+<!-- KMT_VERSION ver.20260413.21 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -165,14 +164,6 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
 }
 .mobile-menu-btn{display:none;align-items:center;justify-content:center;width:36px;height:36px;border-radius:8px;border:1.5px solid var(--gray-200);background:white;cursor:pointer;font-size:18px;}
 </style>
-
-<style>
-#companyMapWrap { display:none; height:calc(100vh - 170px); border-radius:12px; overflow:hidden; box-shadow:var(--shadow); border:1px solid var(--gray-200); }
-#companyMap { width:100%; height:100%; }
-.map-popup-name { font-weight:700; font-size:13px; color:#0f2040; }
-.map-popup-info { font-size:11px; color:#475569; margin-top:2px; }
-.map-popup-link { font-size:11px; color:#2563eb; cursor:pointer; margin-top:4px; display:inline-block; }
-</style>
 </head>
 <body>
 
@@ -181,14 +172,13 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260412.11</div>
+    <div class="logo-ver">ver.20260413.21</div>
   </div>
   <div class="nav-item active" onclick="showScreen('ofusa_view')" style="background:rgba(37,99,235,0.2);color:#93c5fd;margin:8px 8px 4px;border-radius:6px;">📊 案件進捗確認</div>
   <div class="nav-item" onclick="showScreen('decision_report')" style="color:#86efac;margin:2px 8px 4px;border-radius:6px;">📋 決定報告</div>
   <div style="height:1px;background:rgba(255,255,255,0.08);margin:4px 16px 8px;"></div>
   <div class="sidebar-section">メイン</div>
   <div class="nav-item" onclick="showScreen('companies')">🏢 所属機関</div>
-  <div class="nav-item" onclick="showScreen('map_view')">🗺️ 所属機関マップ</div>
   <div class="nav-item" onclick="showScreen('workers')">👤 外国人材</div>
   <div class="nav-item" onclick="showScreen('candidates')">📋 候補者</div>
   <div class="nav-item" onclick="showScreen('jobs')">💼 求人管理</div>
@@ -222,7 +212,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="topbar">
     <div style="display:flex;align-items:center;gap:10px;">
       <button class="mobile-menu-btn" onclick="toggleMobile()">☰</button>
-      <div class="page-title" id="pageTitle">🏢 受入企業</div>
+      <div class="page-title" id="pageTitle">🏢 所属機関</div>
     </div>
     <div class="topbar-actions">
       <button class="btn btn-outline" onclick="loadCompanies()">🔄 更新</button>
@@ -281,12 +271,8 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
     </div>
   </div>
 
-  <!-- MAP -->
-  <div class="content-wrap" id="companyMapWrap">
-    <div id="companyMap"></div>
-  </div>
   <!-- TABLE -->
-  <div class="content-wrap" id="companyTableWrap">
+  <div class="content-wrap">
     <div class="table-wrap">
       <table>
         <thead>
@@ -637,6 +623,8 @@ let statFilter = 'all';
 
 // ===== INIT =====
 window.addEventListener('DOMContentLoaded', () => {
+  const ver = document.querySelector('.logo-ver')?.textContent || 'unknown';
+  console.log('%c KMT案件管理システム ' + ver + ' ', 'background:#0f2040;color:#93c5fd;font-size:14px;font-weight:bold;padding:4px 8px;border-radius:4px;');
   loadCompanies();
 });
 
@@ -786,6 +774,7 @@ function openCompanyModal(id) {
   }
   switchCoTab('basic');
   document.getElementById('companyModal').classList.add('show');
+  setTimeout(() => setupAutoSave(saveCompany), 100);
 }
 
 function closeCompanyModal() {
@@ -1506,6 +1495,7 @@ function buildDecisionReportScreen() {
           <div class="form-group"><label class="form-label">光熱費等</label><input class="form-input" id="sl_utility_fee" placeholder="例: 実費"></div>
           <div class="form-group full"><label class="form-label">備考（〜と一緒など）</label><input class="form-input" id="sl_condition_note" placeholder="例: 直近のXXさんと一緒"></div>
           <div class="section-title">■ その他</div>
+          <div class="form-group full"><label class="form-label">STOCK URL</label><input class="form-input" id="sl_url" placeholder="https://www.stock-app.jp/..."></div>
           <div class="form-group"><label class="form-label">KMT担当</label><input class="form-input" id="sl_kmt_staff" placeholder="例: Ahyu Wibowo アヒュ"></div>
           <div class="form-group"><label class="form-label">大房担当</label><input class="form-input" id="sl_ohfusa_staff" placeholder="例: 金丸"></div>
         </div>
@@ -1703,6 +1693,7 @@ function copySoloReport() {
     condNote ? '(' + condNote + ')と一緒など' : '',
     '',
     '■その他',
+    g('sl_url'),
     '@KMT ' + g('sl_kmt_staff') + ' @大房行政書士法人（' + g('sl_ohfusa_staff') + '）',
     '書類の作成＆グループ作成をよろしくお願いします！',
   ].filter(v => v !== null && v !== undefined).join('\n');
@@ -1711,237 +1702,178 @@ function copySoloReport() {
     .catch(() => showToast('❌ コピー失敗', 'error'));
 }
 
-// ==============================
-// 🗺️ マップモード（所属機関）
-// ==============================
-// ==============================
-// 🗺️ 所属機関マップ
-// ==============================
-let mapInstance = null;
-let mapMarkers = [];
-
-function buildMapViewScreen() {
-  return `
-  <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;align-items:center;">
-    <input class="search-input" id="mapSearchInput" placeholder="機関名・都道府県で絞り込み..." oninput="filterMapMarkers()" style="flex:1;min-width:200px;">
-    <select class="filter-select" id="mapFilterPref" onchange="filterMapMarkers()">
-      <option value="">全都道府県</option>
-    </select>
-    <select class="filter-select" id="mapFilterStatus" onchange="filterMapMarkers()">
-      <option value="">全ステータス</option>
-      <option value="active">支援中</option>
-      <option value="past">過去</option>
-    </select>
-    <div id="mapCount" style="font-size:12px;color:var(--gray-400);font-weight:600;"></div>
-  </div>
-  <div style="display:flex;gap:12px;height:calc(100vh - 200px);">
-    <!-- 地図 -->
-    <div id="leafletMap" style="flex:1;border-radius:10px;border:1px solid var(--gray-200);min-height:400px;z-index:1;"></div>
-    <!-- 右サイドリスト -->
-    <div id="mapSideList" style="width:220px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;flex-shrink:0;"></div>
-  </div>`;
-}
-
-async function loadMapView() {
-  // Leaflet JSを動的ロード
-  if (!window.L) {
-    await new Promise((resolve, reject) => {
-      const s = document.createElement('script');
-      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
-      s.onload = resolve;
-      s.onerror = reject;
-      document.head.appendChild(s);
-    });
-  }
-
-  // 企業データがなければ取得
-  if (!allCompanies.length) {
-    showLoading(true);
-    try {
-      const data = await sbFetch('companies?select=*&order=company_no.asc.nullslast,name.asc');
-      allCompanies = data || [];
-    } catch(e) { showToast('❌ ' + e.message, 'error'); }
-    showLoading(false);
-  }
-
-  // 都道府県フィルター生成
-  const prefs = [...new Set(allCompanies.map(c => c.pref).filter(Boolean))].sort();
-  const prefSel = document.getElementById('mapFilterPref');
-  if (prefSel) {
-    prefSel.innerHTML = '<option value="">全都道府県</option>' + prefs.map(p => `<option>${p}</option>`).join('');
-  }
-
-  // 地図初期化
-  const mapEl = document.getElementById('leafletMap');
-  if (!mapEl) return;
-
-  if (mapInstance) {
-    mapInstance.remove();
-    mapInstance = null;
-  }
-
-  mapInstance = L.map('leafletMap').setView([36.5, 136.0], 5);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    maxZoom: 18,
-  }).addTo(mapInstance);
-
-  mapMarkers = [];
-  showToast('📍 住所から座標を取得中...（しばらくお待ちください）');
-  await geocodeAndPlotCompanies();
-  showToast('✅ マップ表示完了', 'success');
-}
-
-async function geocodeAndPlotCompanies() {
-  if (!mapInstance) return;
-  mapMarkers.forEach(m => m.marker && mapInstance.removeLayer(m.marker));
-  mapMarkers = [];
-
-  const companies = getFilteredMapCompanies();
-  document.getElementById('mapCount').textContent = companies.length + '件表示中';
-  renderMapSideList(companies);
-
-  // 座標キャッシュ（Supabaseのlat/lngカラムがあれば使う、なければAPIで取得）
-  const GSI_URL = 'https://msearch.gsi.go.jp/address-search/AddressSearch?q=';
-
-  const bounds = [];
-  let requestCount = 0;
-
-  for (const c of companies) {
-    // lat/lngがSupabaseに保存済みならAPIスキップ
-    let lat = c.lat ? parseFloat(c.lat) : null;
-    let lng = c.lng ? parseFloat(c.lng) : null;
-
-    if (!lat || !lng) {
-      const addr = [c.pref, c.city, c.address].filter(Boolean).join('');
-      if (!addr) continue;
-
-      try {
-        // 国土地理院API（CORS対応・無料・日本語住所対応）
-        const res = await fetch(GSI_URL + encodeURIComponent(addr));
-        const data = await res.json();
-        if (data && data[0] && data[0].geometry) {
-          lng = data[0].geometry.coordinates[0];
-          lat = data[0].geometry.coordinates[1];
-        }
-        requestCount++;
-        // レートリミット対策（10秒で10回まで）
-        if (requestCount % 8 === 0) await new Promise(r => setTimeout(r, 1200));
-        else await new Promise(r => setTimeout(r, 150));
-      } catch(e) {
-        continue;
-      }
-    }
-
-    if (!lat || !lng || isNaN(lat) || isNaN(lng)) continue;
-
-    const isActive = c.status !== 'past';
-    const color = isActive ? '#2563eb' : '#94a3b8';
-    const addr = [c.pref, c.city, c.address].filter(Boolean).join(' ');
-
-    const icon = L.divIcon({
-      className: '',
-      html: `<div style="
-        background:${color};
-        width:14px;height:14px;
-        border-radius:50%;
-        border:2.5px solid white;
-        box-shadow:0 2px 6px rgba(0,0,0,0.4);
-        cursor:pointer;
-      "></div>`,
-      iconSize: [14, 14],
-      iconAnchor: [7, 7],
-    });
-
-    const marker = L.marker([lat, lng], { icon })
-      .addTo(mapInstance)
-      .bindPopup(`
-        <div style="min-width:190px;font-family:-apple-system,sans-serif;font-size:12px;">
-          <div style="font-size:13px;font-weight:700;color:#0f2040;margin-bottom:5px;">${esc(c.name)}</div>
-          <div style="color:#64748b;margin-bottom:2px;">📍 ${esc(addr)}</div>
-          ${c.industry ? `<div style="color:#64748b;margin-bottom:2px;">🏭 ${esc(c.industry)}</div>` : ''}
-          ${c.fee_per_person ? `<div style="color:#64748b;margin-bottom:2px;">💴 ${Number(c.fee_per_person).toLocaleString()}円/人</div>` : ''}
-          ${c.main_staff ? `<div style="color:#64748b;margin-bottom:6px;">👤 ${esc(c.main_staff)}</div>` : ''}
-          <span style="background:${isActive?'#eff6ff':'#f8fafc'};color:${isActive?'#2563eb':'#64748b'};padding:2px 8px;border-radius:10px;font-weight:600;font-size:11px;">
-            ${isActive ? '支援中' : '過去'}
-          </span>
-          <div style="margin-top:8px;">
-            <button onclick="openCompanyModal('${c.id}')"
-              style="background:#2563eb;color:white;border:none;border-radius:5px;padding:4px 10px;font-size:11px;cursor:pointer;width:100%;">
-              詳細を開く
-            </button>
-          </div>
-        </div>
-      `, { maxWidth: 230 });
-
-    mapMarkers.push({ id: c.id, marker, lat, lng });
-    bounds.push([lat, lng]);
-  }
-
-  // 全マーカーにフィット
-  if (bounds.length > 0) {
-    mapInstance.fitBounds(bounds, { padding: [40, 40] });
-  } else {
-    showToast('⚠️ 住所から座標を取得できませんでした', 'error');
-  }
-}
-
-function getFilteredMapCompanies() {
-  const q = (document.getElementById('mapSearchInput')?.value || '').toLowerCase();
-  const pref = document.getElementById('mapFilterPref')?.value || '';
-  const status = document.getElementById('mapFilterStatus')?.value || '';
-  return allCompanies.filter(c => {
-    if (q && !((c.name||'').toLowerCase().includes(q) || (c.pref||'').toLowerCase().includes(q))) return false;
-    if (pref && c.pref !== pref) return false;
-    if (status && c.status !== status) return false;
-    return true;
-  });
-}
-
-function filterMapMarkers() {
-  const companies = getFilteredMapCompanies();
-  document.getElementById('mapCount').textContent = companies.length + '件表示中';
-  renderMapSideList(companies);
-
-  const visibleIds = new Set(companies.map(c => c.id));
-  mapMarkers.forEach(m => {
-    if (!mapInstance) return;
-    if (visibleIds.has(m.id)) {
-      if (!mapInstance.hasLayer(m.marker)) mapInstance.addLayer(m.marker);
-    } else {
-      if (mapInstance.hasLayer(m.marker)) mapInstance.removeLayer(m.marker);
-    }
-  });
-}
-
-function renderMapSideList(companies) {
-  const list = document.getElementById('mapSideList');
-  if (!list) return;
-  list.innerHTML = companies.map(c => {
-    const isActive = c.status !== 'past';
-    return `<div onclick="focusMapMarker('${c.id}')"
-      style="background:white;border:1px solid var(--gray-200);border-radius:8px;padding:8px 10px;cursor:pointer;transition:.15s;"
-      onmouseover="this.style.borderColor='var(--blue)'" onmouseout="this.style.borderColor='var(--gray-200)'">
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">
-        <div style="width:8px;height:8px;border-radius:50%;background:${isActive?'#2563eb':'#94a3b8'};flex-shrink:0;"></div>
-        <div style="font-size:12px;font-weight:700;color:var(--navy);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(c.name)}</div>
-      </div>
-      <div style="font-size:10px;color:var(--gray-400);">${esc(c.pref||'')} ${esc(c.city||'')}</div>
-      ${c.industry ? `<div style="font-size:10px;color:var(--gray-400);">${esc(c.industry)}</div>` : ''}
-    </div>`;
-  }).join('');
-}
-
-function focusMapMarker(companyId) {
-  const m = mapMarkers.find(x => x.id === companyId);
-  if (m && mapInstance) {
-    mapInstance.setView([m.lat, m.lng], 14);
-    m.marker.openPopup();
-  }
-}
-
 // ===== UTILS =====
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function calcAge(birthdate) {
+  if (!birthdate) return '?';
+  const b = new Date(birthdate), t = new Date();
+  let age = t.getFullYear() - b.getFullYear();
+  if (t.getMonth() < b.getMonth() || (t.getMonth()===b.getMonth() && t.getDate()<b.getDate())) age--;
+  return age;
+}
+
+// ===== 自動保存 =====
+let _autoSaveTimer=null, _autoSaveFn=null, _autoSaveStatus=null, _autoSaveUndoData=null;
+
+function setupAutoSave(saveFn, delayMs=1500) {
+  _autoSaveFn = saveFn;
+  _autoSaveTimer && clearTimeout(_autoSaveTimer);
+  if (!_autoSaveStatus) {
+    _autoSaveStatus = document.createElement('div');
+    _autoSaveStatus.id = 'autoSaveStatus';
+    _autoSaveStatus.style.cssText = 'position:fixed;bottom:16px;right:16px;background:#1e293b;color:#86efac;font-size:12px;font-weight:600;padding:6px 16px;border-radius:20px;z-index:9999;opacity:0;transition:opacity .3s;display:flex;align-items:center;gap:10px;';
+    document.body.appendChild(_autoSaveStatus);
+  }
+  const modal = document.querySelector('.modal.show') || document.querySelector('.gen-modal.show');
+  if (!modal) return;
+  const inputs = modal.querySelectorAll('input, select, textarea');
+  _autoSaveUndoData = {};
+  inputs.forEach(el => { if(el.id) _autoSaveUndoData[el.id] = el.value; });
+  inputs.forEach(el => {
+    if (el._autoSaveBound) return;
+    el._autoSaveBound = true;
+    const trigger = () => {
+      _autoSaveStatus.style.opacity = '1';
+      _autoSaveStatus.innerHTML = '✏️ 入力中...';
+      _autoSaveTimer && clearTimeout(_autoSaveTimer);
+      _autoSaveTimer = setTimeout(async () => {
+        if (!_autoSaveFn) return;
+        const modal2 = document.querySelector('.modal.show') || document.querySelector('.gen-modal.show');
+        if (modal2) { _autoSaveUndoData={}; modal2.querySelectorAll('input,select,textarea').forEach(e=>{if(e.id)_autoSaveUndoData[e.id]=e.value;}); }
+        _autoSaveStatus.innerHTML = '💾 保存中...';
+        await _autoSaveFn(true);
+        _autoSaveStatus.innerHTML = '✅ 保存済 <span onclick="undoAutoSave()" style="cursor:pointer;color:#fbbf24;text-decoration:underline;font-size:11px;">↩ 取り消し</span>';
+        setTimeout(() => { _autoSaveStatus.style.opacity='0'; }, 3000);
+      }, delayMs);
+    };
+    el.addEventListener('input', trigger);
+    el.addEventListener('change', trigger);
+  });
+}
+async function undoAutoSave() {
+  if (!_autoSaveUndoData || !_autoSaveFn) return;
+  Object.entries(_autoSaveUndoData).forEach(([id,val])=>{const el=document.getElementById(id);if(el)el.value=val;});
+  await _autoSaveFn(true);
+  _autoSaveStatus.innerHTML='↩ 取り消しました';
+  setTimeout(()=>{_autoSaveStatus.style.opacity='0';},1500);
+  showToast('↩ 取り消しました','success');
+}
+function clearAutoSave() {
+  _autoSaveTimer && clearTimeout(_autoSaveTimer);
+  _autoSaveFn = null;
+  if (_autoSaveStatus) _autoSaveStatus.style.opacity='0';
+  document.querySelectorAll('[data-auto-save-bound]').forEach(el=>{el._autoSaveBound=false;});
+}
+
+// ===== 印刷関数 =====
+function printResume() {
+  const wrap = document.getElementById('resumePreviewWrap');
+  if (!wrap || !wrap.querySelector('.resume-page')) { showToast('❌ 先に候補者を選択してください','error'); return; }
+  const name = document.getElementById('rf_name')?.value || '履歴書';
+  const title = name + '_履歴書';
+  const oldFrame = document.getElementById('_printFrame');
+  if (oldFrame) oldFrame.remove();
+  const iframe = document.createElement('iframe');
+  iframe.id = '_printFrame';
+  iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:210mm;height:297mm;border:none;';
+  document.body.appendChild(iframe);
+  const resumeCss = `.resume-date { text-align: right; font-size: 11px; color: #555; margin-bottom: 4px; }
+.resume-title { text-align: center; font-size: 20px; font-weight: 900; letter-spacing: 8px; margin-bottom: 4px; border-bottom: 3px double #333; padding-bottom: 6px; }
+.resume-subtitle { text-align: center; font-size: 11px; color: #777; margin-bottom: 12px; }
+.resume-grid { display: grid; grid-template-columns: 1fr 130px; gap: 10px; margin-bottom: 10px; }
+.resume-info table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.resume-info td { padding: 3px 7px; border: 1px solid #ccc; font-size: 11px; vertical-align: top; word-break: break-all; overflow-wrap: break-word; }
+.resume-info td.lbl { background: #f5f5f5; font-weight: 700; width: 30%; white-space: nowrap; color: #333; font-size: 10px; }
+.resume-photo { border: 1px solid #ccc; border-radius: 4px; display: flex; align-items: center; justify-content: center; background: #f9f9f9; min-height: 150px; }
+.resume-photo img { width: 100%; height: 100%; object-fit: cover; }
+.resume-photo-placeholder { text-align: center; color: #bbb; font-size: 11px; padding: 10px; }
+.resume-section { margin-bottom: 8px; }
+.resume-section-title { background: #0f2040; color: white; padding: 3px 8px; font-size: 10px; font-weight: 700; letter-spacing: 1px; border-radius: 3px; margin-bottom: 5px; }
+.resume-table { width: 100%; border-collapse: collapse; font-size: 11px; table-layout: fixed; }
+.resume-table th { background: #f0f4f8; padding: 3px 7px; border: 1px solid #ccc; font-size: 10px; font-weight: 700; color: #333; white-space: nowrap; }
+.resume-table td { padding: 4px 7px; border: 1px solid #ccc; vertical-align: top; word-break: break-all; overflow-wrap: break-word; }
+.resume-table td.lbl { background: #f8f9fa; font-weight: 700; width: 22%; color: #333; font-size: 10px; white-space: nowrap; }
+.resume-lic-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
+.resume-lic-item { border: 1px solid #ccc; border-radius: 3px; padding: 3px 6px; font-size: 10px; display: flex; align-items: center; justify-content: space-between; }
+.resume-lic-item .has { color: #16a34a; font-weight: 700; }
+.resume-lic-item .none { color: #ccc; }
+.resume-memo-box { border: 1px solid #ccc; border-radius: 3px; padding: 6px 8px; min-height: 36px; font-size: 11px; background: #fafafa; }
+.resume-sign { text-align: right; font-size: 10px; color: #555; margin-top: 8px; padding-top: 5px; border-top: 1px solid #eee; }`;
+  const doc = iframe.contentDocument || iframe.contentWindow.document;
+  doc.open();
+  doc.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${title}</title><style>
+    * { box-sizing: border-box; }
+    body { margin:0;padding:0;background:white;font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans','Yu Gothic',sans-serif; }
+    @page { margin:8mm;size:A4; }
+    @media print { * { -webkit-print-color-adjust:exact !important;print-color-adjust:exact !important; } }
+    .resume-page { box-shadow:none!important;border:none!important;margin:0!important;max-width:100%!important;padding:4mm!important; }
+    ${resumeCss}
+  </style></head><body>${wrap.innerHTML}</body></html>`);
+  doc.close();
+  const prevTitle = document.title;
+  document.title = title;
+  setTimeout(() => {
+    iframe.contentWindow.document.title = title;
+    iframe.contentWindow.focus();
+    iframe.contentWindow.print();
+    setTimeout(() => { document.title = prevTitle; }, 3000);
+  }, 600);
+}
+function printJobFlyer() {
+  const preview = document.getElementById('jobFlyerPreview');
+  if (!preview) return;
+  const company = document.getElementById('ff_company')?.value || '求人票';
+  const title = company + '求人票';
+  const oldFrame = document.getElementById('_printFrame');
+  if (oldFrame) oldFrame.remove();
+  const iframe = document.createElement('iframe');
+  iframe.id = '_printFrame';
+  iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:210mm;height:1px;border:none;';
+  document.body.appendChild(iframe);
+  const doc = iframe.contentDocument || iframe.contentWindow.document;
+  doc.open();
+  doc.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${title}</title><style>
+    *{box-sizing:border-box;}
+    body{margin:0;padding:14mm;font-family:'Noto Sans JP','Hiragino Sans',sans-serif;background:white;}
+    @page{margin:0;size:A4;}
+    @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;padding:10mm;}}
+  </style></head><body>${preview.innerHTML}</body></html>`);
+  doc.close();
+  iframe.onload = () => {
+    const prev=document.title; document.title=title;
+    iframe.contentWindow.document.title=title;
+    iframe.contentWindow.focus(); iframe.contentWindow.print();
+    setTimeout(()=>{document.title=prev;},2000);
+  };
+}
+
+// ===== 顔写真アップロード =====
+async function uploadResumePhoto(input) {
+  const file = input.files?.[0]; if (!file) return;
+  const status = document.getElementById('photoUploadStatus');
+  if (status) { status.textContent='アップロード中...'; status.style.display=''; }
+  try {
+    const ext = file.name.split('.').pop().toLowerCase();
+    const fileName = 'photo_' + Date.now() + '.' + ext;
+    const res = await fetch('https://oyblvyocvdnhcxeeokuw.supabase.co/storage/v1/object/photos/' + fileName, {
+      method:'POST',
+      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':file.type,'x-upsert':'true'},
+      body: await file.arrayBuffer()
+    });
+    if (!res.ok) throw new Error((await res.json()).error || 'アップロード失敗');
+    const url = 'https://oyblvyocvdnhcxeeokuw.supabase.co/storage/v1/object/public/photos/' + fileName;
+    const urlInput = document.getElementById('rf_photo_url');
+    if (urlInput) urlInput.value = url;
+    updatePhotoThumb(url); previewResume();
+    if (status) { status.textContent='✅ 完了'; setTimeout(()=>{status.style.display='none';},2000); }
+  } catch(e) { showToast('❌ 写真アップロード失敗: '+e.message,'error'); if(status) status.style.display='none'; }
+}
+function onPhotoUrlInput() { updatePhotoThumb(document.getElementById('rf_photo_url')?.value); previewResume(); }
+function updatePhotoThumb(url) {
+  const thumb = document.getElementById('photoPreviewThumb'); if(!thumb) return;
+  thumb.innerHTML = url ? `<img src="${url}" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.innerHTML='<span style=font-size:20px>📷</span>'">` : '<span style="font-size:20px;color:#ccc">📷</span>';
+}
+
 function showLoading(v) { document.getElementById('loadingOverlay').classList.toggle('show', v); }
 
 let toastTimer;
@@ -1962,7 +1894,6 @@ document.getElementById('companyModal').addEventListener('click', function(e) {
 // ===== SCREEN MANAGER =====
 const SCREENS = {
   companies: { title: '🏢 所属機関', init: loadCompanies },
-  map_view:  { title: '🗺️ 所属機関マップ', init: loadMapView },
   workers:   { title: '👤 外国人材', init: loadWorkers },
   candidates:{ title: '📋 候補者',   init: loadCandidates },
   jobs:      { title: '💼 求人管理', init: loadJobs },
@@ -1976,6 +1907,7 @@ const SCREENS = {
   ofusa_view:{ title: '📊 案件進捗確認', init: loadOfusaView },
   decision_report:{ title: '📋 決定報告', init: loadDecisionReport },
   resume:    { title: '📝 履歴書作成', init: loadResumeScreen },
+  job_flyer: { title: '📄 求人票作成', init: loadJobFlyer },
 };
 
 let currentScreen = 'companies';
@@ -2006,10 +1938,11 @@ function showScreen(name) {
 function updateTopbarButtons(name) {
   const actions = document.querySelector('.topbar-actions');
   const btnMap = {
-
+    companies:    `<button class="btn btn-outline" onclick="loadCompanies()">🔄 更新</button><button class="btn btn-primary" onclick="openCompanyModal(null)">＋ 企業登録</button>`,
     workers:      `<button class="btn btn-outline" onclick="loadWorkers()">🔄 更新</button><button class="btn btn-primary" onclick="openWorkerModal(null)">＋ 人材登録</button>`,
     candidates:   `<button class="btn btn-outline" onclick="loadCandidates()">🔄 更新</button><button class="btn btn-primary" onclick="openCandidateModal(null)">＋ 候補者登録</button>`,
-    jobs:         `<button class="btn btn-outline" onclick="loadJobs()">🔄 更新</button><button class="btn btn-primary" onclick="openJobModal(null)">＋ 求人登録</button>`,
+    jobs:         `<button class="btn btn-outline" onclick="showJobFlyer()">📄 求人票作成</button><button class="btn btn-outline" onclick="loadJobs()">🔄 更新</button><button class="btn btn-primary" onclick="openJobModal(null)">＋ 求人登録</button>`,
+    job_flyer:    `<button class="btn btn-outline" onclick="showScreen('jobs')">← 求人一覧に戻る</button>`,
     introductions:`<button class="btn btn-outline" onclick="loadIntroductions()">🔄 更新</button><button class="btn btn-primary" onclick="openIntroModal(null)">＋ 紹介案件登録</button>`,
     sending:      `<button class="btn btn-outline" onclick="loadSending()">🔄 更新</button><button class="btn btn-primary" onclick="openSendingModal(null)">＋ 機関登録</button>`,
     partners:     `<button class="btn btn-outline" onclick="loadPartners()">🔄 更新</button><button class="btn btn-primary" onclick="openPartnerModal(null)">＋ 機関登録</button>`,
@@ -2029,31 +1962,26 @@ function renderScreenContent(name) {
   const filtersSection = document.querySelector('.filters-section');
   const contentWrap = document.querySelector('.content-wrap');
 
-  // 各画面のHTML（必要な画面だけ構築）
-  const screenBuilders = {
-    workers: buildWorkersScreen,
-    candidates: buildCandidatesScreen,
-    jobs: buildJobsScreen,
-    introductions: buildIntroductionsScreen,
-    sending: buildSendingScreen,
-    partners: buildPartnersScreen,
-    fees: buildFeesScreen,
-    sales: buildSalesScreen,
-    expenses: buildExpensesScreen,
-    users: buildUsersScreen,
-    ofusa_view: buildOfusaViewScreen,
-    decision_report: buildDecisionReportScreen,
-    resume: buildResumeScreen,
-  };
-  const buildScreen = (n) => {
-    try { return screenBuilders[n] ? screenBuilders[n]() : null; }
-    catch(e) { console.error('buildScreen error:', n, e); return '<div style="padding:40px;text-align:center;color:var(--red)">画面の読み込みに失敗しました: ' + e.message + '</div>'; }
+  // 各画面のHTML
+  const screens = {
+    companies: null, // 既存
+    workers: buildWorkersScreen(),
+    candidates: buildCandidatesScreen(),
+    jobs: buildJobsScreen(),
+    introductions: buildIntroductionsScreen(),
+    sending: buildSendingScreen(),
+    partners: buildPartnersScreen(),
+    fees: buildFeesScreen(),
+    sales: buildSalesScreen(),
+    expenses: buildExpensesScreen(),
+    users: buildUsersScreen(),
+    ofusa_view: buildOfusaViewScreen(),
+    resume: buildResumeScreen(),
   };
 
   if (name === 'companies') {
     statsRow.style.display = '';
     filtersSection.style.display = '';
-    contentWrap.style.padding = '';
     contentWrap.innerHTML = `<div class="table-wrap">
       <table><thead><tr>
         <th>No.</th><th>企業名</th><th>業種</th><th>都道府県</th>
@@ -2064,18 +1992,23 @@ function renderScreenContent(name) {
     return;
   }
 
-  if (name === 'map_view') {
+  if (name === 'decision_report') {
+    statsRow.style.display = 'none';
+    filtersSection.style.display = 'none';
+    contentWrap.innerHTML = buildDecisionReportScreen();
+    return;
+  }
+  if (name === 'job_flyer') {
     statsRow.style.display = 'none';
     filtersSection.style.display = 'none';
     contentWrap.style.padding = '0';
-    contentWrap.innerHTML = buildMapViewScreen();
+    contentWrap.innerHTML = buildJobFlyerScreen();
     return;
   }
-
   statsRow.style.display = 'none';
   filtersSection.style.display = 'none';
   contentWrap.style.padding = '';
-  contentWrap.innerHTML = buildScreen(name) || '<div style="padding:40px;text-align:center;color:var(--gray-400)">準備中</div>';
+  contentWrap.innerHTML = screens[name] || '<div style="padding:40px;text-align:center;color:var(--gray-400)">準備中</div>';
 }
 
 // ==============================
@@ -2191,6 +2124,7 @@ function openWorkerModal(id) {
   const w = id ? allWorkers.find(x=>x.id===id) : null;
   editingWorkerId = id;
   showGenModal('workerModal', id ? '👤 外国人材詳細' : '👤 外国人材登録', buildWorkerModalBody(w));
+  setTimeout(() => setupAutoSave(saveWorker), 100);
 }
 let editingWorkerId = null;
 
@@ -2211,7 +2145,7 @@ function buildWorkerModalBody(w) {
       </select></div>
     <div class="form-group"><label class="form-label">生年月日</label><input class="form-input" id="wf_birthdate" type="date" value="${w.birthdate||''}"></div>
     <div class="section-title">所属・就労</div>
-    <div class="form-group full"><label class="form-label">受入企業</label>
+    <div class="form-group full"><label class="form-label">所属機関</label>
       <select class="form-select" id="wf_company_id">
         <option value="">選択...</option>
         ${allCompanies.map(c=>`<option value="${c.id}" ${w.company_id===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}
@@ -2391,6 +2325,7 @@ function openCandidateModal(id) {
   const c=id?allCandidates.find(x=>x.id===id):null;
   editingCandidateId=id;
   showGenModal('candidateModal', id?'📋 候補者詳細':'📋 候補者登録', buildCandidateModalBody(c));
+  setTimeout(() => setupAutoSave(saveCandidate), 100);
 }
 let editingCandidateId=null;
 
@@ -2495,7 +2430,7 @@ function buildJobsScreen() {
 async function loadJobs() {
   showLoading(true);
   try {
-    const data=await sbFetch('job_openings?select=*,companies(name),partner_support_orgs(name)&order=created_at.desc');
+    const data=await sbFetch('job_openings?select=*,companies(name,pref,city,address)&order=created_at.desc');
     allJobs=data||[];
     applyJobFilters();
   }catch(e){showToast('❌ '+e.message,'error');}
@@ -2508,7 +2443,7 @@ function applyJobFilters() {
   const status=document.getElementById('jFilterStatus')?.value||'';
   const industry=document.getElementById('jFilterIndustry')?.value||'';
   filteredJobs=allJobs.filter(j=>{
-    if(q && !((j.job_code||'').toLowerCase().includes(q)||(j.title||'').toLowerCase().includes(q)||(j.companies?.name||'').toLowerCase().includes(q))) return false;
+    if(q && !((j.job_code||'').toLowerCase().includes(q)||(j.companies?.name||'').toLowerCase().includes(q))) return false;
     if(status && j.status!==status) return false;
     if(industry && j.industry!==industry) return false;
     return true;
@@ -2542,6 +2477,7 @@ function openJobModal(id) {
   const j=id?allJobs.find(x=>x.id===id):null;
   editingJobId=id;
   showGenModal('jobModal',id?'💼 求人詳細':'💼 求人登録',buildJobModalBody(j));
+  setTimeout(() => setupAutoSave(saveJob), 100);
 }
 let editingJobId=null;
 
@@ -2553,13 +2489,13 @@ function buildJobModalBody(j) {
     <div class="form-group"><label class="form-label">求人コード</label><input class="form-input" id="jf_code" value="${esc(j.job_code||'')}"></div>
     <div class="form-group"><label class="form-label">ステータス</label>
       <select class="form-select" id="jf_status">${['募集中','新着','提案中','保留','停止','決定','募集再開'].map(s=>`<option ${j.status===s?'selected':''}>${s}</option>`).join('')}</select></div>
-    <div class="form-group full"><label class="form-label">求人・会社名（表示用）</label><input class="form-input" id="jf_title" value="${esc(j.title||'')}"></div>
+    <div class="form-group full"><label class="form-label">会社名</label><input class="form-input" id="jf_title" value="${esc(j.title||'')}"></div>
     <div class="form-group"><label class="form-label">業種（特定技能分野）</label>
       <select class="form-select" id="jf_industry">${['','農業','漁業','建設','製造業','飲食料品製造業','外食業','介護','ビルクリーニング','宿泊','自動車整備','航空','造船・船用工業'].map(s=>`<option ${j.industry===s?'selected':''}>${s}</option>`).join('')}</select></div>
     <div class="form-group"><label class="form-label">職種</label><input class="form-input" id="jf_job_type" value="${esc(j.job_type||'')}"></div>
     <div class="form-group"><label class="form-label">国内/外</label>
       <select class="form-select" id="jf_location">${['','国内','国外','国内/外'].map(s=>`<option ${j.location_domestic===s?'selected':''}>${s}</option>`).join('')}</select></div>
-    <div class="form-group"><label class="form-label">受入企業</label>
+    <div class="form-group"><label class="form-label">所属機関</label>
       <select class="form-select" id="jf_company_id"><option value="">選択...</option>${allCompanies.map(c=>`<option value="${c.id}" ${j.company_id===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div>
     <div class="section-title">条件</div>
     <div class="form-group"><label class="form-label">募集国籍</label><input class="form-input" id="jf_target_nationality" value="${esc(j.target_nationality||'')}"></div>
@@ -2634,7 +2570,7 @@ function buildIntroductionsScreen() {
     <button class="btn btn-outline" style="font-size:11px;padding:4px 10px" onclick="clearIntroFilters()">✕</button>
   </div>
   <div class="table-wrap"><table><thead><tr>
-    <th>決定日</th><th>人材名</th><th>国籍</th><th>受入企業</th>
+    <th>決定日</th><th>人材名</th><th>国籍</th><th>所属機関</th>
     <th>登録支援機関</th><th>職種</th><th>紹介費</th><th>請求タイミング</th><th>担当</th><th>ステータス</th>
   </tr></thead>
   <tbody id="introTbody"><tr><td colspan="10" style="text-align:center;padding:40px;color:var(--gray-400)">読み込み中...</td></tr></tbody>
@@ -2689,6 +2625,7 @@ function openIntroModal(id) {
   const i=id?allIntros.find(x=>x.id===id):null;
   editingIntroId=id;
   showGenModal('introModal',id?'🤝 紹介案件詳細':'🤝 紹介案件登録',buildIntroModalBody(i));
+  setTimeout(() => setupAutoSave(saveIntro), 100);
 }
 let editingIntroId=null;
 
@@ -2705,7 +2642,7 @@ function buildIntroModalBody(i) {
       <select class="form-select" id="if_nationality">${['','インドネシア','ベトナム','タイ','カンボジア','ミャンマー','その他'].map(n=>`<option ${i.nationality===n?'selected':''}>${n}</option>`).join('')}</select></div>
     <div class="form-group"><label class="form-label">国内/国外</label>
       <select class="form-select" id="if_domestic">${['','国内','国外'].map(s=>`<option ${i.domestic_or_overseas===s?'selected':''}>${s}</option>`).join('')}</select></div>
-    <div class="form-group full"><label class="form-label">受入企業名</label>
+    <div class="form-group full"><label class="form-label">所属機関名</label>
       <select class="form-select" id="if_company_id"><option value="">選択...</option>${allCompanies.map(c=>`<option value="${c.id}" ${i.company_id===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div>
     <div class="form-group full"><label class="form-label">登録支援機関名</label><input class="form-input" id="if_partner_org_name" value="${esc(i.partner_org_name||'')}"></div>
     <div class="form-group"><label class="form-label">職種</label><input class="form-input" id="if_job_type" value="${esc(i.job_type||'')}"></div>
@@ -2795,6 +2732,7 @@ function renderSendingTable() {
   renderGenPagination('sendingPagination',total,sendingPage,p=>{sendingPage=p;renderSendingTable();});
 }
 function openSendingModal(id){const s=id?allSending.find(x=>x.id===id):null; editingSendingId=id; showGenModal('sendingModal',id?'✈️ 送り出し機関詳細':'✈️ 送り出し機関登録',buildSendingModalBody(s));}
+  setTimeout(() => setupAutoSave(saveSending), 100);
 let editingSendingId=null;
 function buildSendingModalBody(s){s=s||{}; return `<div class="form-grid">
   <div class="section-title">基本情報</div>
@@ -2824,6 +2762,7 @@ function applyPartnerFilters(){if(currentScreen!=='partners') return;const q=(do
 function clearPartnerFilters(){['pSearchInput','pFilterType'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});applyPartnerFilters();}
 function renderPartnerTable(){const tbody=document.getElementById('partnerTbody');if(!tbody)return;const total=filteredPartners.length;const page=filteredPartners.slice((partnerPage-1)*PAGE_SIZE,partnerPage*PAGE_SIZE);if(!page.length){tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--gray-400)">データなし</td></tr>';document.getElementById('partnerPagination').innerHTML='';return;}tbody.innerHTML=page.map(p=>`<tr onclick="openPartnerModal('${p.id}')"><td><strong>${esc(p.name)}</strong></td><td style="font-size:11px">${esc(p.org_type||'-')}</td><td style="color:var(--blue);font-weight:700">${esc(p.job_code||'-')}</td><td style="font-size:11px">${esc(p.main_industry||'-')}</td><td style="font-size:12px">${p.fee_kmt?Number(p.fee_kmt).toLocaleString()+'円':'-'}</td><td style="font-size:12px">${esc(p.glt_staff||'-')}</td><td style="font-size:12px;text-align:center">${p.case_count??'-'}</td><td style="font-size:12px">${p.partnership_start?formatDate(p.partnership_start):'-'}</td></tr>`).join('');renderGenPagination('partnerPagination',total,partnerPage,p2=>{partnerPage=p2;renderPartnerTable();});}
 function openPartnerModal(id){const p=id?allPartners.find(x=>x.id===id):null;editingPartnerId=id;showGenModal('partnerModal',id?'🏛️ 提携登録支援機関詳細':'🏛️ 提携登録支援機関登録',buildPartnerModalBody(p));}
+  setTimeout(() => setupAutoSave(savePartner), 100);
 let editingPartnerId=null;
 function buildPartnerModalBody(p){p=p||{};return `<div class="form-grid"><div class="section-title">基本情報</div><div class="form-group full"><label class="form-label">機関名 *</label><input class="form-input" id="pf_name" value="${esc(p.name||'')}"></div><div class="form-group"><label class="form-label">区分</label><select class="form-select" id="pf_org_type">${['','登録支援機関','人材紹介会社+登録支援機関','営業代理店','その他'].map(s=>`<option ${p.org_type===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">求人票コード</label><input class="form-input" id="pf_job_code" value="${esc(p.job_code||'')}"></div><div class="form-group"><label class="form-label">主な職種</label><input class="form-input" id="pf_industry" value="${esc(p.main_industry||'')}"></div><div class="form-group"><label class="form-label">担当者名</label><input class="form-input" id="pf_contact" value="${esc(p.contact_name||'')}"></div><div class="form-group"><label class="form-label">メール</label><input class="form-input" id="pf_email" value="${esc(p.email||'')}"></div><div class="section-title">請求・担当</div><div class="form-group"><label class="form-label">KMT側請求額（円）</label><input class="form-input" id="pf_fee_kmt" type="number" value="${p.fee_kmt??''}"></div><div class="form-group"><label class="form-label">大房側請求額（円）</label><input class="form-input" id="pf_fee_ofusa" type="number" value="${p.fee_ofusa??''}"></div><div class="form-group"><label class="form-label">請求タイミング</label><select class="form-select" id="pf_billing_timing">${['','配属後','決定時'].map(s=>`<option ${p.billing_timing===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">GLT担当</label><input class="form-input" id="pf_glt_staff" value="${esc(p.glt_staff||'')}"></div><div class="form-group"><label class="form-label">大房担当</label><input class="form-input" id="pf_ofusa_staff" value="${esc(p.ofusa_staff||'')}"></div><div class="form-group"><label class="form-label">提携開始日</label><input class="form-input" id="pf_start_date" type="date" value="${p.partnership_start||''}"></div><div class="form-group full"><label class="form-label">HP</label><input class="form-input" id="pf_website" value="${esc(p.website||'')}"></div><div class="form-group full"><label class="form-label">備考</label><textarea class="form-textarea" id="pf_notes">${esc(p.notes||'')}</textarea></div></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)"><button class="btn btn-outline" onclick="closeGenModal('partnerModal')">キャンセル</button><button class="btn btn-primary" onclick="savePartner()">💾 保存</button></div>`;}
 async function savePartner(){const g=id=>document.getElementById(id)?.value||null;const ni=id=>document.getElementById(id)?.value?parseInt(document.getElementById(id).value):null;const data={name:g('pf_name'),org_type:g('pf_org_type'),job_code:g('pf_job_code'),main_industry:g('pf_industry'),contact_name:g('pf_contact'),email:g('pf_email'),fee_kmt:ni('pf_fee_kmt'),fee_ofusa:ni('pf_fee_ofusa'),billing_timing:g('pf_billing_timing'),glt_staff:g('pf_glt_staff'),ofusa_staff:g('pf_ofusa_staff'),partnership_start:g('pf_start_date'),website:g('pf_website'),notes:g('pf_notes'),updated_at:new Date().toISOString()};if(!data.name){showToast('❌ 機関名は必須','error');return;}showLoading(true);try{if(editingPartnerId){await sbFetch('partner_support_orgs?id=eq.'+editingPartnerId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新','success');}else{await sbFetch('partner_support_orgs',{method:'POST',body:JSON.stringify(data)});showToast('✅ 登録','success');}closeGenModal('partnerModal');await loadPartners();}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
@@ -2957,10 +2896,10 @@ async function loadFees(page) {
 function renderFeeMaster() {
   const area = document.getElementById('feeContentArea');
   if (!area) return;
-  // companiesのfee情報を表示（受入企業一覧から取得済みのallCompaniesを使用）
+  // companiesのfee情報を表示（所属機関一覧から取得済みのallCompaniesを使用）
   const active = allCompanies.filter(c => c.status !== 'past');
   if (!active.length) {
-    area.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray-400)">所属機関データを読み込み中...<br><small>先に「受入企業」画面を一度開いてください</small></div>';
+    area.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray-400)">所属機関データを読み込み中...<br><small>先に「所属機関」画面を一度開いてください</small></div>';
     return;
   }
   const payBadge = m => m === '口振' ? '<span class="pay-badge pay-koza">口振</span>' : m === '振込' ? '<span class="pay-badge pay-furikomi">振込</span>' : m ? `<span class="pay-badge">${esc(m)}</span>` : '-';
@@ -3068,6 +3007,7 @@ function openFeeModalForCompany(companyId, billingMonth) {
     status: '未請求',
   };
   showGenModal('feeModal', '💴 委託費登録', buildFeeModalBody(pseudo));
+  setTimeout(() => setupAutoSave(saveFee), 100);
 }
 
 
@@ -3258,6 +3198,7 @@ function renderSaleMonthTable(ym) {
 function applySaleFilters() { loadSales(1); }
 function clearSaleFilters() { loadSales(1); }
 function openSaleModal(id){const s=id?allSales.find(x=>x.id===id):null;editingSaleId=id;showGenModal('saleModal',id?'📊 売上詳細':'📊 売上登録',buildSaleModalBody(s));}
+  setTimeout(() => setupAutoSave(saveSale), 100);
 let editingSaleId=null;
 function buildSaleModalBody(s){s=s||{};return `<div class="form-grid"><div class="section-title">売上情報</div><div class="form-group full"><label class="form-label">企業</label><select class="form-select" id="saf_company_id"><option value="">選択...</option>${allCompanies.map(c=>`<option value="${c.id}" ${s.company_id===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">請求月 (YYYY-MM)</label><input class="form-input" id="saf_billing_month" value="${esc(s.billing_month||'')}"></div><div class="form-group"><label class="form-label">請求法人</label><select class="form-select" id="saf_kmt_entity">${['','株式会社KMT','一般社団法人KMT'].map(v=>`<option ${s.kmt_entity===v?'selected':''}>${v}</option>`).join('')}</select></div><div class="form-group full"><label class="form-label">項目名</label><input class="form-input" id="saf_item_name" value="${esc(s.item_name||'')}"></div><div class="form-group"><label class="form-label">単価（円）</label><input class="form-input" id="saf_unit_price" type="number" value="${s.unit_price??''}"></div><div class="form-group"><label class="form-label">数量</label><input class="form-input" id="saf_quantity" type="number" value="${s.quantity??''}"></div><div class="form-group"><label class="form-label">金額（税抜）</label><input class="form-input" id="saf_amount_excl" type="number" value="${s.amount_excl??''}"></div><div class="form-group"><label class="form-label">金額（税込）</label><input class="form-input" id="saf_amount_incl" type="number" value="${s.amount_incl??''}"></div><div class="form-group"><label class="form-label">確度</label><select class="form-select" id="saf_certainty">${['確定','50%','期待'].map(v=>`<option ${s.certainty===v?'selected':''}>${v}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">カテゴリ</label><select class="form-select" id="saf_category">${['委託費','初期費用','紹介費','その他'].map(v=>`<option ${s.category===v?'selected':''}>${v}</option>`).join('')}</select></div><div class="form-group full"><label class="form-label">備考</label><textarea class="form-textarea" id="saf_notes">${esc(s.notes||'')}</textarea></div></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)"><button class="btn btn-outline" onclick="closeGenModal('saleModal')">キャンセル</button><button class="btn btn-primary" onclick="saveSale()">💾 保存</button></div>`;}
 async function saveSale(){const g=id=>document.getElementById(id)?.value||null;const ni=id=>document.getElementById(id)?.value?parseInt(document.getElementById(id).value):null;const data={company_id:g('saf_company_id'),billing_month:g('saf_billing_month'),kmt_entity:g('saf_kmt_entity'),item_name:g('saf_item_name'),unit_price:ni('saf_unit_price'),quantity:ni('saf_quantity'),amount_excl:ni('saf_amount_excl'),amount_incl:ni('saf_amount_incl'),certainty:g('saf_certainty'),category:g('saf_category'),notes:g('saf_notes'),updated_at:new Date().toISOString()};if(!data.billing_month){showToast('❌ 請求月は必須','error');return;}showLoading(true);try{if(editingSaleId){await sbFetch('sales_forecast?id=eq.'+editingSaleId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新','success');}else{await sbFetch('sales_forecast',{method:'POST',body:JSON.stringify(data)});showToast('✅ 登録','success');}closeGenModal('saleModal');await loadSales(salePage);}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
@@ -3298,6 +3239,7 @@ function renderExpenseTableDirect() {
 }
 // applyExpenseFilters/clearExpenseFilters/renderExpenseTable → loadExpenses()に統合
 function openExpenseModal(id){const e=id?allExpenses.find(x=>x.id===id):null;editingExpenseId=id;showGenModal('expenseModal',id?'💸 立替詳細':'💸 立替登録',buildExpenseModalBody(e));}
+  setTimeout(() => setupAutoSave(saveExpense), 100);
 let editingExpenseId=null;
 function buildExpenseModalBody(e){e=e||{};return `<div class="form-grid"><div class="section-title">立替情報</div><div class="form-group"><label class="form-label">日付</label><input class="form-input" id="ef_date" type="date" value="${e.expense_date||''}"></div><div class="form-group"><label class="form-label">ステータス</label><select class="form-select" id="ef_status">${['未請求','請求済','入金済'].map(s=>`<option ${e.status===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group full"><label class="form-label">人材</label><select class="form-select" id="ef_worker_id"><option value="">選択...</option>${allWorkers.map(w=>`<option value="${w.id}" ${e.worker_id===w.id?'selected':''}>${esc(w.name)}</option>`).join('')}</select></div><div class="form-group full"><label class="form-label">企業</label><select class="form-select" id="ef_company_id"><option value="">選択...</option>${allCompanies.map(c=>`<option value="${c.id}" ${e.company_id===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div><div class="form-group full"><label class="form-label">名目（航空券等）</label><input class="form-input" id="ef_item_name" value="${esc(e.item_name||'')}"></div><div class="form-group"><label class="form-label">金額（円）</label><input class="form-input" id="ef_amount" type="number" value="${e.amount??''}"></div><div class="form-group"><label class="form-label">支払方法</label><select class="form-select" id="ef_payment_method">${['','立替','クレカ'].map(s=>`<option ${e.payment_method===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">請求先</label><select class="form-select" id="ef_billed_to">${['','企業','本人'].map(s=>`<option ${e.billed_to===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">担当者</label><input class="form-input" id="ef_staff" value="${esc(e.staff||'')}"></div><div class="form-group full"><label class="form-label">備考</label><textarea class="form-textarea" id="ef_notes">${esc(e.notes||'')}</textarea></div></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)"><button class="btn btn-outline" onclick="closeGenModal('expenseModal')">キャンセル</button><button class="btn btn-primary" onclick="saveExpense()">💾 保存</button></div>`;}
 async function saveExpense(){const g=id=>document.getElementById(id)?.value||null;const data={expense_date:g('ef_date'),status:g('ef_status')||'未請求',worker_id:g('ef_worker_id'),company_id:g('ef_company_id'),item_name:g('ef_item_name'),amount:document.getElementById('ef_amount')?.value?parseInt(document.getElementById('ef_amount').value):null,payment_method:g('ef_payment_method'),billed_to:g('ef_billed_to'),staff:g('ef_staff'),notes:g('ef_notes'),updated_at:new Date().toISOString()};showLoading(true);try{if(editingExpenseId){await sbFetch('expenses?id=eq.'+editingExpenseId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新','success');}else{await sbFetch('expenses',{method:'POST',body:JSON.stringify(data)});showToast('✅ 登録','success');}closeGenModal('expenseModal');await loadExpenses();}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
@@ -3688,18 +3630,18 @@ function buildResumeHTML(c) {
 .resume-title { text-align: center; font-size: 20px; font-weight: 900; letter-spacing: 8px; margin-bottom: 4px; border-bottom: 3px double #333; padding-bottom: 6px; }
 .resume-subtitle { text-align: center; font-size: 11px; color: #777; margin-bottom: 12px; }
 .resume-grid { display: grid; grid-template-columns: 1fr 130px; gap: 10px; margin-bottom: 10px; }
-.resume-info table { width: 100%; border-collapse: collapse; }
-.resume-info td { padding: 3px 7px; border: 1px solid #ccc; font-size: 11px; vertical-align: top; }
-.resume-info td.lbl { background: #f5f5f5; font-weight: 700; width: 80px; white-space: nowrap; color: #333; font-size: 10px; }
+.resume-info table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.resume-info td { padding: 3px 7px; border: 1px solid #ccc; font-size: 11px; vertical-align: top; word-break: break-all; overflow-wrap: break-word; }
+.resume-info td.lbl { background: #f5f5f5; font-weight: 700; width: 30%; white-space: nowrap; color: #333; font-size: 10px; }
 .resume-photo { border: 1px solid #ccc; border-radius: 4px; display: flex; align-items: center; justify-content: center; background: #f9f9f9; min-height: 150px; }
 .resume-photo img { width: 100%; height: 100%; object-fit: cover; }
 .resume-photo-placeholder { text-align: center; color: #bbb; font-size: 11px; padding: 10px; }
 .resume-section { margin-bottom: 8px; }
 .resume-section-title { background: #0f2040; color: white; padding: 3px 8px; font-size: 10px; font-weight: 700; letter-spacing: 1px; border-radius: 3px; margin-bottom: 5px; }
-.resume-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.resume-table { width: 100%; border-collapse: collapse; font-size: 11px; table-layout: fixed; }
 .resume-table th { background: #f0f4f8; padding: 3px 7px; border: 1px solid #ccc; font-size: 10px; font-weight: 700; color: #333; white-space: nowrap; }
-.resume-table td { padding: 4px 7px; border: 1px solid #ccc; vertical-align: top; }
-.resume-table td.lbl { background: #f8f9fa; font-weight: 700; width: 80px; color: #333; font-size: 10px; white-space: nowrap; }
+.resume-table td { padding: 4px 7px; border: 1px solid #ccc; vertical-align: top; word-break: break-all; overflow-wrap: break-word; }
+.resume-table td.lbl { background: #f8f9fa; font-weight: 700; width: 22%; color: #333; font-size: 10px; white-space: nowrap; }
 .resume-lic-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
 .resume-lic-item { border: 1px solid #ccc; border-radius: 3px; padding: 3px 6px; font-size: 10px; display: flex; align-items: center; justify-content: space-between; }
 .resume-lic-item .has { color: #16a34a; font-weight: 700; }
