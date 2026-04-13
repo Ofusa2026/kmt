@@ -1847,6 +1847,161 @@ function printJobFlyer() {
   };
 }
 
+// ==============================
+// 📄 求人票作成
+// ==============================
+function showJobFlyer(jobId) {
+  showScreen('job_flyer');
+  setTimeout(() => loadJobFlyer(jobId), 50);
+}
+
+function buildJobFlyerScreen() {
+  return `
+  <div style="display:flex;gap:0;height:calc(100vh - 110px);overflow:hidden;">
+    <div style="width:300px;flex-shrink:0;overflow-y:auto;border-right:1px solid var(--gray-200);padding:14px;background:white;display:flex;flex-direction:column;gap:8px;">
+      <div>
+        <label class="form-label" style="margin-bottom:4px;display:block;">求人を選択</label>
+        <select id="flyerJobSelect" class="form-select" onchange="onFlyerJobSelect()" style="width:100%;font-size:13px;">
+          <option value="">── 求人を選択 ──</option>
+        </select>
+      </div>
+      <div id="flyerFormBody" style="display:none;flex-direction:column;gap:6px;">
+        <div class="section-title" style="font-size:10px;font-weight:800;color:var(--navy);padding:4px 0;border-bottom:1px solid var(--gray-200);">📋 基本情報</div>
+        <div><label class="form-label" style="font-size:10px">会社名</label><input class="form-input" id="ff_company" oninput="previewFlyer()" style="font-size:11px"></div>
+        <div><label class="form-label" style="font-size:10px">所在地</label><input class="form-input" id="ff_location" oninput="previewFlyer()" style="font-size:11px"></div>
+        <div><label class="form-label" style="font-size:10px">業種</label><input class="form-input" id="ff_industry" oninput="previewFlyer()" style="font-size:11px"></div>
+        <div><label class="form-label" style="font-size:10px">事業内容</label><input class="form-input" id="ff_job_type" oninput="previewFlyer()" style="font-size:11px"></div>
+        <div><label class="form-label" style="font-size:10px">アピールポイント</label><textarea class="form-textarea" id="ff_appeal" rows="2" oninput="previewFlyer()" style="font-size:11px"></textarea></div>
+        <div class="section-title" style="font-size:10px;font-weight:800;color:var(--navy);padding:4px 0;border-bottom:1px solid var(--gray-200);">⑴ 仕事内容</div>
+        <div><label class="form-label" style="font-size:10px">仕事内容</label><textarea class="form-textarea" id="ff_description" rows="3" oninput="previewFlyer()" style="font-size:11px"></textarea></div>
+        <div class="section-title" style="font-size:10px;font-weight:800;color:var(--navy);padding:4px 0;border-bottom:1px solid var(--gray-200);">⑵ 勤務時間</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
+          <div><label class="form-label" style="font-size:10px">始業</label><input class="form-input" id="ff_start_time" type="time" oninput="previewFlyer()" style="font-size:11px"></div>
+          <div><label class="form-label" style="font-size:10px">終業</label><input class="form-input" id="ff_end_time" type="time" oninput="previewFlyer()" style="font-size:11px"></div>
+        </div>
+        <div><label class="form-label" style="font-size:10px">休憩・残業・変形</label><input class="form-input" id="ff_work_note" oninput="previewFlyer()" style="font-size:11px"></div>
+        <div><label class="form-label" style="font-size:10px">年間休日</label><input class="form-input" id="ff_holidays" oninput="previewFlyer()" style="font-size:11px"></div>
+        <div class="section-title" style="font-size:10px;font-weight:800;color:var(--navy);padding:4px 0;border-bottom:1px solid var(--gray-200);">⑶ 賃金・手当</div>
+        <div><label class="form-label" style="font-size:10px">月給</label><input class="form-input" id="ff_salary" oninput="previewFlyer()" style="font-size:11px"></div>
+        <div><label class="form-label" style="font-size:10px">手当・賞与</label><input class="form-input" id="ff_allowances" oninput="previewFlyer()" style="font-size:11px"></div>
+        <div class="section-title" style="font-size:10px;font-weight:800;color:var(--navy);padding:4px 0;border-bottom:1px solid var(--gray-200);">⑷ 控除額</div>
+        <div><label class="form-label" style="font-size:10px">控除内容</label><input class="form-input" id="ff_deductions" oninput="previewFlyer()" style="font-size:11px"></div>
+        <div class="section-title" style="font-size:10px;font-weight:800;color:var(--navy);padding:4px 0;border-bottom:1px solid var(--gray-200);">⑸ 寮</div>
+        <div><label class="form-label" style="font-size:10px">寮情報</label><input class="form-input" id="ff_dorm" oninput="previewFlyer()" style="font-size:11px"></div>
+        <div class="section-title" style="font-size:10px;font-weight:800;color:var(--navy);padding:4px 0;border-bottom:1px solid var(--gray-200);">⑹ 受入条件</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
+          <div><label class="form-label" style="font-size:10px">募集国籍</label><input class="form-input" id="ff_nationality" oninput="previewFlyer()" style="font-size:11px"></div>
+          <div><label class="form-label" style="font-size:10px">採用人数</label><input class="form-input" id="ff_count" type="number" oninput="previewFlyer()" style="font-size:11px"></div>
+        </div>
+        <div><label class="form-label" style="font-size:10px">性別・年齢・経験</label><input class="form-input" id="ff_requirements" oninput="previewFlyer()" style="font-size:11px"></div>
+        <div><label class="form-label" style="font-size:10px">日本語レベル・資格</label><input class="form-input" id="ff_jp_level" oninput="previewFlyer()" style="font-size:11px"></div>
+        <div><label class="form-label" style="font-size:10px">理想の人材像</label><input class="form-input" id="ff_ideal" oninput="previewFlyer()" style="font-size:11px"></div>
+        <div class="section-title" style="font-size:10px;font-weight:800;color:var(--navy);padding:4px 0;border-bottom:1px solid var(--gray-200);">⑺ 面接</div>
+        <div><label class="form-label" style="font-size:10px">面接情報</label><input class="form-input" id="ff_interview" oninput="previewFlyer()" style="font-size:11px"></div>
+        <div style="padding-top:10px;border-top:1px solid var(--gray-200);">
+          <div style="font-size:10px;font-weight:700;color:var(--navy);margin-bottom:5px;">📋 表示セクション</div>
+          <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:8px;font-size:11px;">
+            ${[['fs_appeal','アピール'],['fs_s1','⑴仕事内容'],['fs_s2','⑵勤務時間'],['fs_s3','⑶賃金'],['fs_s4','⑷控除額'],['fs_s5','⑸寮'],['fs_s6','⑹受入条件'],['fs_s7','⑺面接']].map(([id,label])=>`<label style="display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" id="${id}" checked onchange="previewFlyer()">${label}</label>`).join('')}
+          </div>
+          <button class="btn btn-primary" style="width:100%" onclick="printJobFlyer()">🖨️ 印刷 / PDF保存</button>
+        </div>
+      </div>
+    </div>
+    <div style="flex:1;overflow-y:auto;background:#e5e7eb;padding:20px;display:flex;justify-content:center;">
+      <div id="jobFlyerPreview" style="width:210mm;min-height:297mm;background:white;border-radius:4px;box-shadow:0 4px 20px rgba(0,0,0,0.15);padding:14mm;box-sizing:border-box;font-family:'Noto Sans JP','Hiragino Sans',sans-serif;">
+        <div style="text-align:center;color:var(--gray-300);padding:60px 0;font-size:14px;">← 求人を選択してください</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+async function loadJobFlyer(jobId) {
+  if (!allJobs.length) {
+    showLoading(true);
+    try {
+      const data = await sbFetch('job_openings?select=*,companies(name,pref,city,address)&order=created_at.desc');
+      allJobs = data || [];
+    } catch(e) { showToast('❌ '+e.message,'error'); }
+    showLoading(false);
+  }
+  const sel = document.getElementById('flyerJobSelect');
+  if (sel) {
+    sel.innerHTML = '<option value="">── 求人を選択 ──</option>' +
+      allJobs.map(j=>`<option value="${j.id}">${esc(j.job_code||'')} ${esc(j.companies?.name||'')}</option>`).join('');
+    if (jobId) { sel.value = jobId; onFlyerJobSelect(); }
+  }
+}
+
+function onFlyerJobSelect() {
+  const id = document.getElementById('flyerJobSelect')?.value;
+  if (!id) {
+    document.getElementById('flyerFormBody').style.display = 'none';
+    document.getElementById('jobFlyerPreview').innerHTML = '<div style="text-align:center;color:var(--gray-300);padding:60px 0;font-size:14px;">← 求人を選択してください</div>';
+    return;
+  }
+  const j = allJobs.find(x=>x.id===id); if(!j) return;
+  const g = (id,val) => { const el=document.getElementById(id); if(el) el.value=val||''; };
+  g('ff_company',   j.companies?.name||'');
+  g('ff_location',  j.location||[j.companies?.pref,j.companies?.city].filter(Boolean).join(''));
+  g('ff_industry',  j.industry||'');
+  g('ff_job_type',  j.job_type||'');
+  g('ff_appeal',    j.appeal||'');
+  g('ff_description', j.job_description||'');
+  g('ff_start_time', j.start_time||'');
+  g('ff_end_time',  j.end_time||'');
+  g('ff_work_note', [j.break_minutes?'休憩'+j.break_minutes+'分':'',j.overtime?'残業'+j.overtime:''].filter(Boolean).join('・'));
+  g('ff_holidays',  [j.annual_holiday_days?'年間'+j.annual_holiday_days+'日':'',j.holiday_note].filter(Boolean).join(' '));
+  g('ff_salary',    [j.salary_amount?'月給 '+Number(j.salary_amount).toLocaleString()+'円':'',j.take_home?'（手取り目安 '+Number(j.take_home).toLocaleString()+'円）':''].filter(Boolean).join(''));
+  g('ff_allowances', [j.allowances,j.bonus==='有'?'賞与'+(j.bonus_detail||'有'):''].filter(Boolean).join('・'));
+  g('ff_deductions', [j.meal_cost?'食費：'+j.meal_cost:'',j.housing_cost?'居住費：'+Number(j.housing_cost).toLocaleString()+'円':'',j.utility_cost?'光熱費：'+Number(j.utility_cost).toLocaleString()+'円':''].filter(Boolean).join('・'));
+  g('ff_dorm',      [j.room_capacity?'1部屋'+j.room_capacity+'人':'',j.room_layout||'',j.furniture?'家電家具'+j.furniture:'',j.wifi?'WIFI'+j.wifi:''].filter(Boolean).join('・'));
+  g('ff_nationality', j.target_nationality||'');
+  g('ff_count',     j.target_count||'');
+  g('ff_requirements', [j.gender_req&&j.gender_req!=='不問'?j.gender_req:'',j.age_limit?j.age_limit+'歳以下':'',j.experience_req||''].filter(Boolean).join('・'));
+  g('ff_jp_level',  [j.jp_level_req,j.required_license].filter(Boolean).join('・'));
+  g('ff_ideal',     j.ideal_candidate||'');
+  g('ff_interview', [j.interview_schedule||'',j.interview_method||'',j.interview_tool?'('+j.interview_tool+')':'',j.interview_count?j.interview_count+'回':'',j.kmt_interview==='あり'?'KMT人材面接あり':''].filter(Boolean).join(' '));
+  document.getElementById('flyerFormBody').style.display = 'flex';
+  previewFlyer();
+}
+
+function previewFlyer() {
+  const g = id => document.getElementById(id)?.value||'';
+  const show = id => document.getElementById(id)?.checked !== false;
+  const preview = document.getElementById('jobFlyerPreview'); if(!preview) return;
+  const company=g('ff_company'),location=g('ff_location'),industry=g('ff_industry'),jobType=g('ff_job_type'),appeal=g('ff_appeal'),desc=g('ff_description');
+  const startTime=g('ff_start_time'),endTime=g('ff_end_time'),workNote=g('ff_work_note'),holidays=g('ff_holidays');
+  const salary=g('ff_salary'),allowances=g('ff_allowances'),deductions=g('ff_deductions'),dorm=g('ff_dorm');
+  const nat=g('ff_nationality'),count=g('ff_count'),reqs=g('ff_requirements'),jpLv=g('ff_jp_level'),ideal=g('ff_ideal'),interview=g('ff_interview');
+  const row=(label,val)=>val?`<tr><td style="width:28%;padding:6px 8px;background:#eef2ff;font-size:10px;font-weight:700;color:#1e3a6e;border:1px solid #c7d2f0;white-space:nowrap;vertical-align:top;">${label}</td><td style="padding:6px 8px;font-size:11px;border:1px solid #c7d2f0;line-height:1.7;white-space:pre-wrap;">${esc(val)}</td></tr>`:'';
+  const section=t=>`<div style="font-size:11px;font-weight:800;color:#1e3a6e;background:#dde6ff;padding:5px 10px;margin:10px 0 0;border-left:4px solid #1e3a6e;">${t}</div>`;
+  preview.innerHTML=`<div style="border-top:5px solid #1e3a6e;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:12px 0 10px;">
+      <div>
+        <div style="font-size:10px;color:#64748b;letter-spacing:1.5px;font-weight:600;margin-bottom:3px;">求　人　票</div>
+        <div style="font-size:20px;font-weight:900;color:#1e3a6e;">${esc(company)||'会社名'}</div>
+        <div style="font-size:11px;color:#2563eb;font-weight:700;margin-top:3px;">${esc(industry)}${jobType?' ／ '+esc(jobType):''}</div>
+        ${location?`<div style="font-size:10px;color:#64748b;margin-top:2px;">📍 ${esc(location)}</div>`:''}
+      </div>
+      <div style="background:#1e3a6e;color:white;padding:8px 12px;border-radius:6px;text-align:center;min-width:70px;flex-shrink:0;">
+        <div style="font-size:8px;margin-bottom:2px;">採用人数</div>
+        <div style="font-size:18px;font-weight:900;">${count||'－'}<span style="font-size:10px;">名</span></div>
+        <div style="font-size:8px;margin-top:2px;">${esc(nat)}</div>
+      </div>
+    </div>
+    ${show('fs_appeal')&&appeal?`<div style="background:#fff7ed;border:1px solid #fed7aa;padding:7px 10px;border-radius:4px;margin-bottom:8px;font-size:11px;line-height:1.7;">⭐ ${esc(appeal)}</div>`:''}
+    ${show('fs_s1')&&desc?section('⑴ 仕事内容')+`<div style="padding:7px 10px;font-size:11px;line-height:1.8;border:1px solid #c7d2f0;border-top:none;white-space:pre-wrap;">${esc(desc)}</div>`:''}
+    ${show('fs_s2')?section('⑵ 勤務時間')+`<table style="width:100%;border-collapse:collapse;">${row('勤務時間',startTime&&endTime?startTime+' 〜 '+endTime:(startTime||endTime))}${row('休憩・残業',workNote)}${row('年間休日',holidays)}</table>`:''}
+    ${show('fs_s3')?section('⑶ 賃金・手当')+`<table style="width:100%;border-collapse:collapse;">${row('月給',salary)}${row('手当・賞与',allowances)}</table>`:''}
+    ${show('fs_s4')&&deductions?section('⑷ 控除額')+`<table style="width:100%;border-collapse:collapse;">${row('控除内容',deductions)}</table>`:''}
+    ${show('fs_s5')&&dorm?section('⑸ 寮')+`<table style="width:100%;border-collapse:collapse;">${row('寮情報',dorm)}</table>`:''}
+    ${show('fs_s6')?section('⑹ 受入条件')+`<table style="width:100%;border-collapse:collapse;">${row('性別・年齢・経験',reqs)}${row('日本語・資格',jpLv)}${row('理想の人材像',ideal)}</table>`:''}
+    ${show('fs_s7')&&interview?section('⑺ 面接')+`<table style="width:100%;border-collapse:collapse;">${row('面接情報',interview)}</table>`:''}
+    <div style="border-top:1px solid #e2e8f0;margin-top:14px;padding-top:8px;text-align:center;font-size:9px;color:#94a3b8;">株式会社KMT ／ 大房行政書士法人</div>
+  </div>`;
+}
+
+
 // ===== 顔写真アップロード =====
 async function uploadResumePhoto(input) {
   const file = input.files?.[0]; if (!file) return;
@@ -1907,7 +2062,7 @@ const SCREENS = {
   ofusa_view:{ title: '📊 案件進捗確認', init: loadOfusaView },
   decision_report:{ title: '📋 決定報告', init: loadDecisionReport },
   resume:    { title: '📝 履歴書作成', init: loadResumeScreen },
-  job_flyer: { title: '📄 求人票作成', init: loadJobFlyer },
+  job_flyer: { title: '📄 求人票作成', init: (id) => loadJobFlyer(id) },
 };
 
 let currentScreen = 'companies';
