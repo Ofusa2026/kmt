@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260413.41 -->
+<!-- KMT_VERSION ver.20260413.86 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -208,8 +208,8 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260413.41</div>
-    <div id="currentUserBadge" style="font-size:10px;color:#86efac;margin-top:2px;cursor:pointer;" onclick="logoutUser()">👤 読込中...</div>
+    <div class="logo-ver">ver.20260413.86</div>
+    <div id="currentUserBadge" style="font-size:10px;color:#86efac;margin-top:2px;cursor:pointer;" onclick="showScreen('my_account')">👤 読込中...</div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;color:#86efac;margin:4px 8px;border-radius:6px;background:rgba(134,239,172,0.1);" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
   <div style="height:1px;background:rgba(255,255,255,0.08);margin:4px 16px 8px;"></div>
@@ -351,6 +351,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
       <div class="modal-tab" onclick="switchCoTab('contract')">契約・委託費</div>
       <div class="modal-tab" onclick="switchCoTab('finance')">財務情報</div>
       <div class="modal-tab" onclick="switchCoTab('memo')">メモ</div>
+      <div class="modal-tab" onclick="switchCoTab('meetings')">📅 定期面談</div>
     </div>
     <div class="modal-body">
       <!-- 基本情報 -->
@@ -582,6 +583,61 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
           </div>
         </div>
       </div>
+
+      <!-- 定期面談タブ -->
+      <div class="tab-panel" id="tab-meetings">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
+          <button class="btn btn-primary" style="font-size:12px;padding:5px 14px;" onclick="openMeetingForm()">＋ 面談を記録</button>
+        </div>
+        <!-- 新規記録フォーム -->
+        <div id="meetingForm" style="display:none;background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:14px;margin-bottom:14px;">
+          <div class="form-grid" style="margin-bottom:8px;">
+            <div class="form-group">
+              <label class="form-label">年度</label>
+              <select class="form-select" id="mf_year">
+                <option value="2026">2026年度</option>
+                <option value="2027">2027年度</option>
+                <option value="2028">2028年度</option>
+                <option value="2029">2029年度</option>
+                <option value="2030">2030年度</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">期間</label>
+              <select class="form-select" id="mf_quarter">
+                <option value="4-6">4〜6月</option>
+                <option value="7-9">7〜9月</option>
+                <option value="10-12">10〜12月</option>
+                <option value="1-3">1〜3月</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">面談日</label>
+              <input class="form-input" id="mf_date" type="date">
+            </div>
+            <div class="form-group full">
+              <label class="form-label">面談相手（企業担当者）</label>
+              <input class="form-input" id="mf_contact" placeholder="例: 田中部長">
+            </div>
+            <div class="form-group full">
+              <label class="form-label">参加外国人材（複数選択可）</label>
+              <div id="mf_worker_checkboxes" style="display:flex;flex-wrap:wrap;gap:8px;padding:8px;border:1px solid var(--gray-200);border-radius:6px;min-height:40px;background:white;">
+                <span style="font-size:12px;color:var(--gray-400);">読み込み中...</span>
+              </div>
+            </div>
+            <div class="form-group full">
+              <label class="form-label">詳細メモ</label>
+              <textarea class="form-textarea" id="mf_memo" rows="4" placeholder="面談内容・申し送り事項など..."></textarea>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button class="btn btn-outline" onclick="closeMeetingForm()">キャンセル</button>
+            <button class="btn btn-primary" onclick="saveMeeting()">💾 保存</button>
+          </div>
+        </div>
+        <!-- 面談一覧 -->
+        <div id="meetingList"><div style="text-align:center;padding:30px;color:var(--gray-400);font-size:13px;">読み込み中...</div></div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeCompanyModal()">キャンセル</button>
@@ -804,7 +860,9 @@ function renderPagination(total) {
 function goPage(p) { currentPage = p; renderTable(); window.scrollTo(0,0); }
 
 // ===== MODAL =====
+let editingCompanyId = null;
 function openCompanyModal(id) {
+  editingCompanyId = id;
   editingCoId = id;
   clearCoForm();
   if (id) {
@@ -821,6 +879,167 @@ function openCompanyModal(id) {
   setTimeout(() => setupAutoSave(saveCompany), 100);
 }
 
+// ==============================
+// 📅 定期面談
+// ==============================
+let _editingMeetingId = null;
+
+async function loadMeetings(companyId) {
+  const list = document.getElementById('meetingList'); if (!list) return;
+  try {
+    const data = await sbFetch('company_meetings?company_id=eq.'+companyId+'&order=meeting_date.desc');
+    const meetings = data || [];
+    if (!meetings.length) {
+      list.innerHTML = '<div style="text-align:center;padding:30px;color:var(--gray-400);font-size:13px;">面談記録がありません</div>';
+      return;
+    }
+    // 期間でグループ化
+    const quarters = ['4-6','7-9','10-12','1-3'];
+    const qLabels = {'4-6':'4〜6月','7-9':'7〜9月','10-12':'10〜12月','1-3':'1〜3月'};
+    // 年度でグループ
+    const years = [...new Set(meetings.map(m => m.fiscal_year || 2026))].sort((a,b) => b-a);
+    // 年度フィルター（UIで選択できるように）
+    const selYear = parseInt(document.getElementById('meetingYearFilter')?.value) || years[0] || 2026;
+    const yearFiltered = meetings.filter(m => (m.fiscal_year || 2026) === selYear);
+    const grouped = {};
+    quarters.forEach(q => { grouped[q] = []; });
+    yearFiltered.forEach(m => { if (grouped[m.quarter]) grouped[m.quarter].push(m); });
+    // 年度フィルターUI
+    const yearFilterHtml = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">' +
+      '<span style="font-size:12px;font-weight:700;color:var(--navy);">年度：</span>' +
+      '<select id="meetingYearFilter" class="form-select" style="width:120px;font-size:12px;" onchange="loadMeetings(editingCompanyId)">' +
+      years.map(y => '<option value="'+y+'" '+(y===selYear?'selected':'')+'>'+y+'年度</option>').join('') +
+      '</select>' +
+      '<span style="font-size:11px;color:var(--gray-400);">'+yearFiltered.length+'件</span>' +
+    '</div>';
+    list.innerHTML = yearFilterHtml + quarters.map(q => {
+      const items = grouped[q];
+      if (!items.length) return '';
+      return '<div style="margin-bottom:16px;">' +
+        '<div style="font-size:12px;font-weight:800;color:var(--navy);background:#f0f4ff;padding:6px 12px;border-radius:6px;margin-bottom:8px;">📅 '+qLabels[q]+'（'+items.length+'件）</div>' +
+        items.map(m => {
+          const dateStr = m.meeting_date ? new Date(m.meeting_date+'T00:00:00').toLocaleDateString('ja-JP',{year:'numeric',month:'numeric',day:'numeric'}) : '日付未設定';
+          return '<div style="border:1px solid var(--gray-200);border-radius:8px;padding:10px 14px;margin-bottom:6px;background:white;">' +
+            '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">' +
+              '<div style="display:flex;align-items:center;gap:10px;">' +
+                '<span style="font-size:11px;color:var(--gray-400);">'+(m.fiscal_year||2026)+'年度</span>' +
+                '<span style="font-size:12px;font-weight:700;color:var(--navy);">'+esc(dateStr)+'</span>' +
+                (m.contact_name ? '<span style="font-size:12px;color:var(--gray-600);">👔 '+esc(m.contact_name)+'</span>' : '') +
+              '</div>' +
+              ((m.worker_ids && m.worker_ids.length) ? '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">' +
+                m.worker_ids.map(wid => {
+                  const w = allWorkers.find(x => x.id === wid);
+                  return w ? '<span style="font-size:11px;background:#ede9fe;color:#5b21b6;padding:1px 7px;border-radius:10px;font-weight:600;">'+natFlag(w.nationality||'')+' '+esc(w.name)+'</span>' : '';
+                }).join('') +
+              '</div>' : '') +
+              '<div style="display:flex;gap:6px;">' +
+                '<button class="btn btn-outline" style="font-size:10px;padding:2px 8px;" onclick="editMeeting(\''+m.id+'\')">✏️ 編集</button>' +
+                '<button class="btn btn-outline" style="font-size:10px;padding:2px 8px;color:var(--red);" onclick="deleteMeeting(\''+m.id+'\')">削除</button>' +
+              '</div>' +
+            '</div>' +
+            (m.memo ? '<div style="font-size:12px;color:var(--gray-600);line-height:1.6;white-space:pre-wrap;border-top:1px solid var(--gray-100);margin-top:6px;padding-top:6px;">'+esc(m.memo)+'</div>' : '') +
+          '</div>';
+        }).join('') +
+      '</div>';
+    }).join('');
+  } catch(e) {
+    list.innerHTML = '<div style="color:var(--red);padding:20px;">❌ '+e.message+'</div>';
+  }
+}
+
+async function openMeetingForm(m) {
+  _editingMeetingId = m?.id || null;
+  const qEl = document.getElementById('mf_quarter');
+  if (qEl) qEl.value = m?.quarter || '4-6';
+  const dEl = document.getElementById('mf_date');
+  if (dEl) dEl.value = m?.meeting_date || '';
+  const cEl = document.getElementById('mf_contact');
+  if (cEl) cEl.value = m?.contact_name || '';
+  const mEl = document.getElementById('mf_memo');
+  if (mEl) mEl.value = m?.memo || '';
+  document.getElementById('meetingForm').style.display = '';
+  await renderMeetingWorkerCheckboxes(editingCompanyId, m?.worker_ids || []);
+}
+
+async function renderMeetingWorkerCheckboxes(companyId, checkedIds) {
+  const wrap = document.getElementById('mf_worker_checkboxes');
+  if (!wrap) return;
+  wrap.innerHTML = '<span style="font-size:12px;color:var(--gray-400);">読み込み中...</span>';
+  try {
+    const workers = await sbFetch('workers?company_id=eq.'+companyId+'&select=id,name,nationality&order=name.asc');
+    if (!workers?.length) {
+      wrap.innerHTML = '<span style="font-size:12px;color:var(--gray-400);">この企業に登録された外国人材がいません</span>';
+      return;
+    }
+    wrap.innerHTML = workers.map(w => {
+      const checked = Array.isArray(checkedIds) && checkedIds.includes(w.id) ? 'checked' : '';
+      return '<label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;background:#f8fafc;padding:4px 10px;border-radius:16px;border:1px solid var(--gray-200);">'+
+        '<input type="checkbox" value="'+w.id+'" '+checked+' style="margin:0;">'+
+        natFlag(w.nationality||'')+' '+esc(w.name)+
+      '</label>';
+    }).join('');
+  } catch(e) {
+    wrap.innerHTML = '<span style="font-size:12px;color:var(--red);">❌ '+e.message+'</span>';
+  }
+}
+
+function getMeetingWorkerIds() {
+  const checkboxes = document.querySelectorAll('#mf_worker_checkboxes input[type=checkbox]:checked');
+  return Array.from(checkboxes).map(cb => cb.value);
+}
+
+function closeMeetingForm() {
+  document.getElementById('meetingForm').style.display = 'none';
+  _editingMeetingId = null;
+}
+
+async function saveMeeting() {
+  const companyId = document.getElementById('co_no')?.dataset?.cid || editingCompanyId;
+  if (!companyId) { showToast('⚠️ 企業IDが取得できません', 'error'); return; }
+  const data = {
+    company_id: companyId,
+    fiscal_year: parseInt(document.getElementById('mf_year')?.value) || new Date().getFullYear(),
+    quarter: document.getElementById('mf_quarter').value,
+    meeting_date: document.getElementById('mf_date').value || null,
+    contact_name: document.getElementById('mf_contact').value.trim() || null,
+    memo: document.getElementById('mf_memo').value.trim() || null,
+    worker_ids: getMeetingWorkerIds(),
+    updated_at: new Date().toISOString(),
+  };
+  showLoading(true);
+  try {
+    if (_editingMeetingId) {
+      await sbFetch('company_meetings?id=eq.'+_editingMeetingId, {method:'PATCH', body:JSON.stringify(data)});
+      showToast('✅ 更新しました','success');
+    } else {
+      data.created_at = new Date().toISOString();
+      await sbFetch('company_meetings', {method:'POST', body:JSON.stringify(data)});
+      showToast('✅ 保存しました','success');
+    }
+    closeMeetingForm();
+    await loadMeetings(companyId);
+  } catch(e) { showToast('❌ '+e.message,'error'); }
+  showLoading(false);
+}
+
+async function editMeeting(id) {
+  const companyId = editingCompanyId;
+  const data = await sbFetch('company_meetings?id=eq.'+id+'&select=*&limit=1');
+  if (data?.[0]) openMeetingForm(data[0]);
+}
+
+async function deleteMeeting(id) {
+  if (!confirm('この面談記録を削除しますか？')) return;
+  const companyId = editingCompanyId;
+  showLoading(true);
+  try {
+    await sbFetch('company_meetings?id=eq.'+id, {method:'DELETE'});
+    showToast('🗑️ 削除しました','success');
+    await loadMeetings(companyId);
+  } catch(e) { showToast('❌ '+e.message,'error'); }
+  showLoading(false);
+}
+
 function closeCompanyModal() {
   document.getElementById('companyModal').classList.remove('show');
   editingCoId = null;
@@ -834,6 +1053,9 @@ function switchCoTab(tab) {
   document.querySelectorAll('.tab-panel').forEach(p => {
     p.classList.toggle('active', p.id === 'tab-' + tab);
   });
+  if (tab === 'meetings' && editingCompanyId) {
+    loadMeetings(editingCompanyId);
+  }
 }
 
 const CO_FIELDS = [
@@ -1748,6 +1970,7 @@ function copySoloReport() {
 
 // ===== UTILS =====
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function safeSetItem(key, value) { try { localStorage.setItem(key, value); } catch(e) { console.warn('localStorage quota exceeded:', key); } }
 function calcAge(birthdate) {
   if (!birthdate) return '?';
   const b = new Date(birthdate), t = new Date();
@@ -1842,6 +2065,8 @@ function printResume() {
 .resume-lic-item .has { color: #16a34a; font-weight: 700; }
 .resume-lic-item .none { color: #ccc; }
 .resume-memo-box { border: 1px solid #ccc; border-radius: 3px; padding: 6px 8px; min-height: 36px; font-size: 11px; background: #fafafa; }
+.mention-item:hover { background: #f0f4ff; }
+.mention-item.mention-active { background: #eff6ff; }
 .resume-sign { text-align: right; font-size: 10px; color: #555; margin-top: 8px; padding-top: 5px; border-top: 1px solid #eee; }`;
   const doc = iframe.contentDocument || iframe.contentWindow.document;
   doc.open();
@@ -1879,7 +2104,7 @@ function printJobFlyer() {
   doc.open();
   doc.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${title}</title><style>
     *{box-sizing:border-box;}
-    body{margin:0;padding:14mm;font-family:'Noto Sans JP','Hiragino Sans',sans-serif;background:white;}
+    body{margin:0;padding:14mm;font-family:'Noto Sans JP','Hiragino Sans','Noto Sans','Arial Unicode MS',sans-serif;background:white;}
     @page{margin:0;size:A4;}
     @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;padding:10mm;}}
   </style>
@@ -1973,7 +2198,7 @@ function buildJobFlyerScreen() {
       </div>
     </div>
     <div style="flex:1;overflow-y:auto;background:#e5e7eb;padding:20px;display:flex;justify-content:center;">
-      <div id="jobFlyerPreview" style="width:210mm;min-height:297mm;background:white;border-radius:4px;box-shadow:0 4px 20px rgba(0,0,0,0.15);padding:14mm;box-sizing:border-box;font-family:'Noto Sans JP','Hiragino Sans',sans-serif;">
+      <div id="jobFlyerPreview" style="width:210mm;min-height:297mm;background:white;border-radius:4px;box-shadow:0 4px 20px rgba(0,0,0,0.15);padding:14mm;box-sizing:border-box;font-family:'Noto Sans JP','Hiragino Sans','Noto Sans','Arial Unicode MS',sans-serif;">
         <div style="text-align:center;color:var(--gray-300);padding:60px 0;font-size:14px;">← 求人を選択してください</div>
       </div>
     </div>
@@ -2037,41 +2262,42 @@ function previewFlyer() {
   const mode = document.querySelector('input[name="flyerMode"]:checked')?.value || 'ja';
   const t = _flyerTranslated || {};
   // 翻訳モードに応じてテキストを取得するヘルパー
+  // txt: HTMLを返す（バイリンガル時は翻訳をspan付きで付加）
   const txt = (key, jaVal) => {
     const trVal = t[key] || '';
-    if (mode === 'ja' || !trVal) return jaVal;
-    if (mode === 'translated') return trVal;
-    // bilingual: 日本語 + 翻訳
-    return jaVal + (trVal ? '<br><span style="color:#1a56db;font-size:10px;">' + trVal.split('\n').join('<br>') + '</span>' : '');
+    if (mode === 'ja' || !trVal) return esc(jaVal);
+    if (mode === 'translated') return esc(trVal);
+    // bilingual: 日本語 + 翻訳（両方escしてからHTMLを組み立て）
+    return esc(jaVal) + '<br><span style="color:#1a56db;font-size:10px;">' + esc(trVal) + '</span>';
   };
   const company=txt('company',g('ff_company')),location=txt('location',g('ff_location')),industry=txt('industry',g('ff_industry')),jobType=txt('job_type',g('ff_job_type')),appeal=txt('appeal',g('ff_appeal')),desc=txt('description',g('ff_description'));
   const startTime=g('ff_start_time'),endTime=g('ff_end_time'),workNote=txt('work_note',g('ff_work_note')),holidays=txt('holidays',g('ff_holidays'));
   const salary=txt('salary',g('ff_salary')),allowances=txt('allowances',g('ff_allowances')),deductions=txt('deductions',g('ff_deductions')),dorm=txt('dorm',g('ff_dorm'));
-  const nat=g('ff_nationality'),count=g('ff_count'),reqs=txt('requirements',g('ff_requirements')),jpLv=txt('jp_level',g('ff_jp_level')),ideal=txt('ideal',g('ff_ideal')),interview=txt('interview',g('ff_interview'));
-  const row=(label,val)=>val?`<tr><td style="width:28%;padding:6px 8px;background:#eef2ff;font-size:10px;font-weight:700;color:#1e3a6e;border:1px solid #c7d2f0;white-space:nowrap;vertical-align:top;">${label}</td><td style="padding:6px 8px;font-size:11px;border:1px solid #c7d2f0;line-height:1.7;white-space:pre-wrap;">${val}</td></tr>`:'';
+  const nat=esc(g('ff_nationality')),count=g('ff_count'),reqs=txt('requirements',g('ff_requirements')),jpLv=txt('jp_level',g('ff_jp_level')),ideal=txt('ideal',g('ff_ideal')),interview=txt('interview',g('ff_interview'));
+  const row=(label,val)=>val?`<tr><td style="width:28%;padding:6px 8px;background:#eef2ff;font-size:10px;font-weight:700;color:#1e3a6e;border:1px solid #c7d2f0;white-space:nowrap;vertical-align:top;">${label}</td><td style="padding:6px 8px;font-size:11px;border:1px solid #c7d2f0;line-height:1.7;white-space:pre-wrap;word-break:break-word;max-width:0;">${val}</td></tr>`:'';
   const section=t=>`<div style="font-size:11px;font-weight:800;color:#1e3a6e;background:#dde6ff;padding:5px 10px;margin:10px 0 0;border-left:4px solid #1e3a6e;">${t}</div>`;
   preview.innerHTML=`<div style="border-top:5px solid #1e3a6e;">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:12px 0 10px;">
       <div>
         <div style="font-size:10px;color:#64748b;letter-spacing:1.5px;font-weight:600;margin-bottom:3px;">求　人　票</div>
-        <div style="font-size:20px;font-weight:900;color:#1e3a6e;">${esc(company)||'会社名'}</div>
-        <div style="font-size:11px;color:#2563eb;font-weight:700;margin-top:3px;">${esc(industry)}${jobType?' ／ '+esc(jobType):''}</div>
-        ${location?`<div style="font-size:10px;color:#64748b;margin-top:2px;">📍 ${esc(location)}</div>`:''}
+        <div style="font-size:20px;font-weight:900;color:#1e3a6e;">${company||'会社名'}</div>
+        <div style="font-size:11px;color:#2563eb;font-weight:700;margin-top:3px;">${industry}${jobType?' ／ '+jobType:''}</div>
+        ${location?`<div style="font-size:10px;color:#64748b;margin-top:2px;">📍 ${location}</div>`:''}
       </div>
       <div style="background:#1e3a6e;color:white;padding:8px 12px;border-radius:6px;text-align:center;min-width:70px;flex-shrink:0;">
         <div style="font-size:8px;margin-bottom:2px;">採用人数</div>
         <div style="font-size:18px;font-weight:900;">${count||'－'}<span style="font-size:10px;">名</span></div>
-        <div style="font-size:8px;margin-top:2px;">${esc(nat)}</div>
+        <div style="font-size:8px;margin-top:2px;">${nat}</div>
       </div>
     </div>
-    ${show('fs_appeal')&&appeal?`<div style="background:#fff7ed;border:1px solid #fed7aa;padding:7px 10px;border-radius:4px;margin-bottom:8px;font-size:11px;line-height:1.7;">⭐ ${esc(appeal)}</div>`:''}
-    ${show('fs_s1')&&desc?section('⑴ 仕事内容')+`<div style="padding:7px 10px;font-size:11px;line-height:1.8;border:1px solid #c7d2f0;border-top:none;white-space:pre-wrap;">${esc(desc)}</div>`:''}
-    ${show('fs_s2')?section('⑵ 勤務時間')+`<table style="width:100%;border-collapse:collapse;">${row('勤務時間',startTime&&endTime?startTime+' 〜 '+endTime:(startTime||endTime))}${row('休憩・残業',workNote)}${row('年間休日',holidays)}</table>`:''}
-    ${show('fs_s3')?section('⑶ 賃金・手当')+`<table style="width:100%;border-collapse:collapse;">${row('月給',salary)}${row('手当・賞与',allowances)}</table>`:''}
-    ${show('fs_s4')&&deductions?section('⑷ 控除額')+`<table style="width:100%;border-collapse:collapse;">${row('控除内容',deductions)}</table>`:''}
-    ${show('fs_s5')&&dorm?section('⑸ 寮')+`<table style="width:100%;border-collapse:collapse;">${row('寮情報',dorm)}</table>`:''}
-    ${show('fs_s6')?section('⑹ 受入条件')+`<table style="width:100%;border-collapse:collapse;">${row('性別・年齢・経験',reqs)}${row('日本語・資格',jpLv)}${row('理想の人材像',ideal)}</table>`:''}
-    ${show('fs_s7')&&interview?section('⑺ 面接')+`<table style="width:100%;border-collapse:collapse;">${row('面接情報',interview)}</table>`:''}
+    ${show('fs_appeal')&&appeal?`<div style="background:#fff7ed;border:1px solid #fed7aa;padding:7px 10px;border-radius:4px;margin-bottom:8px;font-size:11px;line-height:1.7;">⭐ ${appeal}</div>`:''}
+    ${show('fs_s1')&&desc?section('⑴ 仕事内容')+`<div style="padding:7px 10px;font-size:11px;line-height:1.8;border:1px solid #c7d2f0;border-top:none;white-space:pre-wrap;">${desc}</div>`:''}
+    ${show('fs_s2')?section('⑵ 勤務時間')+`<table style="width:100%;border-collapse:collapse;table-layout:fixed;">${row('勤務時間',startTime&&endTime?startTime+' 〜 '+endTime:(startTime||endTime))}${row('休憩・残業',workNote)}${row('年間休日',holidays)}</table>`:''}
+    ${show('fs_s3')?section('⑶ 賃金・手当')+`<table style="width:100%;border-collapse:collapse;table-layout:fixed;">${row('月給',salary)}${row('手当・賞与',allowances)}</table>`:''}
+    ${show('fs_s4')&&deductions?section('⑷ 控除額')+`<table style="width:100%;border-collapse:collapse;table-layout:fixed;">${row('控除内容',deductions)}</table>`:''}
+    ${show('fs_s5')&&dorm?section('⑸ 寮')+`<table style="width:100%;border-collapse:collapse;table-layout:fixed;">${row('寮情報',dorm)}</table>`:''}
+    ${show('fs_s6')?section('⑹ 受入条件')+`<table style="width:100%;border-collapse:collapse;table-layout:fixed;">${row('性別・年齢・経験',reqs)}${row('日本語・資格',jpLv)}${row('理想の人材像',ideal)}</table>`:''}
+    ${show('fs_s7')&&interview?section('⑺ 面接')+`<table style="width:100%;border-collapse:collapse;table-layout:fixed;">${row('面接情報',interview)}</table>`:''}
     <div style="border-top:1px solid #e2e8f0;margin-top:14px;padding-top:8px;text-align:center;font-size:9px;color:#94a3b8;">株式会社KMT ／ 大房行政書士法人</div>
   </div>`;
 }
@@ -2258,6 +2484,121 @@ async function deleteAiKn(id) {
 }
 
 // ==============================
+// 👤 マイアカウント
+// ==============================
+function buildMyAccountScreen() {
+  const u = currentUser || {};
+  const avatar = u.avatar_url || '';
+  return `
+  <div style="max-width:500px;margin:0 auto;padding:24px;">
+    <div style="background:white;border:1px solid var(--gray-200);border-radius:16px;padding:28px;box-shadow:var(--shadow);">
+      <div style="text-align:center;margin-bottom:24px;">
+        <!-- アイコン -->
+        <div id="myAvatarWrap" style="width:96px;height:96px;border-radius:50%;overflow:hidden;margin:0 auto 12px;border:3px solid var(--blue);background:#f0f4ff;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;" onclick="document.getElementById('myAvatarInput').click()">
+          ${avatar ? `<img id="myAvatarImg" src="${esc(avatar)}" style="width:100%;height:100%;object-fit:cover;">` : `<span id="myAvatarPlaceholder" style="font-size:40px;">👤</span>`}
+          <div style="position:absolute;inset:0;background:rgba(0,0,0,.3);opacity:0;border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-size:12px;font-weight:700;transition:.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0'">変更</div>
+        </div>
+        <input type="file" id="myAvatarInput" accept="image/*" style="display:none;" onchange="uploadMyAvatar(this)">
+        <div style="font-size:18px;font-weight:800;color:var(--navy);">${esc(u.name||'')}</div>
+        <div style="font-size:12px;color:var(--gray-400);margin-top:2px;">${esc(u.role||'スタッフ')}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div>
+          <label style="font-size:11px;font-weight:700;color:var(--gray-600);display:block;margin-bottom:4px;">表示名</label>
+          <input class="form-input" id="ma_name" value="${esc(u.name||'')}" placeholder="例: 亀谷">
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:700;color:var(--gray-600);display:block;margin-bottom:4px;">役割</label>
+          <input class="form-input" id="ma_role" value="${esc(u.role||'')}" placeholder="例: スタッフ">
+        </div>
+        <div id="myAvatarUrlWrap" style="${avatar?'':'display:none;'}">
+          <label style="font-size:11px;font-weight:700;color:var(--gray-600);display:block;margin-bottom:4px;">アイコン画像URL</label>
+          <input class="form-input" id="ma_avatar_url" value="${esc(avatar)}" placeholder="https://..." oninput="previewMyAvatar()">
+        </div>
+        <div id="myAvatarUploadStatus" style="display:none;font-size:11px;color:var(--blue);"></div>
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <button class="btn btn-primary" style="flex:1;" onclick="saveMyAccount()">💾 保存</button>
+          <button class="btn btn-outline" onclick="logoutUser()">ログアウト</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+async function loadMyAccount() {
+  // 最新のユーザー情報をDBから取得
+  if (!currentUser?.id) return;
+  try {
+    const data = await sbFetch('users?id=eq.' + currentUser.id + '&select=id,name,role,avatar_url&limit=1');
+    if (data?.[0]) {
+      currentUser = { ...currentUser, ...data[0] };
+      safeSetItem('kmt_current_user', JSON.stringify(currentUser));
+    }
+  } catch(e) {}
+  const cw = document.querySelector('.content-wrap');
+  if (cw) cw.innerHTML = buildMyAccountScreen();
+}
+
+function previewMyAvatar() {
+  const url = document.getElementById('ma_avatar_url')?.value;
+  const wrap = document.getElementById('myAvatarWrap');
+  if (!wrap) return;
+  const existing = document.getElementById('myAvatarImg');
+  const placeholder = document.getElementById('myAvatarPlaceholder');
+  if (url) {
+    if (existing) { existing.src = url; }
+    else { wrap.innerHTML = `<img id="myAvatarImg" src="${url}" style="width:100%;height:100%;object-fit:cover;">` + wrap.innerHTML.replace(/<img[^>]*>/,''); }
+    if (placeholder) placeholder.style.display = 'none';
+  }
+}
+
+async function uploadMyAvatar(input) {
+  const file = input.files?.[0]; if (!file) return;
+  const status = document.getElementById('myAvatarUploadStatus');
+  if (status) { status.textContent = '📤 アップロード中...'; status.style.display = ''; }
+  try {
+    const ext = file.name.split('.').pop().toLowerCase();
+    const fileName = 'avatar_' + (currentUser?.id||Date.now()) + '.' + ext;
+    const res = await fetch('https://oyblvyocvdnhcxeeokuw.supabase.co/storage/v1/object/photos/' + fileName, {
+      method: 'POST',
+      headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': file.type, 'x-upsert': 'true' },
+      body: await file.arrayBuffer()
+    });
+    if (!res.ok) throw new Error('アップロード失敗');
+    const url = 'https://oyblvyocvdnhcxeeokuw.supabase.co/storage/v1/object/public/photos/' + fileName;
+    const urlInput = document.getElementById('ma_avatar_url');
+    if (urlInput) { urlInput.value = url; }
+    document.getElementById('myAvatarUrlWrap').style.display = '';
+    // プレビュー更新
+    const wrap = document.getElementById('myAvatarWrap');
+    if (wrap) wrap.querySelector('img,span').outerHTML = `<img id="myAvatarImg" src="${url}" style="width:100%;height:100%;object-fit:cover;">`;
+    if (status) { status.textContent = '✅ アップロード完了'; setTimeout(()=>{status.style.display='none';},2000); }
+  } catch(e) { if (status) { status.textContent = '❌ 失敗: ' + e.message; } }
+}
+
+async function saveMyAccount() {
+  if (!currentUser?.id) return;
+  const name = document.getElementById('ma_name')?.value.trim();
+  const role = document.getElementById('ma_role')?.value.trim();
+  const avatar_url = document.getElementById('ma_avatar_url')?.value.trim() || null;
+  if (!name) { showToast('⚠️ 名前を入力してください', 'error'); return; }
+  showLoading(true);
+  try {
+    await sbFetch('users?id=eq.' + currentUser.id, { method: 'PATCH', body: JSON.stringify({ name, role, avatar_url, updated_at: new Date().toISOString() }) });
+    currentUser = { ...currentUser, name, role, avatar_url };
+    safeSetItem('kmt_current_user', JSON.stringify(currentUser));
+    // バッジ更新
+    const badge = document.getElementById('currentUserBadge');
+    if (badge) badge.textContent = '👤 ' + name + ' （設定）';
+    showToast('✅ プロフィールを保存しました', 'success');
+    // 画面を再描画
+    const cw = document.querySelector('.content-wrap');
+    if (cw) cw.innerHTML = buildMyAccountScreen();
+  } catch(e) { showToast('❌ ' + e.message, 'error'); }
+  showLoading(false);
+}
+
+// ==============================
 // 🔐 ログイン・ユーザー管理
 // ==============================
 const SHARED_EMAIL = 'kmt@k-m-t.jp';
@@ -2311,7 +2652,7 @@ async function loginStep1() {
 
 function selectUser(id, name, role, email) {
   currentUser = { id, name, email, role };
-  localStorage.setItem('kmt_current_user', JSON.stringify(currentUser));
+  safeSetItem('kmt_current_user', JSON.stringify(currentUser));
   document.getElementById('userSelectScreen').style.display = 'none';
   onLoginSuccess();
 }
@@ -2321,7 +2662,7 @@ function onLoginSuccess() {
   document.getElementById('userSelectScreen').style.display = 'none';
   document.getElementById('mainWrap').style.display = '';
   const badge = document.getElementById('currentUserBadge');
-  if (badge && currentUser) badge.textContent = '👤 ' + currentUser.name + ' （ログアウト）';
+  if (badge && currentUser) badge.textContent = '👤 ' + currentUser.name + ' （設定）';
   loadCompanies();
   initPushNotification();
   loadChatUnread();
@@ -2337,46 +2678,82 @@ function logoutUser() {
 // ==============================
 // 💬 チャット
 // ==============================
-let chatRooms = []; // { id, name, type, drive_url, unread }
+let chatRooms = [];
+let chatGroups = [];
+let _selectedGroupId = null;
+let _chatTab = 'active'; // 'active' | 'done' // { id, name, type, drive_url, unread }
 let currentRoom = null;
 let chatRealtimeSub = null;
 let chatMessages = [];
 
 function buildChatScreen() {
   return `
-  <div style="display:flex;gap:0;height:calc(100vh - 110px);overflow:hidden;">
+  <div id="chatFullWrap" style="display:flex;gap:0;height:calc(100vh - 110px);overflow:hidden;">
     <!-- 左：ルーム一覧 -->
-    <div style="width:240px;flex-shrink:0;border-right:1px solid var(--gray-200);background:white;display:flex;flex-direction:column;">
-      <div style="padding:12px;border-bottom:1px solid var(--gray-200);">
-        <input class="search-input" id="chatRoomSearch" placeholder="案件名で検索..." oninput="renderChatRooms()" style="width:100%;font-size:12px;">
+    <div style="width:280px;flex-shrink:0;border-right:1px solid #e0e0e0;background:white;display:flex;flex-direction:column;">
+      <div style="padding:10px 12px;border-bottom:1px solid #e0e0e0;">
+        <input id="chatRoomSearch" placeholder="チャットを検索" oninput="chatSearch()" style="width:100%;font-size:13px;padding:8px 14px;border:1px solid #e0e0e0;border-radius:24px;outline:none;background:#f1f3f4;box-sizing:border-box;font-family:inherit;">
+        <div id="chatSearchResults" style="display:none;margin-top:6px;"></div>
       </div>
+      <!-- 進行中/完了タブ -->
+      <div style="display:flex;border-bottom:1px solid #e0e0e0;flex-shrink:0;">
+        <button id="chatTabActive" onclick="setChatTab('active')"
+          style="flex:1;padding:8px 0;font-size:12px;font-weight:700;border:none;background:none;cursor:pointer;color:#1a73e8;border-bottom:2px solid #1a73e8;">
+          🟢 進行中
+        </button>
+        <button id="chatTabDone" onclick="setChatTab('done')"
+          style="flex:1;padding:8px 0;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;color:#5f6368;border-bottom:2px solid transparent;">
+          ✅ 完了
+        </button>
+      </div>
+      <div style="padding:6px 10px;border-bottom:1px solid #e0e0e0;flex-shrink:0;"><button class="btn btn-primary" style="width:100%;font-size:12px;padding:7px;" onclick="openCreateGroupModal()">＋ 案件グループを作成</button></div>
       <div id="chatRoomList" style="flex:1;overflow-y:auto;"></div>
     </div>
     <!-- 右：メッセージエリア -->
     <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
       <!-- ヘッダー -->
+      <!-- 全画面時の戻るボタン -->
+      <div id="chatFullscreenBar" style="display:none;padding:8px 16px;background:#1a73e8;color:white;font-size:13px;font-weight:700;align-items:center;gap:10px;flex-shrink:0;">
+        <button onclick="exitChatFullscreen()" style="background:none;border:none;color:white;font-size:20px;cursor:pointer;padding:0 4px;">←</button>
+        <span id="chatFullscreenTitle">チャット</span>
+      </div>
       <div id="chatRoomHeader" style="padding:12px 16px;border-bottom:1px solid var(--gray-200);background:white;display:flex;align-items:center;gap:10px;flex-shrink:0;">
-        <div style="color:var(--gray-400);font-size:13px;">← 案件を選択してください</div>
+
       </div>
       <!-- メッセージ一覧 -->
-      <div id="chatMessageArea" style="flex:1;overflow-y:auto;padding:16px;background:#f8fafc;display:flex;flex-direction:column;gap:10px;transition:background .2s;" ondragover="event.preventDefault();this.style.background='#dbeafe';" ondragleave="this.style.background='#f8fafc';" ondrop="event.preventDefault();this.style.background='#f8fafc';chatDropFile(event);">
+      <div id="chatMessageArea" style="flex:1;overflow-y:auto;padding:12px 0;background:white;display:flex;flex-direction:column;transition:background .2s;" ondragover="event.preventDefault();this.style.background='#dbeafe';" ondragleave="this.style.background='white';" ondrop="event.preventDefault();this.style.background='white';chatDropFile(event);">
       </div>
       <!-- 入力エリア -->
       <div id="chatInputArea" style="display:none;padding:10px 14px;border-top:1px solid var(--gray-200);background:white;flex-shrink:0;">
-        <div id="chatFilePreview" style="display:none;padding:6px 10px;background:#f0f9ff;border-radius:6px;margin-bottom:8px;font-size:11px;color:#0369a1;display:flex;align-items:center;gap:8px;">
+        <!-- リプライプレビュー -->
+        <div id="chatReplyPreview" style="display:none;background:#f0f4ff;border-left:3px solid #1a73e8;border-radius:4px;padding:6px 10px;margin-bottom:8px;font-size:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
+            <span id="chatReplySender" style="font-weight:700;color:#1a73e8;font-size:11px;"></span>
+            <button onclick="clearReply()" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:14px;padding:0;">✕</button>
+          </div>
+          <div id="chatReplyText" style="color:#5f6368;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;"></div>
+        </div>
+        <div id="chatFilePreview" style="display:none;padding:6px 10px;background:#f0f9ff;border-radius:6px;margin-bottom:8px;font-size:11px;color:#0369a1;align-items:center;gap:8px;">
           <span id="chatFileName"></span>
           <button onclick="clearChatFile()" style="background:none;border:none;color:#94a3b8;cursor:pointer;">✕</button>
         </div>
+        <!-- メンション候補 -->
+        <div style="position:relative;">
+        <div id="mentionPopup" style="display:none;position:absolute;bottom:calc(100% + 4px);left:0;right:0;background:white;border:1px solid var(--gray-200);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.15);z-index:999;overflow:hidden;"></div>
         <div style="display:flex;gap:8px;align-items:flex-end;">
           <label style="cursor:pointer;font-size:18px;color:#94a3b8;flex-shrink:0;padding:4px;"
             title="ファイルを添付（Driveにアップロード）">
             📎<input type="file" id="chatFileInput" style="display:none;" onchange="onChatFileSelect(this)">
           </label>
-          <textarea id="chatTextInput" class="form-textarea" rows="2"
-            placeholder="メッセージを入力... (Shift+Enterで改行)"
-            style="flex:1;resize:none;font-size:13px;padding:8px 10px;"
-            onkeydown="if(event.key==='Enter'&&!event.shiftKey&&!event.isComposing){event.preventDefault();sendChatMessage();}"></textarea>
+          <textarea id="chatTextInput"
+            placeholder="メッセージを入力... @名前でメンション (Shift+Enterで改行)"
+            style="flex:1;resize:none;font-size:13px;padding:10px 14px;border:1.5px solid #dadce0;border-radius:24px;outline:none;font-family:inherit;line-height:1.5;min-height:42px;max-height:120px;overflow-y:auto;background:#f1f3f4;"
+            onfocus="this.style.borderColor='var(--blue)'"
+            onblur="this.style.borderColor='var(--gray-200)'"
+            onkeydown="chatTextKeydown(event)"
+            oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px';chatTextInput(this)"></textarea>
           <button class="btn btn-primary" style="flex-shrink:0;align-self:flex-end;" onclick="sendChatMessage()">送信</button>
+        </div>
         </div>
       </div>
     </div>
@@ -2386,54 +2763,146 @@ function buildChatScreen() {
 async function loadChatScreen() {
   showLoading(true);
   try {
+    // usersをロード
+    if (!allUsers.length) {
+      try {
+        const ud = await sbFetch('users?select=id,name,role,avatar_url&order=name.asc');
+        allUsers = ud || [];
+      } catch(e) {}
+    }
+    // グループを毎回取得（作成直後も反映されるよう常に更新）
+    try {
+      const gd = await sbFetch('chat_groups?select=*,companies(id,name)&order=created_at.desc');
+      chatGroups = gd || [];
+    } catch(e) { console.error('chat_groups load error:', e); }
     // chat_roomsテーブルからチャット開始済みの案件のみ取得
-    const d = await sbFetch('chat_rooms?select=id,worker_id,created_at,workers(id,name,nationality,drive_url,companies(name))&order=created_at.desc');
+    const d = await sbFetch('chat_rooms?select=id,worker_id,group_id,status,completed_at,created_at,workers(id,name,nationality,drive_url,company_id,companies(id,name))&order=created_at.desc');
     chatRooms = (d||[]).map(r => ({
-      id: r.id, // chat_rooms.id
+      id: r.id,
       worker_id: r.worker_id,
       name: r.workers?.name || '',
       subName: r.workers?.companies?.name || '',
       nationality: r.workers?.nationality || '',
       drive_url: r.workers?.drive_url || '',
+      company_id: r.workers?.company_id || r.workers?.companies?.id || '',
+      group_id: r.group_id || null,
+      status: r.status || 'active',
+      completed_at: r.completed_at || null,
       created_at: r.created_at,
+      lastMsg: null, // 後でセット
     }));
+    // 各ルームの最終メッセージを取得
+    await loadRoomLastMessages();
     renderChatRooms();
     loadChatUnread();
   } catch(e) { showToast('❌ ' + e.message, 'error'); }
   showLoading(false);
 }
 
+async function saveAndStartChat() {
+  // まず保存してからチャット開始
+  const saved = await saveWorker(true); // true = チャット開始フラグ
+  if (saved) await startWorkerChat(editingWorkerId);
+}
+
 async function startWorkerChat(workerId) {
   if (!workerId) return;
+  closeGenModal('workerModal');
+  // グループ読み込み
+  if (!chatGroups.length) {
+    try { const gd = await sbFetch('chat_groups?select=*,companies(id,name)&order=created_at.desc'); chatGroups = gd||[]; } catch(e) {}
+  }
+  if (!allWorkers.length) {
+    try { const d = await sbFetch('workers?select=id,name,nationality,companies(name)&order=name.asc'); allWorkers = d||[]; } catch(e) {}
+  }
+  // グループ選択モーダル
+  // グループ選択ボタンをJS関数でクリックに紐づけ（文字列エスケープ回避）
+  window._chatGroupSelectCallback = async function(groupId) {
+    await addWorkerToGroupAndOpen(null, workerId, groupId);
+  };
+  const groupRows = chatGroups.map(g => {
+    const cnt = chatRooms.filter(r => r.group_id === g.id).length;
+    return '<div class="_grpsel" data-gid="'+g.id+'" '+
+      'style="padding:10px 14px;border:1px solid var(--gray-200);border-radius:8px;cursor:pointer;background:white;margin-bottom:4px;">'+
+      '<div style="font-size:13px;font-weight:600;color:var(--navy);">📁 '+esc(g.name)+'</div>'+
+      '<div style="font-size:11px;color:var(--gray-400);margin-top:1px;">'+cnt+'名参加中</div>'+
+      '</div>';
+  }).join('');
+  showGenModal('aiKnModal', '💬 案件グループを選択',
+    '<div style="display:flex;flex-direction:column;gap:10px;">' +
+    '<div style="font-size:12px;color:var(--gray-400);">既存のグループに追加するか、新しいグループを作成してください。</div>' +
+    '<div style="max-height:240px;overflow-y:auto;">'+(groupRows||'<div style="text-align:center;padding:16px;color:var(--gray-400);">グループがありません</div>')+'</div>'+
+    '<div style="border-top:1px solid var(--gray-200);padding-top:10px;">'+
+    '<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px;">＋ 新しいグループを作成</div>'+
+    '<div style="display:flex;gap:8px;">'+
+    '<input class="form-input" id="newGroupNameInput" placeholder="グループ名を入力" style="flex:1;font-size:12px;">'+
+    '<button class="btn btn-primary" style="white-space:nowrap;" id="_createAddBtn">作成して追加</button>'+
+    '</div></div>'+
+    '<button class="btn btn-outline" id="_cancelGrpBtn">キャンセル</button>'+
+    '</div>'
+  );
+  setTimeout(() => {
+    document.getElementById('newGroupNameInput')?.focus();
+    document.querySelectorAll('#aiKnModalBody ._grpsel').forEach(el => {
+      el.onmouseover = () => el.style.background = '#f0f4ff';
+      el.onmouseout = () => el.style.background = 'white';
+      el.onclick = () => window._chatGroupSelectCallback(el.dataset.gid);
+    });
+    const btn = document.getElementById('_createAddBtn');
+    if (btn) btn.onclick = () => createAndAddWorker(workerId);
+    const cancelBtn = document.getElementById('_cancelGrpBtn');
+    if (cancelBtn) cancelBtn.onclick = () => closeGenModal('aiKnModal');
+  }, 150);
+}
+
+async function addWorkerToGroupAndOpen(el, workerId, groupId) {
+  if (el && el.dataset) { workerId = el.dataset.wid; groupId = el.dataset.gid; }
+  closeGenModal('aiKnModal');
   showLoading(true);
   try {
-    // 既存ルームを確認
-    const existing = await sbFetch('chat_rooms?worker_id=eq.' + workerId + '&select=id&limit=1');
-    let roomId;
-    if (existing && existing.length > 0) {
-      roomId = existing[0].id;
-    } else {
-      // 新規ルーム作成
-      const res = await sbFetch('chat_rooms', {
-        method: 'POST',
-        headers: { 'Prefer': 'return=representation' },
-        body: JSON.stringify({ worker_id: workerId, created_by: currentUser?.name || '' })
-      });
-      roomId = res?.[0]?.id;
-    }
-    if (!roomId) throw new Error('ルーム作成失敗');
-    closeGenModal('workerModal');
-    // 先にチャット画面を描画してからデータ取得・ルームを開く
+    const existing = chatRooms.find(r => r.worker_id === workerId);
+    if (existing) await sbFetch('chat_rooms?id=eq.'+existing.id, {method:'PATCH', body:JSON.stringify({group_id:groupId})});
+    else await sbFetch('chat_rooms', {method:'POST', body:JSON.stringify({worker_id:workerId, group_id:groupId, created_by:currentUser?.name||''})});
+    showToast('✅ グループに追加しました', 'success');
     showScreen('chat');
-    // renderScreenContent が chat 画面を描画するのを待つ
     await new Promise(r => setTimeout(r, 100));
     await loadChatScreen();
-    // roomId でルームを開く
-    const targetRoom = chatRooms.find(r => r.id === roomId);
-    if (targetRoom) await openChatRoom(roomId);
-    showToast('💬 チャットを開始しました', 'success');
-  } catch(e) { showToast('❌ ' + e.message, 'error'); }
+    selectGroup(groupId);
+  } catch(e) { showToast('❌ '+e.message,'error'); }
   showLoading(false);
+}
+
+async function createAndAddWorker(workerId) {
+  const name = document.getElementById('newGroupNameInput')?.value.trim();
+  if (!name) { showToast('⚠️ グループ名を入力してください','error'); return; }
+  showLoading(true);
+  try {
+    const res = await sbFetch('chat_groups', {method:'POST', body:JSON.stringify({name, created_by:currentUser?.name||''})});
+    const groupId = res?.[0]?.id;
+    if (!groupId) throw new Error('グループ作成失敗');
+    await sbFetch('chat_rooms', {method:'POST', body:JSON.stringify({worker_id:workerId, group_id:groupId, created_by:currentUser?.name||''})});
+    showToast('✅ グループを作成してチャットを開始しました', 'success');
+    closeGenModal('aiKnModal');
+    showScreen('chat');
+    await new Promise(r => setTimeout(r, 100));
+    await loadChatScreen();
+    selectGroup(groupId);
+  } catch(e) { showToast('❌ '+e.message,'error'); }
+  showLoading(false);
+}
+
+async function loadRoomLastMessages() {
+  if (!chatRooms.length) return;
+  try {
+    // 全メッセージの中で各ルームの最新1件を取得
+    const msgs = await sbFetch('chat_messages?select=chat_room_id,sender_name,content,file_name,created_at&order=created_at.desc&limit=200');
+    const seen = {};
+    (msgs||[]).forEach(m => {
+      if (!m.chat_room_id) return;
+      if (!seen[m.chat_room_id]) seen[m.chat_room_id] = m;
+    });
+    chatRooms.forEach(r => { r.lastMsg = seen[r.id] || null; });
+  } catch(e) {}
 }
 
 async function loadChatUnread() {
@@ -2458,37 +2927,511 @@ async function loadChatUnread() {
     });
     chatRooms.forEach(r => { r.unread = unreadByRoom[r.id] || 0; });
     const total = Object.values(unreadByRoom).reduce((s,v) => s+v, 0);
+    // メンション未読をチェック
+    const mentionCount = (msgs||[]).filter(m => {
+      const readAt = readMap[m.chat_room_id];
+      return m.mentions && Array.isArray(m.mentions) &&
+        m.mentions.includes(currentUser?.name) &&
+        (!readAt || m.created_at > readAt);
+    }).length;
     const badge = document.getElementById('chatUnreadBadge');
     if (badge) {
       badge.textContent = total;
       badge.style.display = total > 0 ? '' : 'none';
+      badge.style.background = mentionCount > 0 ? '#f59e0b' : '#ef4444';
+      badge.title = mentionCount > 0 ? `${mentionCount}件のメンションあり` : '';
     }
     renderChatRooms();
   } catch(e) {}
 }
 
-function renderChatRooms() {
+// ==============================
+// 📁 案件グループ管理
+// ==============================
+function openDeleteChatRoomModal(roomId, workerName, groupId) {
+  showGenModal('aiKnModal', '💬 チャットの削除',
+    '<div style="display:flex;flex-direction:column;gap:14px;">'+
+    '<div style="font-size:13px;color:var(--navy);">「<b>'+esc(workerName)+'</b>」のチャットをどうしますか？</div>'+
+    '<div style="display:flex;flex-direction:column;gap:8px;">'+
+    '<button class="btn btn-outline" id="_removeFromGroupBtn" style="text-align:left;padding:12px 16px;">'+
+      '<div style="font-weight:700;">📁 グループから外す</div>'+
+      '<div style="font-size:11px;color:var(--gray-400);margin-top:2px;">チャット履歴は残ります。未分類に移動します。</div>'+
+    '</button>'+
+    '<button class="btn btn-outline" id="_deleteChatBtn" style="text-align:left;padding:12px 16px;border-color:var(--red);color:var(--red);">'+
+      '<div style="font-weight:700;">🗑️ チャットを完全に削除</div>'+
+      '<div style="font-size:11px;color:var(--gray-400);margin-top:2px;">チャット履歴ごとすべて削除します。元に戻せません。</div>'+
+    '</button>'+
+    '</div>'+
+    '<button class="btn btn-outline" id="_cancelDelBtn">キャンセル</button>'+
+    '</div>'
+  );
+  setTimeout(() => {
+    document.getElementById('_cancelDelBtn').onclick = () => closeGenModal('aiKnModal');
+    document.getElementById('_removeFromGroupBtn').onclick = () => removeFromGroup(roomId, groupId);
+    document.getElementById('_deleteChatBtn').onclick = () => deleteChatRoom(roomId, groupId);
+  }, 100);
+}
+
+async function removeFromGroup(roomId, groupId) {
+  if (!confirm('このチャットをグループから外しますか？\nメッセージは未分類に残ります。')) return;
+  showLoading(true);
+  try {
+    await sbFetch('chat_rooms?id=eq.'+roomId, {method:'PATCH', body:JSON.stringify({group_id:null})});
+    showToast('✅ グループから外しました', 'success');
+    closeGenModal('aiKnModal');
+    await loadChatScreen();
+    selectGroup(groupId);
+  } catch(e) { showToast('❌ '+e.message,'error'); }
+  showLoading(false);
+}
+
+async function deleteChatRoom(roomId, groupId) {
+  if (!confirm('このチャットとすべてのメッセージを削除しますか？\nこの操作は元に戻せません。')) return;
+  showLoading(true);
+  try {
+    await sbFetch('chat_messages?chat_room_id=eq.'+roomId, {method:'DELETE'});
+    await sbFetch('chat_rooms?id=eq.'+roomId, {method:'DELETE'});
+    showToast('🗑️ チャットを削除しました', 'success');
+    closeGenModal('aiKnModal');
+    if (currentRoom?.id === roomId) {
+      currentRoom = null;
+      document.getElementById('chatRoomHeader').innerHTML = '';
+      document.getElementById('chatInputArea').style.display = 'none';
+      document.getElementById('chatMessageArea').innerHTML = '';
+    }
+    await loadChatScreen();
+    selectGroup(groupId);
+  } catch(e) { showToast('❌ '+e.message,'error'); }
+  showLoading(false);
+}
+
+async function openEditGroupModal(groupId) {
+  const g = chatGroups.find(x => x.id === groupId);
+  if (!g) return;
+  if (!allCompanies.length) {
+    try { const d = await sbFetch('companies?select=id,name&order=name.asc'); allCompanies = d||[]; } catch(e) {}
+  }
+  const companyOpts = allCompanies.map(c =>
+    '<option value="'+c.id+'"'+(g.company_id===c.id?' selected':'')+'>'+esc(c.name)+'</option>'
+  ).join('');
+  showGenModal('aiKnModal', '⚙️ グループを編集',
+    '<div style="display:flex;flex-direction:column;gap:12px;">'+
+    '<div><label class="form-label">グループ名</label>'+
+    '<input class="form-input" id="egName" value="'+esc(g.name||'')+'" placeholder="グループ名"></div>'+
+    '<div><label class="form-label">紐づける企業（任意）</label>'+
+    '<select class="form-select" id="egCompany">'+
+    '<option value="">── 選択なし ──</option>'+companyOpts+
+    '</select></div>'+
+    '<div><label class="form-label">メモ（任意）</label>'+
+    '<textarea class="form-textarea" id="egMemo" rows="3" placeholder="備考など...">'+esc(g.memo||'')+'</textarea></div>'+
+    '<div style="display:flex;gap:8px;justify-content:space-between;padding-top:8px;border-top:1px solid var(--gray-200);">'+
+    '<button class="btn btn-outline" style="color:var(--red);border-color:var(--red);" id="_deleteGrpBtn">🗑️ 削除</button>'+
+    '<div style="display:flex;gap:8px;">'+
+    '<button class="btn btn-outline" id="_cancelEditBtn">キャンセル</button>'+
+    '<button class="btn btn-primary" id="_saveEditBtn">💾 保存</button>'+
+    '</div></div></div>'
+  );
+  setTimeout(() => {
+    document.getElementById('_cancelEditBtn').onclick = () => closeGenModal('aiKnModal');
+    document.getElementById('_saveEditBtn').onclick = () => saveGroupEdit(groupId);
+    document.getElementById('_deleteGrpBtn').onclick = () => deleteGroup(groupId);
+  }, 100);
+}
+
+async function saveGroupEdit(groupId) {
+  const name = document.getElementById('egName')?.value.trim();
+  const company_id = document.getElementById('egCompany')?.value || null;
+  const memo = document.getElementById('egMemo')?.value.trim() || null;
+  if (!name) { showToast('⚠️ グループ名を入力してください', 'error'); return; }
+  showLoading(true);
+  try {
+    await sbFetch('chat_groups?id=eq.'+groupId, {method:'PATCH', body:JSON.stringify({name, company_id, memo, updated_at:new Date().toISOString()})});
+    showToast('✅ 更新しました', 'success');
+    closeGenModal('aiKnModal');
+    await loadChatScreen();
+    selectGroup(groupId);
+  } catch(e) { showToast('❌ '+e.message,'error'); }
+  showLoading(false);
+}
+
+async function deleteGroup(groupId) {
+  if (!confirm('このグループを削除しますか？\nグループ内のチャットルームはグループから外れます（メッセージは残ります）。')) return;
+  showLoading(true);
+  try {
+    // ルームのgroup_idをnullに
+    await sbFetch('chat_rooms?group_id=eq.'+groupId, {method:'PATCH', body:JSON.stringify({group_id:null})});
+    // グループ削除
+    await sbFetch('chat_groups?id=eq.'+groupId, {method:'DELETE'});
+    showToast('🗑️ グループを削除しました', 'success');
+    closeGenModal('aiKnModal');
+    selectGroup(null);
+    await loadChatScreen();
+  } catch(e) { showToast('❌ '+e.message,'error'); }
+  showLoading(false);
+}
+
+function openCreateGroupModal() {
+  showGenModal('aiKnModal', '📁 案件グループを作成', `
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div>
+        <label class="form-label">グループ名 <span style="color:var(--red)">*</span></label>
+        <input class="form-input" id="cgName" placeholder="例: 山田製作所R7年度申請" autofocus>
+      </div>
+      <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:10px 12px;font-size:12px;color:#0369a1;">
+        💡 グループ作成後、外国人材詳細から「チャット開始」でメンバーを追加できます。
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button class="btn btn-outline" onclick="closeGenModal('aiKnModal')">キャンセル</button>
+        <button class="btn btn-primary" onclick="createChatGroup()">作成</button>
+      </div>
+    </div>
+  `);
+  setTimeout(() => document.getElementById('cgName')?.focus(), 100);
+}
+
+async function createChatGroup(name) {
+  const n = name || document.getElementById('cgName')?.value.trim();
+  if (!n) { showToast('⚠️ グループ名を入力してください', 'error'); return null; }
+  showLoading(true);
+  try {
+    const res = await sbFetch('chat_groups', {method:'POST', body:JSON.stringify({name:n, created_by:currentUser?.name||'', created_at:new Date().toISOString()})});
+    const groupId = res?.[0]?.id;
+    showToast('✅ グループを作成しました', 'success');
+    closeGenModal('aiKnModal');
+    showLoading(false);
+    // チャット画面へ遷移（showScreen内でloadChatScreenが呼ばれる）
+    // 既にチャット画面にいる場合は直接リロード
+    if (currentScreen === 'chat') {
+      await loadChatScreen();
+    } else {
+      showScreen('chat');
+      // SCREENSのinitが非同期なので少し待つ
+      await new Promise(r => setTimeout(r, 300));
+    }
+    renderGroupList();
+    return groupId;
+  } catch(e) { showToast('❌ '+e.message,'error'); showLoading(false); return null; }
+}
+
+async function openInviteModal(groupId) {
+  const group = chatGroups.find(g => g.id === groupId);
+  const existIds = chatRooms.filter(r => r.group_id === groupId).map(r => r.worker_id);
+  if (!allWorkers.length) {
+    showLoading(true);
+    try { const d = await sbFetch('workers?select=id,name,nationality,company_id,companies(name)&order=name.asc'); allWorkers = d||[]; } catch(e) {}
+    showLoading(false);
+  }
+  const available = allWorkers.filter(w => !existIds.includes(w.id));
+  const workerRows = available.map(w =>
+    '<label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid var(--gray-200);border-radius:8px;cursor:pointer;background:white;margin-bottom:4px;">' +
+    '<input type="checkbox" value="'+w.id+'" style="margin:0;flex-shrink:0;">' +
+    '<span style="font-size:18px;">'+natFlag(w.nationality||'')+'</span>' +
+    '<div><div style="font-size:13px;font-weight:600;">'+esc(w.name||'')+'</div>' +
+    '<div style="font-size:11px;color:var(--gray-400);">'+esc(w.companies?.name||'')+'</div></div>' +
+    '</label>'
+  ).join('');
+  showGenModal('aiKnModal', '👥 「'+esc(group?.name||'')+'」にメンバーを招待',
+    '<div style="display:flex;flex-direction:column;gap:10px;">' +
+    '<div style="max-height:320px;overflow-y:auto;">'+
+    (workerRows || '<div style="text-align:center;padding:20px;color:var(--gray-400);">招待できる外国人材がいません</div>')+
+    '</div>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;padding-top:8px;border-top:1px solid var(--gray-200);">' +
+    '<button class="btn btn-outline" id="_cancelInvBtn">キャンセル</button>' +
+    '<button class="btn btn-primary" id="_inviteBtn">招待してチャット開始</button>' +
+    '</div></div>'
+  );
+  setTimeout(() => {
+    const cb = document.getElementById('_cancelInvBtn');
+    if (cb) cb.onclick = () => closeGenModal('aiKnModal');
+    const ib = document.getElementById('_inviteBtn');
+    if (ib) ib.onclick = () => inviteToGroup(groupId);
+  }, 150);
+}
+
+async function inviteToGroup(groupId) {
+  const checked = document.querySelectorAll('#aiKnModalBody input[type=checkbox]:checked');
+  const workerIds = Array.from(checked).map(cb => cb.value);
+  if (!workerIds.length) { showToast('⚠️ 人材を選択してください', 'error'); return; }
+  showLoading(true);
+  try {
+    for (const wid of workerIds) {
+      const existing = chatRooms.find(r => r.worker_id === wid);
+      if (existing) await sbFetch('chat_rooms?id=eq.'+existing.id, {method:'PATCH', body:JSON.stringify({group_id:groupId})});
+      else await sbFetch('chat_rooms', {method:'POST', body:JSON.stringify({worker_id:wid, group_id:groupId, created_by:currentUser?.name||''})});
+    }
+    showToast('✅ 招待しました', 'success');
+    closeGenModal('aiKnModal');
+    await loadChatScreen();
+    selectGroup(groupId);
+  } catch(e) { showToast('❌ '+e.message,'error'); }
+  showLoading(false);
+}
+
+function setChatTab(tab) {
+  _chatTab = tab;
+  document.getElementById('chatTabActive').style.color = tab==='active' ? '#1a73e8' : '#5f6368';
+  document.getElementById('chatTabActive').style.borderBottomColor = tab==='active' ? '#1a73e8' : 'transparent';
+  document.getElementById('chatTabActive').style.fontWeight = tab==='active' ? '700' : '600';
+  document.getElementById('chatTabDone').style.color = tab==='done' ? '#1a73e8' : '#5f6368';
+  document.getElementById('chatTabDone').style.borderBottomColor = tab==='done' ? '#1a73e8' : 'transparent';
+  document.getElementById('chatTabDone').style.fontWeight = tab==='done' ? '700' : '600';
+  renderChatRooms();
+}
+
+function renderChatRooms(filtered) {
+  if (_selectedGroupId) { renderGroupRooms(_selectedGroupId); return; }
+  renderGroupList();
+}
+
+function renderGroupList() {
   const list = document.getElementById('chatRoomList'); if (!list) return;
   const q = (document.getElementById('chatRoomSearch')?.value || '').toLowerCase();
-  const filtered = chatRooms.filter(r => !q || r.name.toLowerCase().includes(q));
+  const rows = chatGroups.filter(g => !q || g.name.toLowerCase().includes(q)).map(g => {
+    const rooms = chatRooms.filter(r => r.group_id === g.id);
+    const unread = rooms.reduce((s,r)=>s+(r.unread||0),0);
+    const lastMsg = rooms.map(r=>r.lastMsg).filter(Boolean).sort((a,b)=>b.created_at>a.created_at?1:-1)[0];
+    const lastTime = lastMsg ? (() => {
+      const d = new Date(lastMsg.created_at), today = new Date();
+      if (d.toDateString()===today.toDateString()) return d.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
+      if (d.toDateString()===new Date(Date.now()-86400000).toDateString()) return '昨日';
+      return d.toLocaleDateString('ja-JP',{month:'numeric',day:'numeric'});
+    })() : '';
+    const preview = lastMsg ? (esc(lastMsg.sender_name)+': '+(esc(lastMsg.content||'📎ファイル')).slice(0,20)) : '（メッセージなし）';
+    const companyName = g.companies?.name || g.company_id ? (allCompanies.find(c=>c.id===g.company_id)?.name||'') : '';
+    const div = document.createElement('div');
+    div.dataset.gid = g.id;
+    div.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;border-radius:8px;margin:2px 6px;transition:background .1s;';
+    div.innerHTML =
+      '<div style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#1a73e8,#7c3aed);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">📁</div>' +
+      '<div style="flex:1;min-width:0;">' +
+        '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:4px;margin-bottom:2px;">' +
+          '<div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
+          '<span style="font-size:13px;font-weight:'+(unread>0?700:500)+';color:#202124;">'+esc(g.name)+'</span>' +
+          (companyName?'<span style="font-size:11px;color:#5f6368;margin-left:6px;">'+esc(companyName)+'</span>':'') +
+          '</div>' +
+          '<span style="font-size:11px;color:#5f6368;white-space:nowrap;">'+lastTime+'</span>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;gap:4px;">' +
+          '<span style="font-size:12px;color:#5f6368;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;"><span style="color:#94a3b8;font-size:11px;">👥'+rooms.length+'名</span> '+preview+'</span>' +
+          (unread>0?'<span style="background:#1a73e8;color:white;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;">'+unread+'</span>':'') +
+        '</div>' +
+      '</div>';
+    return div.outerHTML;
+  });
+  // 未分類ルーム（group_idなし）を追加
+  const ungrouped = chatRooms.filter(r => !r.group_id && (!q || r.name.toLowerCase().includes(q)));
+  if (ungrouped.length) {
+    const sep = document.createElement('div');
+    sep.style.cssText = 'padding:6px 14px;font-size:10px;font-weight:700;color:#94a3b8;letter-spacing:.5px;border-top:1px solid #f0f0f0;margin-top:4px;';
+    sep.textContent = '未分類';
+    const sepHtml = sep.outerHTML;
+    const ungroupedRows = ungrouped.map(r => {
+      const active = currentRoom?.id === r.id;
+      const lastMsg = r.lastMsg;
+      const lastTime = lastMsg ? (() => {
+        const d = new Date(lastMsg.created_at), today = new Date();
+        if (d.toDateString()===today.toDateString()) return d.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
+        if (d.toDateString()===new Date(Date.now()-86400000).toDateString()) return '昨日';
+        return d.toLocaleDateString('ja-JP',{month:'numeric',day:'numeric'});
+      })() : '';
+      const _lc = lastMsg?.content||'';
+      const preview = lastMsg ? (esc(lastMsg.sender_name)+': '+esc(_lc||'📎ファイル').slice(0,18)) : '';
+      const div = document.createElement('div');
+      div.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;border-radius:8px;margin:2px 6px;transition:background .1s;background:'+(active?'#e8f0fe':'');
+      div.dataset.rid = r.id;
+      div.innerHTML =
+        '<div style="width:36px;height:36px;border-radius:50%;background:#e5e7eb;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">'+natFlag(r.nationality||'')+'</div>'+
+        '<div style="flex:1;min-width:0;">'+
+          '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:4px;margin-bottom:2px;">'+
+            '<span style="font-size:13px;font-weight:'+(r.unread>0?700:500)+';color:#202124;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(r.name)+'</span>'+
+            '<span style="font-size:11px;color:#5f6368;white-space:nowrap;">'+lastTime+'</span>'+
+          '</div>'+
+          '<span style="font-size:12px;color:#5f6368;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;">'+preview+'</span>'+
+        '</div>'+
+        (r.unread>0?'<span style="background:#1a73e8;color:white;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;">'+r.unread+'</span>':'');
+      return div.outerHTML;
+    });
+    rows.push(sepHtml, ...ungroupedRows);
+  }
+  // 未分類ルームのイベントも再付与（後でsetする）
+
+  list.innerHTML = '';
+  if (!rows.length && !ungrouped.length) {
+    list.innerHTML = '<div style="padding:30px 14px;text-align:center;color:#94a3b8;font-size:13px;">案件グループがありません</div>';
+    return;
+  }
+  list.innerHTML = rows.join('');
+  // イベントを再付与（outerHTMLで失われるため）
+  list.querySelectorAll('[data-gid]').forEach(el => {
+    const gid = el.dataset.gid;
+    el.onmouseover = () => el.style.background = '#f1f3f4';
+    el.onmouseout = () => el.style.background = '';
+    el.onclick = () => selectGroup(gid);
+  });
+  list.querySelectorAll('[data-rid]').forEach(el => {
+    const rid = el.dataset.rid;
+    const isActive = currentRoom?.id === rid;
+    el.onmouseover = () => { if (!isActive) el.style.background = '#f1f3f4'; };
+    el.onmouseout = () => { el.style.background = isActive ? '#e8f0fe' : ''; };
+    el.onclick = () => openChatRoom(rid);
+  });
+}
+
+function renderGroupRooms(groupId) {
+  const list = document.getElementById('chatRoomList'); if (!list) return;
+  const group = chatGroups.find(g => g.id === groupId);
+  const rooms = chatRooms.filter(r => r.group_id === groupId);
+  list.innerHTML = '';
+
+  // ヘッダー
+  const header = document.createElement('div');
+  header.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid #e0e0e0;background:#f8fafc;flex-shrink:0;';
+  const backBtn = document.createElement('button');
+  backBtn.style.cssText = 'background:none;border:none;cursor:pointer;font-size:18px;color:#5f6368;padding:0;line-height:1;';
+  backBtn.textContent = '←';
+  backBtn.onclick = () => selectGroup(null);
+  const title = document.createElement('span');
+  title.style.cssText = 'font-size:13px;font-weight:700;color:#202124;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+  title.textContent = group?.name || '';
+  const inviteBtn = document.createElement('button');
+  inviteBtn.style.cssText = 'font-size:10px;background:#1a73e8;color:white;border:none;border-radius:12px;padding:3px 10px;cursor:pointer;white-space:nowrap;';
+  inviteBtn.textContent = '＋ 招待';
+  inviteBtn.onclick = () => openInviteModal(groupId);
+  const editBtn = document.createElement('button');
+  editBtn.style.cssText = 'font-size:18px;background:none;border:none;cursor:pointer;color:#5f6368;padding:0 4px;';
+  editBtn.textContent = '⚙️';
+  editBtn.title = 'グループを編集';
+  editBtn.onclick = () => openEditGroupModal(groupId);
+  header.appendChild(backBtn);
+  header.appendChild(title);
+  header.appendChild(editBtn);
+  header.appendChild(inviteBtn);
+  list.appendChild(header);
+
+  if (!rooms.length) {
+    const empty = document.createElement('div');
+    empty.style.cssText = 'padding:20px;text-align:center;color:#94a3b8;font-size:12px;';
+    empty.innerHTML = 'メンバーがいません';
+    const addBtn = document.createElement('button');
+    addBtn.className = 'btn btn-primary';
+    addBtn.style.cssText = 'margin-top:8px;font-size:12px;display:block;margin:8px auto 0;';
+    addBtn.textContent = '＋ 招待';
+    addBtn.onclick = () => openInviteModal(groupId);
+    empty.appendChild(addBtn);
+    list.appendChild(empty);
+    return;
+  }
+
+  rooms.forEach(r => {
+    const active = currentRoom?.id === r.id;
+    const lastMsg = r.lastMsg;
+    const lastTime = lastMsg ? (() => {
+      const d = new Date(lastMsg.created_at), today = new Date();
+      if (d.toDateString()===today.toDateString()) return d.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
+      return d.toLocaleDateString('ja-JP',{month:'numeric',day:'numeric'});
+    })() : '';
+    const _lc = lastMsg?.content||'';
+    const preview = lastMsg ? (esc(lastMsg.sender_name)+': '+esc(_lc||'📎ファイル').slice(0,18)) : '';
+
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;border-radius:8px;margin:2px 6px;transition:background .1s;background:'+(active?'#e8f0fe':'');
+    row.onmouseover = () => { if (!active) row.style.background='#f1f3f4'; };
+    row.onmouseout = () => { row.style.background = active?'#e8f0fe':''; };
+    row.onclick = () => openChatRoom(r.id);
+    row.innerHTML =
+      '<div style="width:36px;height:36px;border-radius:50%;background:#c7d2fe;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">'+natFlag(r.nationality||'')+'</div>'+
+      '<div style="flex:1;min-width:0;">'+
+        '<div style="display:flex;align-items:baseline;justify-content:space-between;">'+
+          '<span style="font-size:13px;font-weight:'+(r.unread>0?700:500)+';color:#202124;">'+esc(r.name)+'</span>'+
+          '<span style="font-size:11px;color:#5f6368;">'+lastTime+'</span>'+
+        '</div>'+
+        '<span style="font-size:12px;color:#5f6368;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;">'+preview+'</span>'+
+      '</div>'+
+      (r.unread>0?'<span style="background:#1a73e8;color:white;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;margin-right:4px;">'+r.unread+'</span>':'');
+    // 削除ボタン（クリック伝播を止める）
+    const delBtn = document.createElement('button');
+    delBtn.style.cssText = 'background:none;border:none;cursor:pointer;color:#d1d5db;font-size:16px;padding:4px;flex-shrink:0;border-radius:4px;';
+    delBtn.textContent = '✕';
+    delBtn.title = 'グループから外す / チャット削除';
+    delBtn.onmouseover = () => delBtn.style.color = '#ef4444';
+    delBtn.onmouseout = () => delBtn.style.color = '#d1d5db';
+    delBtn.onclick = (e) => { e.stopPropagation(); openDeleteChatRoomModal(r.id, r.name, groupId); };
+    row.appendChild(delBtn);
+    list.appendChild(row);
+  });
+}
+
+function selectGroup(groupId) {
+  _selectedGroupId = groupId;
+  if (!groupId) {
+    currentRoom = null;
+    const h = document.getElementById('chatRoomHeader');
+    if (h) h.innerHTML = '';
+    const ia = document.getElementById('chatInputArea');
+    if (ia) ia.style.display = 'none';
+    const ma = document.getElementById('chatMessageArea');
+    if (ma) ma.innerHTML = '';
+  }
+  renderChatRooms();
+}
+
+function renderChatRooms(filtered) {
+  if (_selectedGroupId) { renderGroupRooms(_selectedGroupId); return; }
+  renderGroupList();
+}
+function _renderChatRoomsOld(filtered) {
+  const list = document.getElementById('chatRoomList'); if (!list) return;
+  if (!filtered) {
+    const q = (document.getElementById('chatRoomSearch')?.value || '').toLowerCase();
+    filtered = chatRooms.filter(r => {
+      const matchTab = _chatTab === 'done' ? r.status === 'done' : r.status !== 'done';
+      const matchQ = !q || r.name.toLowerCase().includes(q) || (r.subName||'').toLowerCase().includes(q);
+      return matchTab && matchQ;
+    });
+  }
   if (!filtered.length) {
     list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--gray-400);font-size:12px;">案件なし</div>';
     return;
   }
   list.innerHTML = filtered.map(r => {
     const active = currentRoom?.id === r.id;
-    return `<div onclick="openChatRoom('${r.id}')"
-      style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--gray-100);transition:.15s;border-left:3px solid ${active?'var(--blue)':'transparent'};background:${active?'#eff6ff':''};"
-      onmouseover="this.style.background='${active?'#eff6ff':'#f8fafc'}';"
-      onmouseout="this.style.background='${active?'#eff6ff':''}';">
-      <div style="display:flex;align-items:center;gap:6px;">
-        <span style="font-size:14px;">${natFlag(r.nationality||'')}</span>
-        <span style="font-size:12px;font-weight:700;color:var(--navy);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(r.name)}</span>
-        ${r.unread > 0 ? `<span style="background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;flex-shrink:0;">${r.unread}</span>` : ''}
-      </div>
-      <div style="font-size:10px;color:var(--gray-400);margin-top:1px;">${esc(r.subName||'')}</div>
-      <div style="font-size:9px;margin-top:2px;color:${r.drive_url?'#7c3aed':'#94a3b8'};">${r.drive_url?'📁 Drive連携済み':'Drive URL未設定（外国人材詳細で設定）'}</div>
-    </div>`;
+    const bg = active ? '#e8f0fe' : '';
+    const hover = active ? '#e8f0fe' : '#f1f3f4';
+    const last = r.lastMsg;
+    const lastTime = last ? (() => {
+      const d = new Date(last.created_at);
+      const today = new Date();
+      if (d.toDateString() === today.toDateString()) return d.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
+      const yesterday = new Date(Date.now()-86400000);
+      if (d.toDateString() === yesterday.toDateString()) return '昨日';
+      return d.toLocaleDateString('ja-JP',{month:'numeric',day:'numeric'});
+    })() : '';
+    const _lc = last?.content||'';
+    const lastText = last ? (_lc ? _lc.split('\n').join(' ').slice(0,22)+(_lc.length>22?'…':'') : '📎 '+(last.file_name||'ファイル')) : '';
+    const lastSender = last ? last.sender_name : '';
+    const flag = natFlag(r.nationality||'');
+    const unreadBadge = r.unread > 0 ? '<span style="background:#1a73e8;color:white;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;flex-shrink:0;">'+r.unread+'</span>' : '';
+    const doneBadge = r.status === 'done' ? '<span style="font-size:10px;color:#059669;font-weight:700;">✅ 完了</span>' : '';
+    const preview = lastSender ? '<b>'+esc(lastSender)+'</b>: '+esc(lastText) : esc(lastText);
+    return [
+      '<div onclick="openChatRoom(\''+r.id+'\')"',
+      'style="display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;border-radius:8px;margin:2px 6px;transition:background .1s;background:'+bg+';"',
+      'onmouseover="this.style.background=\''+hover+'\'"',
+      'onmouseout="this.style.background=\''+bg+'\'"',
+      '>',
+      '<div style="width:40px;height:40px;border-radius:50%;background:#c7d2fe;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">'+flag+'</div>',
+      '<div style="flex:1;min-width:0;">',
+        '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:4px;margin-bottom:2px;">',
+          '<span style="font-size:13px;font-weight:'+(r.unread>0?'700':'500')+';color:#202124;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(r.name)+'</span>'+doneBadge+' ',
+          '<span style="font-size:11px;color:#5f6368;white-space:nowrap;flex-shrink:0;">'+lastTime+'</span>',
+        '</div>',
+        '<div style="display:flex;align-items:center;justify-content:space-between;gap:4px;">',
+          '<span style="font-size:12px;color:#5f6368;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">'+preview+'</span>',
+          unreadBadge,
+        '</div>',
+      '</div>',
+      '</div>'
+    ].join(' ');
   }).join('');
 }
 
@@ -2502,9 +3445,34 @@ async function openChatRoom(roomId) {
   const header = document.getElementById('chatRoomHeader');
   if (!header) { console.warn('chatRoomHeader not found'); return; }
   header.innerHTML = `
-    <div style="flex:1;">
-      <div style="font-size:14px;font-weight:800;color:var(--navy);">💬 ${esc(room.name)}</div>
-      ${room.drive_url ? `<div style="font-size:10px;color:#7c3aed;">📁 <a href="${esc(room.drive_url)}" target="_blank" style="color:#7c3aed;">Driveフォルダを開く</a></div>` : '<div style="font-size:10px;color:#94a3b8;">Drive URL未設定（求人詳細で設定）</div>'}
+    <div style="flex:1;min-width:0;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span onclick="openWorkerFromChat('${room.worker_id}')"
+          style="font-size:15px;font-weight:800;color:#202124;cursor:pointer;"
+          onmouseover="this.style.color='#1a73e8'" onmouseout="this.style.color='#202124'">
+          ${esc(room.name)}
+        </span>
+        ${room.subName ? `<span
+          onclick="openCompanyFromChat('${room.company_id}')"
+          style="font-size:13px;color:#5f6368;font-weight:400;cursor:pointer;"
+          onmouseover="this.style.color='#1a73e8';this.style.textDecoration='underline';"
+          onmouseout="this.style.color='#5f6368';this.style.textDecoration='none';">
+          ${esc(room.subName)}
+        </span>` : ''}
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+      ${room.status === 'done'
+        ? `<span style="font-size:11px;background:#d1fae5;color:#059669;font-weight:700;padding:3px 10px;border-radius:12px;">✅ 完了</span>
+           <button onclick="setChatStatus('${room.id}','active')" style="font-size:11px;background:none;border:1px solid #d1d5db;border-radius:8px;padding:3px 8px;cursor:pointer;color:#5f6368;">↩ 進行中に戻す</button>`
+        : `<button onclick="confirmChatDone('${room.id}')" style="font-size:11px;background:none;border:1px solid #d1d5db;border-radius:8px;padding:3px 8px;cursor:pointer;color:#5f6368;font-weight:600;">✅ 完了にする</button>`
+      }
+      ${room.drive_url
+        ? `<a href="${esc(room.drive_url)}" target="_blank" title="Driveフォルダを開く"
+            style="display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;background:#f1f3f4;color:#5f6368;font-size:18px;text-decoration:none;transition:.15s;"
+            onmouseover="this.style.background='#e8eaed'" onmouseout="this.style.background='#f1f3f4'">📁</a>`
+        : `<span style="font-size:11px;color:#ef4444;font-weight:600;">⚠️ ドライブURLを設定</span>`
+      }
     </div>`;
 
   // 入力エリア表示
@@ -2542,27 +3510,135 @@ async function loadChatMessages(roomId) {
 function renderChatMessages() {
   const area = document.getElementById('chatMessageArea'); if (!area) return;
   if (!chatMessages.length) {
-    area.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray-400);font-size:12px;">まだメッセージがありません<br>最初のメッセージを送ってみましょう！</div>';
+    area.innerHTML = '<div style="text-align:center;padding:60px 20px;color:#94a3b8;font-size:13px;">まだメッセージがありません<br>最初のメッセージを送りましょう！</div>';
     return;
   }
-  const isMine = name => currentUser?.name === name;
-  area.innerHTML = chatMessages.map(m => {
-    const mine = isMine(m.sender_name);
-    const time = new Date(m.created_at).toLocaleString('ja-JP', {month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
-    return `
-    <div style="display:flex;flex-direction:${mine?'row-reverse':'row'};gap:8px;align-items:flex-end;padding:0 8px;">
-      ${!mine ? `<div style="font-size:20px;flex-shrink:0;">👤</div>` : ''}
-      <div style="max-width:60%;">
-        ${!mine ? `<div style="font-size:10px;color:var(--gray-400);margin-bottom:3px;">${esc(m.sender_name)}</div>` : ''}
-        <div style="background:${mine?'#1a56db':'white'};color:${mine?'white':'#1a202c'};padding:9px 13px;border-radius:${mine?'14px 4px 14px 14px':'4px 14px 14px 14px'};font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;border:${mine?'none':'1px solid var(--gray-200)'};box-shadow:0 1px 4px rgba(0,0,0,.06);">
-          ${m.file_url ? `<div style="margin-bottom:${m.content?'8px':'0'};">📎 <a href="${esc(m.file_url)}" target="_blank" style="color:${mine?'#bfdbfe':'#1a56db'};font-weight:700;">${esc(m.file_name||'ファイル')}</a></div>` : ''}
-          ${m.content ? esc(m.content) : ''}
-        </div>
-        <div style="font-size:9px;color:var(--gray-400);margin-top:3px;text-align:${mine?'right':'left'};">${time}</div>
-      </div>
-    </div>`;
-  }).join('');
+  // 自分宛メンションバナー
+  const myMentions = chatMessages.filter(m =>
+    m.mentions && Array.isArray(m.mentions) && m.mentions.includes(currentUser?.name)
+  );
+  const mentionBanner = myMentions.length > 0 ? `
+    <div style="background:#fff7ed;border-left:3px solid #f59e0b;padding:8px 12px;margin-bottom:12px;font-size:12px;border-radius:0 6px 6px 0;">
+      <div style="font-weight:700;color:#92400e;margin-bottom:4px;">🔔 あなた宛のメンション（${myMentions.length}件）</div>
+      ${myMentions.map(m => `<div style="color:#78350f;padding:2px 0;cursor:pointer;line-height:1.5;" onclick="scrollToMessage('${m.created_at}')">
+        <strong>${esc(m.sender_name)}</strong>：${renderMessageContent(m.content||'')}
+      </div>`).join('')}
+    </div>` : '';
+  // 日付区切りを追加
+  let lastDate = '';
+  const rows = [];
+  chatMessages.forEach((m, idx) => {
+    const dt = new Date(m.created_at);
+    const dateStr = dt.toLocaleDateString('ja-JP', {year:'numeric',month:'long',day:'numeric'});
+    const today = new Date().toLocaleDateString('ja-JP', {year:'numeric',month:'long',day:'numeric'});
+    const yesterday = new Date(Date.now()-86400000).toLocaleDateString('ja-JP', {year:'numeric',month:'long',day:'numeric'});
+    const dateLabel = dateStr === today ? '今日' : dateStr === yesterday ? '昨日' : dateStr;
+    if (dateStr !== lastDate) {
+      lastDate = dateStr;
+      rows.push(`<div style="display:flex;align-items:center;gap:10px;margin:16px 0 8px;"><div style="flex:1;height:1px;background:#e2e8f0;"></div><span style="font-size:11px;color:#94a3b8;white-space:nowrap;font-weight:600;">${dateLabel}</span><div style="flex:1;height:1px;background:#e2e8f0;"></div></div>`);
+    }
+    const timeStr = dt.toLocaleTimeString('ja-JP', {hour:'2-digit',minute:'2-digit'});
+    const avatarEl = getChatAvatar(m.sender_name);
+    const isMine = m.sender_name === currentUser?.name;
+    const hasMention = m.mentions && Array.isArray(m.mentions) && m.mentions.includes(currentUser?.name);
+    const fileHtml = m.file_url
+      ? '<div style="display:flex;align-items:center;gap:6px;background:' + (isMine?'rgba(255,255,255,.2)':'white') + ';border:' + (isMine?'none':'1px solid #dadce0') + ';border-radius:8px;padding:5px 10px;margin-bottom:' + (m.content?'6px':'0') + ';">\u{1F4CE} <a href=\"' + esc(m.file_url) + '\" target=\"_blank\" style=\"color:' + (isMine?'#e8f0fe':'#1a73e8') + ';font-weight:600;font-size:12px;\">' + esc(m.file_name||'ファイル') + '</a></div>'
+      : '';
+    const bodyHtml = fileHtml + (m.content ? renderMessageContent(m.content) : '');
+    const replyQuote = m.reply_to
+      ? '<div style="border-left:3px solid ' + (isMine?'rgba(255,255,255,.6)':'#9e9e9e') + ';background:' + (isMine?'rgba(255,255,255,.15)':'#e8eaed') + ';border-radius:4px;padding:4px 8px;margin-bottom:6px;font-size:11px;color:' + (isMine?'rgba(255,255,255,.85)':'#5f6368') + ';overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><b>' + esc(m.reply_to.sender_name||'') + '</b>: ' + esc((m.reply_to.content||'').slice(0,50)) + '</div>'
+      : '';
+    const replyBtnStyle = 'opacity:0;position:absolute;top:-12px;background:white;border:1px solid #dadce0;border-radius:14px;padding:2px 10px;font-size:11px;cursor:pointer;color:#5f6368;box-shadow:0 1px 4px rgba(0,0,0,.15);white-space:nowrap;transition:opacity .15s;';
+    const replyBtnClick = "setReply('" + esc(m.sender_name).replace(/'/g,"\'") + "','" + esc(m.content||'').replace(/'/g,"\'").slice(0,80) + "','" + m.created_at + "')";
+    if (isMine) {
+      rows.push(
+        '<div data-ts="' + m.created_at + '" style="display:flex;flex-direction:row-reverse;align-items:flex-end;gap:8px;padding:2px 12px;margin:2px 0;">' +
+          '<div style="max-width:62%;">' +
+            '<div style="font-size:10px;color:#94a3b8;text-align:right;margin-bottom:3px;">' + timeStr + '</div>' +
+            '<div class="chat-bubble-wrap">' +
+              '<div style="background:#1a73e8;color:white;padding:10px 14px;border-radius:20px 20px 4px 20px;font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;box-shadow:0 1px 2px rgba(0,0,0,.12);">' + replyQuote + bodyHtml + '</div>' +
+              '<button class="rb" onclick="' + replyBtnClick + '" style="' + replyBtnStyle + 'left:0;">↩ 返信</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>'
+      );
+    } else {
+      const mentionBadge = hasMention ? '<span style="font-size:10px;background:#f59e0b;color:white;padding:1px 5px;border-radius:4px;font-weight:700;margin-left:4px;">@あなた</span>' : '';
+      rows.push(
+        '<div data-ts="' + m.created_at + '" style="display:flex;align-items:flex-end;gap:8px;padding:2px 12px;margin:2px 0;' + (hasMention?'background:#fffbeb;border-radius:8px;':'') + '">' +
+          '<div style="width:32px;height:32px;border-radius:50%;overflow:hidden;flex-shrink:0;background:#e8eaed;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#5f6368;margin-bottom:2px;">' + avatarEl + '</div>' +
+          '<div style="max-width:62%;">' +
+            '<div style="font-size:11px;font-weight:600;color:#5f6368;margin-bottom:3px;">' + esc(m.sender_name) + ' <span style="font-weight:400;color:#94a3b8;">' + timeStr + '</span>' + mentionBadge + '</div>' +
+            '<div class="chat-bubble-wrap">' +
+              '<div style="background:#f1f3f4;color:#202124;padding:10px 14px;border-radius:20px 20px 20px 4px;font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;box-shadow:0 1px 2px rgba(0,0,0,.08);">' + replyQuote + bodyHtml + '</div>' +
+              '<button class="rb" onclick="' + replyBtnClick + '" style="' + replyBtnStyle + 'right:0;">↩ 返信</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>'
+      );
+    }
+  });
+  area.innerHTML = mentionBanner + rows.join('');
   area.scrollTop = area.scrollHeight;
+}
+
+async function confirmChatDone(roomId) {
+  if (!confirm('このチャットを「完了」にしますか？\n完了後は「完了」タブに移動します。')) return;
+  await setChatStatus(roomId, 'done');
+}
+
+async function setChatStatus(roomId, status) {
+  showLoading(true);
+  try {
+    const body = { status, updated_at: new Date().toISOString() };
+    if (status === 'done') body.completed_at = new Date().toISOString();
+    await sbFetch('chat_rooms?id=eq.'+roomId, { method:'PATCH', body: JSON.stringify(body) });
+    const room = chatRooms.find(r => r.id === roomId);
+    if (room) room.status = status;
+    showToast(status === 'done' ? '✅ 完了にしました' : '↩ 進行中に戻しました', 'success');
+    await loadChatScreen();
+    // 完了にした場合はタブを切り替え
+    if (status === 'done') setChatTab('done');
+    else { setChatTab('active'); await openChatRoom(roomId); }
+  } catch(e) { showToast('❌ '+e.message,'error'); }
+  showLoading(false);
+}
+
+function openCompanyFromChat(companyId) {
+  if (!companyId) return;
+  // チャット画面から離れずにモーダルだけ表示
+  openCompanyModal(companyId);
+}
+
+async function openWorkerFromChat(workerId) {
+  if (!workerId) return;
+  if (!allWorkers.length) {
+    showLoading(true);
+    try { const d = await sbFetch('workers?select=*&order=name.asc'); allWorkers = d||[]; } catch(e) {}
+    showLoading(false);
+  }
+  openWorkerModal(workerId);
+}
+
+function getChatAvatar(name) {
+  const u = (allUsers||[]).find(x => x.name === name);
+  if (u?.avatar_url) return `<img src="${u.avatar_url}" style="width:100%;height:100%;object-fit:cover;">`;
+  return (name||'?').charAt(0).toUpperCase();
+}
+
+function scrollToMessage(createdAt) {
+  // 該当メッセージにスクロール
+  const area = document.getElementById('chatMessageArea');
+  const msgs = area?.querySelectorAll('[data-ts]');
+  if (!msgs) return;
+  for (const el of msgs) {
+    if (el.dataset.ts === createdAt) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.style.background = '#fef9c3';
+      setTimeout(() => { el.style.background = ''; }, 2000);
+      return;
+    }
+  }
 }
 
 async function markChatRead(roomId) {
@@ -2580,6 +3656,268 @@ async function markChatRead(roomId) {
 }
 
 let _chatFile = null;
+// ==============================
+// 🔍 チャット検索
+// ==============================
+let _allChatMessages = []; // 全ルームのメッセージキャッシュ
+
+async function chatSearch() {
+  const q = (document.getElementById('chatRoomSearch')?.value || '').trim().toLowerCase();
+  const resultsEl = document.getElementById('chatSearchResults');
+
+  if (!q) {
+    if (resultsEl) resultsEl.style.display = 'none';
+    renderChatRooms();
+    return;
+  }
+
+  // ルーム名マッチ
+  const roomMatches = chatRooms.filter(r => r.name.toLowerCase().includes(q) || (r.subName||'').toLowerCase().includes(q));
+
+  // メッセージ全文検索（DBから）
+  if (resultsEl) {
+    resultsEl.style.display = '';
+    resultsEl.innerHTML = '<div style="font-size:11px;color:var(--gray-400);padding:4px 0;">🔍 検索中...</div>';
+  }
+
+  try {
+    const msgs = await sbFetch(`chat_messages?content=ilike.*${encodeURIComponent(q)}*&select=chat_room_id,sender_name,content,created_at&order=created_at.desc&limit=30`);
+    const msgResults = (msgs || []).filter(m => m.chat_room_id);
+
+    // ルーム名でのフィルター結果を表示
+    renderChatRooms(roomMatches);
+
+    // メッセージ検索結果を表示
+    if (!resultsEl) return;
+    if (!msgResults.length && !roomMatches.length) {
+      resultsEl.innerHTML = '<div style="font-size:11px;color:var(--gray-400);padding:8px 4px;text-align:center;">見つかりませんでした</div>';
+      return;
+    }
+    if (!msgResults.length) { resultsEl.style.display = 'none'; return; }
+
+    resultsEl.innerHTML = `
+      <div style="font-size:10px;font-weight:700;color:var(--gray-400);padding:4px 0 6px;letter-spacing:.5px;">💬 メッセージ内の検索結果 (${msgResults.length}件)</div>
+      ${msgResults.map(m => {
+        const room = chatRooms.find(r => r.id === m.chat_room_id);
+        const roomName = room?.name || '不明';
+        const safeQ = q.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'); const hi = esc(m.content).replace(new RegExp(safeQ, 'gi'), match => `<mark style="background:#fef08a;border-radius:2px;">${match}</mark>`);
+        const time = new Date(m.created_at).toLocaleDateString('ja-JP',{month:'numeric',day:'numeric'});
+        return `<div onclick="openChatRoomById('${m.chat_room_id}')"
+          style="padding:7px 8px;border:1px solid var(--gray-200);border-radius:6px;margin-bottom:5px;cursor:pointer;background:white;transition:.15s;"
+          onmouseover="this.style.background='#f0f4ff';" onmouseout="this.style.background='white';">
+          <div style="font-size:10px;font-weight:700;color:var(--blue);margin-bottom:2px;">📁 ${esc(roomName)}</div>
+          <div style="font-size:10px;color:var(--gray-400);margin-bottom:3px;">${esc(m.sender_name)} · ${time}</div>
+          <div style="font-size:11px;color:var(--gray-600);line-height:1.5;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${hi}</div>
+        </div>`;
+      }).join('')}`;
+  } catch(e) {
+    if (resultsEl) resultsEl.innerHTML = '<div style="font-size:11px;color:var(--red);">❌ 検索エラー</div>';
+  }
+}
+
+async function openChatRoomById(roomId) {
+  // 検索結果からルームを開く
+  document.getElementById('chatRoomSearch').value = '';
+  const resultsEl = document.getElementById('chatSearchResults');
+  if (resultsEl) resultsEl.style.display = 'none';
+  renderChatRooms();
+  // ルームが一覧にあれば開く、なければロードしてから開く
+  if (!chatRooms.find(r => r.id === roomId)) await loadChatScreen();
+  await openChatRoom(roomId);
+}
+
+// ==============================
+// 💬 メンション機能
+// ==============================
+let _mentionStart = -1; // @の位置
+
+function chatTextKeydown(event) {
+  const popup = document.getElementById('mentionPopup');
+  // 候補表示中のキー操作
+  if (popup && popup.style.display !== 'none') {
+    const items = popup.querySelectorAll('[data-mention]');
+    const active = popup.querySelector('.mention-active');
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      if (!active && items[0]) items[0].classList.add('mention-active');
+      else if (active) {
+        active.classList.remove('mention-active');
+        const next = active.nextElementSibling;
+        if (next) next.classList.add('mention-active');
+        else items[0]?.classList.add('mention-active');
+      }
+      return;
+    }
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      if (active) {
+        active.classList.remove('mention-active');
+        const prev = active.previousElementSibling;
+        if (prev) prev.classList.add('mention-active');
+        else items[items.length-1]?.classList.add('mention-active');
+      }
+      return;
+    }
+    if (event.key === 'Enter' && !event.shiftKey) {
+      const activeItem = popup.querySelector('.mention-active');
+      if (activeItem) {
+        event.preventDefault();
+        insertMention(activeItem.dataset.mention);
+        return;
+      }
+    }
+    if (event.key === 'Escape') {
+      closeMentionPopup();
+      return;
+    }
+  }
+  if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
+    event.preventDefault();
+    sendChatMessage();
+  }
+}
+
+async function chatTextInput(el) {
+  const val = el.value;
+  const pos = el.selectionStart;
+  // @の位置を探す
+  let atPos = -1;
+  for (let i = pos - 1; i >= 0; i--) {
+    if (val[i] === '@' || val[i] === '＠') { atPos = i; break; }
+    if (val[i] === ' ' || val[i] === '\n' || val[i] === '　') break;
+  }
+  if (atPos === -1) { closeMentionPopup(); return; }
+  const query = val.slice(atPos + 1, pos).toLowerCase();
+  _mentionStart = atPos;
+  await showMentionPopup(query);
+}
+
+async function showMentionPopup(query) {
+  const popup = document.getElementById('mentionPopup');
+  if (!popup) return;
+  // allUsersが空ならロード
+  if (!allUsers.length) {
+    try {
+      const ud = await sbFetch('users?select=id,name,avatar_url&order=name.asc');
+      allUsers = ud || [];
+    } catch(e) {}
+  }
+  // allUsersから候補を取得
+  const candidates = (allUsers || []).filter(u =>
+    u.name && u.name !== currentUser?.name &&
+    (!query || u.name.toLowerCase().includes(query))
+  ).slice(0, 8);
+  if (!candidates.length) { closeMentionPopup(); return; }
+  popup.innerHTML = candidates.map((u, i) =>
+    `<div data-mention="${esc(u.name)}"
+      class="mention-item${i===0?' mention-active':''}"
+      onclick="insertMention('${esc(u.name)}')"
+      style="padding:8px 12px;cursor:pointer;font-size:12px;font-weight:600;display:flex;align-items:center;gap:8px;"
+      onmouseover="this.parentElement.querySelectorAll('.mention-active').forEach(el=>el.classList.remove('mention-active'));this.classList.add('mention-active');">
+      👤 ${esc(u.name)}
+    </div>`
+  ).join('');
+  popup.style.display = '';
+}
+
+function insertMention(name) {
+  const ta = document.getElementById('chatTextInput');
+  if (!ta) return;
+  const val = ta.value;
+  const pos = ta.selectionStart;
+  const before = val.slice(0, _mentionStart);
+  const after = val.slice(pos);
+  ta.value = before + '@' + name + ' ' + after;
+  const newPos = before.length + name.length + 2;
+  ta.setSelectionRange(newPos, newPos);
+  ta.focus();
+  closeMentionPopup();
+  _mentionStart = -1;
+}
+
+function closeMentionPopup() {
+  const popup = document.getElementById('mentionPopup');
+  if (popup) popup.style.display = 'none';
+}
+
+// メンション抽出
+function extractMentions(text) {
+  const matches = text.match(/@([^\s@]+)/g) || [];
+  return matches.map(m => m.slice(1));
+}
+
+// メンションのハイライト表示
+function renderMessageContent(text) {
+  return esc(text).replace(/@([^\s@]+)/g, (match, name) => {
+    const isMe = name === currentUser?.name;
+    return `<span style="background:${isMe?'#fef3c7':'#ede9fe'};color:${isMe?'#92400e':'#5b21b6'};font-weight:700;border-radius:4px;padding:0 3px;">@${esc(name)}</span>`;
+  });
+}
+
+// ==============================
+// 🖥️ 全画面チャット
+// ==============================
+let _prevScreen = 'workers';
+
+function enterChatFullscreen(roomId) {
+  _prevScreen = currentScreen || 'workers';
+  // サイドバー・ヘッダーを非表示
+  document.getElementById('sidebar').style.display = 'none';
+  document.getElementById('sidebarToggleBtn').style.display = 'none';
+  const topbar = document.querySelector('.topbar');
+  if (topbar) topbar.style.display = 'none';
+  const mainWrap = document.getElementById('mainWrap');
+  if (mainWrap) mainWrap.style.marginLeft = '0';
+  // チャット画面を全画面に
+  const wrap = document.getElementById('chatFullWrap');
+  if (wrap) wrap.style.height = '100vh';
+  // 全画面バーを表示、左パネルを非表示
+  const bar = document.getElementById('chatFullscreenBar');
+  if (bar) { bar.style.display = 'flex'; }
+  // 左パネル非表示
+  const leftPanel = document.querySelector('#chatFullWrap > div:first-child');
+  if (leftPanel) leftPanel.style.display = 'none';
+  document.body.style.overflow = 'hidden';
+}
+
+function exitChatFullscreen() {
+  document.getElementById('sidebar').style.display = '';
+  document.getElementById('sidebarToggleBtn').style.display = '';
+  const topbar = document.querySelector('.topbar');
+  if (topbar) topbar.style.display = '';
+  const mainWrap = document.getElementById('mainWrap');
+  if (mainWrap) mainWrap.style.marginLeft = '';
+  const wrap = document.getElementById('chatFullWrap');
+  if (wrap) wrap.style.height = '';
+  const bar = document.getElementById('chatFullscreenBar');
+  if (bar) bar.style.display = 'none';
+  const leftPanel = document.querySelector('#chatFullWrap > div:first-child');
+  if (leftPanel) leftPanel.style.display = '';
+  document.body.style.overflow = '';
+}
+
+// ==============================
+// 💬 リプライ（LINE式引用返信）
+// ==============================
+let _replyTo = null; // { sender_name, content, created_at }
+
+function setReply(senderName, text, ts) {
+  _replyTo = { sender_name: senderName, content: text, created_at: ts };
+  const preview = document.getElementById('chatReplyPreview');
+  const sender = document.getElementById('chatReplySender');
+  const replyText = document.getElementById('chatReplyText');
+  if (preview) preview.style.display = '';
+  if (sender) sender.textContent = senderName + ' への返信';
+  if (replyText) replyText.textContent = text ? text.slice(0,60)+(text.length>60?'…':'') : '📎 ファイル';
+  document.getElementById('chatTextInput')?.focus();
+}
+
+function clearReply() {
+  _replyTo = null;
+  const preview = document.getElementById('chatReplyPreview');
+  if (preview) preview.style.display = 'none';
+}
+
 function chatDropFile(e) {
   const file = e.dataTransfer.files[0];
   if (!file) return;
@@ -2653,6 +3991,7 @@ async function sendChatMessage() {
     }
 
     // メッセージ保存
+    const mentions = text ? extractMentions(text) : [];
     const newMsg = {
       chat_room_id: currentRoom.id,
       room_id: currentRoom.id,
@@ -2661,8 +4000,11 @@ async function sendChatMessage() {
       content: text || null,
       file_url: fileUrl,
       file_name: fileName,
+      mentions: mentions.length ? mentions : null,
+      reply_to: _replyTo ? { sender_name: _replyTo.sender_name, content: (_replyTo.content||'').slice(0,80) } : null,
       created_at: new Date().toISOString(),
     };
+    clearReply();
     await sbFetch('chat_messages', {
       method: 'POST',
       body: JSON.stringify(newMsg)
@@ -2879,6 +4221,7 @@ const SCREENS = {
   job_flyer: { title: '📄 求人票作成', init: (id) => loadJobFlyer(id) },
   ai_knowledge: { title: '🧠 AI記憶', init: loadAiKnowledge },
   chat: { title: '💬 チャット', init: loadChatScreen },
+  my_account: { title: '👤 マイアカウント', init: loadMyAccount },
 };
 
 let currentScreen = 'companies';
@@ -2900,7 +4243,7 @@ function showScreen(name) {
   renderScreenContent(name);
 
   // データ読み込み
-  SCREENS[name].init();
+  Promise.resolve(SCREENS[name].init()).then(() => { if (name === 'chat') renderGroupList(); });
 
   // モバイルはサイドバー閉じる
   document.getElementById('sidebar').classList.remove('mobile-open');
@@ -2964,6 +4307,13 @@ function renderScreenContent(name) {
     return;
   }
 
+  if (name === 'my_account') {
+    statsRow.style.display = 'none';
+    filtersSection.style.display = 'none';
+    contentWrap.style.padding = '';
+    contentWrap.innerHTML = buildMyAccountScreen();
+    return;
+  }
   if (name === 'chat') {
     statsRow.style.display = 'none';
     filtersSection.style.display = 'none';
@@ -3001,9 +4351,11 @@ function renderScreenContent(name) {
 // 👤 外国人材
 // ==============================
 let allWorkers = [], filteredWorkers = [], workerPage = 1;
+let _workerSort = {key:'name', asc:true};
 
 function buildWorkersScreen() {
   return `
+  <div id="workerAlertBanner"></div>
   <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
     <input class="search-input" id="wSearchInput" placeholder="氏名・国籍・企業名で検索..." oninput="applyWorkerFilters()" style="flex:1;min-width:200px;">
     <select class="filter-select" id="wFilterStatus" onchange="applyWorkerFilters()">
@@ -3025,10 +4377,19 @@ function buildWorkersScreen() {
   </div>
   <div class="table-wrap">
     <table><thead><tr>
-      <th>氏名</th><th>国籍</th><th>企業名</th><th>分野/職種</th>
-      <th>在留資格</th><th>在留期限</th><th>配属日</th><th>ステータス</th><th>担当</th>
+      <th onclick="sortWorkers('name')" style="cursor:pointer">氏名 <span id="wsort_name" style="font-size:9px;color:var(--gray-400)">⇅</span></th>
+      <th onclick="sortWorkers('nationality')" style="cursor:pointer">国籍 <span id="wsort_nationality" style="font-size:9px;color:var(--gray-400)">⇅</span></th>
+      <th onclick="sortWorkers('companies.name')" style="cursor:pointer">企業名 <span id="wsort_companies.name" style="font-size:9px;color:var(--gray-400)">⇅</span></th>
+      <th onclick="sortWorkers('applicant_field')" style="cursor:pointer">分野/職種 <span id="wsort_applicant_field" style="font-size:9px;color:var(--gray-400)">⇅</span></th>
+      <th onclick="sortWorkers('visa_status')" style="cursor:pointer">在留資格 <span id="wsort_visa_status" style="font-size:9px;color:var(--gray-400)">⇅</span></th>
+      <th onclick="sortWorkers('visa_expiry')" style="cursor:pointer">在留期限 <span id="wsort_visa_expiry" style="font-size:9px;color:var(--gray-400)">⇅</span></th>
+      <th onclick="sortWorkers('joined_date')" style="cursor:pointer">配属日 <span id="wsort_joined_date" style="font-size:9px;color:var(--gray-400)">⇅</span></th>
+      <th onclick="sortWorkers('status')" style="cursor:pointer">ステータス <span id="wsort_status" style="font-size:9px;color:var(--gray-400)">⇅</span></th>
+      <th onclick="sortWorkers('staff')" style="cursor:pointer">担当 <span id="wsort_staff" style="font-size:9px;color:var(--gray-400)">⇅</span></th>
+      <th onclick="sortWorkers('apply_date')" style="cursor:pointer">申請日 <span id="wsort_apply_date" style="font-size:9px;color:var(--gray-400)">⇅</span></th>
+      <th onclick="sortWorkers('apply_number')" style="cursor:pointer">申請番号 <span id="wsort_apply_number" style="font-size:9px;color:var(--gray-400)">⇅</span></th>
     </tr></thead>
-    <tbody id="workerTbody"><tr><td colspan="9" style="text-align:center;padding:40px;color:var(--gray-400)">読み込み中...</td></tr></tbody>
+    <tbody id="workerTbody"><tr><td colspan="11" style="text-align:center;padding:40px;color:var(--gray-400)">読み込み中...</td></tr></tbody>
     </table>
     <div class="pagination-bar" id="workerPagination"></div>
   </div>`;
@@ -3074,29 +4435,158 @@ const STATUS_COLORS = {
   '退職（転職）':'st-none','退職（帰国）':'st-none','失踪':'st-danger','5年満了':'st-cert'
 };
 
+function sortWorkers(key) {
+  if (_workerSort.key === key) _workerSort.asc = !_workerSort.asc;
+  else { _workerSort.key = key; _workerSort.asc = true; }
+  const asc = _workerSort.asc;
+  filteredWorkers.sort((a, b) => {
+    let av = key.includes('.') ? key.split('.').reduce((o,k)=>o?.[k],a) : a[key];
+    let bv = key.includes('.') ? key.split('.').reduce((o,k)=>o?.[k],b) : b[key];
+    av = av||''; bv = bv||'';
+    return asc ? String(av).localeCompare(String(bv),'ja') : String(bv).localeCompare(String(av),'ja');
+  });
+  // ソートアイコン更新
+  document.querySelectorAll('[id^="wsort_"]').forEach(el => { el.textContent = '⇅'; el.style.color='var(--gray-400)'; });
+  const iconEl = document.getElementById('wsort_'+key.replace('.','_'));
+  if (iconEl) { iconEl.textContent = asc ? '▲' : '▼'; iconEl.style.color='var(--blue)'; }
+  workerPage = 1;
+  renderWorkerTable();
+}
+
 function renderWorkerTable() {
   const tbody = document.getElementById('workerTbody');
   if (!tbody) return;
   const total = filteredWorkers.length;
   const page = filteredWorkers.slice((workerPage-1)*PAGE_SIZE, workerPage*PAGE_SIZE);
-  if (!page.length) { tbody.innerHTML='<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--gray-400)">データなし</td></tr>'; document.getElementById('workerPagination').innerHTML=''; return; }
+  if (!page.length) { tbody.innerHTML='<tr><td colspan="11" style="text-align:center;padding:40px;color:var(--gray-400)">データなし</td></tr>'; document.getElementById('workerPagination').innerHTML=''; return; }
   tbody.innerHTML = page.map(w => {
     const cls = STATUS_COLORS[w.status] || 'st-none';
     const expiry = w.visa_expiry ? formatDate(w.visa_expiry) : '-';
     const expWarn = w.visa_expiry && daysDiff(w.visa_expiry) < 120 ? ' style="color:var(--red);font-weight:700"' : '';
+    const expiryAlert = w.visa_expiry ? (() => {
+      const days = Math.floor((new Date(w.visa_expiry)-new Date())/86400000);
+      if (days<=30) return ' style="color:#dc2626;font-weight:700;"';
+      if (days<=60) return ' style="color:#ea580c;font-weight:700;"';
+      if (days<=90) return ' style="color:#d97706;font-weight:700;"';
+      return '';
+    })() : '';
     return `<tr onclick="openWorkerModal('${w.id}')">
       <td><strong>${esc(w.name)}</strong>${w.name_kana?'<div style="font-size:10px;color:var(--gray-400)">'+esc(w.name_kana)+'</div>':''}</td>
       <td>${natFlag(w.nationality)} ${esc(w.nationality||'-')}</td>
       <td style="font-size:12px">${esc(w.companies?.name||'-')}</td>
       <td style="font-size:11px;color:var(--gray-700)">${esc(w.applicant_field||'')}${w.job_category?'<br>'+esc(w.job_category):''}</td>
       <td style="font-size:12px">${esc(w.visa_status||'-')}</td>
-      <td${expWarn}>${expiry}</td>
+      <td${expiryAlert}>${expiry}</td>
       <td style="font-size:12px">${w.joined_date?formatDate(w.joined_date):'-'}</td>
       <td><span class="st-badge ${cls}">${esc(w.status||'-')}</span></td>
       <td style="font-size:12px">${esc(w.staff||'-')}</td>
+      <td style="font-size:12px">${w.apply_date?formatDate(w.apply_date):'-'}</td>
+      <td style="font-size:12px">${esc(w.apply_number||'-')}</td>
     </tr>`;
   }).join('');
   renderGenPagination('workerPagination', total, workerPage, p => { workerPage=p; renderWorkerTable(); });
+  renderWorkerAlerts();
+}
+
+function renderWorkerAlerts() {
+  const banner = document.getElementById('workerAlertBanner');
+  if (!banner) return;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const alerts = { 1:[], 2:[], 3:[] };
+  (filteredWorkers.length ? filteredWorkers : allWorkers).forEach(w => {
+    if (!w.visa_expiry) return;
+    if (w.request_date) return; // 申請依頼日が入っていればアラート除外
+    const exp = new Date(w.visa_expiry); exp.setHours(0,0,0,0);
+    const days = Math.floor((exp-today)/86400000);
+    if (days < 0) return;
+    if (days <= 30) alerts[1].push({w, days});
+    else if (days <= 60) alerts[2].push({w, days});
+    else if (days <= 90) alerts[3].push({w, days});
+  });
+  const total = alerts[1].length + alerts[2].length + alerts[3].length;
+  if (!total) { banner.innerHTML=''; return; }
+  // 1行3列・クリックで人材リスト展開
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'margin-bottom:12px;';
+  const alertDefs = [
+    {list: alerts[1], label:'🔴 1ヶ月以内', color:'#dc2626', bg:'#fef2f2', border:'#fecaca', key:'a1'},
+    {list: alerts[2], label:'🟠 2ヶ月以内', color:'#ea580c', bg:'#fff7ed', border:'#fed7aa', key:'a2'},
+    {list: alerts[3], label:'🟡 3ヶ月以内', color:'#d97706', bg:'#fffbeb', border:'#fde68a', key:'a3'},
+  ];
+  // 3列グリッド
+  const grid = document.createElement('div');
+  grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:0;';
+  alertDefs.forEach(a => {
+    const box = document.createElement('div');
+    box.style.cssText = 'background:'+a.bg+';border:1.5px solid '+a.border+';border-radius:8px;padding:10px 14px;cursor:pointer;transition:.15s;';
+    box.onmouseover = () => box.style.opacity = '0.85';
+    box.onmouseout = () => box.style.opacity = '1';
+    const isEmpty = a.list.length === 0;
+    box.innerHTML =
+      '<div style="font-size:12px;font-weight:800;color:'+a.color+';">'+a.label+'</div>'+
+      '<div style="font-size:22px;font-weight:900;color:'+a.color+';margin:4px 0 2px;">'+a.list.length+'<span style="font-size:13px;font-weight:600;">名</span></div>'+
+      (isEmpty ? '<div style="font-size:11px;color:#94a3b8;">該当者なし</div>' : '<div style="font-size:11px;color:'+a.color+';">クリックで一覧表示 ▼</div>');
+    if (!isEmpty) {
+      box.onclick = () => toggleAlertList(a.key, a, grid);
+    }
+    box.dataset.key = a.key;
+    grid.appendChild(box);
+  });
+  wrap.appendChild(grid);
+  // 展開リストエリア
+  const listArea = document.createElement('div');
+  listArea.id = 'workerAlertList';
+  wrap.appendChild(listArea);
+  banner.innerHTML = '';
+  banner.appendChild(wrap);
+}
+
+function toggleAlertList(key, alertDef, grid) {
+  const listArea = document.getElementById('workerAlertList');
+  if (!listArea) return;
+  // 既に同じキーが開いていれば閉じる
+  if (listArea.dataset.openKey === key) {
+    listArea.innerHTML = '';
+    listArea.dataset.openKey = '';
+    grid.querySelectorAll('[data-key]').forEach(b => b.style.boxShadow = '');
+    return;
+  }
+  listArea.dataset.openKey = key;
+  // ハイライト
+  grid.querySelectorAll('[data-key]').forEach(b => {
+    b.style.boxShadow = b.dataset.key === key ? '0 0 0 2px '+alertDef.color : '';
+  });
+  // リスト描画
+  const box = document.createElement('div');
+  box.style.cssText = 'background:'+alertDef.bg+';border:1px solid '+alertDef.border+';border-radius:0 0 8px 8px;padding:10px 14px;margin-top:-2px;';
+  const title = document.createElement('div');
+  title.style.cssText = 'font-size:11px;font-weight:700;color:'+alertDef.color+';margin-bottom:8px;';
+  title.textContent = alertDef.label + ' の人材一覧';
+  box.appendChild(title);
+  const rows = document.createElement('div');
+  rows.style.cssText = 'display:flex;flex-direction:column;gap:4px;';
+  alertDef.list.forEach(({w, days}) => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;background:white;border:1px solid '+alertDef.border+';border-radius:6px;padding:6px 12px;cursor:pointer;';
+    row.onmouseover = () => row.style.background = '#f8fafc';
+    row.onmouseout = () => row.style.background = 'white';
+    row.onclick = () => openWorkerModal(w.id);
+    const left = document.createElement('div');
+    left.style.cssText = 'display:flex;align-items:center;gap:8px;';
+    left.innerHTML = '<span style="font-size:16px;">'+natFlag(w.nationality||'')+'</span>'+
+      '<div><div style="font-size:13px;font-weight:700;">'+esc(w.name)+'</div>'+
+      '<div style="font-size:11px;color:#5f6368;">'+esc(w.companies?.name||'')+'</div></div>';
+    const right = document.createElement('div');
+    right.style.cssText = 'text-align:right;';
+    right.innerHTML = '<div style="font-size:12px;font-weight:700;color:'+alertDef.color+';">あと'+days+'日</div>'+
+      '<div style="font-size:11px;color:#5f6368;">'+formatDate(w.visa_expiry)+'</div>';
+    row.appendChild(left);
+    row.appendChild(right);
+    rows.appendChild(row);
+  });
+  box.appendChild(rows);
+  listArea.innerHTML = '';
+  listArea.appendChild(box);
 }
 
 function onWorkerWorkplaceChange() {
@@ -3120,6 +4610,21 @@ async function openWorkerModal(id) {
   setTimeout(() => setupAutoSave(saveWorker), 100);
 }
 let editingWorkerId = null;
+
+function switchWorkerTab(tab) {
+  const tabs = ['basic','note'];
+  tabs.forEach(t => {
+    const btn = document.getElementById('wtab_'+t);
+    const panel = document.getElementById('wtab_'+t+'_panel');
+    const active = t === tab;
+    if (btn) {
+      btn.style.color = active ? 'var(--blue)' : 'var(--gray-400)';
+      btn.style.borderBottomColor = active ? 'var(--blue)' : 'transparent';
+      btn.style.fontWeight = active ? '700' : '600';
+    }
+    if (panel) panel.style.display = active ? '' : 'none';
+  });
+}
 
 async function fillWorkerFromCandidate() {
   const selId = document.getElementById('wf_candidate_src')?.value;
@@ -3159,6 +4664,19 @@ function buildWorkerModalBody(w) {
     ? allCandidates.map(c => `<option value="${c.id}">${natFlag(c.nationality||'')} ${esc(c.name||'')}（${esc(c.nationality||'')}）</option>`).join('')
     : '<option value="">候補者データなし</option>';
   return `
+  <!-- タブ -->
+  <div style="display:flex;gap:0;border-bottom:1px solid var(--gray-200);margin-bottom:16px;margin-top:-4px;">
+    <button id="wtab_basic" onclick="switchWorkerTab('basic')"
+      style="padding:8px 18px;font-size:12px;font-weight:700;border:none;background:none;cursor:pointer;color:var(--blue);border-bottom:2px solid var(--blue);">
+      📋 基本情報
+    </button>
+    <button id="wtab_note" onclick="switchWorkerTab('note')"
+      style="padding:8px 18px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--gray-400);border-bottom:2px solid transparent;">
+      📝 ノート
+    </button>
+  </div>
+  <!-- 基本情報タブ -->
+  <div id="wtab_basic_panel">
   <div class="form-grid">
     <div class="section-title">基本情報</div>
     <div class="form-group full" style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:10px 12px;margin-bottom:4px;">
@@ -3197,6 +4715,10 @@ function buildWorkerModalBody(w) {
     <div class="form-group"><label class="form-label">在留期限</label><input class="form-input" id="wf_visa_expiry" type="date" value="${w.visa_expiry||''}"></div>
     <div class="form-group"><label class="form-label">在留カード番号</label><input class="form-input" id="wf_residence_card" value="${esc(w.residence_card||'')}"></div>
     <div class="form-group"><label class="form-label">入国日</label><input class="form-input" id="wf_entry_date" type="date" value="${w.entry_date||''}"></div>
+    <div class="section-title">申請情報</div>
+    <div class="form-group"><label class="form-label">申請依頼日 <span style="font-size:10px;color:var(--gray-400);">（入力でアラートから除外）</span></label><input class="form-input" id="wf_request_date" type="date" value="${w.request_date||''}"></div>
+    <div class="form-group"><label class="form-label">申請日</label><input class="form-input" id="wf_apply_date" type="date" value="${w.apply_date||''}"></div>
+    <div class="form-group"><label class="form-label">申請番号</label><input class="form-input" id="wf_apply_number" value="${esc(w.apply_number||'')}" placeholder="例: 2024-T-001"></div>
     <div class="section-title">ステータス</div>
     <div class="form-group"><label class="form-label">ステータス</label>
       <select class="form-select" id="wf_status">
@@ -3229,14 +4751,49 @@ function buildWorkerModalBody(w) {
     <div class="section-title">メモ</div>
     <div class="form-group full"><label class="form-label">備考</label><textarea class="form-textarea" id="wf_memo">${esc(w.memo||'')}</textarea></div>
   </div>
+  </div>
+  <!-- ノートタブ -->
+  <div id="wtab_note_panel" style="display:none;padding:4px 0;">
+    <div style="margin-bottom:8px;font-size:11px;color:var(--gray-400);">この人材に関するメモ・申し送り事項を記録してください。</div>
+    <textarea class="form-textarea" id="wf_notes" rows="14"
+      style="font-size:13px;line-height:1.8;resize:vertical;"
+      placeholder="例: 家族構成・日本語レベル・経歴・特記事項など...">${esc(w.notes||'')}</textarea>
+  </div>
   <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)">
     <button class="btn btn-outline" onclick="closeGenModal('workerModal')">キャンセル</button>
-    <button class="btn btn-outline" style="color:#059669;border-color:#059669;" onclick="startWorkerChat(editingWorkerId)">💬 チャット開始</button>
+    ${editingWorkerId ? '<button class="btn btn-outline" style="color:var(--red);border-color:var(--red);" onclick="deleteWorker()">🗑️ 削除</button>' : ''}
+    <button class="btn btn-outline" style="color:#059669;border-color:#059669;" onclick="saveAndStartChat()">💬 チャット開始</button>
     <button class="btn btn-primary" onclick="saveWorker()">💾 保存</button>
   </div>`;
 }
 
-async function saveWorker() {
+async function deleteWorker() {
+  if (!editingWorkerId) return;
+  if (!confirm('この外国人材を削除しますか？\nチャット履歴も削除されます。')) return;
+  showLoading(true);
+  try {
+    await sbFetch('workers?id=eq.'+editingWorkerId, {method:'DELETE'});
+    showToast('🗑️ 削除しました', 'success');
+    closeGenModal('workerModal');
+    await loadWorkers();
+  } catch(e) { showToast('❌ '+e.message,'error'); }
+  showLoading(false);
+}
+
+async function deleteCandidate() {
+  if (!editingCandidateId) return;
+  if (!confirm('この候補者を削除しますか？')) return;
+  showLoading(true);
+  try {
+    await sbFetch('candidates?id=eq.'+editingCandidateId, {method:'DELETE'});
+    showToast('🗑️ 削除しました', 'success');
+    closeGenModal('candidateModal');
+    await loadCandidates();
+  } catch(e) { showToast('❌ '+e.message,'error'); }
+  showLoading(false);
+}
+
+async function saveWorker(returnResult=false) {
   const data = {
     name: document.getElementById('wf_name').value,
     name_kana: document.getElementById('wf_name_kana').value||null,
@@ -3276,11 +4833,13 @@ async function saveWorker() {
       await sbFetch('workers?id=eq.'+editingWorkerId, {method:'PATCH', body:JSON.stringify(data)});
       showToast('✅ 更新しました', 'success');
     } else {
-      await sbFetch('workers', {method:'POST', body:JSON.stringify(data)});
+      const res = await sbFetch('workers', {method:'POST', body:JSON.stringify(data)});
+      editingWorkerId = res?.[0]?.id || null; // 新規登録時にIDをセット
       showToast('✅ 登録しました', 'success');
     }
-    closeGenModal('workerModal');
+    if (!returnResult) closeGenModal('workerModal');
     await loadWorkers();
+    if (returnResult) { showLoading(false); return true; }
   } catch(e) { showToast('❌ '+e.message,'error'); }
   showLoading(false);
 }
@@ -3371,6 +4930,19 @@ let editingCandidateId=null;
 function buildCandidateModalBody(c) {
   c=c||{};
   return `
+  <!-- タブ -->
+  <div style="display:flex;gap:0;border-bottom:1px solid var(--gray-200);margin-bottom:16px;margin-top:-4px;">
+    <button id="wtab_basic" onclick="switchWorkerTab('basic')"
+      style="padding:8px 18px;font-size:12px;font-weight:700;border:none;background:none;cursor:pointer;color:var(--blue);border-bottom:2px solid var(--blue);">
+      📋 基本情報
+    </button>
+    <button id="wtab_note" onclick="switchWorkerTab('note')"
+      style="padding:8px 18px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--gray-400);border-bottom:2px solid transparent;">
+      📝 ノート
+    </button>
+  </div>
+  <!-- 基本情報タブ -->
+  <div id="wtab_basic_panel">
   <div class="form-grid">
     <div class="section-title">基本情報</div>
     <div class="form-group full"><label class="form-label">氏名（ローマ字）*</label><input class="form-input" id="cf_name" value="${esc(c.name||'')}"></div>
@@ -3495,7 +5067,7 @@ function renderJobTable() {
   const tbody=document.getElementById('jobTbody'); if(!tbody) return;
   const total=filteredJobs.length;
   const page=filteredJobs.slice((jobPage-1)*PAGE_SIZE,jobPage*PAGE_SIZE);
-  if(!page.length){tbody.innerHTML='<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--gray-400)">データなし</td></tr>'; document.getElementById('jobPagination').innerHTML=''; return;}
+  if(!page.length){tbody.innerHTML='<tr><td colspan="11" style="text-align:center;padding:40px;color:var(--gray-400)">データなし</td></tr>'; document.getElementById('jobPagination').innerHTML=''; return;}
   const stCls={募集中:'st-active',新着:'st-docs',提案中:'st-review',保留:'st-add',停止:'st-none',決定:'st-cert',募集再開:'st-submit'};
   const priCls={高:'st-active',中:'st-review',低:'st-none'};
   tbody.innerHTML=page.map(j=>`<tr onclick="openJobModal('${j.id}')">
@@ -3671,6 +5243,19 @@ let editingIntroId=null;
 function buildIntroModalBody(i) {
   i=i||{};
   return `
+  <!-- タブ -->
+  <div style="display:flex;gap:0;border-bottom:1px solid var(--gray-200);margin-bottom:16px;margin-top:-4px;">
+    <button id="wtab_basic" onclick="switchWorkerTab('basic')"
+      style="padding:8px 18px;font-size:12px;font-weight:700;border:none;background:none;cursor:pointer;color:var(--blue);border-bottom:2px solid var(--blue);">
+      📋 基本情報
+    </button>
+    <button id="wtab_note" onclick="switchWorkerTab('note')"
+      style="padding:8px 18px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--gray-400);border-bottom:2px solid transparent;">
+      📝 ノート
+    </button>
+  </div>
+  <!-- 基本情報タブ -->
+  <div id="wtab_basic_panel">
   <div class="form-grid">
     <div class="section-title">基本情報</div>
     <div class="form-group"><label class="form-label">決定日付</label><input class="form-input" id="if_decision_date" type="date" value="${i.decision_date||''}"></div>
@@ -4268,7 +5853,7 @@ function clearExpenseFilters() {
 }
 function renderExpenseTableDirect() {
   const tbody=document.getElementById('expenseTbody'); if(!tbody) return;
-  if(!allExpenses.length){tbody.innerHTML='<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--gray-400)">データなし</td></tr>';document.getElementById('expensePagination').innerHTML='';return;}
+  if(!allExpenses.length){tbody.innerHTML='<tr><td colspan="11" style="text-align:center;padding:40px;color:var(--gray-400)">データなし</td></tr>';document.getElementById('expensePagination').innerHTML='';return;}
   const stCls={未請求:'st-add',請求済:'st-review',入金済:'st-active'};
   // クライアント側テキスト検索（名前等）
   const q=(document.getElementById('exSearchInput')?.value||'').toLowerCase();
@@ -4339,7 +5924,7 @@ function clearApiKey() {
   if (cw) cw.innerHTML = buildUsersScreen();
   loadUsers();
 }
-async function loadUsers(){showLoading(true);try{const data=await sbFetch('users?select=*&order=name.asc');allUsers=data||[];applyUserFilters();}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
+async function loadUsers(){showLoading(true);try{const data=await sbFetch('users?select=id,name,role,team,email,is_active,avatar_url&order=name.asc');allUsers=data||[];applyUserFilters();}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
 function applyUserFilters(){if(currentScreen!=='users')return;const q=(document.getElementById('uSearchInput')?.value||'').toLowerCase();filteredUsers=allUsers.filter(u=>!q||((u.name||'').toLowerCase().includes(q)||(u.email||'').toLowerCase().includes(q)));userPage=1;renderUserTable();}
 function clearUserFilters(){const el=document.getElementById('uSearchInput');if(el)el.value='';applyUserFilters();}
 function renderUserTable(){const tbody=document.getElementById('userTbody');if(!tbody)return;const total=filteredUsers.length;const page=filteredUsers.slice((userPage-1)*PAGE_SIZE,userPage*PAGE_SIZE);if(!page.length){tbody.innerHTML='<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--gray-400)">データなし</td></tr>';document.getElementById('userPagination').innerHTML='';return;}tbody.innerHTML=page.map(u=>`<tr onclick="openUserModal('${u.id}')"><td><div style="display:flex;align-items:center;gap:8px"><div class="user-avatar" style="width:28px;height:28px;font-size:11px">${(u.name||'?').charAt(0)}</div><strong>${esc(u.name)}</strong></div></td><td style="font-size:12px">${esc(u.email||'-')}</td><td style="font-size:12px">${esc(u.role||'-')}</td><td style="font-size:12px">${esc(u.team||'-')}</td><td><span class="st-badge ${u.is_active!==false?'st-active':'st-none'}">${u.is_active!==false?'有効':'無効'}</span></td></tr>`).join('');renderGenPagination('userPagination',total,userPage,p=>{userPage=p;renderUserTable();});}
@@ -4737,6 +6322,8 @@ function buildResumeHTML(c) {
 .resume-lic-item .has { color: #16a34a; font-weight: 700; }
 .resume-lic-item .none { color: #ccc; }
 .resume-memo-box { border: 1px solid #ccc; border-radius: 3px; padding: 6px 8px; min-height: 36px; font-size: 11px; background: #fafafa; }
+.mention-item:hover { background: #f0f4ff; }
+.mention-item.mention-active { background: #eff6ff; }
 .resume-sign { text-align: right; font-size: 10px; color: #555; margin-top: 8px; padding-top: 5px; border-top: 1px solid #eee; }
 </style>
 
@@ -4843,7 +6430,7 @@ function buildResumeHTML(c) {
 // ==============================
 // 汎用モーダル・ユーティリティ
 // ==============================
-const MODAL_IDS=['workerModal','candidateModal','jobModal','introModal','sendingModal','partnerModal','feeModal','saleModal','expenseModal','userModal','newRequestModal'];
+const MODAL_IDS=['workerModal','candidateModal','jobModal','introModal','sendingModal','partnerModal','feeModal','saleModal','expenseModal','userModal','newRequestModal','aiKnModal'];
 
 function ensureModals() {
   MODAL_IDS.forEach(id=>{
@@ -4932,6 +6519,10 @@ document.head.appendChild(extraStyle);
 .koc-kn-item{border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:11px;margin-bottom:6px;}
 .koc-kn-item.pending{border-color:#fcd34d;background:#fffbeb;}
 .koc-kn-item.approved{border-color:#6ee7b7;background:#f0fdf4;}
+
+.chat-bubble-wrap { position:relative; }
+.chat-bubble-wrap .rb { opacity:0; transition:opacity .15s; }
+.chat-bubble-wrap:hover .rb { opacity:1; }
 </style>
 
 <button id="kmt-chat-btn" onclick="kocToggle()" title="AIアシスタント">🤖</button>
