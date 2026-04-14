@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260413.32 -->
+<!-- KMT_VERSION ver.20260413.41 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -208,7 +208,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260413.32</div>
+    <div class="logo-ver">ver.20260413.41</div>
     <div id="currentUserBadge" style="font-size:10px;color:#86efac;margin-top:2px;cursor:pointer;" onclick="logoutUser()">👤 読込中...</div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;color:#86efac;margin:4px 8px;border-radius:6px;background:rgba(134,239,172,0.1);" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -1949,6 +1949,25 @@ function buildJobFlyerScreen() {
           <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:8px;font-size:11px;">
             ${[['fs_appeal','アピール'],['fs_s1','⑴仕事内容'],['fs_s2','⑵勤務時間'],['fs_s3','⑶賃金'],['fs_s4','⑷控除額'],['fs_s5','⑸寮'],['fs_s6','⑹受入条件'],['fs_s7','⑺面接']].map(([id,label])=>`<label style="display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" id="${id}" checked onchange="previewFlyer()">${label}</label>`).join('')}
           </div>
+          <div style="font-size:10px;font-weight:700;color:var(--navy);margin-bottom:5px;">🌐 翻訳</div>
+          <div style="display:flex;gap:4px;margin-bottom:6px;">
+            <select id="flyerLang" class="form-select" style="font-size:11px;flex:1;" onchange="onFlyerLangChange()">
+              <option value="">言語を選択</option>
+              <option value="Indonesian">インドネシア語</option>
+              <option value="English">English</option>
+              <option value="Vietnamese">ベトナム語</option>
+              <option value="Burmese">ミャンマー語</option>
+              <option value="Khmer">カンボジア語（クメール語）</option>
+              <option value="Thai">タイ語</option>
+            </select>
+            <button class="btn btn-outline" style="font-size:10px;padding:4px 8px;flex-shrink:0;" onclick="translateFlyer()" id="flyerTranslateBtn">翻訳</button>
+          </div>
+          <div style="display:flex;gap:4px;margin-bottom:8px;font-size:10px;">
+            <label style="display:flex;align-items:center;gap:3px;cursor:pointer;"><input type="radio" name="flyerMode" value="ja" onchange="previewFlyer()" checked>日本語のみ</label>
+            <label style="display:flex;align-items:center;gap:3px;cursor:pointer;"><input type="radio" name="flyerMode" value="bilingual" onchange="previewFlyer()">日本語＋翻訳</label>
+            <label style="display:flex;align-items:center;gap:3px;cursor:pointer;"><input type="radio" name="flyerMode" value="translated" onchange="previewFlyer()">翻訳のみ</label>
+          </div>
+          <div id="flyerTranslateStatus" style="font-size:10px;color:var(--blue);margin-bottom:6px;display:none;">翻訳中...</div>
           <button class="btn btn-primary" style="width:100%" onclick="printJobFlyer()">🖨️ 印刷 / PDF保存</button>
         </div>
       </div>
@@ -2015,11 +2034,21 @@ function previewFlyer() {
   const g = id => document.getElementById(id)?.value||'';
   const show = id => document.getElementById(id)?.checked !== false;
   const preview = document.getElementById('jobFlyerPreview'); if(!preview) return;
-  const company=g('ff_company'),location=g('ff_location'),industry=g('ff_industry'),jobType=g('ff_job_type'),appeal=g('ff_appeal'),desc=g('ff_description');
-  const startTime=g('ff_start_time'),endTime=g('ff_end_time'),workNote=g('ff_work_note'),holidays=g('ff_holidays');
-  const salary=g('ff_salary'),allowances=g('ff_allowances'),deductions=g('ff_deductions'),dorm=g('ff_dorm');
-  const nat=g('ff_nationality'),count=g('ff_count'),reqs=g('ff_requirements'),jpLv=g('ff_jp_level'),ideal=g('ff_ideal'),interview=g('ff_interview');
-  const row=(label,val)=>val?`<tr><td style="width:28%;padding:6px 8px;background:#eef2ff;font-size:10px;font-weight:700;color:#1e3a6e;border:1px solid #c7d2f0;white-space:nowrap;vertical-align:top;">${label}</td><td style="padding:6px 8px;font-size:11px;border:1px solid #c7d2f0;line-height:1.7;white-space:pre-wrap;">${esc(val)}</td></tr>`:'';
+  const mode = document.querySelector('input[name="flyerMode"]:checked')?.value || 'ja';
+  const t = _flyerTranslated || {};
+  // 翻訳モードに応じてテキストを取得するヘルパー
+  const txt = (key, jaVal) => {
+    const trVal = t[key] || '';
+    if (mode === 'ja' || !trVal) return jaVal;
+    if (mode === 'translated') return trVal;
+    // bilingual: 日本語 + 翻訳
+    return jaVal + (trVal ? '<br><span style="color:#1a56db;font-size:10px;">' + trVal.split('\n').join('<br>') + '</span>' : '');
+  };
+  const company=txt('company',g('ff_company')),location=txt('location',g('ff_location')),industry=txt('industry',g('ff_industry')),jobType=txt('job_type',g('ff_job_type')),appeal=txt('appeal',g('ff_appeal')),desc=txt('description',g('ff_description'));
+  const startTime=g('ff_start_time'),endTime=g('ff_end_time'),workNote=txt('work_note',g('ff_work_note')),holidays=txt('holidays',g('ff_holidays'));
+  const salary=txt('salary',g('ff_salary')),allowances=txt('allowances',g('ff_allowances')),deductions=txt('deductions',g('ff_deductions')),dorm=txt('dorm',g('ff_dorm'));
+  const nat=g('ff_nationality'),count=g('ff_count'),reqs=txt('requirements',g('ff_requirements')),jpLv=txt('jp_level',g('ff_jp_level')),ideal=txt('ideal',g('ff_ideal')),interview=txt('interview',g('ff_interview'));
+  const row=(label,val)=>val?`<tr><td style="width:28%;padding:6px 8px;background:#eef2ff;font-size:10px;font-weight:700;color:#1e3a6e;border:1px solid #c7d2f0;white-space:nowrap;vertical-align:top;">${label}</td><td style="padding:6px 8px;font-size:11px;border:1px solid #c7d2f0;line-height:1.7;white-space:pre-wrap;">${val}</td></tr>`:'';
   const section=t=>`<div style="font-size:11px;font-weight:800;color:#1e3a6e;background:#dde6ff;padding:5px 10px;margin:10px 0 0;border-left:4px solid #1e3a6e;">${t}</div>`;
   preview.innerHTML=`<div style="border-top:5px solid #1e3a6e;">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:12px 0 10px;">
@@ -2330,7 +2359,7 @@ function buildChatScreen() {
         <div style="color:var(--gray-400);font-size:13px;">← 案件を選択してください</div>
       </div>
       <!-- メッセージ一覧 -->
-      <div id="chatMessageArea" style="flex:1;overflow-y:auto;padding:16px;background:#f8fafc;display:flex;flex-direction:column;gap:10px;">
+      <div id="chatMessageArea" style="flex:1;overflow-y:auto;padding:16px;background:#f8fafc;display:flex;flex-direction:column;gap:10px;transition:background .2s;" ondragover="event.preventDefault();this.style.background='#dbeafe';" ondragleave="this.style.background='#f8fafc';" ondrop="event.preventDefault();this.style.background='#f8fafc';chatDropFile(event);">
       </div>
       <!-- 入力エリア -->
       <div id="chatInputArea" style="display:none;padding:10px 14px;border-top:1px solid var(--gray-200);background:white;flex-shrink:0;">
@@ -2394,12 +2423,14 @@ async function startWorkerChat(workerId) {
     }
     if (!roomId) throw new Error('ルーム作成失敗');
     closeGenModal('workerModal');
+    // 先にチャット画面を描画してからデータ取得・ルームを開く
     showScreen('chat');
-    setTimeout(async () => {
-      await loadChatScreen();
-      const room = chatRooms.find(r => r.id === roomId);
-      if (room) openChatRoom(roomId);
-    }, 300);
+    // renderScreenContent が chat 画面を描画するのを待つ
+    await new Promise(r => setTimeout(r, 100));
+    await loadChatScreen();
+    // roomId でルームを開く
+    const targetRoom = chatRooms.find(r => r.id === roomId);
+    if (targetRoom) await openChatRoom(roomId);
     showToast('💬 チャットを開始しました', 'success');
   } catch(e) { showToast('❌ ' + e.message, 'error'); }
   showLoading(false);
@@ -2408,19 +2439,21 @@ async function startWorkerChat(workerId) {
 async function loadChatUnread() {
   if (!currentUser) return;
   try {
-    // 各ルームの最新メッセージと既読時刻を比較
+    // chat_room_id ベースで未読を計算
     const [msgs, reads] = await Promise.all([
-      sbFetch('chat_messages?select=room_id,created_at&order=created_at.desc'),
+      sbFetch('chat_messages?select=chat_room_id,created_at&order=created_at.desc'),
       sbFetch('chat_read_at?select=room_id,read_at&user_id=eq.' + currentUser.id),
     ]);
     const readMap = {};
     (reads||[]).forEach(r => { readMap[r.room_id] = r.read_at; });
-    // ルームごとの未読数を計算
+    // ルームごとの未読数（メッセージがあるものだけ）
     const unreadByRoom = {};
     (msgs||[]).forEach(m => {
-      const readAt = readMap[m.room_id];
+      const roomId = m.chat_room_id;
+      if (!roomId) return;
+      const readAt = readMap[roomId];
       if (!readAt || m.created_at > readAt) {
-        unreadByRoom[m.room_id] = (unreadByRoom[m.room_id] || 0) + 1;
+        unreadByRoom[roomId] = (unreadByRoom[roomId] || 0) + 1;
       }
     });
     chatRooms.forEach(r => { r.unread = unreadByRoom[r.id] || 0; });
@@ -2465,8 +2498,9 @@ async function openChatRoom(roomId) {
   currentRoom = room;
   renderChatRooms();
 
-  // ヘッダー更新
+  // ヘッダー更新（要素が存在することを確認）
   const header = document.getElementById('chatRoomHeader');
+  if (!header) { console.warn('chatRoomHeader not found'); return; }
   header.innerHTML = `
     <div style="flex:1;">
       <div style="font-size:14px;font-weight:800;color:var(--navy);">💬 ${esc(room.name)}</div>
@@ -2516,9 +2550,9 @@ function renderChatMessages() {
     const mine = isMine(m.sender_name);
     const time = new Date(m.created_at).toLocaleString('ja-JP', {month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
     return `
-    <div style="display:flex;flex-direction:${mine?'row-reverse':'row'};gap:8px;align-items:flex-end;">
+    <div style="display:flex;flex-direction:${mine?'row-reverse':'row'};gap:8px;align-items:flex-end;padding:0 8px;">
       ${!mine ? `<div style="font-size:20px;flex-shrink:0;">👤</div>` : ''}
-      <div style="max-width:70%;">
+      <div style="max-width:60%;">
         ${!mine ? `<div style="font-size:10px;color:var(--gray-400);margin-bottom:3px;">${esc(m.sender_name)}</div>` : ''}
         <div style="background:${mine?'#1a56db':'white'};color:${mine?'white':'#1a202c'};padding:9px 13px;border-radius:${mine?'14px 4px 14px 14px':'4px 14px 14px 14px'};font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;border:${mine?'none':'1px solid var(--gray-200)'};box-shadow:0 1px 4px rgba(0,0,0,.06);">
           ${m.file_url ? `<div style="margin-bottom:${m.content?'8px':'0'};">📎 <a href="${esc(m.file_url)}" target="_blank" style="color:${mine?'#bfdbfe':'#1a56db'};font-weight:700;">${esc(m.file_name||'ファイル')}</a></div>` : ''}
@@ -2546,6 +2580,17 @@ async function markChatRead(roomId) {
 }
 
 let _chatFile = null;
+function chatDropFile(e) {
+  const file = e.dataTransfer.files[0];
+  if (!file) return;
+  _chatFile = file;
+  document.getElementById('chatFileName').textContent = '📎 ' + file.name;
+  document.getElementById('chatFilePreview').style.display = 'flex';
+  showToast('📎 ' + file.name + ' を添付しました', 'success');
+  // 入力エリアにフォーカス
+  document.getElementById('chatTextInput')?.focus();
+}
+
 function onChatFileSelect(input) {
   const file = input.files[0]; if (!file) return;
   _chatFile = file;
@@ -2608,23 +2653,27 @@ async function sendChatMessage() {
     }
 
     // メッセージ保存
+    const newMsg = {
+      chat_room_id: currentRoom.id,
+      room_id: currentRoom.id,
+      sender_id: currentUser?.id || '',
+      sender_name: currentUser?.name || '',
+      content: text || null,
+      file_url: fileUrl,
+      file_name: fileName,
+      created_at: new Date().toISOString(),
+    };
     await sbFetch('chat_messages', {
       method: 'POST',
-      body: JSON.stringify({
-        room_id: currentRoom.id,
-        room_type: currentRoom.type,
-        sender_id: currentUser.id,
-        sender_name: currentUser.name,
-        content: text || null,
-        file_url: fileUrl,
-        file_name: fileName,
-        created_at: new Date().toISOString(),
-      })
+      body: JSON.stringify(newMsg)
     });
 
+    // 送信後すぐにローカルに追加して表示
+    chatMessages.push(newMsg);
+    renderChatMessages();
     document.getElementById('chatTextInput').value = '';
 
-    // Push通知送信（自分以外に）
+    // Push通知送信
     sendPushToOthers(currentRoom.name, currentUser.name + ': ' + (text || fileName || 'ファイル'));
 
   } catch(e) {
@@ -2665,6 +2714,106 @@ function initSupabaseClient() {
   if (typeof supabase !== 'undefined') {
     window._supabaseClient = supabase.createClient(SB_URL, SB_KEY);
   }
+}
+
+// ==============================
+// 🌐 求人票翻訳
+// ==============================
+let _flyerTranslated = {}; // { fieldId: translatedText }
+let _flyerLang = '';
+
+function onFlyerLangChange() {
+  _flyerLang = document.getElementById('flyerLang')?.value || '';
+  if (!_flyerLang) {
+    // 言語未選択なら日本語のみに戻す
+    const r = document.querySelector('input[name="flyerMode"][value="ja"]');
+    if (r) r.checked = true;
+  }
+  previewFlyer();
+}
+
+async function translateFlyer() {
+  const lang = document.getElementById('flyerLang')?.value;
+  if (!lang) { showToast('⚠️ 翻訳言語を選択してください', 'error'); return; }
+  const apiKey = (localStorage.getItem('ofusa_apiKey') || '').trim();
+  if (!apiKey) { showToast('⚠️ APIキーが設定されていません（ユーザー設定）', 'error'); return; }
+
+  const langNames = {
+    Indonesian: 'インドネシア語(Bahasa Indonesia)',
+    English: '英語(English)',
+    Vietnamese: 'ベトナム語(Tiếng Việt)',
+    Burmese: 'ミャンマー語(မြန်မာဘာသာ)',
+    Khmer: 'カンボジア語・クメール語(ភាសាខ្មែរ)',
+    Thai: 'タイ語(ภาษาไทย)',
+  };
+
+  const g = id => document.getElementById(id)?.value || '';
+  const fields = {
+    company:      g('ff_company'),
+    location:     g('ff_location'),
+    industry:     g('ff_industry'),
+    job_type:     g('ff_job_type'),
+    appeal:       g('ff_appeal'),
+    description:  g('ff_description'),
+    work_note:    g('ff_work_note'),
+    holidays:     g('ff_holidays'),
+    salary:       g('ff_salary'),
+    allowances:   g('ff_allowances'),
+    deductions:   g('ff_deductions'),
+    dorm:         g('ff_dorm'),
+    requirements: g('ff_requirements'),
+    jp_level:     g('ff_jp_level'),
+    ideal:        g('ff_ideal'),
+    interview:    g('ff_interview'),
+  };
+
+  // 空フィールドを除外
+  const toTranslate = Object.fromEntries(Object.entries(fields).filter(([,v]) => v.trim()));
+  if (!Object.keys(toTranslate).length) { showToast('⚠️ 翻訳する内容がありません', 'error'); return; }
+
+  const statusEl = document.getElementById('flyerTranslateStatus');
+  const btn = document.getElementById('flyerTranslateBtn');
+  if (statusEl) statusEl.style.display = '';
+  if (btn) btn.disabled = true;
+
+  try {
+    const prompt = `以下の日本語テキストを${langNames[lang] || lang}に翻訳してください。
+JSONオブジェクトのみ返してください（説明不要）。
+キー名はそのまま、値を翻訳してください。
+
+${JSON.stringify(toTranslate, null, 2)}`;
+
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 2000,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+    const json = await resp.json();
+    const raw = (json.content || []).map(b => b.text || '').join('').trim();
+    const clean = raw.replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
+    _flyerTranslated = JSON.parse(clean);
+    _flyerLang = lang;
+
+    // 翻訳後に「日本語＋翻訳」に切り替え
+    const bilingualRadio = document.querySelector('input[name="flyerMode"][value="bilingual"]');
+    if (bilingualRadio) bilingualRadio.checked = true;
+    previewFlyer();
+    showToast('✅ 翻訳完了', 'success');
+  } catch(e) {
+    showToast('❌ 翻訳失敗: ' + e.message, 'error');
+  }
+
+  if (statusEl) statusEl.style.display = 'none';
+  if (btn) btn.disabled = false;
 }
 
 // ===== 顔写真アップロード =====
@@ -2799,6 +2948,7 @@ function renderScreenContent(name) {
     users: buildUsersScreen(),
     ofusa_view: buildOfusaViewScreen(),
     resume: buildResumeScreen(),
+    // chat は専用処理で描画
   };
 
   if (name === 'companies') {
@@ -2814,6 +2964,13 @@ function renderScreenContent(name) {
     return;
   }
 
+  if (name === 'chat') {
+    statsRow.style.display = 'none';
+    filtersSection.style.display = 'none';
+    contentWrap.style.padding = '0';
+    contentWrap.innerHTML = buildChatScreen();
+    return;
+  }
   if (name === 'ai_knowledge') {
     statsRow.style.display = 'none';
     filtersSection.style.display = 'none';
@@ -2949,19 +3106,71 @@ function onWorkerWorkplaceChange() {
   custom.style.display = sel.value === '__custom__' ? '' : 'none';
 }
 
-function openWorkerModal(id) {
+async function openWorkerModal(id) {
   const w = id ? allWorkers.find(x=>x.id===id) : null;
   editingWorkerId = id;
+  // 候補者データがなければロード
+  if (!allCandidates.length) {
+    try {
+      const d = await sbFetch('candidates?select=id,name,nationality,name_kana,gender,birthdate,cel_phone,email,jp_address&order=name.asc');
+      allCandidates = d || [];
+    } catch(e) {}
+  }
   showGenModal('workerModal', id ? '👤 外国人材詳細' : '👤 外国人材登録', buildWorkerModalBody(w));
   setTimeout(() => setupAutoSave(saveWorker), 100);
 }
 let editingWorkerId = null;
 
+async function fillWorkerFromCandidate() {
+  const selId = document.getElementById('wf_candidate_src')?.value;
+  if (!selId) { showToast('⚠️ 候補者を選択してください', 'error'); return; }
+  // まずallCandidatesから探す
+  let c = allCandidates.find(x => x.id === selId);
+  // なければDBから取得
+  if (!c) {
+    showLoading(true);
+    try {
+      const data = await sbFetch('candidates?id=eq.' + selId + '&select=*&limit=1');
+      c = data?.[0];
+    } catch(e) { showToast('❌ ' + e.message, 'error'); }
+    showLoading(false);
+  }
+  if (!c) { showToast('❌ 候補者データが見つかりません', 'error'); return; }
+  const g = (id, val) => { const el = document.getElementById(id); if(el) el.value = val||''; };
+  g('wf_name',       c.name||'');
+  g('wf_name_kana',  c.name_kana||'');
+  // 国籍セレクト
+  const natSel = document.getElementById('wf_nationality');
+  if (natSel) natSel.value = c.nationality||'';
+  // 性別セレクト
+  const genSel = document.getElementById('wf_gender');
+  if (genSel) genSel.value = c.gender||'';
+  g('wf_birthdate',  c.birthdate||'');
+  g('wf_cel_phone',  c.cel_phone||c.phone||'');
+  g('wf_email',      c.email||'');
+  g('wf_jp_address', c.jp_address||'');
+  showToast('✅ 候補者情報を転記しました', 'success');
+}
+
 function buildWorkerModalBody(w) {
   w = w||{};
+  // 候補者セレクトのオプション生成
+  const candidateOpts = allCandidates.length
+    ? allCandidates.map(c => `<option value="${c.id}">${natFlag(c.nationality||'')} ${esc(c.name||'')}（${esc(c.nationality||'')}）</option>`).join('')
+    : '<option value="">候補者データなし</option>';
   return `
   <div class="form-grid">
     <div class="section-title">基本情報</div>
+    <div class="form-group full" style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:10px 12px;margin-bottom:4px;">
+      <label class="form-label" style="color:#0369a1;font-weight:800;">📋 候補者から自動入力</label>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <select id="wf_candidate_src" class="form-select" style="flex:1;font-size:12px;">
+          <option value="">── 候補者を選択 ──</option>
+          ${candidateOpts}
+        </select>
+        <button class="btn btn-outline" style="font-size:11px;white-space:nowrap;flex-shrink:0;" onclick="fillWorkerFromCandidate()">→ 転記</button>
+      </div>
+    </div>
     <div class="form-group full"><label class="form-label">氏名（ローマ字）*</label><input class="form-input" id="wf_name" value="${esc(w.name||'')}"></div>
     <div class="form-group"><label class="form-label">フリガナ</label><input class="form-input" id="wf_name_kana" value="${esc(w.name_kana||'')}"></div>
     <div class="form-group"><label class="form-label">国籍</label>
@@ -4091,6 +4300,15 @@ function buildUsersScreen(){
       ${savedKey ? '<button class="btn btn-outline" onclick="clearApiKey()" style="white-space:nowrap;color:var(--red);">削除</button>' : ''}
     </div>
     ${savedKey ? '<div style="font-size:10px;color:var(--green);margin-top:6px;">✅ APIキーが設定されています</div>' : '<div style="font-size:10px;color:var(--orange);margin-top:6px;">⚠️ APIキー未設定</div>'}
+    <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--gray-200);">
+      <div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:4px;">📁 チャットファイルアップ GAS URL</div>
+      <div style="font-size:11px;color:var(--gray-400);margin-bottom:8px;">チャットにファイルを添付するとGAS経由でDriveにアップロードします</div>
+      <input class="form-input" id="gasUrlInput" value="${localStorage.getItem('kmt_gas_url')||''}" placeholder="https://script.google.com/macros/s/..." style="font-size:12px;width:100%;box-sizing:border-box;">
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px;">
+      <button class="btn btn-primary" onclick="saveApiKey()" style="white-space:nowrap;">💾 設定を保存</button>
+      ${savedKey ? '<button class="btn btn-outline" onclick="clearApiKey()" style="white-space:nowrap;color:var(--red);">APIキー削除</button>' : ''}
+    </div>
   </div>
   <!-- ユーザー一覧 -->
   <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;"><input class="search-input" id="uSearchInput" placeholder="名前・メールで検索..." oninput="applyUserFilters()" style="flex:1;min-width:200px;"><button class="btn btn-outline" style="font-size:11px;padding:4px 10px" onclick="clearUserFilters()">✕</button></div>
@@ -4100,10 +4318,15 @@ function buildUsersScreen(){
 function saveApiKey() {
   const key = document.getElementById('apiKeyInput')?.value.trim();
   if (!key) { showToast('⚠️ APIキーを入力してください', 'error'); return; }
-  localStorage.setItem('ofusa_apiKey', key.trim());
-  const gasUrl = document.getElementById('gasUrlInput')?.value.trim();
-  if (gasUrl) localStorage.setItem('kmt_gas_url', gasUrl);
-  showToast('✅ 設定を保存しました', 'success');
+  try {
+    localStorage.setItem('ofusa_apiKey', key);
+    const gasUrl = document.getElementById('gasUrlInput')?.value.trim();
+    if (gasUrl) localStorage.setItem('kmt_gas_url', gasUrl);
+    showToast('✅ 設定を保存しました', 'success');
+  } catch(e) {
+    showToast('⚠️ ローカルファイルでは保存できません。GitHub Pagesで開いてください。', 'error');
+    return;
+  }
   const cw = document.querySelector('.content-wrap');
   if (cw) cw.innerHTML = buildUsersScreen();
   loadUsers();
