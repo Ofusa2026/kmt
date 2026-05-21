@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260521.113 -->
+<!-- KMT_VERSION ver.20260521.114 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -208,7 +208,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260521.113</div>
+    <div class="logo-ver">ver.20260521.114</div>
     <div id="currentUserBadge" style="font-size:10px;color:#86efac;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;color:#86efac;margin:4px 8px;border-radius:6px;background:rgba(134,239,172,0.1);" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -4235,8 +4235,15 @@ async function sendChatMessage() {
           reader.onerror = rej;
           reader.readAsDataURL(item.file);
         });
-        const resp = await fetch(gasUrl, {
+        // キャッシュバスター付きURL（連続POSTでstale 404になるのを回避）
+        const sep = gasUrl.includes('?') ? '&' : '?';
+        const urlWithBust = gasUrl + sep + 't=' + Date.now() + '_' + i;
+        const resp = await fetch(urlWithBust, {
           method: 'POST',
+          cache: 'no-store',
+          redirect: 'follow',
+          // text/plain で送るとCORS preflightを回避できる（GAS定番）
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify({
             action: 'uploadFileToDrive',
             driveUrl: currentRoom.drive_url,
@@ -4245,6 +4252,7 @@ async function sendChatMessage() {
             mimeType: item.file.type,
           })
         });
+        if (!resp.ok) throw new Error('「' + finalName + '」: HTTP ' + resp.status);
         const result = await resp.json();
         if (!result.success) throw new Error('「' + finalName + '」: ' + (result.error || 'アップロード失敗'));
         attachments.push({
@@ -4253,6 +4261,10 @@ async function sendChatMessage() {
           mimeType: item.file.type,
           size: item.file.size
         });
+        // 連続POSTでGASのリダイレクトキャッシュとぶつからないよう間隔を空ける
+        if (i < _chatFiles.length - 1) {
+          await new Promise(r => setTimeout(r, 400));
+        }
       }
       showToast('✅ ' + attachments.length + '件アップロード完了', 'success');
     }
