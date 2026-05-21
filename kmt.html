@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260521.111 -->
+<!-- KMT_VERSION ver.20260521.112 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -208,7 +208,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260521.111</div>
+    <div class="logo-ver">ver.20260521.112</div>
     <div id="currentUserBadge" style="font-size:10px;color:#86efac;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;color:#86efac;margin:4px 8px;border-radius:6px;background:rgba(134,239,172,0.1);" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -2970,16 +2970,19 @@ async function loadChatUnread() {
   try {
     // chat_room_id ベースで未読を計算
     const [msgs, reads] = await Promise.all([
-      sbFetch('chat_messages?select=chat_room_id,created_at&order=created_at.desc'),
+      sbFetch('chat_messages?select=chat_room_id,sender_name,sender_id,created_at,mentions,deleted_at&order=created_at.desc'),
       sbFetch('chat_read_at?select=room_id,read_at&user_id=eq.' + currentUser.id),
     ]);
     const readMap = {};
     (reads||[]).forEach(r => { readMap[r.room_id] = r.read_at; });
-    // ルームごとの未読数（メッセージがあるものだけ）
+    // ルームごとの未読数（メッセージがあるものだけ・自分の送信を除外・削除済みを除外）
     const unreadByRoom = {};
     (msgs||[]).forEach(m => {
       const roomId = m.chat_room_id;
       if (!roomId) return;
+      if (m.deleted_at) return; // 削除済みは未読カウント対象外
+      // 自分が送ったメッセージは未読扱いしない
+      if (m.sender_name === currentUser?.name || (m.sender_id && m.sender_id === currentUser?.id)) return;
       const readAt = readMap[roomId];
       if (!readAt || m.created_at > readAt) {
         unreadByRoom[roomId] = (unreadByRoom[roomId] || 0) + 1;
@@ -2987,8 +2990,10 @@ async function loadChatUnread() {
     });
     chatRooms.forEach(r => { r.unread = unreadByRoom[r.id] || 0; });
     const total = Object.values(unreadByRoom).reduce((s,v) => s+v, 0);
-    // メンション未読をチェック
+    // メンション未読をチェック（自分のメンションのみ）
     const mentionCount = (msgs||[]).filter(m => {
+      if (m.deleted_at) return false;
+      if (m.sender_name === currentUser?.name) return false;
       const readAt = readMap[m.chat_room_id];
       return m.mentions && Array.isArray(m.mentions) &&
         m.mentions.includes(currentUser?.name) &&
@@ -3816,7 +3821,7 @@ function scrollToMessage(createdAt) {
 async function markChatRead(roomId) {
   if (!currentUser) return;
   try {
-    await sbFetch('chat_read_at', {
+    await sbFetch('chat_read_at?on_conflict=user_id,room_id', {
       method: 'POST',
       headers: { 'Prefer': 'resolution=merge-duplicates' },
       body: JSON.stringify({ user_id: currentUser.id, room_id: roomId, read_at: new Date().toISOString() })
@@ -4188,6 +4193,9 @@ async function sendChatMessage() {
     chatMessages.push(row || newMsg);
     renderChatMessages();
     document.getElementById('chatTextInput').value = '';
+
+    // 自分が送ったので即既読扱い（バッジが増えないように）
+    markChatRead(currentRoom.id);
 
     // Push通知送信
     sendPushToOthers(currentRoom.name, currentUser.name + ': ' + (text || fileName || 'ファイル'));
