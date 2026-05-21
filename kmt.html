@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260413.109 -->
+<!-- KMT_VERSION ver.20260521.110 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -208,8 +208,8 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260413.109</div>
-    <div id="currentUserBadge" style="font-size:10px;color:#86efac;margin-top:2px;cursor:pointer;" onclick="showScreen('my_account')">👤 読込中...</div>
+    <div class="logo-ver">ver.20260521.110</div>
+    <div id="currentUserBadge" style="font-size:10px;color:#86efac;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;color:#86efac;margin:4px 8px;border-radius:6px;background:rgba(134,239,172,0.1);" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
   <div style="height:1px;background:rgba(255,255,255,0.08);margin:4px 16px 8px;"></div>
@@ -2618,9 +2618,9 @@ async function saveMyAccount() {
     await sbFetch('users?id=eq.' + currentUser.id, { method: 'PATCH', body: JSON.stringify({ name, role, avatar_url, updated_at: new Date().toISOString() }) });
     currentUser = { ...currentUser, name, role, avatar_url };
     safeSetItem('kmt_current_user', JSON.stringify(currentUser));
-    // バッジ更新
+    // バッジ更新（プレゼンスドット保持）
     const badge = document.getElementById('currentUserBadge');
-    if (badge) badge.textContent = '👤 ' + name + ' （設定）';
+    if (badge) badge.innerHTML = '<span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 ' + esc(name) + ' （設定）</span><span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;cursor:pointer;">アクティブ</span>';
     showToast('✅ プロフィールを保存しました', 'success');
     // 画面を再描画
     const cw = document.querySelector('.content-wrap');
@@ -2693,10 +2693,13 @@ function onLoginSuccess() {
   document.getElementById('userSelectScreen').style.display = 'none';
   document.getElementById('mainWrap').style.display = '';
   const badge = document.getElementById('currentUserBadge');
-  if (badge && currentUser) badge.textContent = '👤 ' + currentUser.name + ' （設定）';
+  if (badge && currentUser) {
+    badge.innerHTML = '<span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 ' + esc(currentUser.name) + ' （設定）</span><span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;cursor:pointer;">アクティブ</span>';
+  }
   loadCompanies();
   initPushNotification();
   loadChatUnread();
+  startPresenceHeartbeat();
 }
 
 function logoutUser() {
@@ -2716,6 +2719,13 @@ let _chatTab = 'active'; // 'active' | 'done' // { id, name, type, drive_url, un
 let currentRoom = null;
 let chatRealtimeSub = null;
 let chatMessages = [];
+// ===== 拡張機能用 =====
+let chatReactions = {};        // { messageId: [{user_id, user_name, emoji}, ...] }
+let userPresence = {};         // { user_id: { status, last_seen_at, user_name } }
+let _presenceTimer = null;
+let _threadOpenForId = null;   // 現在右パネルで開いているスレッド親メッセージID
+let _editingMessageId = null;  // 編集中メッセージID
+const COMMON_EMOJIS = ['👍','😂','🙏','❤️','😊','🎉','👀','🔥','✅','❓','💯','😢','😮','👏','🙌','😅'];
 
 function buildChatScreen() {
   return `
@@ -2771,11 +2781,15 @@ function buildChatScreen() {
         <!-- メンション候補 -->
         <div style="position:relative;">
         <div id="mentionPopup" style="display:none;position:absolute;bottom:calc(100% + 4px);left:0;right:0;background:white;border:1px solid var(--gray-200);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.15);z-index:999;overflow:hidden;"></div>
+        <!-- 絵文字ピッカー -->
+        <div id="emojiPicker" style="display:none;position:absolute;bottom:calc(100% + 4px);left:0;background:white;border:1px solid var(--gray-200);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.15);z-index:999;padding:8px;width:280px;"></div>
         <div style="display:flex;gap:8px;align-items:flex-end;">
           <label style="cursor:pointer;font-size:18px;color:#94a3b8;flex-shrink:0;padding:4px;"
             title="ファイルを添付（Driveにアップロード）">
             📎<input type="file" id="chatFileInput" style="display:none;" onchange="onChatFileSelect(this)">
           </label>
+          <button onclick="openDrivePicker()" title="Driveのファイルを共有" style="background:none;border:none;cursor:pointer;font-size:18px;color:#94a3b8;flex-shrink:0;padding:4px;">📁</button>
+          <button onclick="toggleEmojiPicker()" title="絵文字" style="background:none;border:none;cursor:pointer;font-size:18px;color:#94a3b8;flex-shrink:0;padding:4px;">😊</button>
           <textarea id="chatTextInput"
             placeholder="メッセージを入力... @名前でメンション (Shift+Enterで改行)"
             style="flex:1;resize:none;font-size:13px;padding:10px 14px;border:1.5px solid #dadce0;border-radius:24px;outline:none;font-family:inherit;line-height:1.5;min-height:42px;max-height:120px;overflow-y:auto;background:#f1f3f4;"
@@ -2785,6 +2799,21 @@ function buildChatScreen() {
             oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px';chatTextInput(this)"></textarea>
           <button class="btn btn-primary" style="flex-shrink:0;align-self:flex-end;" onclick="sendChatMessage()">送信</button>
         </div>
+        </div>
+      </div>
+    </div>
+    <!-- スレッドパネル（右側） -->
+    <div id="chatThreadPanel" style="display:none;width:380px;flex-shrink:0;border-left:1px solid var(--gray-200);background:white;flex-direction:column;overflow:hidden;">
+      <div style="padding:12px 16px;border-bottom:1px solid var(--gray-200);display:flex;align-items:center;justify-content:space-between;gap:8px;background:#f8fafc;">
+        <div style="font-weight:700;font-size:13px;color:var(--navy);">🧵 スレッド</div>
+        <button onclick="closeThreadPanel()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;padding:0 4px;">✕</button>
+      </div>
+      <div id="chatThreadArea" style="flex:1;overflow-y:auto;padding:12px;background:white;display:flex;flex-direction:column;"></div>
+      <div id="chatThreadInputArea" style="padding:10px 14px;border-top:1px solid var(--gray-200);background:white;flex-shrink:0;">
+        <div style="display:flex;gap:6px;align-items:flex-end;">
+          <textarea id="chatThreadInput" placeholder="スレッドに返信..." style="flex:1;resize:none;font-size:12px;padding:8px 12px;border:1.5px solid #dadce0;border-radius:18px;outline:none;font-family:inherit;line-height:1.5;min-height:36px;max-height:100px;overflow-y:auto;background:#f1f3f4;"
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendThreadReply();}"></textarea>
+          <button class="btn btn-primary" style="flex-shrink:0;font-size:11px;padding:7px 12px;" onclick="sendThreadReply()">送信</button>
         </div>
       </div>
     </div>
@@ -3519,11 +3548,50 @@ async function openChatRoom(roomId) {
     ?.channel('chat_' + roomId)
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: 'chat_room_id=eq.' + roomId },
       (payload) => {
-        chatMessages.push(payload.new);
-        renderChatMessages();
-        markChatRead(roomId);
+        // 自分の送信は既にローカル追加済みなので重複防止
+        if (!chatMessages.find(m => m.id === payload.new.id)) {
+          chatMessages.push(payload.new);
+          renderChatMessages();
+          if (_threadOpenForId && payload.new.thread_root_id === _threadOpenForId) renderThreadPanel();
+          markChatRead(roomId);
+        }
       }
-    ).subscribe();
+    )
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'chat_messages', filter: 'chat_room_id=eq.' + roomId },
+      (payload) => {
+        const idx = chatMessages.findIndex(m => m.id === payload.new.id);
+        if (idx >= 0) {
+          chatMessages[idx] = payload.new;
+          renderChatMessages();
+          if (_threadOpenForId) renderThreadPanel();
+        }
+      }
+    )
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_reactions' },
+      (payload) => {
+        const mid = payload.new.message_id;
+        if (chatMessages.find(m => m.id === mid)) {
+          if (!chatReactions[mid]) chatReactions[mid] = [];
+          if (!chatReactions[mid].find(r => r.id === payload.new.id)) {
+            chatReactions[mid].push(payload.new);
+            renderChatMessages();
+            if (_threadOpenForId) renderThreadPanel();
+          }
+        }
+      }
+    )
+    .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'chat_reactions' },
+      (payload) => {
+        const oldRow = payload.old;
+        const mid = oldRow.message_id;
+        if (chatReactions[mid]) {
+          chatReactions[mid] = chatReactions[mid].filter(r => r.id !== oldRow.id);
+          renderChatMessages();
+          if (_threadOpenForId) renderThreadPanel();
+        }
+      }
+    )
+    .subscribe();
 }
 
 async function loadChatMessages(roomId) {
@@ -3532,6 +3600,8 @@ async function loadChatMessages(roomId) {
   try {
     const data = await sbFetch('chat_messages?chat_room_id=eq.' + roomId + '&order=created_at.asc&limit=200');
     chatMessages = data || [];
+    // リアクションも一括取得
+    await loadChatReactions(chatMessages.map(m => m.id).filter(Boolean));
     renderChatMessages();
   } catch(e) {
     area.innerHTML = '<div style="text-align:center;padding:20px;color:var(--red);">❌ ' + e.message + '</div>';
@@ -3544,9 +3614,18 @@ function renderChatMessages() {
     area.innerHTML = '<div style="text-align:center;padding:60px 20px;color:#94a3b8;font-size:13px;">まだメッセージがありません<br>最初のメッセージを送りましょう！</div>';
     return;
   }
+  // 親メッセージのみ表示（thread_root_idがあるものはスレッド側で表示）
+  const topMessages = chatMessages.filter(m => !m.thread_root_id);
+  // スレッド子メッセージ数カウント
+  const threadCounts = {};
+  chatMessages.forEach(m => {
+    if (m.thread_root_id) {
+      threadCounts[m.thread_root_id] = (threadCounts[m.thread_root_id]||0) + 1;
+    }
+  });
   // 自分宛メンションバナー
-  const myMentions = chatMessages.filter(m =>
-    m.mentions && Array.isArray(m.mentions) && m.mentions.includes(currentUser?.name)
+  const myMentions = topMessages.filter(m =>
+    m.mentions && Array.isArray(m.mentions) && m.mentions.includes(currentUser?.name) && !m.deleted_at
   );
   const mentionBanner = myMentions.length > 0 ? `
     <div style="background:#fff7ed;border-left:3px solid #f59e0b;padding:8px 12px;margin-bottom:12px;font-size:12px;border-radius:0 6px 6px 0;">
@@ -3558,7 +3637,7 @@ function renderChatMessages() {
   // 日付区切りを追加
   let lastDate = '';
   const rows = [];
-  chatMessages.forEach((m, idx) => {
+  topMessages.forEach((m, idx) => {
     const dt = new Date(m.created_at);
     const dateStr = dt.toLocaleDateString('ja-JP', {year:'numeric',month:'long',day:'numeric'});
     const today = new Date().toLocaleDateString('ja-JP', {year:'numeric',month:'long',day:'numeric'});
@@ -3568,49 +3647,111 @@ function renderChatMessages() {
       lastDate = dateStr;
       rows.push(`<div style="display:flex;align-items:center;gap:10px;margin:16px 0 8px;"><div style="flex:1;height:1px;background:#e2e8f0;"></div><span style="font-size:11px;color:#94a3b8;white-space:nowrap;font-weight:600;">${dateLabel}</span><div style="flex:1;height:1px;background:#e2e8f0;"></div></div>`);
     }
-    const timeStr = dt.toLocaleTimeString('ja-JP', {hour:'2-digit',minute:'2-digit'});
-    const avatarEl = getChatAvatar(m.sender_name);
-    const isMine = m.sender_name === currentUser?.name;
-    const hasMention = m.mentions && Array.isArray(m.mentions) && m.mentions.includes(currentUser?.name);
-    const fileHtml = m.file_url
-      ? '<div style="display:flex;align-items:center;gap:6px;background:' + (isMine?'rgba(255,255,255,.2)':'white') + ';border:' + (isMine?'none':'1px solid #dadce0') + ';border-radius:8px;padding:5px 10px;margin-bottom:' + (m.content?'6px':'0') + ';">\u{1F4CE} <a href=\"' + esc(m.file_url) + '\" target=\"_blank\" style=\"color:' + (isMine?'#e8f0fe':'#1a73e8') + ';font-weight:600;font-size:12px;\">' + esc(m.file_name||'ファイル') + '</a></div>'
-      : '';
-    const bodyHtml = fileHtml + (m.content ? renderMessageContent(m.content) : '');
-    const replyQuote = m.reply_to
-      ? '<div style="border-left:3px solid ' + (isMine?'rgba(255,255,255,.6)':'#9e9e9e') + ';background:' + (isMine?'rgba(255,255,255,.15)':'#e8eaed') + ';border-radius:4px;padding:4px 8px;margin-bottom:6px;font-size:11px;color:' + (isMine?'rgba(255,255,255,.85)':'#5f6368') + ';overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><b>' + esc(m.reply_to.sender_name||'') + '</b>: ' + esc((m.reply_to.content||'').slice(0,50)) + '</div>'
-      : '';
-    const replyBtnStyle = 'opacity:0;position:absolute;top:-12px;background:white;border:1px solid #dadce0;border-radius:14px;padding:2px 10px;font-size:11px;cursor:pointer;color:#5f6368;box-shadow:0 1px 4px rgba(0,0,0,.15);white-space:nowrap;transition:opacity .15s;';
-    const replyBtnClick = "setReply('" + esc(m.sender_name).replace(/'/g,"\'") + "','" + esc(m.content||'').replace(/'/g,"\'").slice(0,80) + "','" + m.created_at + "')";
-    if (isMine) {
-      rows.push(
-        '<div data-ts="' + m.created_at + '" style="display:flex;flex-direction:row-reverse;align-items:flex-end;gap:8px;padding:2px 12px;margin:2px 0;">' +
-          '<div style="max-width:62%;">' +
-            '<div style="font-size:10px;color:#94a3b8;text-align:right;margin-bottom:3px;">' + timeStr + '</div>' +
-            '<div class="chat-bubble-wrap">' +
-              '<div style="background:#1a73e8;color:white;padding:10px 14px;border-radius:20px 20px 4px 20px;font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;box-shadow:0 1px 2px rgba(0,0,0,.12);">' + replyQuote + bodyHtml + '</div>' +
-              '<button class="rb" onclick="' + replyBtnClick + '" style="' + replyBtnStyle + 'left:0;">↩ 返信</button>' +
-            '</div>' +
-          '</div>' +
-        '</div>'
-      );
-    } else {
-      const mentionBadge = hasMention ? '<span style="font-size:10px;background:#f59e0b;color:white;padding:1px 5px;border-radius:4px;font-weight:700;margin-left:4px;">@あなた</span>' : '';
-      rows.push(
-        '<div data-ts="' + m.created_at + '" style="display:flex;align-items:flex-end;gap:8px;padding:2px 12px;margin:2px 0;' + (hasMention?'background:#fffbeb;border-radius:8px;':'') + '">' +
-          '<div style="width:32px;height:32px;border-radius:50%;overflow:hidden;flex-shrink:0;background:#e8eaed;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#5f6368;margin-bottom:2px;">' + avatarEl + '</div>' +
-          '<div style="max-width:62%;">' +
-            '<div style="font-size:11px;font-weight:600;color:#5f6368;margin-bottom:3px;">' + esc(m.sender_name) + ' <span style="font-weight:400;color:#94a3b8;">' + timeStr + '</span>' + mentionBadge + '</div>' +
-            '<div class="chat-bubble-wrap">' +
-              '<div style="background:#f1f3f4;color:#202124;padding:10px 14px;border-radius:20px 20px 20px 4px;font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;box-shadow:0 1px 2px rgba(0,0,0,.08);">' + replyQuote + bodyHtml + '</div>' +
-              '<button class="rb" onclick="' + replyBtnClick + '" style="' + replyBtnStyle + 'right:0;">↩ 返信</button>' +
-            '</div>' +
-          '</div>' +
-        '</div>'
-      );
-    }
+    rows.push(renderSingleMessage(m, { isThreadView: false, threadCount: threadCounts[m.id] || 0 }));
   });
   area.innerHTML = mentionBanner + rows.join('');
   area.scrollTop = area.scrollHeight;
+}
+
+// 単一メッセージのレンダリング（メイン＆スレッドで共用）
+function renderSingleMessage(m, opts) {
+  opts = opts || {};
+  const isThreadView = !!opts.isThreadView;
+  const threadCount = opts.threadCount || 0;
+  const dt = new Date(m.created_at);
+  const timeStr = dt.toLocaleTimeString('ja-JP', {hour:'2-digit',minute:'2-digit'});
+  const avatarEl = getChatAvatar(m.sender_name);
+  const isMine = m.sender_name === currentUser?.name;
+  const hasMention = m.mentions && Array.isArray(m.mentions) && m.mentions.includes(currentUser?.name);
+  const isDeleted = !!m.deleted_at;
+  const isEdited = !!m.edited_at;
+
+  // ファイル表示
+  const fileHtml = (!isDeleted && m.file_url)
+    ? '<div style="display:flex;align-items:center;gap:6px;background:' + (isMine?'rgba(255,255,255,.2)':'white') + ';border:' + (isMine?'none':'1px solid #dadce0') + ';border-radius:8px;padding:5px 10px;margin-bottom:' + (m.content?'6px':'0') + ';">\u{1F4CE} <a href="' + esc(m.file_url) + '" target="_blank" style="color:' + (isMine?'#e8f0fe':'#1a73e8') + ';font-weight:600;font-size:12px;">' + esc(m.file_name||'ファイル') + '</a></div>'
+    : '';
+  const bodyText = isDeleted
+    ? '<span style="color:' + (isMine?'rgba(255,255,255,.7)':'#94a3b8') + ';font-style:italic;">🗑️ このメッセージは削除されました</span>'
+    : (m.content ? renderMessageContent(m.content) : '');
+  const bodyHtml = fileHtml + bodyText;
+  const editedMark = (isEdited && !isDeleted) ? '<span style="font-size:10px;color:' + (isMine?'rgba(255,255,255,.6)':'#94a3b8') + ';margin-left:4px;">(編集済)</span>' : '';
+
+  const replyQuote = (m.reply_to && !isDeleted)
+    ? '<div style="border-left:3px solid ' + (isMine?'rgba(255,255,255,.6)':'#9e9e9e') + ';background:' + (isMine?'rgba(255,255,255,.15)':'#e8eaed') + ';border-radius:4px;padding:4px 8px;margin-bottom:6px;font-size:11px;color:' + (isMine?'rgba(255,255,255,.85)':'#5f6368') + ';overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><b>' + esc(m.reply_to.sender_name||'') + '</b>: ' + esc((m.reply_to.content||'').slice(0,50)) + '</div>'
+    : '';
+
+  // リアクション表示
+  const reacts = chatReactions[m.id] || [];
+  const reactGroups = {};
+  reacts.forEach(r => {
+    if (!reactGroups[r.emoji]) reactGroups[r.emoji] = { count: 0, users: [], mine: false };
+    reactGroups[r.emoji].count++;
+    reactGroups[r.emoji].users.push(r.user_name);
+    if (r.user_id === currentUser?.id) reactGroups[r.emoji].mine = true;
+  });
+  const reactionsHtml = (Object.keys(reactGroups).length > 0 && !isDeleted)
+    ? '<div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:4px;">' +
+        Object.entries(reactGroups).map(([emoji, info]) =>
+          '<button onclick="toggleReaction(\'' + m.id + '\',\'' + emoji + '\')" title="' + esc(info.users.join(', ')) + '" style="background:' + (info.mine?'#dbeafe':'#f1f3f4') + ';border:1px solid ' + (info.mine?'#1a73e8':'#dadce0') + ';border-radius:12px;padding:1px 7px;font-size:11px;cursor:pointer;display:inline-flex;align-items:center;gap:3px;">' +
+            emoji + '<span style="color:' + (info.mine?'#1a73e8':'#5f6368') + ';font-weight:600;">' + info.count + '</span>' +
+          '</button>'
+        ).join('') +
+      '</div>'
+    : '';
+
+  // スレッドリンク
+  const threadLink = (threadCount > 0 && !isThreadView && !isDeleted)
+    ? '<div onclick="openThreadPanel(\'' + m.id + '\')" style="display:inline-flex;align-items:center;gap:4px;margin-top:4px;padding:3px 8px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;font-size:11px;color:#0369a1;cursor:pointer;font-weight:600;">🧵 スレッド（' + threadCount + '件）</div>'
+    : '';
+
+  // アクションメニュー
+  const senderEsc = esc(m.sender_name).replace(/'/g, "\\'");
+  const contentEsc = esc(m.content||'').replace(/'/g, "\\'").slice(0,80);
+  const actionsHtml = isDeleted ? '' : (
+    '<div class="msg-actions" style="opacity:0;position:absolute;top:-14px;' + (isMine?'left':'right') + ':4px;background:white;border:1px solid #dadce0;border-radius:16px;padding:2px 4px;box-shadow:0 1px 4px rgba(0,0,0,.15);display:flex;gap:2px;transition:opacity .15s;z-index:5;">' +
+      '<button onclick="openReactionPicker(\'' + m.id + '\', this)" title="リアクション" style="background:none;border:none;cursor:pointer;font-size:13px;padding:3px 5px;border-radius:50%;">😊</button>' +
+      (!isThreadView ? '<button onclick="openThreadPanel(\'' + m.id + '\')" title="スレッドで返信" style="background:none;border:none;cursor:pointer;font-size:13px;padding:3px 5px;border-radius:50%;">🧵</button>' : '') +
+      (!isThreadView ? '<button onclick="setReply(\'' + senderEsc + '\',\'' + contentEsc + '\',\'' + m.created_at + '\')" title="インライン返信" style="background:none;border:none;cursor:pointer;font-size:13px;padding:3px 5px;border-radius:50%;">↩</button>' : '') +
+      (isMine ? '<button onclick="startEditMessage(\'' + m.id + '\')" title="編集" style="background:none;border:none;cursor:pointer;font-size:13px;padding:3px 5px;border-radius:50%;">✏️</button>' : '') +
+      (isMine ? '<button onclick="deleteMessage(\'' + m.id + '\')" title="削除" style="background:none;border:none;cursor:pointer;font-size:13px;padding:3px 5px;border-radius:50%;color:#dc2626;">🗑</button>' : '') +
+    '</div>'
+  );
+
+  // プレゼンスドット
+  const senderUser = (allUsers||[]).find(u => u.name === m.sender_name);
+  const presence = senderUser ? userPresence[senderUser.id] : null;
+  const presenceColor = presence?.status === 'active' ? '#22c55e' : (presence?.status === 'away' ? '#f59e0b' : '#94a3b8');
+  const presenceDot = !isMine ? '<span style="position:absolute;bottom:0;right:0;width:10px;height:10px;border-radius:50%;background:' + presenceColor + ';border:2px solid white;"></span>' : '';
+
+  if (isMine) {
+    return (
+      '<div data-ts="' + m.created_at + '" data-mid="' + m.id + '" class="msg-row" style="display:flex;flex-direction:row-reverse;align-items:flex-end;gap:8px;padding:2px 12px;margin:2px 0;position:relative;" onmouseover="this.querySelector(\'.msg-actions\').style.opacity=1" onmouseout="this.querySelector(\'.msg-actions\').style.opacity=0">' +
+        '<div style="max-width:62%;position:relative;">' +
+          '<div style="font-size:10px;color:#94a3b8;text-align:right;margin-bottom:3px;">' + timeStr + editedMark + '</div>' +
+          '<div class="chat-bubble-wrap" style="position:relative;">' +
+            '<div style="background:' + (isDeleted?'#e8eaed':'#1a73e8') + ';color:' + (isDeleted?'#5f6368':'white') + ';padding:10px 14px;border-radius:20px 20px 4px 20px;font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;box-shadow:0 1px 2px rgba(0,0,0,.12);">' + replyQuote + bodyHtml + '</div>' +
+            actionsHtml +
+          '</div>' +
+          '<div style="text-align:right;">' + reactionsHtml + threadLink + '</div>' +
+        '</div>' +
+      '</div>'
+    );
+  } else {
+    const mentionBadge = hasMention ? '<span style="font-size:10px;background:#f59e0b;color:white;padding:1px 5px;border-radius:4px;font-weight:700;margin-left:4px;">@あなた</span>' : '';
+    return (
+      '<div data-ts="' + m.created_at + '" data-mid="' + m.id + '" class="msg-row" style="display:flex;align-items:flex-end;gap:8px;padding:2px 12px;margin:2px 0;position:relative;' + (hasMention?'background:#fffbeb;border-radius:8px;':'') + '" onmouseover="this.querySelector(\'.msg-actions\').style.opacity=1" onmouseout="this.querySelector(\'.msg-actions\').style.opacity=0">' +
+        '<div style="position:relative;width:32px;height:32px;border-radius:50%;overflow:hidden;flex-shrink:0;background:#e8eaed;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#5f6368;margin-bottom:2px;">' + avatarEl + presenceDot + '</div>' +
+        '<div style="max-width:62%;position:relative;">' +
+          '<div style="font-size:11px;font-weight:600;color:#5f6368;margin-bottom:3px;">' + esc(m.sender_name) + ' <span style="font-weight:400;color:#94a3b8;">' + timeStr + '</span>' + editedMark + mentionBadge + '</div>' +
+          '<div class="chat-bubble-wrap" style="position:relative;">' +
+            '<div style="background:' + (isDeleted?'#f8fafc':'#f1f3f4') + ';color:#202124;padding:10px 14px;border-radius:20px 20px 20px 4px;font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;box-shadow:0 1px 2px rgba(0,0,0,.08);">' + replyQuote + bodyHtml + '</div>' +
+            actionsHtml +
+          '</div>' +
+          '<div>' + reactionsHtml + threadLink + '</div>' +
+        '</div>' +
+      '</div>'
+    );
+  }
 }
 
 async function confirmChatDone(roomId) {
@@ -4036,13 +4177,15 @@ async function sendChatMessage() {
       created_at: new Date().toISOString(),
     };
     clearReply();
-    await sbFetch('chat_messages', {
+    const created = await sbFetch('chat_messages', {
       method: 'POST',
+      headers: { 'Prefer': 'return=representation' },
       body: JSON.stringify(newMsg)
     });
+    const row = Array.isArray(created) ? created[0] : created;
 
-    // 送信後すぐにローカルに追加して表示
-    chatMessages.push(newMsg);
+    // 送信後すぐにローカルに追加して表示（idが付いたDB値を使う）
+    chatMessages.push(row || newMsg);
     renderChatMessages();
     document.getElementById('chatTextInput').value = '';
 
@@ -4053,6 +4196,385 @@ async function sendChatMessage() {
     showToast('❌ 送信失敗: ' + e.message, 'error');
   }
   if (btn) btn.disabled = false;
+}
+
+// ==============================
+// 🚀 チャット拡張機能（リアクション・スレッド・編集・削除・プレゼンス・絵文字・Drive）
+// ==============================
+
+// ---------- 共通: loadChatMessages後にリアクションも取得 ----------
+async function loadChatReactions(messageIds) {
+  if (!messageIds || !messageIds.length) { chatReactions = {}; return; }
+  try {
+    // PostgRESTの in.() フィルタ
+    const idsParam = messageIds.map(id => '"' + id + '"').join(',');
+    const data = await sbFetch('chat_reactions?message_id=in.(' + idsParam + ')&select=*');
+    chatReactions = {};
+    (data||[]).forEach(r => {
+      if (!chatReactions[r.message_id]) chatReactions[r.message_id] = [];
+      chatReactions[r.message_id].push(r);
+    });
+  } catch(e) { console.error('reactions load error:', e); }
+}
+
+// ---------- リアクション操作 ----------
+async function toggleReaction(messageId, emoji) {
+  if (!currentUser?.id) { showToast('⚠️ ログイン情報なし','error'); return; }
+  const list = chatReactions[messageId] || [];
+  const existing = list.find(r => r.user_id === currentUser.id && r.emoji === emoji);
+  try {
+    if (existing) {
+      // 削除
+      await sbFetch('chat_reactions?id=eq.' + existing.id, { method: 'DELETE' });
+      chatReactions[messageId] = list.filter(r => r.id !== existing.id);
+    } else {
+      // 追加
+      const newReact = {
+        message_id: messageId,
+        user_id: currentUser.id,
+        user_name: currentUser.name || '',
+        emoji: emoji
+      };
+      const created = await sbFetch('chat_reactions', {
+        method: 'POST',
+        headers: { 'Prefer': 'return=representation' },
+        body: JSON.stringify(newReact)
+      });
+      const row = Array.isArray(created) ? created[0] : created;
+      if (!chatReactions[messageId]) chatReactions[messageId] = [];
+      chatReactions[messageId].push(row || { ...newReact, id: 'tmp_'+Date.now() });
+    }
+    renderChatMessages();
+    if (_threadOpenForId) renderThreadPanel();
+  } catch(e) { showToast('❌ リアクション失敗: ' + e.message, 'error'); }
+}
+
+// ---------- リアクションピッカー（メッセージ右上の😊ボタンから） ----------
+function openReactionPicker(messageId, anchorBtn) {
+  // 既存のピッカーがあれば閉じる
+  const exist = document.getElementById('reactionPickerPopup');
+  if (exist) exist.remove();
+  const popup = document.createElement('div');
+  popup.id = 'reactionPickerPopup';
+  popup.style.cssText = 'position:fixed;background:white;border:1px solid #dadce0;border-radius:12px;padding:8px;box-shadow:0 4px 16px rgba(0,0,0,.2);z-index:9999;display:flex;flex-wrap:wrap;gap:4px;max-width:240px;';
+  popup.innerHTML = COMMON_EMOJIS.map(e =>
+    '<button onclick="toggleReaction(\'' + messageId + '\',\'' + e + '\');document.getElementById(\'reactionPickerPopup\').remove();" style="background:none;border:none;cursor:pointer;font-size:20px;padding:4px 6px;border-radius:6px;" onmouseover="this.style.background=\'#f1f3f4\'" onmouseout="this.style.background=\'none\'">' + e + '</button>'
+  ).join('');
+  document.body.appendChild(popup);
+  // 位置を決める
+  const rect = anchorBtn.getBoundingClientRect();
+  popup.style.left = Math.max(8, Math.min(window.innerWidth - 250, rect.left - 100)) + 'px';
+  popup.style.top = (rect.top - 8 - popup.offsetHeight) + 'px';
+  // 外側クリックで閉じる
+  setTimeout(() => {
+    const closer = (e) => {
+      if (!popup.contains(e.target)) {
+        popup.remove();
+        document.removeEventListener('click', closer);
+      }
+    };
+    document.addEventListener('click', closer);
+  }, 100);
+}
+
+// ---------- 入力欄の絵文字ピッカー ----------
+function toggleEmojiPicker() {
+  const p = document.getElementById('emojiPicker');
+  if (!p) return;
+  if (p.style.display === 'none' || !p.style.display) {
+    p.innerHTML = COMMON_EMOJIS.map(e =>
+      '<button onclick="insertEmojiToInput(\'' + e + '\')" style="background:none;border:none;cursor:pointer;font-size:22px;padding:4px;border-radius:6px;" onmouseover="this.style.background=\'#f1f3f4\'" onmouseout="this.style.background=\'none\'">' + e + '</button>'
+    ).join('');
+    p.style.display = 'flex';
+    p.style.flexWrap = 'wrap';
+    p.style.gap = '2px';
+  } else {
+    p.style.display = 'none';
+  }
+}
+function insertEmojiToInput(emoji) {
+  const ta = document.getElementById('chatTextInput');
+  if (!ta) return;
+  const start = ta.selectionStart || 0;
+  const end = ta.selectionEnd || 0;
+  ta.value = ta.value.slice(0, start) + emoji + ta.value.slice(end);
+  ta.focus();
+  ta.selectionStart = ta.selectionEnd = start + emoji.length;
+  // ピッカーを閉じる
+  const p = document.getElementById('emojiPicker');
+  if (p) p.style.display = 'none';
+}
+
+// ---------- スレッドパネル ----------
+function openThreadPanel(rootMessageId) {
+  _threadOpenForId = rootMessageId;
+  const panel = document.getElementById('chatThreadPanel');
+  if (panel) panel.style.display = 'flex';
+  renderThreadPanel();
+}
+function closeThreadPanel() {
+  _threadOpenForId = null;
+  const panel = document.getElementById('chatThreadPanel');
+  if (panel) panel.style.display = 'none';
+}
+function renderThreadPanel() {
+  if (!_threadOpenForId) return;
+  const area = document.getElementById('chatThreadArea');
+  if (!area) return;
+  const root = chatMessages.find(m => m.id === _threadOpenForId);
+  if (!root) { area.innerHTML = '<div style="color:#94a3b8;font-size:12px;">親メッセージが見つかりません</div>'; return; }
+  const replies = chatMessages.filter(m => m.thread_root_id === _threadOpenForId)
+                              .sort((a,b)=> new Date(a.created_at) - new Date(b.created_at));
+  const rootHtml = renderSingleMessage(root, { isThreadView: true });
+  const replyHtml = replies.length
+    ? replies.map(m => renderSingleMessage(m, { isThreadView: true })).join('')
+    : '<div style="text-align:center;color:#94a3b8;font-size:12px;padding:16px 0;">スレッド返信はまだありません</div>';
+  area.innerHTML =
+    '<div style="border-bottom:1px solid #e2e8f0;padding-bottom:10px;margin-bottom:10px;">' + rootHtml + '</div>' +
+    '<div style="font-size:10px;font-weight:700;color:#94a3b8;letter-spacing:.5px;margin-bottom:6px;">返信 ' + replies.length + '件</div>' +
+    replyHtml;
+  area.scrollTop = area.scrollHeight;
+}
+async function sendThreadReply() {
+  if (!_threadOpenForId || !currentUser || !currentRoom) return;
+  const ta = document.getElementById('chatThreadInput');
+  const text = ta?.value.trim();
+  if (!text) return;
+  const newMsg = {
+    chat_room_id: currentRoom.id,
+    room_id: currentRoom.id,
+    sender_id: currentUser?.id || '',
+    sender_name: currentUser?.name || '',
+    content: text,
+    thread_root_id: _threadOpenForId,
+    mentions: extractMentions(text).length ? extractMentions(text) : null,
+    created_at: new Date().toISOString(),
+  };
+  try {
+    const created = await sbFetch('chat_messages', {
+      method: 'POST',
+      headers: { 'Prefer': 'return=representation' },
+      body: JSON.stringify(newMsg)
+    });
+    const row = Array.isArray(created) ? created[0] : created;
+    chatMessages.push(row || newMsg);
+    ta.value = '';
+    renderChatMessages();
+    renderThreadPanel();
+  } catch(e) { showToast('❌ 送信失敗: ' + e.message, 'error'); }
+}
+
+// ---------- メッセージ編集 ----------
+function startEditMessage(messageId) {
+  const m = chatMessages.find(x => x.id === messageId);
+  if (!m) return;
+  if (m.sender_name !== currentUser?.name) { showToast('⚠️ 自分のメッセージのみ編集可','error'); return; }
+  if (m.deleted_at) { showToast('⚠️ 削除済みは編集不可','error'); return; }
+  // 該当バブルを編集モードに
+  const row = document.querySelector('[data-mid="' + messageId + '"]');
+  if (!row) return;
+  const bubble = row.querySelector('.chat-bubble-wrap > div');
+  if (!bubble) return;
+  const original = m.content || '';
+  bubble.innerHTML =
+    '<textarea id="editArea_' + messageId + '" style="width:100%;min-width:200px;min-height:60px;border:1px solid #dadce0;border-radius:8px;padding:6px 8px;font-size:13px;font-family:inherit;background:white;color:#202124;resize:vertical;">' + esc(original) + '</textarea>' +
+    '<div style="display:flex;gap:6px;margin-top:6px;justify-content:flex-end;">' +
+      '<button onclick="cancelEditMessage()" style="background:white;color:#5f6368;border:1px solid #dadce0;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;">キャンセル</button>' +
+      '<button onclick="saveEditMessage(\'' + messageId + '\')" style="background:#1a73e8;color:white;border:none;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:600;">保存</button>' +
+    '</div>';
+  _editingMessageId = messageId;
+  setTimeout(() => { const ta = document.getElementById('editArea_' + messageId); if (ta) { ta.focus(); ta.selectionStart = ta.selectionEnd = ta.value.length; } }, 50);
+}
+function cancelEditMessage() {
+  _editingMessageId = null;
+  renderChatMessages();
+  if (_threadOpenForId) renderThreadPanel();
+}
+async function saveEditMessage(messageId) {
+  const ta = document.getElementById('editArea_' + messageId);
+  if (!ta) return;
+  const newText = ta.value.trim();
+  if (!newText) { showToast('⚠️ 空にはできません（削除はゴミ箱から）','error'); return; }
+  try {
+    await sbFetch('chat_messages?id=eq.' + messageId, {
+      method: 'PATCH',
+      body: JSON.stringify({ content: newText, edited_at: new Date().toISOString() })
+    });
+    const m = chatMessages.find(x => x.id === messageId);
+    if (m) { m.content = newText; m.edited_at = new Date().toISOString(); }
+    _editingMessageId = null;
+    renderChatMessages();
+    if (_threadOpenForId) renderThreadPanel();
+    showToast('✅ 編集しました','success');
+  } catch(e) { showToast('❌ 編集失敗: ' + e.message, 'error'); }
+}
+
+// ---------- メッセージ削除（ソフトデリート） ----------
+async function deleteMessage(messageId) {
+  const m = chatMessages.find(x => x.id === messageId);
+  if (!m) return;
+  if (m.sender_name !== currentUser?.name) { showToast('⚠️ 自分のメッセージのみ削除可','error'); return; }
+  if (!confirm('このメッセージを削除しますか？\n（履歴には「削除されました」と表示されます）')) return;
+  try {
+    await sbFetch('chat_messages?id=eq.' + messageId, {
+      method: 'PATCH',
+      body: JSON.stringify({ deleted_at: new Date().toISOString(), content: null, file_url: null })
+    });
+    m.deleted_at = new Date().toISOString();
+    m.content = null;
+    m.file_url = null;
+    renderChatMessages();
+    if (_threadOpenForId) renderThreadPanel();
+    showToast('🗑️ 削除しました','success');
+  } catch(e) { showToast('❌ 削除失敗: ' + e.message, 'error'); }
+}
+
+// ---------- プレゼンス（ステータス表示） ----------
+async function startPresenceHeartbeat() {
+  if (!currentUser?.id) return;
+  // 自分のステータスを「active」に
+  await updateMyPresence('active');
+  // ハートビート（60秒ごと）
+  if (_presenceTimer) clearInterval(_presenceTimer);
+  _presenceTimer = setInterval(async () => {
+    // タブが非アクティブなら away
+    const status = document.hidden ? 'away' : 'active';
+    await updateMyPresence(status);
+    await loadAllPresence();
+  }, 60000);
+  // タブのvisibility変更で即時反映
+  document.addEventListener('visibilitychange', async () => {
+    const s = document.hidden ? 'away' : 'active';
+    await updateMyPresence(s);
+  });
+  // 全員のプレゼンスを取得
+  await loadAllPresence();
+}
+async function updateMyPresence(status) {
+  if (!currentUser?.id) return;
+  try {
+    // upsert
+    await sbFetch('user_presence?on_conflict=user_id', {
+      method: 'POST',
+      headers: { 'Prefer': 'resolution=merge-duplicates' },
+      body: JSON.stringify({
+        user_id: currentUser.id,
+        user_name: currentUser.name || '',
+        status: status,
+        last_seen_at: new Date().toISOString()
+      })
+    });
+    // 自分のバッジ更新
+    updateMyPresenceBadge(status);
+  } catch(e) { /* silent */ }
+}
+function updateMyPresenceBadge(status) {
+  const dot = document.getElementById('myPresenceDot');
+  const btn = document.getElementById('myPresenceStatusBtn');
+  if (dot) dot.style.background = status === 'active' ? '#22c55e' : (status === 'away' ? '#f59e0b' : '#94a3b8');
+  if (btn) btn.textContent = status === 'active' ? 'アクティブ' : (status === 'away' ? '離席' : 'オフライン');
+}
+async function toggleMyPresence() {
+  // 手動で active <-> away 切替
+  const cur = userPresence[currentUser?.id]?.status || 'active';
+  const next = cur === 'active' ? 'away' : 'active';
+  if (!userPresence[currentUser.id]) userPresence[currentUser.id] = {};
+  userPresence[currentUser.id].status = next;
+  await updateMyPresence(next);
+  renderChatMessages();
+  renderChatRooms();
+}
+async function loadAllPresence() {
+  try {
+    const data = await sbFetch('user_presence?select=*');
+    userPresence = {};
+    const now = Date.now();
+    (data||[]).forEach(p => {
+      // 5分以上更新なしならoffline扱い
+      const lastSeen = new Date(p.last_seen_at).getTime();
+      const status = (now - lastSeen > 5*60*1000) ? 'offline' : p.status;
+      userPresence[p.user_id] = { ...p, status };
+    });
+    // 自分のバッジ更新
+    if (currentUser?.id && userPresence[currentUser.id]) {
+      updateMyPresenceBadge(userPresence[currentUser.id].status);
+    }
+  } catch(e) { /* silent */ }
+}
+
+// ---------- Driveファイル直接共有UI ----------
+async function openDrivePicker() {
+  if (!currentRoom) { showToast('⚠️ ルーム未選択','error'); return; }
+  if (!currentRoom.drive_url) { showToast('⚠️ このルームにDrive URLが設定されていません','error'); return; }
+  showGenModal('drivePickerModal', '📁 Driveファイルを共有',
+    '<div style="font-size:12px;color:#5f6368;margin-bottom:10px;">このルームの<a href="' + esc(currentRoom.drive_url) + '" target="_blank" style="color:#1a73e8;font-weight:600;">📂 Driveフォルダ</a>からファイルを選んで共有します。</div>' +
+    '<div id="drivePickerList" style="max-height:400px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px;padding:8px;background:#fafafa;">' +
+      '<div style="text-align:center;padding:20px;color:#94a3b8;">読み込み中...</div>' +
+    '</div>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">' +
+      '<button class="btn btn-outline" onclick="closeGenModal(\'drivePickerModal\')">閉じる</button>' +
+    '</div>'
+  );
+  await loadDriveFilesForPicker();
+}
+async function loadDriveFilesForPicker() {
+  const list = document.getElementById('drivePickerList');
+  if (!list) return;
+  const gasUrl = localStorage.getItem('kmt_gas_url') || '';
+  if (!gasUrl) {
+    list.innerHTML = '<div style="color:#dc2626;padding:14px;font-size:12px;">⚠️ GAS URLが設定されていません（ユーザー設定で登録）</div>';
+    return;
+  }
+  try {
+    const resp = await fetch(gasUrl, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'listDriveFiles', driveUrl: currentRoom.drive_url })
+    });
+    const result = await resp.json();
+    if (!result.success) throw new Error(result.error || '取得失敗');
+    const files = result.files || [];
+    if (!files.length) {
+      list.innerHTML = '<div style="color:#94a3b8;padding:14px;font-size:12px;text-align:center;">フォルダにファイルがありません</div>';
+      return;
+    }
+    list.innerHTML = files.map(f =>
+      '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;cursor:pointer;background:white;border:1px solid #e2e8f0;margin-bottom:4px;" onclick="shareDriveFile(\'' + esc(f.url) + '\',\'' + esc(f.name) + '\')" onmouseover="this.style.background=\'#f0f9ff\';this.style.borderColor=\'#1a73e8\'" onmouseout="this.style.background=\'white\';this.style.borderColor=\'#e2e8f0\'">' +
+        '<div style="font-size:18px;">📄</div>' +
+        '<div style="flex:1;min-width:0;">' +
+          '<div style="font-size:12px;font-weight:600;color:#202124;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(f.name) + '</div>' +
+          (f.modifiedTime ? '<div style="font-size:10px;color:#94a3b8;">' + new Date(f.modifiedTime).toLocaleDateString('ja-JP') + '</div>' : '') +
+        '</div>' +
+        '<button class="btn btn-primary" style="font-size:10px;padding:4px 10px;flex-shrink:0;">共有</button>' +
+      '</div>'
+    ).join('');
+  } catch(e) {
+    list.innerHTML = '<div style="color:#dc2626;padding:14px;font-size:12px;">❌ ' + esc(e.message) + '<br><br>※ GASのlistDriveFilesアクションが必要です。未実装の場合、添付（📎）からアップロードしてください。</div>';
+  }
+}
+async function shareDriveFile(fileUrl, fileName) {
+  closeGenModal('drivePickerModal');
+  // チャットメッセージとして送信
+  const newMsg = {
+    chat_room_id: currentRoom.id,
+    room_id: currentRoom.id,
+    sender_id: currentUser?.id || '',
+    sender_name: currentUser?.name || '',
+    content: null,
+    file_url: fileUrl,
+    file_name: fileName,
+    created_at: new Date().toISOString(),
+  };
+  try {
+    const created = await sbFetch('chat_messages', {
+      method: 'POST',
+      headers: { 'Prefer': 'return=representation' },
+      body: JSON.stringify(newMsg)
+    });
+    const row = Array.isArray(created) ? created[0] : created;
+    chatMessages.push(row || newMsg);
+    renderChatMessages();
+    showToast('📁 Driveファイルを共有しました','success');
+  } catch(e) { showToast('❌ 共有失敗: ' + e.message, 'error'); }
 }
 
 // ==============================
