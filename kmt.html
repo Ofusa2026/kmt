@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260521.121 -->
+<!-- KMT_VERSION ver.20260521.122 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -208,7 +208,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260521.121</div>
+    <div class="logo-ver">ver.20260521.122</div>
     <div id="currentUserBadge" style="font-size:10px;color:#86efac;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;color:#86efac;margin:4px 8px;border-radius:6px;background:rgba(134,239,172,0.1);" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -2084,7 +2084,8 @@ function printResume() {
   if (oldFrame) oldFrame.remove();
   const iframe = document.createElement('iframe');
   iframe.id = '_printFrame';
-  iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:210mm;height:297mm;border:none;';
+  // heightは固定せずauto。コンテンツが2ページ以上に渡る場合も自然分割される
+  iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:210mm;height:1px;border:none;';
   document.body.appendChild(iframe);
   const resumeCss = `.resume-date { text-align: right; font-size: 11px; color: #555; margin-bottom: 4px; }
 .resume-title { text-align: center; font-size: 20px; font-weight: 900; letter-spacing: 8px; margin-bottom: 4px; border-bottom: 3px double #333; padding-bottom: 6px; }
@@ -2096,40 +2097,41 @@ function printResume() {
 .resume-photo { border: 1px solid #ccc; border-radius: 4px; display: flex; align-items: center; justify-content: center; background: #f9f9f9; min-height: 150px; }
 .resume-photo img { width: 100%; height: 100%; object-fit: cover; }
 .resume-photo-placeholder { text-align: center; color: #bbb; font-size: 11px; padding: 10px; }
-.resume-section { margin-bottom: 8px; }
+.resume-section { margin-bottom: 8px; page-break-inside: avoid; break-inside: avoid; }
 .resume-section-title { background: #0f2040; color: white; padding: 3px 8px; font-size: 10px; font-weight: 700; letter-spacing: 1px; border-radius: 3px; margin-bottom: 5px; }
 .resume-table { width: 100%; border-collapse: collapse; font-size: 11px; table-layout: fixed; }
 .resume-table th { background: #f0f4f8; padding: 3px 7px; border: 1px solid #ccc; font-size: 10px; font-weight: 700; color: #333; white-space: nowrap; }
 .resume-table td { padding: 4px 7px; border: 1px solid #ccc; vertical-align: top; word-break: break-all; overflow-wrap: break-word; }
 .resume-table td.lbl { background: #f8f9fa; font-weight: 700; width: 22%; color: #333; font-size: 10px; white-space: nowrap; }
+.resume-table tr { page-break-inside: avoid; break-inside: avoid; }
 .resume-lic-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
 .resume-lic-item { border: 1px solid #ccc; border-radius: 3px; padding: 3px 6px; font-size: 10px; display: flex; align-items: center; justify-content: space-between; }
 .resume-lic-item .has { color: #16a34a; font-weight: 700; }
 .resume-lic-item .none { color: #ccc; }
 .resume-memo-box { border: 1px solid #ccc; border-radius: 3px; padding: 6px 8px; min-height: 36px; font-size: 11px; background: #fafafa; }
-.mention-item:hover { background: #f0f4ff; }
-.mention-item.mention-active { background: #eff6ff; }
 .resume-sign { text-align: right; font-size: 10px; color: #555; margin-top: 8px; padding-top: 5px; border-top: 1px solid #eee; }`;
   const doc = iframe.contentDocument || iframe.contentWindow.document;
   doc.open();
   doc.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${title}</title><style>
     * { box-sizing: border-box; }
-    body { margin:0;padding:0;background:white;font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans','Yu Gothic',sans-serif; }
+    html, body { margin:0;padding:0;background:white;font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans','Yu Gothic',sans-serif;color:#111;line-height:1.5;font-size:12px; }
     @page { margin:8mm;size:A4; }
     @media print { * { -webkit-print-color-adjust:exact !important;print-color-adjust:exact !important; } }
-    .resume-page { box-shadow:none!important;border:none!important;margin:0!important;max-width:100%!important;padding:4mm!important; }
+    /* 印刷用に.resume-pageの枠線・影・最大幅をリセット、ページ内に収まらない部分は自然に2ページ目に流す */
+    .resume-page { box-shadow:none!important;border:none!important;margin:0!important;max-width:100%!important;padding:0!important;background:white; }
     ${resumeCss}
   </style>
 </head><body>${wrap.innerHTML}</body></html>`);
   doc.close();
   const prevTitle = document.title;
   document.title = title;
+  // contents読み込み完了を待ってからprint
   setTimeout(() => {
     iframe.contentWindow.document.title = title;
     iframe.contentWindow.focus();
     iframe.contentWindow.print();
     setTimeout(() => { document.title = prevTitle; }, 3000);
-  }, 600);
+  }, 800);
 }
 function printJobFlyer() {
   const preview = document.getElementById('jobFlyerPreview');
@@ -5066,7 +5068,7 @@ function updateTopbarButtons(name) {
     users:        `<button class="btn btn-outline" onclick="loadUsers()">🔄 更新</button><button class="btn btn-primary" onclick="openUserModal(null)">＋ ユーザー追加</button>`,
     decision_report: ``,
     ofusa_view:   `<button class="btn btn-outline" onclick="document.getElementById('ofusaIframe').src=document.getElementById('ofusaIframe').src">🔄 更新</button><a href="https://ofusa2026.github.io/org-view/share.html?token=370ea355-f962-4ce1-884c-2fa274b72b8e" target="_blank" class="btn btn-outline">↗️ 別タブで開く</a>`,
-    resume:       `<button class="btn btn-outline" onclick="window.print()">🖨️ 印刷</button>`,
+    resume:       `<button class="btn btn-outline" onclick="printResume()">🖨️ 印刷</button>`,
   };
   actions.innerHTML = btnMap[name] || '';
 }
@@ -7434,7 +7436,7 @@ function buildResumeScreen() {
         <!-- 保存ボタン -->
         <div style="padding:12px 0;border-top:1px solid var(--gray-200);display:flex;gap:8px;margin-top:8px">
           <button class="btn btn-primary" style="flex:1" onclick="saveResume()">💾 保存</button>
-          <button class="btn btn-outline" onclick="window.print()">🖨️ 印刷</button>
+          <button class="btn btn-outline" onclick="printResume()">🖨️ 印刷</button>
         </div>
       </div>
     </div>
