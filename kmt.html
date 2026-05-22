@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260521.118 -->
+<!-- KMT_VERSION ver.20260521.119 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -208,7 +208,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260521.118</div>
+    <div class="logo-ver">ver.20260521.119</div>
     <div id="currentUserBadge" style="font-size:10px;color:#86efac;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;color:#86efac;margin:4px 8px;border-radius:6px;background:rgba(134,239,172,0.1);" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -7074,21 +7074,68 @@ function buildPartnerModalBody(p){p=p||{};return `<div class="form-grid"><div cl
 
 async function saveJob() {
   const g=id=>document.getElementById(id)?.value||null;
+  const intOrNull=id=>{const v=document.getElementById(id)?.value;return v?parseInt(v):null;};
+
+  // 各国の応募状況を組み立て
+  const countries = ['ベトナム','インドネシア','フィリピン','ミャンマー','ネパール','カンボジア','タイ','中国','モンゴル','スリランカ','ウズベキスタン','バングラデシュ'];
+  const country_progress = {};
+  const country_progress_updated_at = {};
+  // 既存の更新日を保持しつつ、変更されたフィールドだけ今日付に
+  const editing = editingJobId ? (allJobs||[]).find(x=>x.id===editingJobId) : null;
+  const prevCp = (editing?.country_progress && typeof editing.country_progress === 'object') ? editing.country_progress : {};
+  const prevCpUpd = (editing?.country_progress_updated_at && typeof editing.country_progress_updated_at === 'object') ? editing.country_progress_updated_at : {};
+  const todayStr = new Date().toISOString().slice(0,10);
+  countries.forEach(c => {
+    const statusEl = document.getElementById('cp_status_'+c);
+    const countEl = document.getElementById('cp_count_'+c);
+    const status = statusEl?.value || '';
+    const count = countEl?.value ? parseInt(countEl.value) : null;
+    const prev = prevCp[c] || {};
+    const hasNew = status || count !== null;
+    if (hasNew) {
+      country_progress[c] = { status, count };
+      // 値が変わったら今日付。同じなら従来の日付を維持
+      const changed = (prev.status||'') !== status || (prev.count != null ? prev.count : null) !== count;
+      country_progress_updated_at[c] = changed ? todayStr : (prevCpUpd[c] || todayStr);
+    }
+  });
+
   const data={
-    job_code:g('jf_code'), status:g('jf_status')||'募集中', title:g('jf_title'),
-    industry:g('jf_industry'), job_type:g('jf_job_type'), location_domestic:g('jf_location'),
+    // 労働局指定
+    job_code:g('jf_code'),
+    contact_phone:g('jf_contact_phone'),
+    reception_date:g('jf_reception_date'),
+    valid_until:g('jf_valid_until'),
+    employment_period_type:g('jf_employment_period_type'),
+    employment_period_detail:g('jf_employment_period_detail'),
+
+    status:g('jf_status')||'募集中', title:g('jf_title'),
+    industry:g('jf_industry'), job_type:g('jf_job_type'),
+    location:g('jf_location'), location_domestic:g('jf_location'),
     company_id:g('jf_company_id'),
     target_nationality:g('jf_target_nationality'),
-    target_count:document.getElementById('jf_target_count')?.value?parseInt(document.getElementById('jf_target_count').value):null,
+    target_count: intOrNull('jf_target_count'),
     jp_level_req:g('jf_jp_level_req'), required_license:g('jf_required_license'),
     salary_type:g('jf_salary_type'),
-    salary_amount:document.getElementById('jf_salary_amount')?.value?parseInt(document.getElementById('jf_salary_amount').value):null,
+    salary_amount: intOrNull('jf_salary_amount'),
     dormitory_available:g('jf_dormitory'),
-    annual_holiday_days:document.getElementById('jf_holiday_days')?.value?parseInt(document.getElementById('jf_holiday_days').value):null,
-    referral_fee:document.getElementById('jf_referral_fee')?.value?parseInt(document.getElementById('jf_referral_fee').value):null,
-    priority:g('jf_priority'), glt_staff:g('jf_glt_staff'), sales_staff:g('jf_sales_staff'),
-    recruitment_start:g('jf_recruitment_start'), stock_url:g('jf_stock_url'),
-    progress_note:g('jf_progress_note'), job_description:g('jf_job_description'),
+    annual_holiday_days: intOrNull('jf_holiday_days'),
+
+    // KMT管理
+    domestic_overseas:g('jf_domestic_overseas'),
+    priority:g('jf_priority'),
+    expected_count: intOrNull('jf_expected_count'),
+    referral_fee: intOrNull('jf_referral_fee'),
+    sales_staff:g('jf_sales_staff'),
+    glt_staff:g('jf_glt_staff'),
+    obo_staff:g('jf_obo_staff'),
+    recruitment_start:g('jf_recruitment_start'),
+    stock_url:g('jf_stock_url'),
+    progress_note:g('jf_progress_note'),
+    jinzai_comment:g('jf_jinzai_comment'),
+    job_description:g('jf_job_description'),
+    country_progress: Object.keys(country_progress).length ? country_progress : null,
+    country_progress_updated_at: Object.keys(country_progress_updated_at).length ? country_progress_updated_at : null,
     updated_at:new Date().toISOString()
   };
   showLoading(true);
@@ -7398,9 +7445,9 @@ function buildJobsScreen() {
   </div>
   <div class="table-wrap"><table><thead><tr>
     <th>求人コード</th><th>会社名</th><th>業種/職種</th><th>国内外</th>
-    <th>紹介費</th><th>優先度</th><th>GLT担当</th><th>募集開始日</th><th>ステータス</th>
+    <th>紹介費</th><th>優先度</th><th>GLT担当</th><th>募集開始日</th><th>ステータス</th><th>⚠️</th>
   </tr></thead>
-  <tbody id="jobTbody"><tr><td colspan="9" style="text-align:center;padding:40px;color:var(--gray-400)">読み込み中...</td></tr></tbody>
+  <tbody id="jobTbody"><tr><td colspan="10" style="text-align:center;padding:40px;color:var(--gray-400)">読み込み中...</td></tr></tbody>
   </table><div class="pagination-bar" id="jobPagination"></div></div>`;
 }
 
@@ -7667,23 +7714,32 @@ function buildJobModalBody(j) {
   j=j||{};
   return `
   <div class="form-grid">
+    <div class="section-title" style="color:#dc2626;">⚖️ 労働局指定項目（求人受理票）</div>
+    <div class="form-group"><label class="form-label">求人受理番号（求人コード）</label><input class="form-input" id="jf_code" value="${esc(j.job_code||'')}"></div>
+    <div class="form-group"><label class="form-label">担当者連絡先電話番号</label><input class="form-input" id="jf_contact_phone" type="tel" value="${esc(j.contact_phone||'')}" placeholder="03-1234-5678"></div>
+    <div class="form-group"><label class="form-label">受付年月日</label><input class="form-input" id="jf_reception_date" type="date" value="${j.reception_date||''}"></div>
+    <div class="form-group"><label class="form-label">有効期間（終了日）</label><input class="form-input" id="jf_valid_until" type="date" value="${j.valid_until||''}"></div>
+    <div class="form-group"><label class="form-label">雇用期間</label>
+      <select class="form-select" id="jf_employment_period_type">${['','無期','有期','定めなし'].map(s=>`<option ${j.employment_period_type===s?'selected':''}>${s}</option>`).join('')}</select></div>
+    <div class="form-group"><label class="form-label">雇用期間詳細（有期の場合）</label><input class="form-input" id="jf_employment_period_detail" value="${esc(j.employment_period_detail||'')}" placeholder="例: 1年（更新あり）"></div>
+
     <div class="section-title">求人基本情報</div>
-    <div class="form-group"><label class="form-label">求人コード</label><input class="form-input" id="jf_code" value="${esc(j.job_code||'')}"></div>
     <div class="form-group"><label class="form-label">ステータス</label>
       <select class="form-select" id="jf_status">${['募集中','新着','提案中','保留','停止','決定','募集再開'].map(s=>`<option ${j.status===s?'selected':''}>${s}</option>`).join('')}</select></div>
-    <div class="form-group full"><label class="form-label">会社名</label><input class="form-input" id="jf_title" value="${esc(j.title||'')}"></div>
+    <div class="form-group full"><label class="form-label">会社名（案件名）</label><input class="form-input" id="jf_title" value="${esc(j.title||'')}"></div>
     <div class="form-group"><label class="form-label">業種（特定技能分野）</label>
       <select class="form-select" id="jf_industry">${['','農業','漁業','建設','製造業','飲食料品製造業','外食業','介護','ビルクリーニング','宿泊','自動車整備','航空','造船・船用工業'].map(s=>`<option ${j.industry===s?'selected':''}>${s}</option>`).join('')}</select></div>
     <div class="form-group"><label class="form-label">職種</label><input class="form-input" id="jf_job_type" value="${esc(j.job_type||'')}"></div>
-    <div class="form-group"><label class="form-label">国内/外</label>
-      <select class="form-select" id="jf_location">${['','国内','国外','国内/外'].map(s=>`<option ${j.location_domestic===s?'selected':''}>${s}</option>`).join('')}</select></div>
+    <div class="form-group"><label class="form-label">就業場所（都道府県等）</label><input class="form-input" id="jf_location" value="${esc(j.location||j.location_domestic||'')}"></div>
     <div class="form-group"><label class="form-label">所属機関</label>
       <select class="form-select" id="jf_company_id"><option value="">選択...</option>${allCompanies.map(c=>`<option value="${c.id}" ${j.company_id===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div>
+
     <div class="section-title">条件</div>
     <div class="form-group"><label class="form-label">募集国籍</label><input class="form-input" id="jf_target_nationality" value="${esc(j.target_nationality||'')}"></div>
     <div class="form-group"><label class="form-label">採用予定人数</label><input class="form-input" id="jf_target_count" type="number" value="${j.target_count??''}"></div>
     <div class="form-group"><label class="form-label">日本語レベル</label><input class="form-input" id="jf_jp_level_req" value="${esc(j.jp_level_req||'')}"></div>
     <div class="form-group"><label class="form-label">必要資格</label><input class="form-input" id="jf_required_license" value="${esc(j.required_license||'')}"></div>
+
     <div class="section-title">給与・住居</div>
     <div class="form-group"><label class="form-label">給与種別</label>
       <select class="form-select" id="jf_salary_type">${['','月給','時給'].map(s=>`<option ${j.salary_type===s?'selected':''}>${s}</option>`).join('')}</select></div>
@@ -7691,21 +7747,78 @@ function buildJobModalBody(j) {
     <div class="form-group"><label class="form-label">寮</label>
       <select class="form-select" id="jf_dormitory">${['','あり','なし'].map(s=>`<option ${j.dormitory_available===s?'selected':''}>${s}</option>`).join('')}</select></div>
     <div class="form-group"><label class="form-label">年間休日</label><input class="form-input" id="jf_holiday_days" type="number" value="${j.annual_holiday_days??''}"></div>
-    <div class="section-title">紹介費・担当</div>
-    <div class="form-group"><label class="form-label">紹介費（円・税抜）</label><input class="form-input" id="jf_referral_fee" type="number" value="${j.referral_fee??''}"></div>
+
+    <div class="section-title" style="color:#1a73e8;">📋 KMT管理項目</div>
+    <div class="form-group"><label class="form-label">国内/国外</label>
+      <select class="form-select" id="jf_domestic_overseas">${['','国内','国外','国内/外'].map(s=>`<option ${j.domestic_overseas===s||(!j.domestic_overseas&&j.location_domestic===s)?'selected':''}>${s}</option>`).join('')}</select></div>
     <div class="form-group"><label class="form-label">優先度</label>
       <select class="form-select" id="jf_priority">${['','高','中','低'].map(s=>`<option ${j.priority===s?'selected':''}>${s}</option>`).join('')}</select></div>
+    <div class="form-group"><label class="form-label">見込み人数</label><input class="form-input" id="jf_expected_count" type="number" value="${j.expected_count??''}"></div>
+    <div class="form-group"><label class="form-label">紹介費（円・税抜）</label><input class="form-input" id="jf_referral_fee" type="number" value="${j.referral_fee??''}"></div>
+    <div class="form-group"><label class="form-label">企業担当</label><input class="form-input" id="jf_sales_staff" value="${esc(j.sales_staff||'')}"></div>
     <div class="form-group"><label class="form-label">GLT担当</label><input class="form-input" id="jf_glt_staff" value="${esc(j.glt_staff||'')}"></div>
-    <div class="form-group"><label class="form-label">営業担当</label><input class="form-input" id="jf_sales_staff" value="${esc(j.sales_staff||'')}"></div>
+    <div class="form-group"><label class="form-label">大房側担当</label><input class="form-input" id="jf_obo_staff" value="${esc(j.obo_staff||'')}"></div>
     <div class="form-group"><label class="form-label">募集開始日</label><input class="form-input" id="jf_recruitment_start" type="date" value="${j.recruitment_start||''}"></div>
     <div class="form-group full"><label class="form-label">STOCKのURL</label><input class="form-input" id="jf_stock_url" value="${esc(j.stock_url||'')}"></div>
-    <div class="form-group full"><label class="form-label">候補者の状況・コメント</label><textarea class="form-textarea" id="jf_progress_note">${esc(j.progress_note||'')}</textarea></div>
+    <div class="form-group full"><label class="form-label">案件担当のコメント（候補者の状況・進捗）</label><textarea class="form-textarea" id="jf_progress_note">${esc(j.progress_note||'')}</textarea></div>
+    <div class="form-group full"><label class="form-label">人材担当のコメント</label><textarea class="form-textarea" id="jf_jinzai_comment">${esc(j.jinzai_comment||'')}</textarea></div>
     <div class="form-group full"><label class="form-label">仕事内容</label><textarea class="form-textarea" id="jf_job_description">${esc(j.job_description||'')}</textarea></div>
+
+    <div class="section-title" style="color:#16a34a;">🌍 各国の応募状況</div>
+    <div class="form-group full" id="jf_country_progress_wrap">${buildCountryProgressEditor(j)}</div>
   </div>
   <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)">
     <button class="btn btn-outline" onclick="closeGenModal('jobModal')">キャンセル</button>
     <button class="btn btn-primary" onclick="saveJob()">💾 保存</button>
   </div>`;
+}
+
+// 各国の応募状況エディタ
+function buildCountryProgressEditor(j) {
+  const countries = ['ベトナム','インドネシア','フィリピン','ミャンマー','ネパール','カンボジア','タイ','中国','モンゴル','スリランカ','ウズベキスタン','バングラデシュ'];
+  const cp = (j.country_progress && typeof j.country_progress === 'object') ? j.country_progress : {};
+  const cpUpd = (j.country_progress_updated_at && typeof j.country_progress_updated_at === 'object') ? j.country_progress_updated_at : {};
+  const todayStr = new Date().toISOString().slice(0,10);
+
+  let rowsHtml = '<div style="display:flex;flex-direction:column;gap:6px;">';
+  rowsHtml += '<div style="display:grid;grid-template-columns:120px 1fr 100px 130px;gap:8px;font-size:11px;font-weight:700;color:#5f6368;padding:4px 0;border-bottom:1px solid #e2e8f0;">' +
+    '<div>国</div><div>状況</div><div>応募数</div><div>最終更新</div>' +
+    '</div>';
+  countries.forEach(country => {
+    const cur = cp[country] || {};
+    const status = cur.status || '';
+    const count = cur.count != null ? cur.count : '';
+    const updAt = cpUpd[country] || '';
+    // 2週間以上未更新かチェック
+    let warnHtml = '';
+    if (updAt && (status || count !== '')) {
+      const diffDays = Math.floor((new Date(todayStr) - new Date(updAt)) / (1000*60*60*24));
+      if (diffDays >= 14) {
+        warnHtml = '<span style="color:#dc2626;font-size:10px;font-weight:700;">⚠️ ' + diffDays + '日経過</span>';
+      } else if (diffDays >= 7) {
+        warnHtml = '<span style="color:#f59e0b;font-size:10px;font-weight:700;">' + diffDays + '日経過</span>';
+      }
+    }
+    rowsHtml += '<div style="display:grid;grid-template-columns:120px 1fr 100px 130px;gap:8px;align-items:center;">' +
+      '<div style="font-size:12px;font-weight:600;">' + country + '</div>' +
+      '<input class="form-input" id="cp_status_' + country + '" data-country="' + country + '" data-cp="status" value="' + esc(status) + '" placeholder="例: 募集中、面接予定" style="font-size:12px;padding:5px 8px;" onchange="onCountryProgressChange(this)">' +
+      '<input class="form-input" id="cp_count_' + country + '" data-country="' + country + '" data-cp="count" type="number" value="' + esc(count) + '" placeholder="人数" style="font-size:12px;padding:5px 8px;" onchange="onCountryProgressChange(this)">' +
+      '<div style="font-size:11px;color:#5f6368;display:flex;flex-direction:column;gap:2px;">' +
+        '<span id="cp_upd_' + country + '">' + (updAt || '<span style="color:#94a3b8;">未入力</span>') + '</span>' +
+        warnHtml +
+      '</div>' +
+    '</div>';
+  });
+  rowsHtml += '</div>';
+  rowsHtml += '<div style="font-size:10px;color:#94a3b8;margin-top:6px;">※ 状況・応募数を変更すると最終更新日が自動でセットされます。2週間以上未更新の場合に警告が表示されます。</div>';
+  return rowsHtml;
+}
+
+// 各国の応募状況フィールド変更時に「最終更新日」を今日にセット
+function onCountryProgressChange(input) {
+  const country = input.getAttribute('data-country');
+  const upd = document.getElementById('cp_upd_' + country);
+  if (upd) upd.textContent = new Date().toISOString().slice(0,10);
 }
 
 function buildResumeHTML(c) {
@@ -8232,20 +8345,51 @@ function renderJobTable() {
   const tbody=document.getElementById('jobTbody'); if(!tbody) return;
   const total=filteredJobs.length;
   const page=filteredJobs.slice((jobPage-1)*PAGE_SIZE,jobPage*PAGE_SIZE);
-  if(!page.length){tbody.innerHTML='<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--gray-400)">データなし</td></tr>'; document.getElementById('jobPagination').innerHTML=''; return;}
+  if(!page.length){tbody.innerHTML='<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--gray-400)">データなし</td></tr>'; document.getElementById('jobPagination').innerHTML=''; return;}
   const stCls={募集中:'st-active',新着:'st-docs',提案中:'st-review',保留:'st-add',停止:'st-none',決定:'st-cert',募集再開:'st-submit'};
   const priCls={高:'st-active',中:'st-review',低:'st-none'};
-  tbody.innerHTML=page.map(j=>`<tr onclick="openJobModal('${j.id}')">
-    <td><strong style="color:var(--blue)">${esc(j.job_code||'-')}</strong></td>
-    <td style="font-size:12px">${esc(j.companies?.name||j.partner_support_orgs?.name||j.title||'-')}</td>
-    <td style="font-size:11px">${esc(j.industry||'')}${j.job_type?'<br>'+esc(j.job_type):''}</td>
-    <td style="font-size:12px">${esc(j.location_domestic||'-')}</td>
-    <td style="font-size:12px">${j.referral_fee?Number(j.referral_fee).toLocaleString()+'円':'-'}</td>
-    <td>${j.priority?`<span class="st-badge ${priCls[j.priority]||'st-none'}">${j.priority}</span>`:'-'}</td>
-    <td style="font-size:12px">${esc(j.glt_staff||'-')}</td>
-    <td style="font-size:12px">${j.recruitment_start?formatDate(j.recruitment_start):'-'}</td>
-    <td><span class="st-badge ${stCls[j.status]||'st-none'}">${esc(j.status||'-')}</span></td>
-  </tr>`).join('');
+  const todayMs = Date.now();
+  tbody.innerHTML=page.map(j=>{
+    // 各国の応募状況更新で2週間以上経ったものをカウント
+    let warnBadge = '';
+    const cpUpd = (j.country_progress_updated_at && typeof j.country_progress_updated_at === 'object') ? j.country_progress_updated_at : {};
+    const cp = (j.country_progress && typeof j.country_progress === 'object') ? j.country_progress : {};
+    let warnCount = 0;
+    let warnCountries = [];
+    Object.keys(cpUpd).forEach(country => {
+      const upd = cpUpd[country];
+      const entry = cp[country];
+      if (!upd || !entry) return;
+      // 状況に「決定」「完了」「停止」が含まれているかは未来対応として、ここでは無条件カウント
+      const diffDays = Math.floor((todayMs - new Date(upd).getTime()) / (1000*60*60*24));
+      if (diffDays >= 14) {
+        warnCount++;
+        warnCountries.push(country + '(' + diffDays + '日)');
+      }
+    });
+    if (warnCount > 0) {
+      warnBadge = '<span title="2週間以上未更新: ' + esc(warnCountries.join(', ')) + '" style="background:#fee2e2;color:#dc2626;padding:2px 6px;border-radius:8px;font-size:10px;font-weight:700;">⚠️' + warnCount + '</span>';
+    }
+    // 有効期限切れ
+    if (j.valid_until) {
+      const validUntilMs = new Date(j.valid_until).getTime();
+      if (validUntilMs < todayMs) {
+        warnBadge += ' <span title="有効期限切れ" style="background:#fff7ed;color:#92400e;padding:2px 6px;border-radius:8px;font-size:10px;font-weight:700;">⏰期限切</span>';
+      }
+    }
+    return `<tr onclick="openJobModal('${j.id}')">
+      <td><strong style="color:var(--blue)">${esc(j.job_code||'-')}</strong></td>
+      <td style="font-size:12px">${esc(j.companies?.name||j.partner_support_orgs?.name||j.title||'-')}</td>
+      <td style="font-size:11px">${esc(j.industry||'')}${j.job_type?'<br>'+esc(j.job_type):''}</td>
+      <td style="font-size:12px">${esc(j.domestic_overseas||j.location_domestic||'-')}</td>
+      <td style="font-size:12px">${j.referral_fee?Number(j.referral_fee).toLocaleString()+'円':'-'}</td>
+      <td>${j.priority?`<span class="st-badge ${priCls[j.priority]||'st-none'}">${j.priority}</span>`:'-'}</td>
+      <td style="font-size:12px">${esc(j.glt_staff||'-')}</td>
+      <td style="font-size:12px">${j.recruitment_start?formatDate(j.recruitment_start):'-'}</td>
+      <td><span class="st-badge ${stCls[j.status]||'st-none'}">${esc(j.status||'-')}</span></td>
+      <td>${warnBadge||'-'}</td>
+    </tr>`;
+  }).join('');
   renderGenPagination('jobPagination',total,jobPage,p=>{jobPage=p;renderJobTable();});
 }
 
