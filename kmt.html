@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260521.119 -->
+<!-- KMT_VERSION ver.20260521.120 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -208,7 +208,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260521.119</div>
+    <div class="logo-ver">ver.20260521.120</div>
     <div id="currentUserBadge" style="font-size:10px;color:#86efac;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;color:#86efac;margin:4px 8px;border-radius:6px;background:rgba(134,239,172,0.1);" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -6923,13 +6923,34 @@ async function saveCandidate() {
   const data={
     name:g('cf_name'), name_kana:g('cf_name_kana'), nationality:g('cf_nationality'),
     gender:g('cf_gender'), birthdate:g('cf_birthdate'), religion:g('cf_religion'),
+    home_country_address:g('cf_home_country_address'),
+    jp_address:g('cf_jp_address'),
     marital_status:g('cf_marital_status'),
     num_children:document.getElementById('cf_num_children')?.value?parseInt(document.getElementById('cf_num_children').value):null,
+
+    // 労働局指定項目
+    reception_date:g('cf_reception_date'),
+    valid_until:g('cf_valid_until'),
+
+    // KMT管理
+    domestic_overseas:g('cf_domestic_overseas'),
+    jp_eval_grade:g('cf_jp_eval_grade'),
+    jp_eval_note:g('cf_jp_eval_note'),
+
     jp_language_level:g('cf_jp_language_level'), jp_language_detail:g('cf_jp_language_detail'),
     skill_exam_1:g('cf_skill_exam_1'), hyoka_chosho:g('cf_hyoka_chosho'),
+    experience:g('cf_experience'),
     applicant_field:g('cf_applicant_field'), job_category:g('cf_job_category'),
-    available_from:g('cf_available_from'), desired_salary:g('cf_desired_salary'),
+    available_from:g('cf_available_from'),
+    desired_salary:g('cf_desired_salary'),
+    net_salary_base:g('cf_net_salary_base'),
+    desired_area:g('cf_desired_area'),
+    desired_other:g('cf_desired_other'),
     overtime_preference:g('cf_overtime_preference'), temp_return_wish:g('cf_temp_return_wish'),
+    interview_availability:g('cf_interview_availability'),
+    company_interview_date:g('cf_company_interview_date'),
+    company_interview_result:g('cf_company_interview_result'),
+
     motivation:g('cf_motivation'), health_status:g('cf_health_status'),
     status:g('cf_status')||'選考中', staff:g('cf_staff'),
     staff_impression:g('cf_staff_impression'), memo:g('cf_memo'),
@@ -6951,37 +6972,61 @@ function buildCandidateModalBody(c) {
   c=c||{};
   return `
   <div class="form-grid">
-    <div class="section-title">基本情報</div>
+    <div class="section-title" style="color:#dc2626;">⚖️ 労働局指定項目（求職票）</div>
     <div class="form-group full"><label class="form-label">氏名（ローマ字）*</label><input class="form-input" id="cf_name" value="${esc(c.name||'')}"></div>
     <div class="form-group"><label class="form-label">フリガナ</label><input class="form-input" id="cf_name_kana" value="${esc(c.name_kana||'')}"></div>
+    <div class="form-group"><label class="form-label">生年月日</label><input class="form-input" id="cf_birthdate" type="date" value="${c.birthdate||''}"></div>
+    <div class="form-group full"><label class="form-label">本国住所</label><input class="form-input" id="cf_home_country_address" value="${esc(c.home_country_address||'')}"></div>
+    <div class="form-group full"><label class="form-label">日本住所（在留者）</label><input class="form-input" id="cf_jp_address" value="${esc(c.jp_address||'')}"></div>
+    <div class="form-group"><label class="form-label">希望分野</label><input class="form-input" id="cf_applicant_field" value="${esc(c.applicant_field||'')}"></div>
+    <div class="form-group"><label class="form-label">希望職種</label><input class="form-input" id="cf_job_category" value="${esc(c.job_category||'')}"></div>
+    <div class="form-group"><label class="form-label">受付年月日</label><input class="form-input" id="cf_reception_date" type="date" value="${c.reception_date||''}"></div>
+    <div class="form-group"><label class="form-label">有効期間（終了日）</label><input class="form-input" id="cf_valid_until" type="date" value="${c.valid_until||''}"></div>
+
+    <div class="section-title">基本情報</div>
     <div class="form-group"><label class="form-label">国籍</label>
-      <select class="form-select" id="cf_nationality">${['','インドネシア','ベトナム','タイ','カンボジア','ミャンマー','その他'].map(n=>`<option ${c.nationality===n?'selected':''}>${n}</option>`).join('')}</select></div>
+      <select class="form-select" id="cf_nationality">${['','インドネシア','ベトナム','フィリピン','ミャンマー','ネパール','カンボジア','タイ','中国','モンゴル','スリランカ','ウズベキスタン','バングラデシュ','その他'].map(n=>`<option ${c.nationality===n?'selected':''}>${n}</option>`).join('')}</select></div>
+    <div class="form-group"><label class="form-label">国内/国外人材</label>
+      <select class="form-select" id="cf_domestic_overseas">${['','国内','国外'].map(n=>`<option ${c.domestic_overseas===n?'selected':''}>${n}</option>`).join('')}</select></div>
     <div class="form-group"><label class="form-label">性別</label>
       <select class="form-select" id="cf_gender">${['','男','女'].map(n=>`<option ${c.gender===n?'selected':''}>${n}</option>`).join('')}</select></div>
-    <div class="form-group"><label class="form-label">生年月日</label><input class="form-input" id="cf_birthdate" type="date" value="${c.birthdate||''}"></div>
     <div class="form-group"><label class="form-label">宗教</label><input class="form-input" id="cf_religion" value="${esc(c.religion||'')}"></div>
     <div class="form-group"><label class="form-label">配偶者</label>
       <select class="form-select" id="cf_marital_status">${['','有','無'].map(n=>`<option ${c.marital_status===n?'selected':''}>${n}</option>`).join('')}</select></div>
     <div class="form-group"><label class="form-label">子供（人数）</label><input class="form-input" id="cf_num_children" type="number" value="${c.num_children??''}"></div>
-    <div class="section-title">日本語・技能試験</div>
-    <div class="form-group"><label class="form-label">日本語レベル</label><input class="form-input" id="cf_jp_language_level" value="${esc(c.jp_language_level||'')}" placeholder="N4相当"></div>
-    <div class="form-group"><label class="form-label">日本語詳細（聞き取り・会話）</label><input class="form-input" id="cf_jp_language_detail" value="${esc(c.jp_language_detail||'')}"></div>
+
+    <div class="section-title" style="color:#7c3aed;">🗣️ 日本語能力・経験</div>
+    <div class="form-group"><label class="form-label">日本語能力試験等（保有資格）</label><input class="form-input" id="cf_jp_language_level" value="${esc(c.jp_language_level||'')}" placeholder="例: N4合格、JFT-Basic A2"></div>
+    <div class="form-group"><label class="form-label">日本語詳細</label><input class="form-input" id="cf_jp_language_detail" value="${esc(c.jp_language_detail||'')}" placeholder="聞き取り・会話など"></div>
+    <div class="form-group"><label class="form-label">KMT評価 (A〜E)</label>
+      <select class="form-select" id="cf_jp_eval_grade" style="font-weight:700;">${['','A','B','C','D','E'].map(n=>`<option ${c.jp_eval_grade===n?'selected':''}>${n}</option>`).join('')}</select></div>
+    <div class="form-group"><label class="form-label">評価コメント（面接所感）</label><input class="form-input" id="cf_jp_eval_note" value="${esc(c.jp_eval_note||'')}"></div>
     <div class="form-group"><label class="form-label">技能試験1</label><input class="form-input" id="cf_skill_exam_1" value="${esc(c.skill_exam_1||'')}"></div>
     <div class="form-group"><label class="form-label">評価調書</label>
       <select class="form-select" id="cf_hyoka_chosho">${['','有','無'].map(n=>`<option ${c.hyoka_chosho===n?'selected':''}>${n}</option>`).join('')}</select></div>
+    <div class="form-group full"><label class="form-label">実務経験（経験者）</label><input class="form-input" id="cf_experience" value="${esc(c.experience||'')}" placeholder="例: 3年（介護施設）"></div>
+
     <div class="section-title">希望・就労条件</div>
-    <div class="form-group"><label class="form-label">希望分野</label><input class="form-input" id="cf_applicant_field" value="${esc(c.applicant_field||'')}"></div>
-    <div class="form-group"><label class="form-label">希望職種</label><input class="form-input" id="cf_job_category" value="${esc(c.job_category||'')}"></div>
     <div class="form-group"><label class="form-label">入社可能日</label><input class="form-input" id="cf_available_from" type="date" value="${c.available_from||''}"></div>
-    <div class="form-group"><label class="form-label">希望給料</label><input class="form-input" id="cf_desired_salary" value="${esc(c.desired_salary||'')}"></div>
+    <div class="form-group"><label class="form-label">希望月給</label><input class="form-input" id="cf_desired_salary" value="${esc(c.desired_salary||'')}" placeholder="例: 18万円〜"></div>
+    <div class="form-group"><label class="form-label">希望手取り</label><input class="form-input" id="cf_net_salary_base" value="${esc(c.net_salary_base||'')}" placeholder="例: 15万円〜"></div>
+    <div class="form-group"><label class="form-label">希望地域</label><input class="form-input" id="cf_desired_area" value="${esc(c.desired_area||'')}" placeholder="例: 関東、東海"></div>
+    <div class="form-group full"><label class="form-label">希望その他</label><input class="form-input" id="cf_desired_other" value="${esc(c.desired_other||'')}" placeholder="寮希望、夜勤NG等"></div>
     <div class="form-group"><label class="form-label">残業・夜勤希望</label><input class="form-input" id="cf_overtime_preference" value="${esc(c.overtime_preference||'')}"></div>
     <div class="form-group"><label class="form-label">一時帰国希望</label><input class="form-input" id="cf_temp_return_wish" value="${esc(c.temp_return_wish||'')}"></div>
+    <div class="form-group full"><label class="form-label">面接可能な日時</label><input class="form-input" id="cf_interview_availability" value="${esc(c.interview_availability||'')}" placeholder="例: 平日 9:00-17:00 JST"></div>
     <div class="form-group full"><label class="form-label">志望動機</label><textarea class="form-textarea" id="cf_motivation">${esc(c.motivation||'')}</textarea></div>
+
+    <div class="section-title" style="color:#16a34a;">🤝 企業面接</div>
+    <div class="form-group"><label class="form-label">企業面接日（予定）</label><input class="form-input" id="cf_company_interview_date" type="date" value="${c.company_interview_date||''}"></div>
+    <div class="form-group"><label class="form-label">面接結果</label>
+      <select class="form-select" id="cf_company_interview_result">${['','面接予定','合格','不合格','辞退','保留'].map(n=>`<option ${c.company_interview_result===n?'selected':''}>${n}</option>`).join('')}</select></div>
+
     <div class="section-title">健康・担当</div>
     <div class="form-group"><label class="form-label">健康状況</label><input class="form-input" id="cf_health_status" value="${esc(c.health_status||'')}"></div>
     <div class="form-group"><label class="form-label">ステータス</label>
-      <select class="form-select" id="cf_status">${['選考中','内定','入国待ち','キャンセル'].map(s=>`<option ${c.status===s?'selected':''}>${s}</option>`).join('')}</select></div>
-    <div class="form-group"><label class="form-label">担当</label><input class="form-input" id="cf_staff" value="${esc(c.staff||'')}"></div>
+      <select class="form-select" id="cf_status">${['選考中','内定','入国待ち','配属済','キャンセル'].map(s=>`<option ${c.status===s?'selected':''}>${s}</option>`).join('')}</select></div>
+    <div class="form-group"><label class="form-label">人材担当</label><input class="form-input" id="cf_staff" value="${esc(c.staff||'')}"></div>
     <div class="form-group"><label class="form-label">担当者の感想</label><input class="form-input" id="cf_staff_impression" value="${esc(c.staff_impression||'')}"></div>
     <div class="form-group full"><label class="form-label">メモ</label><textarea class="form-textarea" id="cf_memo">${esc(c.memo||'')}</textarea></div>
   </div>
@@ -7500,10 +7545,10 @@ function buildCandidatesScreen() {
     <button class="btn btn-outline" style="font-size:11px;padding:4px 10px" onclick="clearCandidateFilters()">✕</button>
   </div>
   <div class="table-wrap"><table><thead><tr>
-    <th>氏名</th><th>国籍</th><th>日本語Lv</th><th>技能試験</th><th>分野/職種</th>
-    <th>入社可能日</th><th>ステータス</th><th>担当</th>
+    <th>氏名</th><th>国籍</th><th>国内/外</th><th>日本語Lv</th><th>KMT評価</th><th>分野/職種</th>
+    <th>面接日</th><th>結果</th><th>ステータス</th><th>担当</th><th>⚠️</th>
   </tr></thead>
-  <tbody id="candidateTbody"><tr><td colspan="8" style="text-align:center;padding:40px;color:var(--gray-400)">読み込み中...</td></tr></tbody>
+  <tbody id="candidateTbody"><tr><td colspan="11" style="text-align:center;padding:40px;color:var(--gray-400)">読み込み中...</td></tr></tbody>
   </table><div class="pagination-bar" id="candidatePagination"></div></div>`;
 }
 
@@ -8176,18 +8221,41 @@ function renderCandidateTable() {
   const tbody=document.getElementById('candidateTbody'); if(!tbody) return;
   const total=filteredCandidates.length;
   const page=filteredCandidates.slice((candidatePage-1)*PAGE_SIZE, candidatePage*PAGE_SIZE);
-  if(!page.length){tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--gray-400)">データなし</td></tr>'; document.getElementById('candidatePagination').innerHTML=''; return;}
+  if(!page.length){tbody.innerHTML='<tr><td colspan="11" style="text-align:center;padding:40px;color:var(--gray-400)">データなし</td></tr>'; document.getElementById('candidatePagination').innerHTML=''; return;}
+  const todayMs = Date.now();
+  const gradeColor = { A:'#16a34a', B:'#65a30d', C:'#f59e0b', D:'#ea580c', E:'#dc2626' };
+  const resultColor = { '合格':'#16a34a', '不合格':'#dc2626', '辞退':'#94a3b8', '保留':'#f59e0b', '面接予定':'#1a73e8' };
   tbody.innerHTML=page.map(c=>{
-    const cls=c.status==='選考中'?'st-docs':c.status==='内定'?'st-active':c.status==='入国待ち'?'st-submit':'st-none';
+    const cls=c.status==='選考中'?'st-docs':c.status==='内定'?'st-active':c.status==='入国待ち'?'st-submit':c.status==='配属済'?'st-cert':'st-none';
+    // 有効期限切れ警告
+    let warnBadge = '';
+    if (c.valid_until) {
+      const validMs = new Date(c.valid_until).getTime();
+      if (validMs < todayMs) {
+        warnBadge = '<span title="有効期限切れ (' + c.valid_until + ')" style="background:#fff7ed;color:#92400e;padding:2px 6px;border-radius:8px;font-size:10px;font-weight:700;">⏰期限切</span>';
+      } else if (validMs - todayMs < 14 * 86400000) {
+        const days = Math.ceil((validMs - todayMs) / 86400000);
+        warnBadge = '<span title="期限間近 (' + c.valid_until + ')" style="background:#fef3c7;color:#92400e;padding:2px 6px;border-radius:8px;font-size:10px;font-weight:700;">⏰' + days + '日</span>';
+      }
+    }
+    const gradeBadge = c.jp_eval_grade
+      ? '<span style="background:' + (gradeColor[c.jp_eval_grade]||'#94a3b8') + ';color:white;padding:2px 8px;border-radius:50%;font-size:11px;font-weight:800;display:inline-block;width:18px;height:18px;line-height:18px;text-align:center;">' + esc(c.jp_eval_grade) + '</span>'
+      : '-';
+    const resultBadge = c.company_interview_result
+      ? '<span style="background:white;color:' + (resultColor[c.company_interview_result]||'#5f6368') + ';border:1px solid ' + (resultColor[c.company_interview_result]||'#dadce0') + ';padding:2px 6px;border-radius:8px;font-size:10px;font-weight:700;">' + esc(c.company_interview_result) + '</span>'
+      : '-';
     return `<tr onclick="openCandidateModal('${c.id}')">
       <td><strong>${esc(c.name)}</strong>${c.name_kana?'<div style="font-size:10px;color:var(--gray-400)">'+esc(c.name_kana)+'</div>':''}</td>
       <td>${natFlag(c.nationality)} ${esc(c.nationality||'-')}</td>
+      <td style="font-size:12px">${esc(c.domestic_overseas||'-')}</td>
       <td style="font-size:12px">${esc(c.jp_language_level||'-')}</td>
-      <td style="font-size:11px">${esc(c.skill_exam_1||'-')}</td>
+      <td style="text-align:center">${gradeBadge}</td>
       <td style="font-size:11px">${esc(c.applicant_field||'')}${c.job_category?'<br>'+esc(c.job_category):''}</td>
-      <td style="font-size:12px">${c.available_from?formatDate(c.available_from):'-'}</td>
+      <td style="font-size:12px">${c.company_interview_date?formatDate(c.company_interview_date):'-'}</td>
+      <td>${resultBadge}</td>
       <td><span class="st-badge ${cls}">${esc(c.status||'-')}</span></td>
       <td style="font-size:12px">${esc(c.staff||'-')}</td>
+      <td>${warnBadge||'-'}</td>
     </tr>`;
   }).join('');
   renderGenPagination('candidatePagination', total, candidatePage, p=>{candidatePage=p;renderCandidateTable();});
