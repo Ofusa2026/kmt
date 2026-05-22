@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260521.115 -->
+<!-- KMT_VERSION ver.20260521.116 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -208,7 +208,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260521.115</div>
+    <div class="logo-ver">ver.20260521.116</div>
     <div id="currentUserBadge" style="font-size:10px;color:#86efac;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;color:#86efac;margin:4px 8px;border-radius:6px;background:rgba(134,239,172,0.1);" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -5677,38 +5677,67 @@ const SCHEDULE_EVENT_TYPES = {
 const SCHEDULE_METHOD_LABEL = { online: '🖥️ オンライン', visit: '🏢 訪問' };
 
 let _supportSchedules = [];
-let _scheduleFilter = { type: 'all', status: 'planned' }; // all/<type> + planned/done/all
+let _scheduleFilter = { type: 'all', status: 'planned' };
+
+// 表示モード: 'calendar' | 'table'
+let _scheduleViewMode = 'calendar';
+// カレンダー状態
+let _scheduleCalState = { view: 'week', anchor: new Date() };
 
 function buildSupportSchedulesScreen() {
   return `
   <div style="display:flex;flex-direction:column;gap:12px;">
-    <!-- フィルタ -->
-    <div style="background:white;border:1px solid var(--gray-200);border-radius:8px;padding:12px 16px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;">
-      <div style="font-weight:700;font-size:13px;color:var(--navy);">フィルタ：</div>
-      <select id="scheduleTypeFilter" onchange="onScheduleFilterChange()" style="padding:5px 10px;border:1px solid var(--gray-300);border-radius:6px;font-size:12px;">
-        <option value="all">📋 すべての種別</option>
-        ${Object.entries(SCHEDULE_EVENT_TYPES).map(([k,v]) => `<option value="${k}">${v.icon} ${v.label}</option>`).join('')}
-      </select>
-      <select id="scheduleStatusFilter" onchange="onScheduleFilterChange()" style="padding:5px 10px;border:1px solid var(--gray-300);border-radius:6px;font-size:12px;">
-        <option value="planned">⏰ 予定のみ</option>
-        <option value="done">✅ 実施済のみ</option>
-        <option value="all">すべて</option>
-      </select>
-      <input type="text" id="scheduleSearchInput" placeholder="🔍 人材名・企業名で検索" oninput="onScheduleFilterChange()" style="padding:5px 10px;border:1px solid var(--gray-300);border-radius:6px;font-size:12px;min-width:200px;">
+    <!-- ヘッダ：モード切替＋ナビ -->
+    <div style="background:white;border:1px solid var(--gray-200);border-radius:8px;padding:10px 14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+      <div style="display:flex;gap:0;border:1px solid var(--gray-300);border-radius:6px;overflow:hidden;">
+        <button id="scheduleModeCalBtn" onclick="setScheduleViewMode('calendar')" style="padding:6px 14px;font-size:12px;font-weight:700;border:none;background:var(--navy);color:white;cursor:pointer;">📅 カレンダー</button>
+        <button id="scheduleModeTblBtn" onclick="setScheduleViewMode('table')" style="padding:6px 14px;font-size:12px;font-weight:700;border:none;background:white;color:var(--navy);cursor:pointer;">📋 テーブル</button>
+      </div>
+      <!-- カレンダー用ナビ -->
+      <div id="scheduleCalNav" style="display:flex;gap:6px;align-items:center;">
+        <button onclick="schedCalPrev()" style="font-size:12px;padding:5px 10px;background:white;color:var(--navy);border:1.5px solid var(--gray-200);border-radius:6px;cursor:pointer;font-weight:700;">◀ 前</button>
+        <span id="scheduleCalPeriodLabel" style="font-size:13px;font-weight:800;color:var(--navy);min-width:200px;text-align:center;">―</span>
+        <button onclick="schedCalNext()" style="font-size:12px;padding:5px 10px;background:white;color:var(--navy);border:1.5px solid var(--gray-200);border-radius:6px;cursor:pointer;font-weight:700;">次 ▶</button>
+        <button onclick="schedCalThis()" style="font-size:11px;padding:5px 10px;background:#f8fafc;color:var(--navy);border:1px solid var(--gray-200);border-radius:6px;cursor:pointer;font-weight:700;">今日</button>
+        <div style="display:flex;gap:0;margin-left:6px;border:1px solid var(--gray-300);border-radius:6px;overflow:hidden;">
+          <button id="schedCalWeekBtn" onclick="schedCalSetView('week')" style="font-size:11px;padding:5px 10px;background:var(--navy);color:white;border:none;cursor:pointer;font-weight:700;">週</button>
+          <button id="schedCalMonthBtn" onclick="schedCalSetView('month')" style="font-size:11px;padding:5px 10px;background:white;color:var(--navy);border:none;cursor:pointer;font-weight:700;">月</button>
+        </div>
+      </div>
+      <!-- テーブル用フィルタ（モード切替で表示制御） -->
+      <div id="scheduleTblFilters" style="display:none;gap:10px;align-items:center;flex:1;">
+        <select id="scheduleTypeFilter" onchange="onScheduleFilterChange()" style="padding:5px 10px;border:1px solid var(--gray-300);border-radius:6px;font-size:12px;">
+          <option value="all">📋 すべての種別</option>
+          ${Object.entries(SCHEDULE_EVENT_TYPES).map(([k,v]) => `<option value="${k}">${v.icon} ${v.label}</option>`).join('')}
+        </select>
+        <select id="scheduleStatusFilter" onchange="onScheduleFilterChange()" style="padding:5px 10px;border:1px solid var(--gray-300);border-radius:6px;font-size:12px;">
+          <option value="planned">⏰ 予定のみ</option>
+          <option value="done">✅ 実施済のみ</option>
+          <option value="all">すべて</option>
+        </select>
+        <input type="text" id="scheduleSearchInput" placeholder="🔍 人材名・企業名で検索" oninput="onScheduleFilterChange()" style="padding:5px 10px;border:1px solid var(--gray-300);border-radius:6px;font-size:12px;min-width:200px;">
+      </div>
       <div style="margin-left:auto;font-size:11px;color:var(--gray-500);" id="scheduleCountLabel"></div>
     </div>
 
-    <!-- 通知バナー（次の定期面談が近い・過ぎている） -->
-    <div id="scheduleNotifyBanner" style="display:none;background:#fff7ed;border-left:3px solid #f59e0b;padding:10px 14px;border-radius:0 8px 8px 0;font-size:12px;"></div>
-
-    <!-- カレンダー風概要（今月＋来月） -->
-    <div id="scheduleUpcomingArea" style="background:white;border:1px solid var(--gray-200);border-radius:8px;padding:14px 16px;">
-      <div style="font-weight:700;color:var(--navy);font-size:13px;margin-bottom:8px;">🔜 直近30日の予定</div>
-      <div id="scheduleUpcomingList"></div>
+    <!-- 凡例 -->
+    <div id="scheduleLegend" style="display:flex;gap:14px;padding:6px 14px;font-size:11px;color:#64748b;flex-wrap:wrap;background:#f8fafc;border-radius:6px;">
+      ${Object.entries(SCHEDULE_EVENT_TYPES).map(([k,v]) =>
+        `<span style="display:inline-flex;align-items:center;gap:4px;"><span style="display:inline-block;width:14px;height:14px;background:${v.bg};border:1px solid ${v.color};border-radius:3px;"></span>${v.icon} ${v.label}</span>`
+      ).join('')}
+      <span style="display:inline-flex;align-items:center;gap:4px;margin-left:auto;color:#94a3b8;">セルクリック＝予定の追加・編集</span>
     </div>
 
-    <!-- 全件テーブル -->
-    <div style="background:white;border:1px solid var(--gray-200);border-radius:8px;overflow:hidden;">
+    <!-- 通知バナー -->
+    <div id="scheduleNotifyBanner" style="display:none;background:#fff7ed;border-left:3px solid #f59e0b;padding:10px 14px;border-radius:0 8px 8px 0;font-size:12px;"></div>
+
+    <!-- カレンダー本体 -->
+    <div id="scheduleCalArea" style="background:white;border:1px solid var(--gray-200);border-radius:8px;overflow:auto;max-height:calc(100vh - 270px);">
+      <div style="text-align:center;padding:40px;color:var(--gray-400);">読み込み中...</div>
+    </div>
+
+    <!-- テーブル本体（モード切替で表示制御） -->
+    <div id="scheduleTblWrap" style="display:none;background:white;border:1px solid var(--gray-200);border-radius:8px;overflow:hidden;">
       <div style="padding:10px 16px;background:#f8fafc;border-bottom:1px solid var(--gray-200);font-weight:700;font-size:13px;color:var(--navy);">📋 全スケジュール</div>
       <div class="table-wrap" style="border:none;">
         <table>
@@ -5726,15 +5755,72 @@ function buildSupportSchedulesScreen() {
         </table>
       </div>
     </div>
+
+    <!-- カレンダー用CSS -->
+    <style>
+      #scheduleCalArea table{border-collapse:collapse;background:white;font-size:12px;width:100%;}
+      #scheduleCalArea th, #scheduleCalArea td{border:1px solid #e2e8f0;padding:4px 6px;text-align:center;min-width:80px;vertical-align:top;}
+      #scheduleCalArea th.sched-person-col, #scheduleCalArea td.sched-person-col{position:sticky;left:0;background:#f8fafc;z-index:2;text-align:left;font-weight:700;color:var(--navy);min-width:180px;max-width:180px;}
+      #scheduleCalArea td.sched-person-col{background:white;font-size:12px;}
+      #scheduleCalArea th{background:#f1f5f9;font-size:11px;color:#475569;position:sticky;top:0;z-index:1;}
+      #scheduleCalArea th.sched-today{background:#dbeafe;color:#1e40af;}
+      #scheduleCalArea td.sched-today{background:#eff6ff;}
+      #scheduleCalArea td.sched-sunday-col{background:#fef2f2;}
+      #scheduleCalArea td.sched-saturday-col{background:#eff6ff;}
+      #scheduleCalArea th.sched-sunday-col{background:#fef2f2;color:#dc2626;}
+      #scheduleCalArea th.sched-saturday-col{background:#eff6ff;color:#1e40af;}
+      #scheduleCalArea .sched-cell{cursor:pointer;min-height:32px;height:32px;transition:background .1s;}
+      #scheduleCalArea .sched-cell:hover{background:#fef9c3 !important;}
+      #scheduleCalArea .sched-event{display:inline-flex;align-items:center;gap:2px;font-size:11px;font-weight:700;border-radius:8px;padding:1px 5px;margin:1px;line-height:1.4;cursor:pointer;}
+      #scheduleCalArea .sched-event.done{opacity:.55;text-decoration:line-through;}
+      #scheduleCalArea .sched-event.overdue{box-shadow:0 0 0 1.5px #dc2626;}
+      #scheduleCalArea .sched-group-row td{background:#f1f5f9;font-weight:800;color:var(--navy);font-size:12px;text-align:left;padding:6px 10px;}
+      #scheduleCalArea .sched-add-mini{font-size:10px;color:#94a3b8;opacity:0;}
+      #scheduleCalArea .sched-cell:hover .sched-add-mini{opacity:1;}
+    </style>
   </div>`;
+}
+
+function setScheduleViewMode(mode) {
+  _scheduleViewMode = mode;
+  const btnCal = document.getElementById('scheduleModeCalBtn');
+  const btnTbl = document.getElementById('scheduleModeTblBtn');
+  if (btnCal && btnTbl) {
+    btnCal.style.background = mode === 'calendar' ? 'var(--navy)' : 'white';
+    btnCal.style.color = mode === 'calendar' ? 'white' : 'var(--navy)';
+    btnTbl.style.background = mode === 'table' ? 'var(--navy)' : 'white';
+    btnTbl.style.color = mode === 'table' ? 'white' : 'var(--navy)';
+  }
+  const calNav = document.getElementById('scheduleCalNav');
+  const calArea = document.getElementById('scheduleCalArea');
+  const tblFilters = document.getElementById('scheduleTblFilters');
+  const tblWrap = document.getElementById('scheduleTblWrap');
+  if (calNav) calNav.style.display = mode === 'calendar' ? 'flex' : 'none';
+  if (calArea) calArea.style.display = mode === 'calendar' ? '' : 'none';
+  if (tblFilters) tblFilters.style.display = mode === 'table' ? 'flex' : 'none';
+  if (tblWrap) tblWrap.style.display = mode === 'table' ? '' : 'none';
+  renderSupportSchedules();
 }
 
 async function loadSupportSchedules() {
   showLoading(true);
   try {
-    // 一気に取得
+    // 全件取得（カレンダーで前後月も見れるよう全部）
     const data = await sbFetch('support_schedules?select=*,workers(id,name,nationality,company_id),companies(id,name)&order=scheduled_at.asc');
     _supportSchedules = data || [];
+    // 人材一覧も取得（カレンダーの行に使う）
+    if (!allWorkers || !allWorkers.length) {
+      try {
+        const w = await sbFetch('workers?select=id,name,nationality,company_id,companies(id,name)&order=name.asc');
+        allWorkers = w || [];
+      } catch(e) {}
+    }
+    if (!allCompanies || !allCompanies.length) {
+      try {
+        const c = await sbFetch('companies?select=id,name&order=name.asc');
+        allCompanies = c || [];
+      } catch(e) {}
+    }
     renderSupportSchedules();
     updateSupportScheduleBadge();
   } catch(e) {
@@ -5750,14 +5836,210 @@ function onScheduleFilterChange() {
 }
 
 function renderSupportSchedules() {
+  if (_scheduleViewMode === 'calendar') {
+    renderScheduleCalendar();
+    renderScheduleNotifyBanner();
+  } else {
+    renderScheduleTable();
+    renderScheduleNotifyBanner();
+  }
+}
+
+// ===== カレンダーモード =====
+function schedCalSetView(v) {
+  _scheduleCalState.view = v;
+  const wBtn = document.getElementById('schedCalWeekBtn');
+  const mBtn = document.getElementById('schedCalMonthBtn');
+  if (wBtn && mBtn) {
+    wBtn.style.background = v === 'week' ? 'var(--navy)' : 'white';
+    wBtn.style.color = v === 'week' ? 'white' : 'var(--navy)';
+    mBtn.style.background = v === 'month' ? 'var(--navy)' : 'white';
+    mBtn.style.color = v === 'month' ? 'white' : 'var(--navy)';
+  }
+  renderScheduleCalendar();
+}
+function schedCalPrev() {
+  const d = new Date(_scheduleCalState.anchor);
+  if (_scheduleCalState.view === 'week') d.setDate(d.getDate() - 7);
+  else d.setMonth(d.getMonth() - 1);
+  _scheduleCalState.anchor = d;
+  renderScheduleCalendar();
+}
+function schedCalNext() {
+  const d = new Date(_scheduleCalState.anchor);
+  if (_scheduleCalState.view === 'week') d.setDate(d.getDate() + 7);
+  else d.setMonth(d.getMonth() + 1);
+  _scheduleCalState.anchor = d;
+  renderScheduleCalendar();
+}
+function schedCalThis() {
+  _scheduleCalState.anchor = new Date();
+  renderScheduleCalendar();
+}
+function _schedCalRange() {
+  const anchor = new Date(_scheduleCalState.anchor); anchor.setHours(0,0,0,0);
+  let start, end;
+  if (_scheduleCalState.view === 'week') {
+    const dow = anchor.getDay();
+    const monOffset = dow === 0 ? -6 : 1 - dow; // 月曜開始
+    start = new Date(anchor); start.setDate(anchor.getDate() + monOffset);
+    end = new Date(start); end.setDate(start.getDate() + 6);
+  } else {
+    start = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
+    end = new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0);
+  }
+  return { start, end };
+}
+function _schedCalDateStr(d) {
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+function renderScheduleCalendar() {
+  const area = document.getElementById('scheduleCalArea');
+  if (!area) return;
+  const range = _schedCalRange();
+  // 期間ラベル
+  const lbl = document.getElementById('scheduleCalPeriodLabel');
+  if (lbl) {
+    if (_scheduleCalState.view === 'week') {
+      lbl.textContent = _schedCalDateStr(range.start) + ' 〜 ' + _schedCalDateStr(range.end);
+    } else {
+      lbl.textContent = range.start.getFullYear() + '年' + (range.start.getMonth()+1) + '月';
+    }
+  }
+  // 日付配列
+  const dates = [];
+  const cur = new Date(range.start);
+  while (cur <= range.end) { dates.push(new Date(cur)); cur.setDate(cur.getDate()+1); }
+
+  // 人材を企業ごとにグループ化（企業名なしは「（未所属）」）
+  const groupsMap = {}; // companyId or '_unknown' → { companyName, workers: [] }
+  (allWorkers||[]).forEach(w => {
+    const cid = w.company_id || '_unknown';
+    const cname = w.companies?.name || (cid === '_unknown' ? '（未所属）' : '不明な企業');
+    if (!groupsMap[cid]) groupsMap[cid] = { id: cid, name: cname, workers: [] };
+    groupsMap[cid].workers.push(w);
+  });
+  const groups = Object.values(groupsMap).sort((a,b) => (a.name||'').localeCompare(b.name||'','ja'));
+
+  if (!groups.length) {
+    area.innerHTML = '<div style="text-align:center;padding:60px;color:#94a3b8;">人材が登録されていません</div>';
+    return;
+  }
+
+  // 期間内の予定だけインデックス化（workerId+dateStr → events[]）
+  const rangeStartStr = _schedCalDateStr(range.start);
+  const rangeEndStr = _schedCalDateStr(range.end);
+  const todayStr = _schedCalDateStr(new Date());
+  const eventMap = {}; // key: workerId||dateStr → [event,...]
+  _supportSchedules.forEach(s => {
+    if (!s.worker_id) return;
+    // 予定日と実施日の両方をマーキング（done時は実施日優先で表示）
+    const dateStr = s.completed_at || s.scheduled_at;
+    if (!dateStr) return;
+    if (dateStr < rangeStartStr || dateStr > rangeEndStr) return;
+    const key = s.worker_id + '||' + dateStr;
+    if (!eventMap[key]) eventMap[key] = [];
+    eventMap[key].push(s);
+  });
+
+  let html = '<table><thead><tr>';
+  html += '<th class="sched-person-col">人材（' + (allWorkers||[]).length + '名）</th>';
+  dates.forEach(d => {
+    const ds = _schedCalDateStr(d);
+    const dow = d.getDay();
+    const dowLabel = ['日','月','火','水','木','金','土'][dow];
+    const dowCls = dow === 0 ? 'sched-sunday-col' : (dow === 6 ? 'sched-saturday-col' : '');
+    const todayCls = ds === todayStr ? 'sched-today' : '';
+    html += '<th class="' + dowCls + ' ' + todayCls + '"><div style="font-size:10px;color:#94a3b8;">'+(d.getMonth()+1)+'/'+d.getDate()+'</div><div style="font-weight:800;">'+dowLabel+'</div></th>';
+  });
+  html += '</tr></thead><tbody>';
+
+  groups.forEach(g => {
+    // 企業ヘッダ行
+    html += '<tr class="sched-group-row"><td colspan="' + (dates.length+1) + '">🏢 ' + esc(g.name) + ' <span style="font-weight:400;color:#94a3b8;">(' + g.workers.length + '名)</span></td></tr>';
+    g.workers.forEach(w => {
+      html += '<tr>';
+      const flagMap = { 'ベトナム':'🇻🇳', 'インドネシア':'🇮🇩', 'フィリピン':'🇵🇭', 'ミャンマー':'🇲🇲', 'ネパール':'🇳🇵', 'カンボジア':'🇰🇭', 'タイ':'🇹🇭', '中国':'🇨🇳', 'モンゴル':'🇲🇳', 'スリランカ':'🇱🇰', 'ウズベキスタン':'🇺🇿', 'バングラデシュ':'🇧🇩' };
+      const flag = flagMap[w.nationality] || '';
+      html += '<td class="sched-person-col"><a href="javascript:void(0)" onclick="openWorkerModal(\'' + w.id + '\')" style="color:var(--navy);text-decoration:none;">' + (flag?flag+' ':'') + esc(w.name) + '</a>' + (w.nationality?'<span style="font-size:10px;color:#94a3b8;margin-left:4px;">'+esc(w.nationality)+'</span>':'') + '</td>';
+      dates.forEach(d => {
+        const ds = _schedCalDateStr(d);
+        const dow = d.getDay();
+        const dowCls = dow === 0 ? 'sched-sunday-col' : (dow === 6 ? 'sched-saturday-col' : '');
+        const todayCls = ds === todayStr ? 'sched-today' : '';
+        const evs = eventMap[w.id + '||' + ds] || [];
+        const cellEvents = evs.map(s => {
+          const ev = SCHEDULE_EVENT_TYPES[s.event_type] || { icon:'📅', label:s.event_type, color:'#5f6368', bg:'#f1f3f4' };
+          const isDone = s.status === 'done';
+          const isOverdue = !isDone && s.scheduled_at && s.scheduled_at < todayStr;
+          const cls = (isDone?'done ':'') + (isOverdue?'overdue':'');
+          const tooltip = ev.label + (isDone?'（実施済）':(isOverdue?'（期限超過）':'（予定）')) + (s.event_method?' / '+(SCHEDULE_METHOD_LABEL[s.event_method]||s.event_method):'') + (s.notes?' / '+s.notes.slice(0,40):'');
+          return '<span class="sched-event ' + cls + '" style="background:' + ev.bg + ';color:' + ev.color + ';" title="' + esc(tooltip) + '" onclick="event.stopPropagation();openScheduleModal(\'' + s.id + '\')">' + ev.icon + '</span>';
+        }).join('');
+        const addMini = cellEvents ? '' : '<span class="sched-add-mini">＋</span>';
+        html += '<td class="sched-cell ' + dowCls + ' ' + todayCls + '" onclick="schedCellClick(\'' + w.id + '\',\'' + (w.company_id||'') + '\',\'' + ds + '\')">' + cellEvents + addMini + '</td>';
+      });
+      html += '</tr>';
+    });
+  });
+  html += '</tbody></table>';
+  area.innerHTML = html;
+
+  // 件数表示
+  const countEl = document.getElementById('scheduleCountLabel');
+  if (countEl) {
+    const totalInRange = Object.values(eventMap).reduce((s,arr)=>s+arr.length, 0);
+    countEl.textContent = '表示期間内: ' + totalInRange + '件 / 全' + _supportSchedules.length + '件';
+  }
+}
+
+// セルクリック → 既存予定があればその編集、なければ新規作成（日付・人材プリセット）
+function schedCellClick(workerId, companyId, dateStr) {
+  // その日のその人材の予定（複数あっても先頭を編集）
+  const found = _supportSchedules.find(s => s.worker_id === workerId && (s.completed_at === dateStr || s.scheduled_at === dateStr));
+  if (found) {
+    openScheduleModal(found.id);
+  } else {
+    openScheduleModalPreset(workerId, companyId, dateStr);
+  }
+}
+
+// 新規登録：人材・企業・日付をプリセット
+async function openScheduleModalPreset(workerId, companyId, dateStr) {
+  await openScheduleModal(null);
+  setTimeout(() => {
+    const wSel = document.getElementById('schedWorkerInput');
+    const cSel = document.getElementById('schedCompanyInput');
+    const dInp = document.getElementById('schedScheduledAt');
+    if (wSel && workerId) { wSel.value = workerId; onSchedWorkerChange(); }
+    if (cSel && companyId) cSel.value = companyId;
+    if (dInp && dateStr) dInp.value = dateStr;
+  }, 50);
+}
+
+// 通知バナー（期限超過）
+function renderScheduleNotifyBanner() {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const overdue = _supportSchedules.filter(s => s.status === 'planned' && s.scheduled_at && new Date(s.scheduled_at) < today);
+  const banner = document.getElementById('scheduleNotifyBanner');
+  if (!banner) return;
+  if (overdue.length > 0) {
+    banner.style.display = 'block';
+    banner.innerHTML = '<div style="font-weight:700;color:#92400e;">⚠️ ' + overdue.length + '件の予定が期限を過ぎています</div>';
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
+// ===== テーブルモード（旧render内容） =====
+function renderScheduleTable() {
   const tbody = document.getElementById('scheduleTbody');
-  const upcomingEl = document.getElementById('scheduleUpcomingList');
   const countEl = document.getElementById('scheduleCountLabel');
   if (!tbody) return;
 
   const searchQ = (document.getElementById('scheduleSearchInput')?.value || '').toLowerCase().trim();
 
-  // フィルタ
   let list = _supportSchedules.filter(s => {
     if (_scheduleFilter.type !== 'all' && s.event_type !== _scheduleFilter.type) return false;
     if (_scheduleFilter.status === 'planned' && s.status !== 'planned') return false;
@@ -5771,90 +6053,44 @@ function renderSupportSchedules() {
 
   if (countEl) countEl.textContent = list.length + '件 / 全' + _supportSchedules.length + '件';
 
-  // 全件テーブル
   if (!list.length) {
     tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--gray-400);">該当データなし</td></tr>';
-  } else {
-    tbody.innerHTML = list.map(s => {
-      const ev = SCHEDULE_EVENT_TYPES[s.event_type] || { label: s.event_type, icon: '📅', color: '#5f6368', bg: '#f1f3f4' };
-      const isOverdue = s.status === 'planned' && s.scheduled_at && new Date(s.scheduled_at) < new Date(new Date().toDateString());
-      const isDone = s.status === 'done';
-      const sched = s.scheduled_at ? new Date(s.scheduled_at).toLocaleDateString('ja-JP') : '-';
-      const comp = s.completed_at ? new Date(s.completed_at).toLocaleDateString('ja-JP') : '-';
-      const methodLabel = s.event_method ? (SCHEDULE_METHOD_LABEL[s.event_method] || s.event_method) : '-';
-      const statusBadge = isDone
-        ? '<span style="background:#dcfce7;color:#16a34a;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">✅ 実施済</span>'
-        : (isOverdue
-          ? '<span style="background:#fee2e2;color:#dc2626;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">⚠️ 期限超</span>'
-          : '<span style="background:#dbeafe;color:#1a73e8;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">⏰ 予定</span>');
-      const workerLink = s.worker_id
-        ? '<a href="javascript:void(0)" onclick="openWorkerModal(\'' + s.worker_id + '\')" style="color:#1a73e8;font-weight:600;text-decoration:none;">' + esc(s.workers?.name||'-') + '</a>'
-        : '-';
-      const companyLink = s.company_id
-        ? '<a href="javascript:void(0)" onclick="openCompanyModal(\'' + s.company_id + '\')" style="color:#1a73e8;text-decoration:none;">' + esc(s.companies?.name||'-') + '</a>'
-        : esc(s.companies?.name||'-');
-      return '<tr>' +
-        '<td><span style="background:' + ev.bg + ';color:' + ev.color + ';padding:3px 8px;border-radius:10px;font-size:11px;font-weight:700;">' + ev.icon + ' ' + ev.label + '</span></td>' +
-        '<td style="' + (isOverdue?'color:#dc2626;font-weight:700;':'') + '">' + sched + '</td>' +
-        '<td>' + comp + '</td>' +
-        '<td>' + workerLink + (s.workers?.nationality ? ' <span style="font-size:10px;color:#94a3b8;">' + esc(s.workers.nationality) + '</span>' : '') + '</td>' +
-        '<td>' + companyLink + '</td>' +
-        '<td style="font-size:11px;">' + methodLabel + '</td>' +
-        '<td>' + statusBadge + '</td>' +
-        '<td>' +
-          (!isDone ? '<button class="btn btn-primary" style="font-size:10px;padding:3px 8px;" onclick="markScheduleDone(\'' + s.id + '\')">✓ 実施</button> ' : '') +
-          '<button class="btn btn-outline" style="font-size:10px;padding:3px 8px;" onclick="openScheduleModal(\'' + s.id + '\')">✏️</button> ' +
-          '<button class="btn btn-outline" style="font-size:10px;padding:3px 8px;color:#dc2626;border-color:#fecaca;" onclick="deleteSchedule(\'' + s.id + '\')">🗑</button>' +
-        '</td>' +
-      '</tr>';
-    }).join('');
+    return;
   }
-
-  // 直近30日の予定
-  const today = new Date(); today.setHours(0,0,0,0);
-  const in30 = new Date(today); in30.setDate(in30.getDate() + 30);
-  const upcoming = _supportSchedules
-    .filter(s => s.status === 'planned' && s.scheduled_at)
-    .filter(s => {
-      const d = new Date(s.scheduled_at);
-      return d <= in30;  // 過去・今日・今後30日まで
-    })
-    .sort((a,b)=> new Date(a.scheduled_at) - new Date(b.scheduled_at));
-  if (upcomingEl) {
-    if (!upcoming.length) {
-      upcomingEl.innerHTML = '<div style="color:#94a3b8;font-size:12px;padding:8px;">直近30日の予定はありません</div>';
-    } else {
-      upcomingEl.innerHTML = upcoming.map(s => {
-        const ev = SCHEDULE_EVENT_TYPES[s.event_type] || { label: s.event_type, icon: '📅', color: '#5f6368', bg: '#f1f3f4' };
-        const d = new Date(s.scheduled_at);
-        const diffDays = Math.floor((d - today) / (1000*60*60*24));
-        let dayLabel = '';
-        if (diffDays < 0) dayLabel = '<span style="color:#dc2626;font-weight:700;">⚠️ ' + Math.abs(diffDays) + '日経過</span>';
-        else if (diffDays === 0) dayLabel = '<span style="color:#dc2626;font-weight:700;">📌 今日</span>';
-        else if (diffDays === 1) dayLabel = '<span style="color:#f59e0b;font-weight:700;">明日</span>';
-        else if (diffDays <= 7) dayLabel = '<span style="color:#f59e0b;font-weight:700;">あと' + diffDays + '日</span>';
-        else dayLabel = '<span style="color:#5f6368;">あと' + diffDays + '日</span>';
-        return '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #f1f3f4;font-size:12px;cursor:pointer;" onclick="openScheduleModal(\'' + s.id + '\')">' +
-          '<span style="background:' + ev.bg + ';color:' + ev.color + ';padding:3px 8px;border-radius:10px;font-size:11px;font-weight:700;flex-shrink:0;">' + ev.icon + ' ' + ev.label + '</span>' +
-          '<span style="font-weight:700;color:#202124;flex-shrink:0;">' + d.toLocaleDateString('ja-JP') + '</span>' +
-          '<span style="flex-shrink:0;">' + dayLabel + '</span>' +
-          '<span style="flex:1;color:#5f6368;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(s.workers?.name||'-') + ' / ' + esc(s.companies?.name||'-') + '</span>' +
-        '</div>';
-      }).join('');
-    }
-  }
-
-  // 期限超え通知バナー
-  const overdue = _supportSchedules.filter(s => s.status === 'planned' && s.scheduled_at && new Date(s.scheduled_at) < today);
-  const banner = document.getElementById('scheduleNotifyBanner');
-  if (banner) {
-    if (overdue.length > 0) {
-      banner.style.display = 'block';
-      banner.innerHTML = '<div style="font-weight:700;color:#92400e;">⚠️ ' + overdue.length + '件の予定が期限を過ぎています</div>';
-    } else {
-      banner.style.display = 'none';
-    }
-  }
+  const todayStr = new Date().toISOString().slice(0,10);
+  tbody.innerHTML = list.map(s => {
+    const ev = SCHEDULE_EVENT_TYPES[s.event_type] || { label: s.event_type, icon: '📅', color: '#5f6368', bg: '#f1f3f4' };
+    const isOverdue = s.status === 'planned' && s.scheduled_at && s.scheduled_at < todayStr;
+    const isDone = s.status === 'done';
+    const sched = s.scheduled_at ? new Date(s.scheduled_at).toLocaleDateString('ja-JP') : '-';
+    const comp = s.completed_at ? new Date(s.completed_at).toLocaleDateString('ja-JP') : '-';
+    const methodLabel = s.event_method ? (SCHEDULE_METHOD_LABEL[s.event_method] || s.event_method) : '-';
+    const statusBadge = isDone
+      ? '<span style="background:#dcfce7;color:#16a34a;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">✅ 実施済</span>'
+      : (isOverdue
+        ? '<span style="background:#fee2e2;color:#dc2626;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">⚠️ 期限超</span>'
+        : '<span style="background:#dbeafe;color:#1a73e8;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">⏰ 予定</span>');
+    const workerLink = s.worker_id
+      ? '<a href="javascript:void(0)" onclick="openWorkerModal(\'' + s.worker_id + '\')" style="color:#1a73e8;font-weight:600;text-decoration:none;">' + esc(s.workers?.name||'-') + '</a>'
+      : '-';
+    const companyLink = s.company_id
+      ? '<a href="javascript:void(0)" onclick="openCompanyModal(\'' + s.company_id + '\')" style="color:#1a73e8;text-decoration:none;">' + esc(s.companies?.name||'-') + '</a>'
+      : esc(s.companies?.name||'-');
+    return '<tr>' +
+      '<td><span style="background:' + ev.bg + ';color:' + ev.color + ';padding:3px 8px;border-radius:10px;font-size:11px;font-weight:700;">' + ev.icon + ' ' + ev.label + '</span></td>' +
+      '<td style="' + (isOverdue?'color:#dc2626;font-weight:700;':'') + '">' + sched + '</td>' +
+      '<td>' + comp + '</td>' +
+      '<td>' + workerLink + (s.workers?.nationality ? ' <span style="font-size:10px;color:#94a3b8;">' + esc(s.workers.nationality) + '</span>' : '') + '</td>' +
+      '<td>' + companyLink + '</td>' +
+      '<td style="font-size:11px;">' + methodLabel + '</td>' +
+      '<td>' + statusBadge + '</td>' +
+      '<td>' +
+        (!isDone ? '<button class="btn btn-primary" style="font-size:10px;padding:3px 8px;" onclick="markScheduleDone(\'' + s.id + '\')">✓ 実施</button> ' : '') +
+        '<button class="btn btn-outline" style="font-size:10px;padding:3px 8px;" onclick="openScheduleModal(\'' + s.id + '\')">✏️</button> ' +
+        '<button class="btn btn-outline" style="font-size:10px;padding:3px 8px;color:#dc2626;border-color:#fecaca;" onclick="deleteSchedule(\'' + s.id + '\')">🗑</button>' +
+      '</td>' +
+    '</tr>';
+  }).join('');
 }
 
 // バッジ表示（サイドバーに直近7日以内の予定数を表示）
