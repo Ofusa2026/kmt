@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260521.117 -->
+<!-- KMT_VERSION ver.20260521.118 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -208,7 +208,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260521.117</div>
+    <div class="logo-ver">ver.20260521.118</div>
     <div id="currentUserBadge" style="font-size:10px;color:#86efac;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;color:#86efac;margin:4px 8px;border-radius:6px;background:rgba(134,239,172,0.1);" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -2850,7 +2850,7 @@ async function loadChatScreen() {
     // usersをロード
     if (!allUsers.length) {
       try {
-        const ud = await sbFetch('users?select=id,name,role,avatar_url&order=name.asc');
+        const ud = await sbFetch('users?select=id,name,role,team,avatar_url&order=name.asc');
         allUsers = ud || [];
       } catch(e) {}
     }
@@ -4018,25 +4018,70 @@ async function showMentionPopup(query) {
   // allUsersが空ならロード
   if (!allUsers.length) {
     try {
-      const ud = await sbFetch('users?select=id,name,avatar_url&order=name.asc');
+      const ud = await sbFetch('users?select=id,name,team,avatar_url&order=name.asc');
       allUsers = ud || [];
     } catch(e) {}
   }
-  // allUsersから候補を取得
-  const candidates = (allUsers || []).filter(u =>
+  // ユーザー候補
+  const userCands = (allUsers || []).filter(u =>
     u.name && u.name !== currentUser?.name &&
     (!query || u.name.toLowerCase().includes(query))
   ).slice(0, 8);
-  if (!candidates.length) { closeMentionPopup(); return; }
-  popup.innerHTML = candidates.map((u, i) =>
-    `<div data-mention="${esc(u.name)}"
-      class="mention-item${i===0?' mention-active':''}"
-      onclick="insertMention('${esc(u.name)}')"
-      style="padding:8px 12px;cursor:pointer;font-size:12px;font-weight:600;display:flex;align-items:center;gap:8px;"
-      onmouseover="this.parentElement.querySelectorAll('.mention-active').forEach(el=>el.classList.remove('mention-active'));this.classList.add('mention-active');">
-      👤 ${esc(u.name)}
-    </div>`
-  ).join('');
+
+  // チーム候補（teamフィールドのユニーク値）
+  const teamSet = new Set();
+  (allUsers || []).forEach(u => { if (u.team && u.team.trim()) teamSet.add(u.team.trim()); });
+  const teamCands = Array.from(teamSet).filter(t =>
+    !query || t.toLowerCase().includes(query)
+  ).slice(0, 5).map(t => {
+    const members = (allUsers||[]).filter(u => u.team === t);
+    return { type: 'team', name: t, count: members.length };
+  });
+
+  // 特殊メンション「@全員」
+  const specialCands = [];
+  if (!query || '全員'.includes(query) || 'everyone'.includes(query) || 'all'.includes(query)) {
+    specialCands.push({ type: 'special', name: '全員', count: (allUsers||[]).length });
+  }
+
+  if (!userCands.length && !teamCands.length && !specialCands.length) { closeMentionPopup(); return; }
+
+  let html = '';
+  // 特殊
+  specialCands.forEach((s, i) => {
+    html += '<div data-mention="' + esc(s.name) + '" data-mtype="special" class="mention-item' + (i===0 && userCands.length===0 && teamCands.length===0 ?' mention-active':'') + '" ' +
+      'onclick="insertMention(\'' + esc(s.name).replace(/\'/g, "\\\\'") + '\')" ' +
+      'style="padding:8px 12px;cursor:pointer;font-size:12px;font-weight:700;display:flex;align-items:center;gap:8px;background:#fef3c7;color:#92400e;" ' +
+      'onmouseover="this.parentElement.querySelectorAll(\'.mention-active\').forEach(el=>el.classList.remove(\'mention-active\'));this.classList.add(\'mention-active\');">' +
+      '📢 @全員 <span style="font-weight:400;color:#a16207;font-size:10px;">(' + s.count + '名)</span></div>';
+  });
+  // チーム
+  if (teamCands.length) {
+    html += '<div style="padding:4px 12px;font-size:10px;color:#94a3b8;font-weight:700;letter-spacing:.5px;background:#f8fafc;border-top:1px solid #f1f5f9;">👥 チーム</div>';
+    teamCands.forEach((t, i) => {
+      const memberNames = (allUsers||[]).filter(u => u.team === t.name).map(u=>u.name).slice(0,3).join(', ');
+      const moreMembers = t.count > 3 ? ' +' + (t.count - 3) : '';
+      html += '<div data-mention="' + esc(t.name) + '" data-mtype="team" class="mention-item' + (i===0 && userCands.length===0 ?' mention-active':'') + '" ' +
+        'onclick="insertMention(\'' + esc(t.name).replace(/\'/g, "\\\\'") + '\')" ' +
+        'style="padding:8px 12px;cursor:pointer;font-size:12px;font-weight:600;display:flex;align-items:center;gap:8px;background:#ede9fe;color:#5b21b6;" ' +
+        'onmouseover="this.parentElement.querySelectorAll(\'.mention-active\').forEach(el=>el.classList.remove(\'mention-active\'));this.classList.add(\'mention-active\');">' +
+        '👥 @' + esc(t.name) + ' <span style="font-weight:400;color:#7c3aed;font-size:10px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">(' + t.count + '名: ' + esc(memberNames) + moreMembers + ')</span></div>';
+    });
+  }
+  // 個人
+  if (userCands.length) {
+    if (teamCands.length || specialCands.length) {
+      html += '<div style="padding:4px 12px;font-size:10px;color:#94a3b8;font-weight:700;letter-spacing:.5px;background:#f8fafc;border-top:1px solid #f1f5f9;">👤 ユーザー</div>';
+    }
+    userCands.forEach((u, i) => {
+      html += '<div data-mention="' + esc(u.name) + '" data-mtype="user" class="mention-item' + (i===0 && !teamCands.length && !specialCands.length ?' mention-active':'') + '" ' +
+        'onclick="insertMention(\'' + esc(u.name).replace(/\'/g, "\\\\'") + '\')" ' +
+        'style="padding:8px 12px;cursor:pointer;font-size:12px;font-weight:600;display:flex;align-items:center;gap:8px;" ' +
+        'onmouseover="this.parentElement.querySelectorAll(\'.mention-active\').forEach(el=>el.classList.remove(\'mention-active\'));this.classList.add(\'mention-active\');">' +
+        '👤 ' + esc(u.name) + (u.team ? ' <span style="font-weight:400;color:#94a3b8;font-size:10px;">(' + esc(u.team) + ')</span>' : '') + '</div>';
+    });
+  }
+  popup.innerHTML = html;
   popup.style.display = '';
 }
 
@@ -4060,17 +4105,64 @@ function closeMentionPopup() {
   if (popup) popup.style.display = 'none';
 }
 
-// メンション抽出
+// メンション抽出（生の @xxx 文字列のリスト）
 function extractMentions(text) {
   const matches = text.match(/@([^\s@]+)/g) || [];
   return matches.map(m => m.slice(1));
 }
 
-// メンションのハイライト表示
+// メンションを「実際に通知すべきユーザー名の配列」に展開
+// - @全員 → 全ユーザー
+// - @チーム名 → そのチームの全メンバー
+// - @個人名 → そのまま
+function expandMentions(rawMentions) {
+  if (!rawMentions || !rawMentions.length) return [];
+  const result = new Set();
+  const teamSet = new Set();
+  (allUsers || []).forEach(u => { if (u.team && u.team.trim()) teamSet.add(u.team.trim()); });
+
+  rawMentions.forEach(name => {
+    if (name === '全員' || name === 'everyone' || name === 'all') {
+      (allUsers || []).forEach(u => { if (u.name && u.name !== currentUser?.name) result.add(u.name); });
+    } else if (teamSet.has(name)) {
+      (allUsers || []).forEach(u => {
+        if (u.team === name && u.name && u.name !== currentUser?.name) result.add(u.name);
+      });
+    } else {
+      // 個人名
+      result.add(name);
+    }
+  });
+  return Array.from(result);
+}
+
+// メッセージのメンションのハイライト表示
 function renderMessageContent(text) {
+  // teamSetをキャッシュ
+  const teamSet = new Set();
+  (allUsers || []).forEach(u => { if (u.team && u.team.trim()) teamSet.add(u.team.trim()); });
+
   return esc(text).replace(/@([^\s@]+)/g, (match, name) => {
     const isMe = name === currentUser?.name;
-    return `<span style="background:${isMe?'#fef3c7':'#ede9fe'};color:${isMe?'#92400e':'#5b21b6'};font-weight:700;border-radius:4px;padding:0 3px;">@${esc(name)}</span>`;
+    const isSpecial = (name === '全員' || name === 'everyone' || name === 'all');
+    const isTeam = teamSet.has(name);
+    // 自分宛か判定（@全員 or 自分の所属チーム or 自分の名前）
+    const myTeam = (allUsers||[]).find(u => u.name === currentUser?.name)?.team;
+    const meInThisTeam = isTeam && myTeam === name;
+    const highlightMe = isMe || isSpecial || meInThisTeam;
+
+    let bg, color, prefix;
+    if (highlightMe) {
+      bg = '#fef3c7'; color = '#92400e';
+    } else if (isSpecial) {
+      bg = '#fee2e2'; color = '#991b1b';
+    } else if (isTeam) {
+      bg = '#ede9fe'; color = '#5b21b6';
+    } else {
+      bg = '#e0e7ff'; color = '#3730a3';
+    }
+    prefix = isSpecial ? '📢' : (isTeam ? '👥' : '');
+    return '<span style="background:' + bg + ';color:' + color + ';font-weight:700;border-radius:4px;padding:0 4px;">' + prefix + '@' + esc(name) + '</span>';
   });
 }
 
@@ -4291,7 +4383,8 @@ async function sendChatMessage() {
     }
 
     // メッセージ保存
-    const mentions = text ? extractMentions(text) : [];
+    const rawMentions = text ? extractMentions(text) : [];
+    const expandedMentions = expandMentions(rawMentions);
     const newMsg = {
       chat_room_id: currentRoom.id,
       room_id: currentRoom.id,
@@ -4302,7 +4395,7 @@ async function sendChatMessage() {
       file_url: attachments.length === 1 ? attachments[0].url : null,
       file_name: attachments.length === 1 ? attachments[0].name : null,
       attachments: attachments.length > 0 ? attachments : null,
-      mentions: mentions.length ? mentions : null,
+      mentions: expandedMentions.length ? expandedMentions : null,
       reply_to: _replyTo ? { sender_name: _replyTo.sender_name, content: (_replyTo.content||'').slice(0,80) } : null,
       created_at: new Date().toISOString(),
     };
@@ -4484,7 +4577,7 @@ async function sendThreadReply() {
     sender_name: currentUser?.name || '',
     content: text,
     thread_root_id: _threadOpenForId,
-    mentions: extractMentions(text).length ? extractMentions(text) : null,
+    mentions: (function(){ const r = extractMentions(text); const e = expandMentions(r); return e.length ? e : null; })(),
     created_at: new Date().toISOString(),
   };
   try {
