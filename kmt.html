@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260521.116 -->
+<!-- KMT_VERSION ver.20260521.117 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -208,7 +208,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260521.116</div>
+    <div class="logo-ver">ver.20260521.117</div>
     <div id="currentUserBadge" style="font-size:10px;color:#86efac;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;color:#86efac;margin:4px 8px;border-radius:6px;background:rgba(134,239,172,0.1);" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -5677,7 +5677,7 @@ const SCHEDULE_EVENT_TYPES = {
 const SCHEDULE_METHOD_LABEL = { online: '🖥️ オンライン', visit: '🏢 訪問' };
 
 let _supportSchedules = [];
-let _scheduleFilter = { type: 'all', status: 'planned' };
+let _scheduleFilter = { type: 'all', status: 'planned', company: 'all', worker: 'all', search: '' };
 
 // 表示モード: 'calendar' | 'table'
 let _scheduleViewMode = 'calendar';
@@ -5704,20 +5704,30 @@ function buildSupportSchedulesScreen() {
           <button id="schedCalMonthBtn" onclick="schedCalSetView('month')" style="font-size:11px;padding:5px 10px;background:white;color:var(--navy);border:none;cursor:pointer;font-weight:700;">月</button>
         </div>
       </div>
-      <!-- テーブル用フィルタ（モード切替で表示制御） -->
-      <div id="scheduleTblFilters" style="display:none;gap:10px;align-items:center;flex:1;">
-        <select id="scheduleTypeFilter" onchange="onScheduleFilterChange()" style="padding:5px 10px;border:1px solid var(--gray-300);border-radius:6px;font-size:12px;">
-          <option value="all">📋 すべての種別</option>
-          ${Object.entries(SCHEDULE_EVENT_TYPES).map(([k,v]) => `<option value="${k}">${v.icon} ${v.label}</option>`).join('')}
-        </select>
-        <select id="scheduleStatusFilter" onchange="onScheduleFilterChange()" style="padding:5px 10px;border:1px solid var(--gray-300);border-radius:6px;font-size:12px;">
-          <option value="planned">⏰ 予定のみ</option>
-          <option value="done">✅ 実施済のみ</option>
-          <option value="all">すべて</option>
-        </select>
-        <input type="text" id="scheduleSearchInput" placeholder="🔍 人材名・企業名で検索" oninput="onScheduleFilterChange()" style="padding:5px 10px;border:1px solid var(--gray-300);border-radius:6px;font-size:12px;min-width:200px;">
-      </div>
       <div style="margin-left:auto;font-size:11px;color:var(--gray-500);" id="scheduleCountLabel"></div>
+    </div>
+
+    <!-- 共通フィルタ（カレンダー・テーブル両方で動く） -->
+    <div style="background:#f8fafc;border:1px solid var(--gray-200);border-radius:8px;padding:8px 14px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+      <span style="font-size:11px;font-weight:700;color:var(--gray-500);">🔍 絞り込み：</span>
+      <select id="scheduleCompanyFilter" onchange="onScheduleFilterChange()" style="padding:5px 10px;border:1px solid var(--gray-300);border-radius:6px;font-size:12px;min-width:160px;">
+        <option value="all">🏢 すべての企業</option>
+      </select>
+      <select id="scheduleWorkerFilter" onchange="onScheduleFilterChange()" style="padding:5px 10px;border:1px solid var(--gray-300);border-radius:6px;font-size:12px;min-width:160px;">
+        <option value="all">👤 すべての人材</option>
+      </select>
+      <select id="scheduleTypeFilter" onchange="onScheduleFilterChange()" style="padding:5px 10px;border:1px solid var(--gray-300);border-radius:6px;font-size:12px;">
+        <option value="all">📋 すべての種別</option>
+        ${Object.entries(SCHEDULE_EVENT_TYPES).map(([k,v]) => `<option value="${k}">${v.icon} ${v.label}</option>`).join('')}
+      </select>
+      <!-- 状態フィルタはテーブル時のみ表示 -->
+      <select id="scheduleStatusFilter" onchange="onScheduleFilterChange()" style="display:none;padding:5px 10px;border:1px solid var(--gray-300);border-radius:6px;font-size:12px;">
+        <option value="planned">⏰ 予定のみ</option>
+        <option value="done">✅ 実施済のみ</option>
+        <option value="all">すべて</option>
+      </select>
+      <input type="text" id="scheduleSearchInput" placeholder="🔍 フリーワード" oninput="onScheduleFilterChange()" style="padding:5px 10px;border:1px solid var(--gray-300);border-radius:6px;font-size:12px;min-width:140px;">
+      <button onclick="clearScheduleFilters()" style="padding:5px 10px;background:white;color:var(--gray-500);border:1px solid var(--gray-300);border-radius:6px;font-size:11px;cursor:pointer;">クリア</button>
     </div>
 
     <!-- 凡例 -->
@@ -5793,13 +5803,52 @@ function setScheduleViewMode(mode) {
   }
   const calNav = document.getElementById('scheduleCalNav');
   const calArea = document.getElementById('scheduleCalArea');
-  const tblFilters = document.getElementById('scheduleTblFilters');
+  const statusFilter = document.getElementById('scheduleStatusFilter');
   const tblWrap = document.getElementById('scheduleTblWrap');
   if (calNav) calNav.style.display = mode === 'calendar' ? 'flex' : 'none';
   if (calArea) calArea.style.display = mode === 'calendar' ? '' : 'none';
-  if (tblFilters) tblFilters.style.display = mode === 'table' ? 'flex' : 'none';
+  // 状態フィルタはテーブルモードでのみ表示（カレンダーは色で識別済）
+  if (statusFilter) statusFilter.style.display = mode === 'table' ? '' : 'none';
   if (tblWrap) tblWrap.style.display = mode === 'table' ? '' : 'none';
   renderSupportSchedules();
+}
+
+// 企業・人材のセレクトボックスを動的に埋める
+function populateScheduleFilters() {
+  const compSel = document.getElementById('scheduleCompanyFilter');
+  const wkSel = document.getElementById('scheduleWorkerFilter');
+  if (!compSel || !wkSel) return;
+  // 既存の選択値を保持
+  const prevComp = compSel.value;
+  const prevWk = wkSel.value;
+  // 企業
+  const companies = (allCompanies || []).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'','ja'));
+  compSel.innerHTML = '<option value="all">🏢 すべての企業</option>' +
+    companies.map(c => '<option value="' + c.id + '">' + esc(c.name||'') + '</option>').join('');
+  if (prevComp && (prevComp === 'all' || companies.find(c => c.id === prevComp))) compSel.value = prevComp;
+  // 人材（企業選択時はその企業の人材だけに絞る）
+  const selectedCompany = compSel.value;
+  let workers = (allWorkers || []);
+  if (selectedCompany && selectedCompany !== 'all') {
+    workers = workers.filter(w => w.company_id === selectedCompany);
+  }
+  workers = workers.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'','ja'));
+  wkSel.innerHTML = '<option value="all">👤 すべての人材</option>' +
+    workers.map(w => '<option value="' + w.id + '">' + esc(w.name||'') + '</option>').join('');
+  if (prevWk && (prevWk === 'all' || workers.find(w => w.id === prevWk))) wkSel.value = prevWk;
+}
+
+function clearScheduleFilters() {
+  ['scheduleCompanyFilter','scheduleWorkerFilter','scheduleTypeFilter','scheduleSearchInput'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (el.tagName === 'SELECT') el.value = 'all';
+    else el.value = '';
+  });
+  const st = document.getElementById('scheduleStatusFilter');
+  if (st) st.value = _scheduleViewMode === 'table' ? 'planned' : 'all';
+  populateScheduleFilters();
+  onScheduleFilterChange();
 }
 
 async function loadSupportSchedules() {
@@ -5821,6 +5870,7 @@ async function loadSupportSchedules() {
         allCompanies = c || [];
       } catch(e) {}
     }
+    populateScheduleFilters();
     renderSupportSchedules();
     updateSupportScheduleBadge();
   } catch(e) {
@@ -5832,6 +5882,13 @@ async function loadSupportSchedules() {
 function onScheduleFilterChange() {
   _scheduleFilter.type = document.getElementById('scheduleTypeFilter')?.value || 'all';
   _scheduleFilter.status = document.getElementById('scheduleStatusFilter')?.value || 'planned';
+  _scheduleFilter.company = document.getElementById('scheduleCompanyFilter')?.value || 'all';
+  _scheduleFilter.worker = document.getElementById('scheduleWorkerFilter')?.value || 'all';
+  _scheduleFilter.search = (document.getElementById('scheduleSearchInput')?.value || '').toLowerCase().trim();
+  // 企業選択が変わったら人材リストを再構築
+  populateScheduleFilters();
+  // 再選択後の値で確定
+  _scheduleFilter.worker = document.getElementById('scheduleWorkerFilter')?.value || 'all';
   renderSupportSchedules();
 }
 
@@ -5912,9 +5969,23 @@ function renderScheduleCalendar() {
   const cur = new Date(range.start);
   while (cur <= range.end) { dates.push(new Date(cur)); cur.setDate(cur.getDate()+1); }
 
-  // 人材を企業ごとにグループ化（企業名なしは「（未所属）」）
-  const groupsMap = {}; // companyId or '_unknown' → { companyName, workers: [] }
-  (allWorkers||[]).forEach(w => {
+  // 人材を企業ごとにグループ化（フィルタ適用後）
+  let workersFiltered = (allWorkers||[]);
+  if (_scheduleFilter.company !== 'all') {
+    workersFiltered = workersFiltered.filter(w => w.company_id === _scheduleFilter.company);
+  }
+  if (_scheduleFilter.worker !== 'all') {
+    workersFiltered = workersFiltered.filter(w => w.id === _scheduleFilter.worker);
+  }
+  if (_scheduleFilter.search) {
+    const q = _scheduleFilter.search;
+    workersFiltered = workersFiltered.filter(w => {
+      const text = ((w.name||'') + ' ' + (w.nationality||'') + ' ' + (w.companies?.name||'')).toLowerCase();
+      return text.includes(q);
+    });
+  }
+  const groupsMap = {};
+  workersFiltered.forEach(w => {
     const cid = w.company_id || '_unknown';
     const cname = w.companies?.name || (cid === '_unknown' ? '（未所属）' : '不明な企業');
     if (!groupsMap[cid]) groupsMap[cid] = { id: cid, name: cname, workers: [] };
@@ -5923,18 +5994,19 @@ function renderScheduleCalendar() {
   const groups = Object.values(groupsMap).sort((a,b) => (a.name||'').localeCompare(b.name||'','ja'));
 
   if (!groups.length) {
-    area.innerHTML = '<div style="text-align:center;padding:60px;color:#94a3b8;">人材が登録されていません</div>';
+    area.innerHTML = '<div style="text-align:center;padding:60px;color:#94a3b8;">該当する人材がありません<br><span style="font-size:11px;">フィルタ条件を変更してください</span></div>';
     return;
   }
 
-  // 期間内の予定だけインデックス化（workerId+dateStr → events[]）
+  // 期間内の予定だけインデックス化（フィルタ適用）
   const rangeStartStr = _schedCalDateStr(range.start);
   const rangeEndStr = _schedCalDateStr(range.end);
   const todayStr = _schedCalDateStr(new Date());
-  const eventMap = {}; // key: workerId||dateStr → [event,...]
+  const eventMap = {};
   _supportSchedules.forEach(s => {
     if (!s.worker_id) return;
-    // 予定日と実施日の両方をマーキング（done時は実施日優先で表示）
+    // 種別フィルタ
+    if (_scheduleFilter.type !== 'all' && s.event_type !== _scheduleFilter.type) return;
     const dateStr = s.completed_at || s.scheduled_at;
     if (!dateStr) return;
     if (dateStr < rangeStartStr || dateStr > rangeEndStr) return;
@@ -6038,15 +6110,15 @@ function renderScheduleTable() {
   const countEl = document.getElementById('scheduleCountLabel');
   if (!tbody) return;
 
-  const searchQ = (document.getElementById('scheduleSearchInput')?.value || '').toLowerCase().trim();
-
   let list = _supportSchedules.filter(s => {
     if (_scheduleFilter.type !== 'all' && s.event_type !== _scheduleFilter.type) return false;
     if (_scheduleFilter.status === 'planned' && s.status !== 'planned') return false;
     if (_scheduleFilter.status === 'done' && s.status !== 'done') return false;
-    if (searchQ) {
-      const text = ((s.workers?.name||'') + ' ' + (s.companies?.name||'')).toLowerCase();
-      if (!text.includes(searchQ)) return false;
+    if (_scheduleFilter.company !== 'all' && s.company_id !== _scheduleFilter.company) return false;
+    if (_scheduleFilter.worker !== 'all' && s.worker_id !== _scheduleFilter.worker) return false;
+    if (_scheduleFilter.search) {
+      const text = ((s.workers?.name||'') + ' ' + (s.companies?.name||'') + ' ' + (s.notes||'')).toLowerCase();
+      if (!text.includes(_scheduleFilter.search)) return false;
     }
     return true;
   });
