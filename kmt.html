@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260521.120 -->
+<!-- KMT_VERSION ver.20260521.121 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -208,7 +208,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260521.120</div>
+    <div class="logo-ver">ver.20260521.121</div>
     <div id="currentUserBadge" style="font-size:10px;color:#86efac;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;color:#86efac;margin:4px 8px;border-radius:6px;background:rgba(134,239,172,0.1);" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -220,7 +220,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="nav-item" onclick="showScreen('companies')">🏢 所属機関</div>
   <div class="nav-item" onclick="showScreen('workers')">👤 外国人材</div>
   <div class="nav-item" onclick="showScreen('tasks_board')">✅ タスクボード</div>
-  <div class="nav-item" onclick="showScreen('support_schedules')" style="color:#fbbf24;">📅 支援スケジュール <span id="supportScheduleBadge" style="display:none;background:#dc2626;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
+  <div class="nav-item" onclick="showScreen('support_schedules')">📅 支援スケジュール <span id="supportScheduleBadge" style="display:none;background:#dc2626;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
   <div class="nav-item" onclick="showScreen('candidates')">📋 候補者</div>
   <div class="nav-item" onclick="showScreen('jobs')">💼 求人管理</div>
   <div class="nav-item" onclick="showScreen('introductions')">🤝 紹介案件</div>
@@ -5612,9 +5612,7 @@ let _allTaskRequests = [];
 let _taskBoardFilter = { status: '', task_name: '', worker: '' };
 
 async function loadTasksBoard() {
-  const wrap = document.getElementById('contentWrap');
-  if (!wrap) return;
-  wrap.innerHTML = buildTasksBoardScreen();
+  // タスクボード画面はshowScreen側で既にbuildTasksBoardScreenを描画済み
   await refreshTasksBoard();
 }
 
@@ -8105,6 +8103,44 @@ function fillResumeForm(c) {
   // 職歴
   _workHistory = Array.isArray(c.work_history) ? [...c.work_history] : [];
   renderWorkHistoryInputs();
+}
+
+// 候補者を選択 → DBから取得してフォーム反映＋プレビュー
+let _editingResumeCandidateId = null;
+let _workHistory = [];
+async function loadResume() {
+  const sel = document.getElementById('resumeCandidateSelect');
+  const id = sel?.value;
+  const formBody = document.getElementById('resumeFormBody');
+  const previewWrap = document.getElementById('resumePreviewWrap');
+  if (!id) {
+    _editingResumeCandidateId = null;
+    if (formBody) formBody.style.display = 'none';
+    if (previewWrap) previewWrap.innerHTML = '<div style="text-align:center;padding:60px;color:#94a3b8;">← 候補者を選択してください</div>';
+    return;
+  }
+  _editingResumeCandidateId = id;
+  showLoading(true);
+  try {
+    const data = await sbFetch('candidates?id=eq.' + id + '&select=*');
+    const c = (data && data[0]) || null;
+    if (!c) {
+      showToast('❌ 候補者データが見つかりません', 'error');
+      return;
+    }
+    if (formBody) formBody.style.display = '';
+    fillResumeForm(c);
+    previewResume();
+  } catch(e) { showToast('❌ ' + e.message, 'error'); }
+  showLoading(false);
+}
+
+// フォームの値から履歴書プレビューを再描画
+function previewResume() {
+  const previewWrap = document.getElementById('resumePreviewWrap');
+  if (!previewWrap) return;
+  const data = getResumeFormData();
+  previewWrap.innerHTML = buildResumeHTML(data);
 }
 
 function getResumeFormData() {
