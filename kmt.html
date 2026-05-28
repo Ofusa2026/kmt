@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260528.26 -->
+<!-- KMT_VERSION ver.20260528.27 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -208,7 +208,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260528.26</div>
+    <div class="logo-ver">ver.20260528.27</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -8160,38 +8160,120 @@ function renderTeamUsers() {
   let list = (allUsers || []).filter(u =>
     !q || (u.name||'').toLowerCase().includes(q) || (u.email||'').toLowerCase().includes(q)
   );
-  // チームごとにグルーピング（team未設定は「未所属」）
+  // 固定チーム順 + データ由来チーム（未所属は最後）
+  const fixedOrder = ['GLT','営業','総務','大房'];
   const byTeam = {};
+  // 固定順に空配列で初期化（メンバー0でもカードが出る）
+  fixedOrder.forEach(t => byTeam[t] = []);
   list.forEach(u => { const k = u.team || '未所属'; (byTeam[k] = byTeam[k] || []).push(u); });
-  const teamNames = Object.keys(byTeam).sort((a,b) => a==='未所属'?1 : b==='未所属'?-1 : a.localeCompare(b,'ja'));
-  if (!teamNames.length) { cont.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray-400)">ユーザーがいません</div>'; return; }
+  const teamNames = Object.keys(byTeam).sort((a,b) => {
+    if (a==='未所属') return 1; if (b==='未所属') return -1;
+    const ai = fixedOrder.indexOf(a), bi = fixedOrder.indexOf(b);
+    if (ai!==-1 && bi!==-1) return ai - bi;
+    if (ai!==-1) return -1;
+    if (bi!==-1) return 1;
+    return a.localeCompare(b,'ja');
+  });
 
   let h = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px;">';
   teamNames.forEach((tname, ti) => {
     const members = byTeam[tname];
     const color = TEAM_COLORS[ti % TEAM_COLORS.length];
-    h += '<div style="background:white;border:2px solid '+color+'30;border-radius:14px;overflow:hidden;">';
+    // チームカード（ドロップターゲット）
+    h += '<div class="team-card" data-team="'+esc(tname)+'" style="background:white;border:2px solid '+color+'30;border-radius:14px;overflow:hidden;transition:border-color .15s,background .15s;">';
     h += '<div style="background:'+color+';padding:12px 16px;display:flex;justify-content:space-between;align-items:center;">';
     h += '<div><div style="font-size:15px;font-weight:900;color:white;">👥 '+esc(tname)+'</div>';
     h += '<div style="font-size:11px;color:rgba(255,255,255,.75);">'+members.length+'名</div></div>';
     h += '<button onclick="openUserModalForTeam(\''+esc(tname)+'\')" style="font-size:11px;padding:4px 10px;background:rgba(255,255,255,.2);color:white;border:1px solid rgba(255,255,255,.4);border-radius:6px;cursor:pointer;font-weight:700;">＋ 追加</button>';
-    h += '</div><div style="padding:6px 0;">';
+    h += '</div><div style="padding:6px 0;min-height:40px;">';
     members.forEach(u => {
       const pos = u.position || 'その他';
       const pb = POSITION_BG[pos] || '#e5e7eb';
       const pc = POSITION_COLOR[pos] || '#475569';
-      h += '<div onclick="openUserModal(\''+u.id+'\')" style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid #f1f5f9;cursor:pointer;" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'\'">';
+      // 行: draggable、左端にドラッグハンドル
+      h += '<div class="team-member-row" draggable="true" data-uid="'+u.id+'" data-uteam="'+esc(tname)+'" style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid #f1f5f9;cursor:grab;" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'\'">';
+      h += '<span style="font-size:14px;color:#cbd5e1;flex-shrink:0;user-select:none;" title="ドラッグして別チームへ移動">⋮⋮</span>';
       h += '<div class="user-avatar" style="width:30px;height:30px;font-size:12px;flex-shrink:0;">'+(u.avatar_url?'<img src="'+esc(u.avatar_url)+'" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">':esc((u.name||'?').charAt(0)))+'</div>';
-      h += '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;color:#202124;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(u.name||'')+'</div>';
+      h += '<div style="flex:1;min-width:0;cursor:pointer;" data-edit="'+u.id+'"><div style="font-size:13px;font-weight:600;color:#202124;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(u.name||'')+'</div>';
       h += '<div style="font-size:10px;color:#94a3b8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(u.email||'')+'</div></div>';
       h += '<span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px;background:'+pb+';color:'+pc+';flex-shrink:0;">'+esc(pos)+'</span>';
       h += '</div>';
     });
-    if (!members.length) h += '<div style="padding:16px;text-align:center;color:#94a3b8;font-size:12px;">メンバーなし</div>';
+    if (!members.length) h += '<div style="padding:16px;text-align:center;color:#94a3b8;font-size:12px;">メンバーなし（ここにドラッグで移動）</div>';
     h += '</div></div>';
   });
   h += '</div>';
   cont.innerHTML = h;
+  attachTeamDnD(cont);
+}
+
+// ドラッグ&ドロップを各要素に紐付け
+let _draggingUserId = null;
+let _draggingFromTeam = null;
+function attachTeamDnD(root) {
+  // メンバー行: ドラッグ開始
+  root.querySelectorAll('.team-member-row').forEach(row => {
+    row.addEventListener('dragstart', (e) => {
+      _draggingUserId = row.dataset.uid;
+      _draggingFromTeam = row.dataset.uteam;
+      row.style.opacity = '0.4';
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', row.dataset.uid);
+    });
+    row.addEventListener('dragend', () => {
+      row.style.opacity = '';
+      _draggingUserId = null;
+      _draggingFromTeam = null;
+      // 全カードのハイライトを解除
+      root.querySelectorAll('.team-card').forEach(c => { c.style.background = ''; c.style.borderColor = ''; });
+    });
+    // 編集クリック: data-edit がある中央領域だけ反応
+    row.querySelector('[data-edit]')?.addEventListener('click', (e) => {
+      openUserModal(e.currentTarget.dataset.edit);
+    });
+  });
+  // チームカード: ドロップターゲット
+  root.querySelectorAll('.team-card').forEach(card => {
+    card.addEventListener('dragover', (e) => {
+      if (!_draggingUserId) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      card.style.background = '#f0f9ff';
+      card.style.borderColor = '#3b82f6';
+    });
+    card.addEventListener('dragleave', () => {
+      card.style.background = '';
+      card.style.borderColor = '';
+    });
+    card.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      const newTeam = card.dataset.team;
+      const uid = _draggingUserId;
+      const fromTeam = _draggingFromTeam;
+      card.style.background = ''; card.style.borderColor = '';
+      if (!uid || !newTeam || newTeam === fromTeam) return;
+      await moveUserToTeam(uid, newTeam);
+    });
+  });
+}
+
+// ユーザーのチームを更新
+async function moveUserToTeam(userId, newTeam) {
+  const u = (allUsers||[]).find(x => x.id === userId);
+  if (!u) return;
+  const teamForDb = newTeam === '未所属' ? null : newTeam;
+  // 楽観的更新
+  const prev = u.team;
+  u.team = teamForDb;
+  renderTeamUsers();
+  try {
+    await sbFetch('users?id=eq.' + userId, { method:'PATCH', body: JSON.stringify({ team: teamForDb, updated_at: new Date().toISOString() }) });
+    showToast('✅ ' + (u.name||'') + ' を「' + newTeam + '」に移動', 'success');
+  } catch(e) {
+    u.team = prev;
+    renderTeamUsers();
+    showToast('❌ 移動に失敗: ' + e.message, 'error');
+  }
 }
 
 // チーム名を初期セットしてユーザー追加モーダルを開く
