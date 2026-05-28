@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260521.122 -->
+<!-- KMT_VERSION ver.20260528.01 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -17,23 +17,23 @@ html,body{height:100%;}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--gray-100);color:var(--navy);}
 
 /* ===== SIDEBAR ===== */
-.sidebar{width:220px;background:var(--navy);flex-shrink:0;display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:100;overflow-y:auto;transition:transform 0.2s ease;}
+.sidebar{width:220px;background:#FFE8D6;flex-shrink:0;display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:100;overflow-y:auto;transition:transform 0.2s ease;}
 .sidebar.collapsed{transform:translateX(-220px);}
-#sidebarToggleBtn{position:fixed;top:50%;transform:translateY(-50%);left:220px;z-index:200;background:var(--navy);color:white;border:none;border-radius:0 6px 6px 0;padding:8px 6px;cursor:pointer;font-size:12px;line-height:1;transition:left 0.2s ease;}
+#sidebarToggleBtn{position:fixed;top:50%;transform:translateY(-50%);left:220px;z-index:200;background:#FFE8D6;color:#7C2D12;border:none;border-radius:0 6px 6px 0;padding:8px 6px;cursor:pointer;font-size:12px;line-height:1;transition:left 0.2s ease;}
 #sidebarToggleBtn.collapsed{left:0;}
 .sidebar-logo{padding:20px 16px 16px;}
 .logo-badge{background:#2563eb;color:white;font-size:11px;font-weight:800;padding:3px 8px;border-radius:4px;display:inline-block;margin-bottom:6px;letter-spacing:1px;}
-.logo-title{color:white;font-size:12px;font-weight:700;line-height:1.4;}
-.logo-ver{color:#475569;font-size:10px;margin-top:2px;}
-.sidebar-section{padding:8px 12px 4px;font-size:10px;color:#475569;font-weight:700;letter-spacing:1px;text-transform:uppercase;}
-.nav-item{display:flex;align-items:center;gap:10px;padding:9px 16px;color:#94a3b8;font-size:13px;cursor:pointer;border-radius:6px;margin:1px 8px;}
-.nav-item:hover,.nav-item.active{background:rgba(255,255,255,0.1);color:white;}
+.logo-title{color:#7C2D12;font-size:12px;font-weight:700;line-height:1.4;}
+.logo-ver{color:#9A3412;font-size:10px;margin-top:2px;}
+.sidebar-section{padding:8px 12px 4px;font-size:10px;color:#9A3412;font-weight:700;letter-spacing:1px;text-transform:uppercase;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 16px;color:#9A3412;font-size:13px;cursor:pointer;border-radius:6px;margin:1px 8px;}
+.nav-item:hover,.nav-item.active{background:rgba(124,45,18,0.12);color:#7C2D12;}
 .nav-item .badge{background:#dc2626;color:white;font-size:10px;padding:1px 6px;border-radius:10px;margin-left:auto;}
-.sidebar-user{padding:12px 16px;border-top:1px solid rgba(255,255,255,0.08);margin-top:auto;}
+.sidebar-user{padding:12px 16px;border-top:1px solid rgba(124,45,18,0.15);margin-top:auto;}
 .user-avatar{width:32px;height:32px;border-radius:50%;background:#2563eb;display:flex;align-items:center;justify-content:center;color:white;font-size:13px;font-weight:700;flex-shrink:0;}
 .user-info{display:flex;align-items:center;gap:8px;}
-.user-name{color:white;font-size:12px;font-weight:600;}
-.user-role{color:#94a3b8;font-size:10px;}
+.user-name{color:#7C2D12;font-size:12px;font-weight:600;}
+.user-role{color:#9A3412;font-size:10px;}
 
 /* ===== MAIN ===== */
 .main-wrap{margin-left:220px;display:flex;flex-direction:column;min-height:100vh;transition:margin-left 0.2s ease;}
@@ -208,14 +208,14 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260521.122</div>
-    <div id="currentUserBadge" style="font-size:10px;color:#86efac;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
+    <div class="logo-ver">ver.20260528.01</div>
+    <div id="currentUserBadge" style="font-size:10px;color:#15803d;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(124,45,18,0.12);color:#7C2D12;padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
-  <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;color:#86efac;margin:4px 8px;border-radius:6px;background:rgba(134,239,172,0.1);" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
-  <div style="height:1px;background:rgba(255,255,255,0.08);margin:4px 16px 8px;"></div>
-  <div class="nav-item active" onclick="showScreen('ofusa_view')" style="background:rgba(37,99,235,0.2);color:#93c5fd;margin:8px 8px 4px;border-radius:6px;">📊 案件進捗確認</div>
-  <div class="nav-item" onclick="showScreen('decision_report')" style="color:#86efac;margin:2px 8px 4px;border-radius:6px;">📋 決定報告</div>
-  <div style="height:1px;background:rgba(255,255,255,0.08);margin:4px 16px 8px;"></div>
+  <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;color:#15803d;margin:4px 8px;border-radius:6px;background:rgba(34,197,94,0.15);" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
+  <div style="height:1px;background:rgba(124,45,18,0.15);margin:4px 16px 8px;"></div>
+  <div class="nav-item active" onclick="showScreen('ofusa_view')" style="background:rgba(37,99,235,0.15);color:#1d4ed8;margin:8px 8px 4px;border-radius:6px;">📊 案件進捗確認</div>
+  <div class="nav-item" onclick="showScreen('decision_report')" style="color:#15803d;margin:2px 8px 4px;border-radius:6px;">📋 決定報告</div>
+  <div style="height:1px;background:rgba(124,45,18,0.15);margin:4px 16px 8px;"></div>
   <div class="sidebar-section">メイン</div>
   <div class="nav-item" onclick="showScreen('companies')">🏢 所属機関</div>
   <div class="nav-item" onclick="showScreen('workers')">👤 外国人材</div>
@@ -234,7 +234,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="nav-item" onclick="showScreen('sales')">📊 売上管理</div>
   <div class="nav-item" onclick="showScreen('expenses')">💸 立替管理</div>
   <div class="nav-item" onclick="showScreen('users')">⚙️ ユーザー設定</div>
-  <div class="nav-item" onclick="showScreen('ai_knowledge')" style="color:#a78bfa;">🧠 AI記憶</div>
+  <div class="nav-item" onclick="showScreen('ai_knowledge')" style="color:#7c3aed;">🧠 AI記憶</div>
   <div class="sidebar-user">
     <div class="user-info">
       <div class="user-avatar" id="userAvatar">K</div>
