@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260528.18 -->
+<!-- KMT_VERSION ver.20260528.19 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -208,7 +208,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260528.18</div>
+    <div class="logo-ver">ver.20260528.19</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -2076,7 +2076,8 @@ async function saveDecisionAsWorker(data) {
       company_id:     companyId,
       return_home_date: data.temp_return || null,  // 一時帰国日
       memo:           memoParts.join(' / ') || null,
-      status:         '申請準備中',
+      status:         '配属前',
+      apply_status:   '申請準備中',
     };
     const res = await sbFetch('workers', { method:'POST', body: JSON.stringify(worker), prefer:'return=representation' });
     const newId = res && res[0] && res[0].id;
@@ -3287,6 +3288,7 @@ async function saveWorker(returnResult=false) {
     apply_date:       g('wf_apply_date'),
     apply_number:     g('wf_apply_number'),
     status:           g('wf_status'),
+    apply_status:     g('wf_apply_status'),
     kmt_support:      g('wf_kmt_support'),
     staff:            g('wf_staff'),
     return_home_date: g('wf_return_home_date'),
@@ -5653,10 +5655,13 @@ function buildWorkersScreen() {
   <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
     <input class="search-input" id="wSearchInput" placeholder="氏名・国籍・企業名で検索..." oninput="applyWorkerFilters()" style="flex:1;min-width:200px;">
     <select class="filter-select" id="wFilterStatus" onchange="applyWorkerFilters()">
-      <option value="">全ステータス</option>
-      <option>在職中</option><option>申請準備中</option><option>許可待ち</option>
-      <option>入国配属待ち</option><option>一時帰国中</option>
-      <option>退職（転職）</option><option>退職（帰国）</option><option>失踪</option><option>5年満了</option>
+      <option value="">全在職ステータス</option>
+      <option>配属前</option><option>在職中</option><option>在職中(一時帰国中)</option>
+      <option>退職済(帰国)</option><option>退職済(転職)</option>
+    </select>
+    <select class="filter-select" id="wFilterApplyStatus" onchange="applyWorkerFilters()">
+      <option value="">全申請ステータス</option>
+      <option>申請予定なし</option><option>申請準備中</option><option>審査中</option>
     </select>
     <select class="filter-select" id="wFilterNationality" onchange="applyWorkerFilters()">
       <option value="">全国籍</option>
@@ -5703,11 +5708,13 @@ function applyWorkerFilters() {
   if (currentScreen !== 'workers') return;
   const q = (document.getElementById('wSearchInput')?.value||'').toLowerCase();
   const status = document.getElementById('wFilterStatus')?.value||'';
+  const applyStatus = document.getElementById('wFilterApplyStatus')?.value||'';
   const nat = document.getElementById('wFilterNationality')?.value||'';
   const kmt = document.getElementById('wFilterKmt')?.value||'';
   filteredWorkers = allWorkers.filter(w => {
     if (q && !((w.name||'').toLowerCase().includes(q) || (w.nationality||'').toLowerCase().includes(q) || (w.companies?.name||'').toLowerCase().includes(q))) return false;
     if (status && w.status !== status) return false;
+    if (applyStatus && (w.apply_status||'') !== applyStatus) return false;
     if (nat && w.nationality !== nat) return false;
     if (kmt && w.kmt_support !== kmt) return false;
     return true;
@@ -5717,16 +5724,18 @@ function applyWorkerFilters() {
 }
 
 function clearWorkerFilters() {
-  ['wSearchInput','wFilterStatus','wFilterNationality','wFilterKmt'].forEach(id => {
+  ['wSearchInput','wFilterStatus','wFilterApplyStatus','wFilterNationality','wFilterKmt'].forEach(id => {
     const el = document.getElementById(id); if(el) el.value='';
   });
   applyWorkerFilters();
 }
 
 const STATUS_COLORS = {
-  '在職中':'st-active','申請準備中':'st-docs','許可待ち':'st-review',
-  '入国配属待ち':'st-submit','一時帰国中':'st-add',
-  '退職（転職）':'st-none','退職（帰国）':'st-none','失踪':'st-danger','5年満了':'st-cert'
+  '配属前':'st-submit','在職中':'st-active','在職中(一時帰国中)':'st-add',
+  '退職済(帰国)':'st-none','退職済(転職)':'st-none'
+};
+const APPLY_STATUS_COLORS = {
+  '申請予定なし':'st-none','申請準備中':'st-docs','審査中':'st-review'
 };
 
 function sortWorkers(key) {
@@ -5755,6 +5764,8 @@ function renderWorkerTable() {
   if (!page.length) { tbody.innerHTML='<tr><td colspan="11" style="text-align:center;padding:40px;color:var(--gray-400)">データなし</td></tr>'; document.getElementById('workerPagination').innerHTML=''; return; }
   tbody.innerHTML = page.map(w => {
     const cls = STATUS_COLORS[w.status] || 'st-none';
+    const applyCls = APPLY_STATUS_COLORS[w.apply_status] || 'st-none';
+    const showApply = w.apply_status && w.apply_status !== '申請予定なし';
     const expiry = w.visa_expiry ? formatDate(w.visa_expiry) : '-';
     const expWarn = w.visa_expiry && daysDiff(w.visa_expiry) < 120 ? ' style="color:var(--red);font-weight:700"' : '';
     const expiryAlert = w.visa_expiry ? (() => {
@@ -5772,7 +5783,7 @@ function renderWorkerTable() {
       <td style="font-size:12px">${esc(w.visa_status||'-')}</td>
       <td${expiryAlert}>${expiry}</td>
       <td style="font-size:12px">${w.joined_date?formatDate(w.joined_date):'-'}</td>
-      <td><span class="st-badge ${cls}">${esc(w.status||'-')}</span></td>
+      <td><span class="st-badge ${cls}">${esc(w.status||'-')}</span>${showApply?'<br><span class="st-badge '+applyCls+'" style="margin-top:2px;display:inline-block;">'+esc(w.apply_status)+'</span>':''}</td>
       <td style="font-size:12px">${esc(w.staff||'-')}</td>
       <td style="font-size:12px">${w.apply_date?formatDate(w.apply_date):'-'}</td>
       <td style="font-size:12px">${esc(w.apply_number||'-')}</td>
@@ -6037,9 +6048,13 @@ function buildWorkerModalBody(w) {
     <div class="form-group"><label class="form-label">申請日</label><input class="form-input" id="wf_apply_date" type="date" value="${w.apply_date||''}"></div>
     <div class="form-group"><label class="form-label">申請番号</label><input class="form-input" id="wf_apply_number" value="${esc(w.apply_number||'')}" placeholder="例: 2024-T-001"></div>
     <div class="section-title">ステータス</div>
-    <div class="form-group"><label class="form-label">ステータス</label>
+    <div class="form-group"><label class="form-label">在職ステータス</label>
       <select class="form-select" id="wf_status">
-        ${['在職中','申請準備中','許可待ち','入国配属待ち','一時帰国中','退職（転職）','退職（帰国）','失踪','キャンセル','5年満了'].map(s=>`<option ${w.status===s?'selected':''}>${s}</option>`).join('')}
+        ${['配属前','在職中','在職中(一時帰国中)','退職済(帰国)','退職済(転職)'].map(s=>`<option ${w.status===s?'selected':''}>${s}</option>`).join('')}
+      </select></div>
+    <div class="form-group"><label class="form-label">申請ステータス</label>
+      <select class="form-select" id="wf_apply_status">
+        ${['申請予定なし','申請準備中','審査中'].map(s=>`<option ${(w.apply_status||'申請予定なし')===s?'selected':''}>${s}</option>`).join('')}
       </select></div>
     <div class="form-group"><label class="form-label">KMT支援区分</label>
       <select class="form-select" id="wf_kmt_support">
@@ -7545,7 +7560,7 @@ async function loadFees(page) {
     const masterRows = activeCompanies.filter(c => isBillingMonth(c, ym));
 
     // 各企業に紐づく「在職」人材数を数える（在職中・一時帰国中）
-    const billableStatuses = ['在職中','一時帰国中'];
+    const billableStatuses = ['在職中','在職中(一時帰国中)'];
     const countWorkers = (companyId) => (allWorkers || []).filter(w =>
       w.company_id === companyId && billableStatuses.includes(w.status)
     ).length;
@@ -8211,7 +8226,7 @@ function buildFeeModalBody(f){
   f=f||{};
   const autoCalc=()=>{const wp=parseInt(document.getElementById('ff_worker_count')?.value||0);const up=parseInt(document.getElementById('ff_unit_price')?.value||0);const excl=wp*up;document.getElementById('ff_amount_excl').value=excl||'';document.getElementById('ff_amount_incl').value=excl?Math.round(excl*1.1):'';};
   // この企業に紐づく全人材（チェックで請求対象を選ぶ）
-  const billableStatuses = ['在職中','一時帰国中'];
+  const billableStatuses = ['在職中','在職中(一時帰国中)'];
   const linkedWorkers = (allWorkers||[]).filter(w => w.company_id === f.company_id);
   // 既存の選択（保存済みのworker_idsがあれば優先、なければ在職系を初期チェック）
   const savedIds = Array.isArray(f.worker_ids) ? f.worker_ids : null;
