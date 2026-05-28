@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260528.01 -->
+<!-- KMT_VERSION ver.20260528.02 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -17,9 +17,9 @@ html,body{height:100%;}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--gray-100);color:var(--navy);}
 
 /* ===== SIDEBAR ===== */
-.sidebar{width:220px;background:#FFE8D6;flex-shrink:0;display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:100;overflow-y:auto;transition:transform 0.2s ease;}
+.sidebar{width:220px;background:#FDBA74;flex-shrink:0;display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:100;overflow-y:auto;transition:transform 0.2s ease;}
 .sidebar.collapsed{transform:translateX(-220px);}
-#sidebarToggleBtn{position:fixed;top:50%;transform:translateY(-50%);left:220px;z-index:200;background:#FFE8D6;color:#7C2D12;border:none;border-radius:0 6px 6px 0;padding:8px 6px;cursor:pointer;font-size:12px;line-height:1;transition:left 0.2s ease;}
+#sidebarToggleBtn{position:fixed;top:50%;transform:translateY(-50%);left:220px;z-index:200;background:#FDBA74;color:#7C2D12;border:none;border-radius:0 6px 6px 0;padding:8px 6px;cursor:pointer;font-size:12px;line-height:1;transition:left 0.2s ease;}
 #sidebarToggleBtn.collapsed{left:0;}
 .sidebar-logo{padding:20px 16px 16px;}
 .logo-badge{background:#2563eb;color:white;font-size:11px;font-weight:800;padding:3px 8px;border-radius:4px;display:inline-block;margin-bottom:6px;letter-spacing:1px;}
@@ -208,7 +208,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260528.01</div>
+    <div class="logo-ver">ver.20260528.02</div>
     <div id="currentUserBadge" style="font-size:10px;color:#15803d;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(124,45,18,0.12);color:#7C2D12;padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;color:#15803d;margin:4px 8px;border-radius:6px;background:rgba(34,197,94,0.15);" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
