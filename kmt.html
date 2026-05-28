@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260528.11 -->
+<!-- KMT_VERSION ver.20260528.12 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -208,7 +208,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260528.11</div>
+    <div class="logo-ver">ver.20260528.12</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -1700,7 +1700,7 @@ function buildDecisionReportScreen() {
         <div class="form-grid">
           <div class="section-title">基本情報</div>
           <div class="form-group"><label class="form-label">2. 依頼受領日</label><input class="form-input" id="dr_received_date" type="date"></div>
-          <div class="form-group"><label class="form-label">3. 大房行政書士法人 担当MG</label><input class="form-input" id="dr_ohfusa_mg" value="坂齊"></div>
+          <div class="form-group"><label class="form-label">3. 大房行政書士法人 担当MG</label><input class="form-input" id="dr_ohfusa_mg" value="書類部"></div>
           <div class="section-title">区分情報</div>
           <div class="form-group"><label class="form-label">5. 【A区分】希望在留資格</label>
             <select class="form-select" id="dr_visa_type"><option value="">選択</option><option>特定技能1号</option><option>特定技能2号</option><option>特定活動</option><option>技人国</option></select></div>
@@ -1899,7 +1899,7 @@ function getDecisionData() {
   return {
     paku: '',
     received_date: g('dr_received_date'),
-    ohfusa_mg: g('dr_ohfusa_mg') || '坂齊',
+    ohfusa_mg: g('dr_ohfusa_mg') || '書類部',
     support_org: '株式会社KMT',
     visa_type: g('dr_visa_type'),
     app_type: g('dr_app_type'),
@@ -1967,12 +1967,62 @@ async function submitDecisionReport() {
   }
   if (!KMT_REQUEST_GAS_URL) { showToast('❌ GAS URLが未設定です', 'error'); return; }
   showLoading(true);
+  let sentOk = false;
   try {
     const res = await fetch(KMT_REQUEST_GAS_URL, { method: 'POST', body: JSON.stringify(data) });
     const result = await res.json();
-    if (result.success) { showToast('✅ スプレッドシートに送信しました', 'success'); }
+    if (result.success) { showToast('✅ スプレッドシートに送信しました', 'success'); sentOk = true; }
     else { showToast('❌ 送信失敗: ' + (result.error || '不明'), 'error'); }
   } catch(e) { showToast('❌ 送信エラー: ' + e.message, 'error'); }
+  showLoading(false);
+
+  // 送信成功後、外国人材への追加を確認
+  if (sentOk && data.person_name) {
+    if (confirm('この内容を「外国人材」に追加しますか？\n（人材名・国籍・在留期限・在留資格などを保存します）')) {
+      await saveDecisionAsWorker(data);
+    }
+  }
+}
+
+// 決定報告データを workers テーブルに保存
+async function saveDecisionAsWorker(data) {
+  showLoading(true);
+  try {
+    // 企業名から company_id を逆引き
+    let companyId = null;
+    if (data.company_name) {
+      const co = (allCompanies || []).find(c => c.name === data.company_name);
+      if (co) companyId = co.id;
+    }
+    // 専用列がない項目はmemoにまとめる
+    const memoParts = [];
+    if (data.visa_type)    memoParts.push('希望在留資格: ' + data.visa_type);
+    if (data.app_type)     memoParts.push('認定/変更/更新: ' + data.app_type);
+    if (data.tokurei)      memoParts.push('特例期間: ' + data.tokurei);
+    if (data.total_period) memoParts.push('特定技能通算: ' + data.total_period);
+    if (data.ginou_end)    memoParts.push('技能実習修了日: ' + data.ginou_end);
+    if (data.target_date)  memoParts.push('申請目標日: ' + data.target_date);
+
+    const worker = {
+      name:           data.person_name || '',
+      nationality:    data.nationality || null,
+      visa_status:    data.current_visa || null,   // 現在の在留資格
+      visa_expiry:    data.expire_date || null,    // 在留期限
+      applicant_field:data.field || null,          // 申請分野
+      staff:          data.support_staff || null,  // 支援担当者
+      company_id:     companyId,
+      return_home_date: data.temp_return || null,  // 一時帰国日
+      memo:           memoParts.join(' / ') || null,
+      status:         '申請準備中',
+    };
+    const res = await sbFetch('workers', { method:'POST', body: JSON.stringify(worker), prefer:'return=representation' });
+    const newId = res && res[0] && res[0].id;
+    showToast('✅ 外国人材に追加しました' + (companyId ? '' : '（企業は未紐付け）'), 'success');
+    // 人材一覧を再読込（開いていれば反映）
+    if (typeof loadWorkers === 'function') { try { await loadWorkers(); } catch(e){} }
+  } catch(e) {
+    showToast('❌ 人材追加に失敗: ' + e.message, 'error');
+  }
   showLoading(false);
 }
 
