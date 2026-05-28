@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260528.10 -->
+<!-- KMT_VERSION ver.20260528.11 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -208,7 +208,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260528.10</div>
+    <div class="logo-ver">ver.20260528.11</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -3611,7 +3611,12 @@ function renderChatRooms(filtered) {
 function renderGroupList() {
   const list = document.getElementById('chatRoomList'); if (!list) return;
   const q = (document.getElementById('chatRoomSearch')?.value || '').toLowerCase();
-  const rows = chatGroups.filter(g => !q || g.name.toLowerCase().includes(q)).map(g => {
+  const rows = chatGroups.filter(g => {
+    // 進行中/完了タブで絞り込み（done以外=進行中）
+    const isDone = g.status === 'done';
+    if (_chatTab === 'done' ? !isDone : isDone) return false;
+    return !q || g.name.toLowerCase().includes(q);
+  }).map(g => {
     const rooms = chatRooms.filter(r => r.group_id === g.id);
     const unread = rooms.reduce((s,r)=>s+(r.unread||0),0);
     const lastMsg = rooms.map(r=>r.lastMsg).filter(Boolean).sort((a,b)=>b.created_at>a.created_at?1:-1)[0];
@@ -3644,7 +3649,12 @@ function renderGroupList() {
     return div.outerHTML;
   });
   // 未分類ルーム（group_idなし）を追加
-  const ungrouped = chatRooms.filter(r => !r.group_id && (!q || r.name.toLowerCase().includes(q)));
+  const ungrouped = chatRooms.filter(r => {
+    if (r.group_id) return false;
+    const isDone = r.status === 'done';
+    if (_chatTab === 'done' ? !isDone : isDone) return false;
+    return !q || r.name.toLowerCase().includes(q);
+  });
   if (ungrouped.length) {
     const sep = document.createElement('div');
     sep.style.cssText = 'padding:6px 14px;font-size:10px;font-weight:700;color:#94a3b8;letter-spacing:.5px;border-top:1px solid #f0f0f0;margin-top:4px;';
@@ -3727,8 +3737,15 @@ function renderGroupRooms(groupId) {
   editBtn.textContent = '⚙️';
   editBtn.title = 'グループを編集';
   editBtn.onclick = () => openEditGroupModal(groupId);
+  // 完了/進行中トグル
+  const doneBtn = document.createElement('button');
+  const _isDone = group?.status === 'done';
+  doneBtn.style.cssText = 'font-size:10px;border:1px solid '+(_isDone?'#d1d5db':'#059669')+';background:'+(_isDone?'#fff':'#059669')+';color:'+(_isDone?'#5f6368':'#fff')+';border-radius:12px;padding:3px 10px;cursor:pointer;white-space:nowrap;font-weight:600;';
+  doneBtn.textContent = _isDone ? '↩ 進行中に戻す' : '✅ 完了';
+  doneBtn.onclick = () => setGroupStatus(groupId, _isDone ? 'active' : 'done');
   header.appendChild(backBtn);
   header.appendChild(title);
+  header.appendChild(doneBtn);
   header.appendChild(editBtn);
   header.appendChild(inviteBtn);
   list.appendChild(header);
@@ -3784,6 +3801,19 @@ function renderGroupRooms(groupId) {
     row.appendChild(delBtn);
     list.appendChild(row);
   });
+}
+
+async function setGroupStatus(groupId, status) {
+  if (status === 'done' && !confirm('このグループを「完了」にしますか？\n完了タブに移動します。')) return;
+  try {
+    const body = { status, updated_at: new Date().toISOString() };
+    await sbFetch('chat_groups?id=eq.' + groupId, { method:'PATCH', body: JSON.stringify(body) });
+    const g = chatGroups.find(x => x.id === groupId);
+    if (g) g.status = status;
+    showToast(status === 'done' ? '✅ グループを完了にしました' : '↩ 進行中に戻しました', 'success');
+    selectGroup(null);
+    renderGroupList();
+  } catch(e) { showToast('❌ ' + e.message, 'error'); }
 }
 
 function selectGroup(groupId) {
