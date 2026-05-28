@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260528.04 -->
+<!-- KMT_VERSION ver.20260528.05 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -208,7 +208,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260528.04</div>
+    <div class="logo-ver">ver.20260528.05</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -2882,6 +2882,81 @@ async function loadChatScreen() {
     renderChatRooms();
     loadChatUnread();
   } catch(e) { showToast('❌ ' + e.message, 'error'); }
+  showLoading(false);
+}
+
+async function saveWorker(returnResult=false) {
+  const g = id => document.getElementById(id)?.value || null;
+  const name = (g('wf_name')||'').trim();
+  if (!name) { showToast('❌ 氏名は必須です', 'error'); return false; }
+
+  // 就業場所: セレクトが __custom__ の時はカスタム入力欄を採用
+  let workplaceName = g('wf_workplace_name');
+  if (workplaceName === '__custom__') workplaceName = g('wf_workplace_name_custom') || null;
+
+  const data = {
+    name,
+    name_kana:        g('wf_name_kana'),
+    nationality:      g('wf_nationality'),
+    gender:           g('wf_gender'),
+    birthdate:        g('wf_birthdate'),
+    company_id:       g('wf_company_id'),
+    applicant_field:  g('wf_applicant_field'),
+    job_category:     g('wf_job_category'),
+    joined_date:      g('wf_joined_date'),
+    left_date:        g('wf_left_date'),
+    visa_status:      g('wf_visa_status'),
+    visa_expiry:      g('wf_visa_expiry'),
+    residence_card:   g('wf_residence_card'),
+    entry_date:       g('wf_entry_date'),
+    request_date:     g('wf_request_date'),
+    apply_date:       g('wf_apply_date'),
+    apply_number:     g('wf_apply_number'),
+    status:           g('wf_status'),
+    kmt_support:      g('wf_kmt_support'),
+    staff:            g('wf_staff'),
+    return_home_date: g('wf_return_home_date'),
+    return_jp_date:   g('wf_return_jp_date'),
+    tg2_expiry:       g('wf_tg2_expiry'),
+    tg2_status:       g('wf_tg2_status'),
+    phone:            g('wf_phone'),
+    email:            g('wf_email'),
+    jp_address:       g('wf_jp_address'),
+    drive_url:        g('wf_drive_url'),
+    workplace_name:   workplaceName,
+    memo:             g('wf_memo'),
+    notes:            g('wf_notes'),
+  };
+
+  showLoading(true);
+  try {
+    if (editingWorkerId) {
+      await sbFetch('workers?id=eq.'+editingWorkerId, {method:'PATCH', body:JSON.stringify(data)});
+      showToast('✅ 更新しました', 'success');
+    } else {
+      const res = await sbFetch('workers', {method:'POST', body:JSON.stringify(data)});
+      editingWorkerId = res?.[0]?.id || null;
+      showToast('✅ 登録しました', 'success');
+    }
+    if (!returnResult) closeGenModal('workerModal');
+    await loadWorkers();
+    if (returnResult) { showLoading(false); return true; }
+  } catch(e) { showToast('❌ '+e.message,'error'); showLoading(false); return false; }
+  showLoading(false);
+  return true;
+}
+
+async function deleteWorker() {
+  if (!editingWorkerId) return;
+  if (!confirm('この外国人材を削除しますか？\nチャット履歴も削除されます。')) return;
+  showLoading(true);
+  try {
+    await sbFetch('workers?id=eq.'+editingWorkerId, {method:'DELETE'});
+    showToast('✅ 削除しました', 'success');
+    closeGenModal('workerModal');
+    editingWorkerId = null;
+    await loadWorkers();
+  } catch(e) { showToast('❌ '+e.message,'error'); }
   showLoading(false);
 }
 
