@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260528.06 -->
+<!-- KMT_VERSION ver.20260528.07 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -208,7 +208,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260528.06</div>
+    <div class="logo-ver">ver.20260528.07</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -655,8 +655,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeCompanyModal()">キャンセル</button>
-      <button class="btn btn-primary" onclick="saveCompany()">💾 保存</button>
+      <button class="btn btn-outline" onclick="closeCompanyModal()">閉じる</button>
     </div>
   </div>
 </div>
@@ -902,6 +901,7 @@ let editingCompanyId = null;
 function openCompanyModal(id) {
   editingCompanyId = id;
   editingCoId = id;
+  _savingCompanyNew = false;
   clearCoForm();
   if (id) {
     const co = allCompanies.find(c => c.id === id);
@@ -1079,6 +1079,7 @@ async function deleteMeeting(id) {
 }
 
 function closeCompanyModal() {
+  if (_autoSaveActive) return;
   document.getElementById('companyModal').classList.remove('show');
   editingCoId = null;
 }
@@ -1217,25 +1218,38 @@ function copyMainAddressToWorkplace() {
   showToast('✅ 基本情報を就業場所に反映しました', 'success');
 }
 
-async function saveCompany() {
+async function saveCompany(autoMode=false) {
   const data = getCoFormData();
-  if (!data.name) { showToast('❌ 機関名は必須です', 'error'); return; }
-  showLoading(true);
+  if (!data.name) { if(!autoMode) showToast('❌ 機関名は必須です', 'error'); return false; }
+  if (!editingCoId) {
+    if (_savingCompanyNew) return false;
+    _savingCompanyNew = true;
+  }
+  if (!autoMode) showLoading(true);
   try {
     if (editingCoId) {
       await sbFetch('companies?id=eq.' + editingCoId, { method:'PATCH', body: JSON.stringify(data), prefer:'return=representation' });
-      showToast('✅ 企業情報を更新しました', 'success');
+      if (!autoMode) showToast('✅ 企業情報を更新しました', 'success');
     } else {
-      await sbFetch('companies', { method:'POST', body: JSON.stringify(data), prefer:'return=representation' });
-      showToast('✅ 企業を登録しました', 'success');
+      const res = await sbFetch('companies', { method:'POST', body: JSON.stringify(data), prefer:'return=representation' });
+      const newId = res?.[0]?.id || null;
+      if (newId) { editingCoId = newId; editingCompanyId = newId; }
+      _savingCompanyNew = false;
+      if (!autoMode) showToast('✅ 企業を登録しました', 'success');
     }
-    closeCompanyModal();
+    if (!autoMode) closeCompanyModal();
     await loadCompanies();
+    if (autoMode) return true;
   } catch(e) {
+    _savingCompanyNew = false;
     showToast('❌ 保存失敗: ' + e.message, 'error');
+    if (!autoMode) showLoading(false);
+    return false;
   }
-  showLoading(false);
+  if (!autoMode) showLoading(false);
+  return true;
 }
+let _savingCompanyNew = false;
 
 // ===== SIDEBAR =====
 let sidebarOpen = true;
@@ -2028,6 +2042,8 @@ function calcAge(birthdate) {
 
 // ===== 自動保存 =====
 let _autoSaveTimer=null, _autoSaveFn=null, _autoSaveStatus=null, _autoSaveUndoData=null;
+let _autoSaveActive=false;   // 自動保存中: closeGenModal/showLoading/showToastを抑制
+let _autoSaveInFlight=false; // 直前の保存がまだ走っているか（二重POST防止）
 
 function setupAutoSave(saveFn, delayMs=1500) {
   _autoSaveFn = saveFn;
@@ -2050,19 +2066,38 @@ function setupAutoSave(saveFn, delayMs=1500) {
       _autoSaveStatus.style.opacity = '1';
       _autoSaveStatus.innerHTML = '✏️ 入力中...';
       _autoSaveTimer && clearTimeout(_autoSaveTimer);
-      _autoSaveTimer = setTimeout(async () => {
-        if (!_autoSaveFn) return;
-        const modal2 = document.querySelector('.modal.show') || document.querySelector('.gen-modal.show');
-        if (modal2) { _autoSaveUndoData={}; modal2.querySelectorAll('input,select,textarea').forEach(e=>{if(e.id)_autoSaveUndoData[e.id]=e.value;}); }
-        _autoSaveStatus.innerHTML = '💾 保存中...';
-        await _autoSaveFn(true);
-        _autoSaveStatus.innerHTML = '✅ 保存済 <span onclick="undoAutoSave()" style="cursor:pointer;color:#fbbf24;text-decoration:underline;font-size:11px;">↩ 取り消し</span>';
-        setTimeout(() => { _autoSaveStatus.style.opacity='0'; }, 3000);
-      }, delayMs);
+      _autoSaveTimer = setTimeout(() => runAutoSave(), delayMs);
     };
     el.addEventListener('input', trigger);
     el.addEventListener('change', trigger);
   });
+}
+
+async function runAutoSave() {
+  if (!_autoSaveFn) return;
+  if (_autoSaveInFlight) {
+    // 保存中なら少し後に再試行（入力が続いている場合）
+    _autoSaveTimer && clearTimeout(_autoSaveTimer);
+    _autoSaveTimer = setTimeout(() => runAutoSave(), 600);
+    return;
+  }
+  const modal2 = document.querySelector('.modal.show') || document.querySelector('.gen-modal.show');
+  if (modal2) { _autoSaveUndoData={}; modal2.querySelectorAll('input,select,textarea').forEach(e=>{if(e.id)_autoSaveUndoData[e.id]=e.value;}); }
+  _autoSaveStatus.style.opacity = '1';
+  _autoSaveStatus.innerHTML = '💾 保存中...';
+  _autoSaveInFlight = true;
+  _autoSaveActive = true;  // この間 closeGenModal/showLoading/showToast を抑制
+  try {
+    await _autoSaveFn(true);
+    _autoSaveStatus.innerHTML = '✅ 保存済 <span onclick="undoAutoSave()" style="cursor:pointer;color:#fbbf24;text-decoration:underline;font-size:11px;">↩ 取り消し</span>';
+    setTimeout(() => { _autoSaveStatus.style.opacity='0'; }, 3000);
+  } catch(e) {
+    _autoSaveStatus.innerHTML = '⚠️ 保存失敗';
+    setTimeout(() => { _autoSaveStatus.style.opacity='0'; }, 3000);
+  } finally {
+    _autoSaveActive = false;
+    _autoSaveInFlight = false;
+  }
 }
 async function undoAutoSave() {
   if (!_autoSaveUndoData || !_autoSaveFn) return;
@@ -2490,8 +2525,8 @@ function openAiKnModal(id) {
         💡 <strong>承認済み</strong>の知識のみAIチャットのシステムプロンプトに反映されます
       </div>
       <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:8px;border-top:1px solid var(--gray-200);">
-        <button class="btn btn-outline" onclick="closeGenModal('aiKnModal')">キャンセル</button>
-        <button class="btn btn-primary" onclick="saveAiKn()">💾 保存</button>
+        <button class="btn btn-outline" onclick="closeGenModal('aiKnModal')">閉じる</button>
+        
       </div>
     </div>
   `);
@@ -2511,7 +2546,8 @@ async function saveAiKn() {
       await sbFetch('ai_knowledge?id=eq.' + editingAiKnId, { method: 'PATCH', body: JSON.stringify({ category: cat, title, content, author, status, updated_at: new Date().toISOString() }) });
       showToast('✅ 更新しました', 'success');
     } else {
-      await sbFetch('ai_knowledge', { method: 'POST', body: JSON.stringify({ category: cat, title, content, author, status: 'pending', created_at: new Date().toISOString() }) });
+      const _r = await sbFetch('ai_knowledge', { method: 'POST', body: JSON.stringify({ category: cat, title, content, author, status: 'pending', created_at: new Date().toISOString() }), prefer:'return=representation' });
+      if (_r && _r[0] && _r[0].id) editingAiKnId = _r[0].id;
       showToast('💾 保存しました（承認待ち）', 'success');
     }
     closeGenModal('aiKnModal');
@@ -2935,21 +2971,28 @@ async function saveWorker(returnResult=false) {
     notes:            g('wf_notes'),
   };
 
-  showLoading(true);
+  const autoMode = returnResult; // 自動保存（モーダル開いたまま）モード
+  // 新規作成の二重POSTガード
+  if (!editingWorkerId) {
+    if (_savingWorkerNew) return false;
+    _savingWorkerNew = true;
+  }
+  if (!autoMode) showLoading(true);
   try {
     if (editingWorkerId) {
       await sbFetch('workers?id=eq.'+editingWorkerId, {method:'PATCH', body:JSON.stringify(data)});
-      showToast('✅ 更新しました', 'success');
+      if (!autoMode) showToast('✅ 更新しました', 'success');
     } else {
       const res = await sbFetch('workers', {method:'POST', body:JSON.stringify(data)});
       editingWorkerId = res?.[0]?.id || null;
-      showToast('✅ 登録しました', 'success');
+      _savingWorkerNew = false;
+      if (!autoMode) showToast('✅ 登録しました', 'success');
     }
-    if (!returnResult) closeGenModal('workerModal');
+    if (!autoMode) closeGenModal('workerModal');
     await loadWorkers();
-    if (returnResult) { showLoading(false); return true; }
-  } catch(e) { showToast('❌ '+e.message,'error'); showLoading(false); return false; }
-  showLoading(false);
+    if (autoMode) { return true; }
+  } catch(e) { _savingWorkerNew = false; showToast('❌ '+e.message,'error'); if(!autoMode) showLoading(false); return false; }
+  if (!autoMode) showLoading(false);
   return true;
 }
 
@@ -3254,7 +3297,7 @@ function openCreateGroupModal() {
         💡 グループ作成後、外国人材詳細から「チャット開始」でメンバーを追加できます。
       </div>
       <div style="display:flex;gap:8px;justify-content:flex-end;">
-        <button class="btn btn-outline" onclick="closeGenModal('aiKnModal')">キャンセル</button>
+        <button class="btn btn-outline" onclick="closeGenModal('aiKnModal')">閉じる</button>
         <button class="btn btn-primary" onclick="createChatGroup()">作成</button>
       </div>
     </div>
@@ -5092,10 +5135,12 @@ function updatePhotoThumb(url) {
   thumb.innerHTML = url ? `<img src="${url}" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.innerHTML='<span style=font-size:20px>📷</span>'">` : '<span style="font-size:20px;color:#ccc">📷</span>';
 }
 
-function showLoading(v) { document.getElementById('loadingOverlay').classList.toggle('show', v); }
+function showLoading(v) { if(_autoSaveActive && v) return; document.getElementById('loadingOverlay').classList.toggle('show', v); }
 
 let toastTimer;
 function showToast(msg, type='') {
+  // 自動保存中は成功系トーストを抑制（右下インジケータと二重になるため）。エラーは表示。
+  if (_autoSaveActive && type !== 'error') return;
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.className = 'toast show' + (type ? ' '+type : '');
@@ -5524,6 +5569,7 @@ function onWorkerWorkplaceChange() {
 async function openWorkerModal(id) {
   const w = id ? allWorkers.find(x=>x.id===id) : null;
   editingWorkerId = id;
+  _savingWorkerNew = false;
   // 候補者データがなければロード
   if (!allCandidates.length) {
     try {
@@ -5535,6 +5581,7 @@ async function openWorkerModal(id) {
   setTimeout(() => setupAutoSave(saveWorker), 100);
 }
 let editingWorkerId = null;
+let _savingWorkerNew = false;
 
 function switchWorkerTab(tab) {
   const tabs = ['basic','note','tasks','schedules'];
@@ -5708,10 +5755,9 @@ function buildWorkerModalBody(w) {
     <div id="workerScheduleArea"><div style="text-align:center;padding:20px;color:var(--gray-400);font-size:13px;">読み込み中...</div></div>
   </div>
   <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)">
-    <button class="btn btn-outline" onclick="closeGenModal('workerModal')">キャンセル</button>
+    <button class="btn btn-outline" onclick="closeGenModal('workerModal')">閉じる</button>
     ${editingWorkerId ? '<button class="btn btn-outline" style="color:var(--red);border-color:var(--red);" onclick="deleteWorker()">🗑️ 削除</button>' : ''}
     <button class="btn btn-outline" style="color:#059669;border-color:#059669;" onclick="saveAndStartChat()">💬 チャット開始</button>
-    <button class="btn btn-primary" onclick="saveWorker()">💾 保存</button>
   </div>`;
 }
 
@@ -7070,13 +7116,13 @@ async function saveCandidate() {
   showLoading(true);
   try {
     if(editingCandidateId){await sbFetch('candidates?id=eq.'+editingCandidateId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新しました','success');}
-    else{await sbFetch('candidates',{method:'POST',body:JSON.stringify(data)});showToast('✅ 登録しました','success');}
+    else{const _r=await sbFetch('candidates',{method:'POST',body:JSON.stringify(data),prefer:'return=representation'});if(_r&&_r[0]&&_r[0].id)editingCandidateId=_r[0].id;showToast('✅ 登録しました','success');}
     closeGenModal('candidateModal'); await loadCandidates();
   }catch(e){showToast('❌ '+e.message,'error');}
   showLoading(false);
 }
 
-async function saveSending(){const g=id=>document.getElementById(id)?.value||null;const data={name:g('sf_name'),country:g('sf_country'),contact_name:g('sf_contact'),email:g('sf_email'),tel:g('sf_tel'),address:g('sf_address'),notes:g('sf_notes'),updated_at:new Date().toISOString()};if(!data.name){showToast('❌ 機関名は必須','error');return;}showLoading(true);try{if(editingSendingId){await sbFetch('sending_orgs?id=eq.'+editingSendingId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新','success');}else{await sbFetch('sending_orgs',{method:'POST',body:JSON.stringify(data)});showToast('✅ 登録','success');}closeGenModal('sendingModal');await loadSending();}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
+async function saveSending(){const g=id=>document.getElementById(id)?.value||null;const data={name:g('sf_name'),country:g('sf_country'),contact_name:g('sf_contact'),email:g('sf_email'),tel:g('sf_tel'),address:g('sf_address'),notes:g('sf_notes'),updated_at:new Date().toISOString()};if(!data.name){showToast('❌ 機関名は必須','error');return;}showLoading(true);try{if(editingSendingId){await sbFetch('sending_orgs?id=eq.'+editingSendingId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新','success');}else{const _r=await sbFetch('sending_orgs',{method:'POST',body:JSON.stringify(data),prefer:'return=representation'});if(_r&&_r[0]&&_r[0].id)editingSendingId=_r[0].id;showToast('✅ 登録','success');}closeGenModal('sendingModal');await loadSending();}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
 
 function buildCandidateModalBody(c) {
   c=c||{};
@@ -7141,16 +7187,16 @@ function buildCandidateModalBody(c) {
     <div class="form-group full"><label class="form-label">メモ</label><textarea class="form-textarea" id="cf_memo">${esc(c.memo||'')}</textarea></div>
   </div>
   <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)">
-    <button class="btn btn-outline" onclick="closeGenModal('candidateModal')">キャンセル</button>
-    <button class="btn btn-primary" onclick="saveCandidate()">💾 保存</button>
+    <button class="btn btn-outline" onclick="closeGenModal('candidateModal')">閉じる</button>
+    
   </div>`;
 }
 
-function buildExpenseModalBody(e){e=e||{};return `<div class="form-grid"><div class="section-title">立替情報</div><div class="form-group"><label class="form-label">日付</label><input class="form-input" id="ef_date" type="date" value="${e.expense_date||''}"></div><div class="form-group"><label class="form-label">ステータス</label><select class="form-select" id="ef_status">${['未請求','請求済','入金済'].map(s=>`<option ${e.status===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group full"><label class="form-label">人材</label><select class="form-select" id="ef_worker_id"><option value="">選択...</option>${allWorkers.map(w=>`<option value="${w.id}" ${e.worker_id===w.id?'selected':''}>${esc(w.name)}</option>`).join('')}</select></div><div class="form-group full"><label class="form-label">企業</label><select class="form-select" id="ef_company_id"><option value="">選択...</option>${allCompanies.map(c=>`<option value="${c.id}" ${e.company_id===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div><div class="form-group full"><label class="form-label">名目（航空券等）</label><input class="form-input" id="ef_item_name" value="${esc(e.item_name||'')}"></div><div class="form-group"><label class="form-label">金額（円）</label><input class="form-input" id="ef_amount" type="number" value="${e.amount??''}"></div><div class="form-group"><label class="form-label">支払方法</label><select class="form-select" id="ef_payment_method">${['','立替','クレカ'].map(s=>`<option ${e.payment_method===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">請求先</label><select class="form-select" id="ef_billed_to">${['','企業','本人'].map(s=>`<option ${e.billed_to===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">担当者</label><input class="form-input" id="ef_staff" value="${esc(e.staff||'')}"></div><div class="form-group full"><label class="form-label">備考</label><textarea class="form-textarea" id="ef_notes">${esc(e.notes||'')}</textarea></div></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)"><button class="btn btn-outline" onclick="closeGenModal('expenseModal')">キャンセル</button><button class="btn btn-primary" onclick="saveExpense()">💾 保存</button></div>`;}
+function buildExpenseModalBody(e){e=e||{};return `<div class="form-grid"><div class="section-title">立替情報</div><div class="form-group"><label class="form-label">日付</label><input class="form-input" id="ef_date" type="date" value="${e.expense_date||''}"></div><div class="form-group"><label class="form-label">ステータス</label><select class="form-select" id="ef_status">${['未請求','請求済','入金済'].map(s=>`<option ${e.status===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group full"><label class="form-label">人材</label><select class="form-select" id="ef_worker_id"><option value="">選択...</option>${allWorkers.map(w=>`<option value="${w.id}" ${e.worker_id===w.id?'selected':''}>${esc(w.name)}</option>`).join('')}</select></div><div class="form-group full"><label class="form-label">企業</label><select class="form-select" id="ef_company_id"><option value="">選択...</option>${allCompanies.map(c=>`<option value="${c.id}" ${e.company_id===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div><div class="form-group full"><label class="form-label">名目（航空券等）</label><input class="form-input" id="ef_item_name" value="${esc(e.item_name||'')}"></div><div class="form-group"><label class="form-label">金額（円）</label><input class="form-input" id="ef_amount" type="number" value="${e.amount??''}"></div><div class="form-group"><label class="form-label">支払方法</label><select class="form-select" id="ef_payment_method">${['','立替','クレカ'].map(s=>`<option ${e.payment_method===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">請求先</label><select class="form-select" id="ef_billed_to">${['','企業','本人'].map(s=>`<option ${e.billed_to===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">担当者</label><input class="form-input" id="ef_staff" value="${esc(e.staff||'')}"></div><div class="form-group full"><label class="form-label">備考</label><textarea class="form-textarea" id="ef_notes">${esc(e.notes||'')}</textarea></div></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)"><button class="btn btn-outline" onclick="closeGenModal('expenseModal')">閉じる</button></div>`;}
 
-async function savePartner(){const g=id=>document.getElementById(id)?.value||null;const ni=id=>document.getElementById(id)?.value?parseInt(document.getElementById(id).value):null;const data={name:g('pf_name'),org_type:g('pf_org_type'),job_code:g('pf_job_code'),main_industry:g('pf_industry'),contact_name:g('pf_contact'),email:g('pf_email'),fee_kmt:ni('pf_fee_kmt'),fee_ofusa:ni('pf_fee_ofusa'),billing_timing:g('pf_billing_timing'),glt_staff:g('pf_glt_staff'),ofusa_staff:g('pf_ofusa_staff'),partnership_start:g('pf_start_date'),website:g('pf_website'),notes:g('pf_notes'),updated_at:new Date().toISOString()};if(!data.name){showToast('❌ 機関名は必須','error');return;}showLoading(true);try{if(editingPartnerId){await sbFetch('partner_support_orgs?id=eq.'+editingPartnerId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新','success');}else{await sbFetch('partner_support_orgs',{method:'POST',body:JSON.stringify(data)});showToast('✅ 登録','success');}closeGenModal('partnerModal');await loadPartners();}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
+async function savePartner(){const g=id=>document.getElementById(id)?.value||null;const ni=id=>document.getElementById(id)?.value?parseInt(document.getElementById(id).value):null;const data={name:g('pf_name'),org_type:g('pf_org_type'),job_code:g('pf_job_code'),main_industry:g('pf_industry'),contact_name:g('pf_contact'),email:g('pf_email'),fee_kmt:ni('pf_fee_kmt'),fee_ofusa:ni('pf_fee_ofusa'),billing_timing:g('pf_billing_timing'),glt_staff:g('pf_glt_staff'),ofusa_staff:g('pf_ofusa_staff'),partnership_start:g('pf_start_date'),website:g('pf_website'),notes:g('pf_notes'),updated_at:new Date().toISOString()};if(!data.name){showToast('❌ 機関名は必須','error');return;}showLoading(true);try{if(editingPartnerId){await sbFetch('partner_support_orgs?id=eq.'+editingPartnerId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新','success');}else{const _r=await sbFetch('partner_support_orgs',{method:'POST',body:JSON.stringify(data),prefer:'return=representation'});if(_r&&_r[0]&&_r[0].id)editingPartnerId=_r[0].id;showToast('✅ 登録','success');}closeGenModal('partnerModal');await loadPartners();}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
 
-async function saveExpense(){const g=id=>document.getElementById(id)?.value||null;const data={expense_date:g('ef_date'),status:g('ef_status')||'未請求',worker_id:g('ef_worker_id'),company_id:g('ef_company_id'),item_name:g('ef_item_name'),amount:document.getElementById('ef_amount')?.value?parseInt(document.getElementById('ef_amount').value):null,payment_method:g('ef_payment_method'),billed_to:g('ef_billed_to'),staff:g('ef_staff'),notes:g('ef_notes'),updated_at:new Date().toISOString()};showLoading(true);try{if(editingExpenseId){await sbFetch('expenses?id=eq.'+editingExpenseId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新','success');}else{await sbFetch('expenses',{method:'POST',body:JSON.stringify(data)});showToast('✅ 登録','success');}closeGenModal('expenseModal');await loadExpenses();}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
+async function saveExpense(){const g=id=>document.getElementById(id)?.value||null;const data={expense_date:g('ef_date'),status:g('ef_status')||'未請求',worker_id:g('ef_worker_id'),company_id:g('ef_company_id'),item_name:g('ef_item_name'),amount:document.getElementById('ef_amount')?.value?parseInt(document.getElementById('ef_amount').value):null,payment_method:g('ef_payment_method'),billed_to:g('ef_billed_to'),staff:g('ef_staff'),notes:g('ef_notes'),updated_at:new Date().toISOString()};showLoading(true);try{if(editingExpenseId){await sbFetch('expenses?id=eq.'+editingExpenseId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新','success');}else{const _r=await sbFetch('expenses',{method:'POST',body:JSON.stringify(data),prefer:'return=representation'});if(_r&&_r[0]&&_r[0].id)editingExpenseId=_r[0].id;showToast('✅ 登録','success');}closeGenModal('expenseModal');await loadExpenses();}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
 
 async function loadFees(page) {
   if (currentScreen !== 'fees') return;
@@ -7221,11 +7267,11 @@ function buildSendingModalBody(s){s=s||{}; return `<div class="form-grid">
   <div class="form-group full"><label class="form-label">備考</label><textarea class="form-textarea" id="sf_notes">${esc(s.notes||'')}</textarea></div>
 </div>
 <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)">
-  <button class="btn btn-outline" onclick="closeGenModal('sendingModal')">キャンセル</button>
-  <button class="btn btn-primary" onclick="saveSending()">💾 保存</button>
+  <button class="btn btn-outline" onclick="closeGenModal('sendingModal')">閉じる</button>
+  
 </div>`;}
 
-function buildPartnerModalBody(p){p=p||{};return `<div class="form-grid"><div class="section-title">基本情報</div><div class="form-group full"><label class="form-label">機関名 *</label><input class="form-input" id="pf_name" value="${esc(p.name||'')}"></div><div class="form-group"><label class="form-label">区分</label><select class="form-select" id="pf_org_type">${['','登録支援機関','人材紹介会社+登録支援機関','営業代理店','その他'].map(s=>`<option ${p.org_type===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">求人票コード</label><input class="form-input" id="pf_job_code" value="${esc(p.job_code||'')}"></div><div class="form-group"><label class="form-label">主な職種</label><input class="form-input" id="pf_industry" value="${esc(p.main_industry||'')}"></div><div class="form-group"><label class="form-label">担当者名</label><input class="form-input" id="pf_contact" value="${esc(p.contact_name||'')}"></div><div class="form-group"><label class="form-label">メール</label><input class="form-input" id="pf_email" value="${esc(p.email||'')}"></div><div class="section-title">請求・担当</div><div class="form-group"><label class="form-label">KMT側請求額（円）</label><input class="form-input" id="pf_fee_kmt" type="number" value="${p.fee_kmt??''}"></div><div class="form-group"><label class="form-label">大房側請求額（円）</label><input class="form-input" id="pf_fee_ofusa" type="number" value="${p.fee_ofusa??''}"></div><div class="form-group"><label class="form-label">請求タイミング</label><select class="form-select" id="pf_billing_timing">${['','配属後','決定時'].map(s=>`<option ${p.billing_timing===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">GLT担当</label><input class="form-input" id="pf_glt_staff" value="${esc(p.glt_staff||'')}"></div><div class="form-group"><label class="form-label">大房担当</label><input class="form-input" id="pf_ofusa_staff" value="${esc(p.ofusa_staff||'')}"></div><div class="form-group"><label class="form-label">提携開始日</label><input class="form-input" id="pf_start_date" type="date" value="${p.partnership_start||''}"></div><div class="form-group full"><label class="form-label">HP</label><input class="form-input" id="pf_website" value="${esc(p.website||'')}"></div><div class="form-group full"><label class="form-label">備考</label><textarea class="form-textarea" id="pf_notes">${esc(p.notes||'')}</textarea></div></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)"><button class="btn btn-outline" onclick="closeGenModal('partnerModal')">キャンセル</button><button class="btn btn-primary" onclick="savePartner()">💾 保存</button></div>`;}
+function buildPartnerModalBody(p){p=p||{};return `<div class="form-grid"><div class="section-title">基本情報</div><div class="form-group full"><label class="form-label">機関名 *</label><input class="form-input" id="pf_name" value="${esc(p.name||'')}"></div><div class="form-group"><label class="form-label">区分</label><select class="form-select" id="pf_org_type">${['','登録支援機関','人材紹介会社+登録支援機関','営業代理店','その他'].map(s=>`<option ${p.org_type===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">求人票コード</label><input class="form-input" id="pf_job_code" value="${esc(p.job_code||'')}"></div><div class="form-group"><label class="form-label">主な職種</label><input class="form-input" id="pf_industry" value="${esc(p.main_industry||'')}"></div><div class="form-group"><label class="form-label">担当者名</label><input class="form-input" id="pf_contact" value="${esc(p.contact_name||'')}"></div><div class="form-group"><label class="form-label">メール</label><input class="form-input" id="pf_email" value="${esc(p.email||'')}"></div><div class="section-title">請求・担当</div><div class="form-group"><label class="form-label">KMT側請求額（円）</label><input class="form-input" id="pf_fee_kmt" type="number" value="${p.fee_kmt??''}"></div><div class="form-group"><label class="form-label">大房側請求額（円）</label><input class="form-input" id="pf_fee_ofusa" type="number" value="${p.fee_ofusa??''}"></div><div class="form-group"><label class="form-label">請求タイミング</label><select class="form-select" id="pf_billing_timing">${['','配属後','決定時'].map(s=>`<option ${p.billing_timing===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">GLT担当</label><input class="form-input" id="pf_glt_staff" value="${esc(p.glt_staff||'')}"></div><div class="form-group"><label class="form-label">大房担当</label><input class="form-input" id="pf_ofusa_staff" value="${esc(p.ofusa_staff||'')}"></div><div class="form-group"><label class="form-label">提携開始日</label><input class="form-input" id="pf_start_date" type="date" value="${p.partnership_start||''}"></div><div class="form-group full"><label class="form-label">HP</label><input class="form-input" id="pf_website" value="${esc(p.website||'')}"></div><div class="form-group full"><label class="form-label">備考</label><textarea class="form-textarea" id="pf_notes">${esc(p.notes||'')}</textarea></div></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)"><button class="btn btn-outline" onclick="closeGenModal('partnerModal')">閉じる</button></div>`;}
 
 async function saveJob() {
   const g=id=>document.getElementById(id)?.value||null;
@@ -7296,7 +7342,7 @@ async function saveJob() {
   showLoading(true);
   try {
     if(editingJobId){await sbFetch('job_openings?id=eq.'+editingJobId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新しました','success');}
-    else{await sbFetch('job_openings',{method:'POST',body:JSON.stringify(data)});showToast('✅ 登録しました','success');}
+    else{const _r=await sbFetch('job_openings',{method:'POST',body:JSON.stringify(data),prefer:'return=representation'});if(_r&&_r[0]&&_r[0].id)editingJobId=_r[0].id;showToast('✅ 登録しました','success');}
     closeGenModal('jobModal'); await loadJobs();
   }catch(e){showToast('❌ '+e.message,'error');}
   showLoading(false);
@@ -7829,7 +7875,7 @@ function applySendingFilters() {
 
 function applyUserFilters(){if(currentScreen!=='users')return;const q=(document.getElementById('uSearchInput')?.value||'').toLowerCase();filteredUsers=allUsers.filter(u=>!q||((u.name||'').toLowerCase().includes(q)||(u.email||'').toLowerCase().includes(q)));userPage=1;renderUserTable();}
 
-function buildFeeModalBody(f){f=f||{};const autoCalc=()=>{const wp=parseInt(document.getElementById('ff_worker_count')?.value||0);const up=parseInt(document.getElementById('ff_unit_price')?.value||0);const excl=wp*up;document.getElementById('ff_amount_excl').value=excl||'';document.getElementById('ff_amount_incl').value=excl?Math.round(excl*1.1):'';};return `<div class="form-grid"><div class="section-title">請求情報</div><div class="form-group full"><label class="form-label">企業</label><select class="form-select" id="ff_company_id"><option value="">選択...</option>${allCompanies.map(c=>`<option value="${c.id}" ${f.company_id===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">請求月 (YYYY-MM)</label><input class="form-input" id="ff_billing_month" value="${esc(f.billing_month||`${feeYear}-${feeActiveTab}`)}" placeholder="2026-04"></div><div class="form-group"><label class="form-label">費用種別</label><select class="form-select" id="ff_fee_type">${['通常委託費','新規委託費','初期費用','その他'].map(s=>`<option ${f.fee_type===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">対象人数</label><input class="form-input" id="ff_worker_count" type="number" value="${f.worker_count??''}" oninput="(${autoCalc.toString()})()"></div><div class="form-group"><label class="form-label">単価（税抜）</label><input class="form-input" id="ff_unit_price" type="number" value="${f.unit_price??''}" oninput="(${autoCalc.toString()})()"></div><div class="form-group"><label class="form-label">金額（税抜）</label><input class="form-input" id="ff_amount_excl" type="number" value="${f.amount_excl??''}"></div><div class="form-group"><label class="form-label">金額（税込）</label><input class="form-input" id="ff_amount_incl" type="number" value="${f.amount_incl??''}"></div><div class="form-group"><label class="form-label">ステータス</label><select class="form-select" id="ff_status">${['未請求','請求済','入金済','未入金'].map(s=>`<option ${f.status===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">請求日</label><input class="form-input" id="ff_billed_date" type="date" value="${f.billed_date||''}"></div><div class="form-group"><label class="form-label">入金日</label><input class="form-input" id="ff_paid_date" type="date" value="${f.paid_date||''}"></div><div class="form-group full"><label class="form-label">備考</label><textarea class="form-textarea" id="ff_notes">${esc(f.notes||'')}</textarea></div></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)"><button class="btn btn-outline" onclick="closeGenModal('feeModal')">キャンセル</button><button class="btn btn-primary" onclick="saveFee()">💾 保存</button></div>`;}
+function buildFeeModalBody(f){f=f||{};const autoCalc=()=>{const wp=parseInt(document.getElementById('ff_worker_count')?.value||0);const up=parseInt(document.getElementById('ff_unit_price')?.value||0);const excl=wp*up;document.getElementById('ff_amount_excl').value=excl||'';document.getElementById('ff_amount_incl').value=excl?Math.round(excl*1.1):'';};return `<div class="form-grid"><div class="section-title">請求情報</div><div class="form-group full"><label class="form-label">企業</label><select class="form-select" id="ff_company_id"><option value="">選択...</option>${allCompanies.map(c=>`<option value="${c.id}" ${f.company_id===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">請求月 (YYYY-MM)</label><input class="form-input" id="ff_billing_month" value="${esc(f.billing_month||`${feeYear}-${feeActiveTab}`)}" placeholder="2026-04"></div><div class="form-group"><label class="form-label">費用種別</label><select class="form-select" id="ff_fee_type">${['通常委託費','新規委託費','初期費用','その他'].map(s=>`<option ${f.fee_type===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">対象人数</label><input class="form-input" id="ff_worker_count" type="number" value="${f.worker_count??''}" oninput="(${autoCalc.toString()})()"></div><div class="form-group"><label class="form-label">単価（税抜）</label><input class="form-input" id="ff_unit_price" type="number" value="${f.unit_price??''}" oninput="(${autoCalc.toString()})()"></div><div class="form-group"><label class="form-label">金額（税抜）</label><input class="form-input" id="ff_amount_excl" type="number" value="${f.amount_excl??''}"></div><div class="form-group"><label class="form-label">金額（税込）</label><input class="form-input" id="ff_amount_incl" type="number" value="${f.amount_incl??''}"></div><div class="form-group"><label class="form-label">ステータス</label><select class="form-select" id="ff_status">${['未請求','請求済','入金済','未入金'].map(s=>`<option ${f.status===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">請求日</label><input class="form-input" id="ff_billed_date" type="date" value="${f.billed_date||''}"></div><div class="form-group"><label class="form-label">入金日</label><input class="form-input" id="ff_paid_date" type="date" value="${f.paid_date||''}"></div><div class="form-group full"><label class="form-label">備考</label><textarea class="form-textarea" id="ff_notes">${esc(f.notes||'')}</textarea></div></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)"><button class="btn btn-outline" onclick="closeGenModal('feeModal')">閉じる</button></div>`;}
 
 function buildIntroModalBody(i) {
   i=i||{};
@@ -7860,8 +7906,8 @@ function buildIntroModalBody(i) {
     <div class="form-group full"><label class="form-label">備考</label><textarea class="form-textarea" id="if_notes">${esc(i.notes||'')}</textarea></div>
   </div>
   <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)">
-    <button class="btn btn-outline" onclick="closeGenModal('introModal')">キャンセル</button>
-    <button class="btn btn-primary" onclick="saveIntro()">💾 保存</button>
+    <button class="btn btn-outline" onclick="closeGenModal('introModal')">閉じる</button>
+    
   </div>`;
 }
 
@@ -7923,8 +7969,8 @@ function buildJobModalBody(j) {
     <div class="form-group full" id="jf_country_progress_wrap">${buildCountryProgressEditor(j)}</div>
   </div>
   <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)">
-    <button class="btn btn-outline" onclick="closeGenModal('jobModal')">キャンセル</button>
-    <button class="btn btn-primary" onclick="saveJob()">💾 保存</button>
+    <button class="btn btn-outline" onclick="closeGenModal('jobModal')">閉じる</button>
+    
   </div>`;
 }
 
@@ -8131,9 +8177,9 @@ function buildResumeHTML(c) {
 </div>`;
 }
 
-function buildSaleModalBody(s){s=s||{};return `<div class="form-grid"><div class="section-title">売上情報</div><div class="form-group full"><label class="form-label">企業</label><select class="form-select" id="saf_company_id"><option value="">選択...</option>${allCompanies.map(c=>`<option value="${c.id}" ${s.company_id===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">請求月 (YYYY-MM)</label><input class="form-input" id="saf_billing_month" value="${esc(s.billing_month||'')}"></div><div class="form-group"><label class="form-label">請求法人</label><select class="form-select" id="saf_kmt_entity">${['','株式会社KMT','一般社団法人KMT'].map(v=>`<option ${s.kmt_entity===v?'selected':''}>${v}</option>`).join('')}</select></div><div class="form-group full"><label class="form-label">項目名</label><input class="form-input" id="saf_item_name" value="${esc(s.item_name||'')}"></div><div class="form-group"><label class="form-label">単価（円）</label><input class="form-input" id="saf_unit_price" type="number" value="${s.unit_price??''}"></div><div class="form-group"><label class="form-label">数量</label><input class="form-input" id="saf_quantity" type="number" value="${s.quantity??''}"></div><div class="form-group"><label class="form-label">金額（税抜）</label><input class="form-input" id="saf_amount_excl" type="number" value="${s.amount_excl??''}"></div><div class="form-group"><label class="form-label">金額（税込）</label><input class="form-input" id="saf_amount_incl" type="number" value="${s.amount_incl??''}"></div><div class="form-group"><label class="form-label">確度</label><select class="form-select" id="saf_certainty">${['確定','50%','期待'].map(v=>`<option ${s.certainty===v?'selected':''}>${v}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">カテゴリ</label><select class="form-select" id="saf_category">${['委託費','初期費用','紹介費','その他'].map(v=>`<option ${s.category===v?'selected':''}>${v}</option>`).join('')}</select></div><div class="form-group full"><label class="form-label">備考</label><textarea class="form-textarea" id="saf_notes">${esc(s.notes||'')}</textarea></div></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)"><button class="btn btn-outline" onclick="closeGenModal('saleModal')">キャンセル</button><button class="btn btn-primary" onclick="saveSale()">💾 保存</button></div>`;}
+function buildSaleModalBody(s){s=s||{};return `<div class="form-grid"><div class="section-title">売上情報</div><div class="form-group full"><label class="form-label">企業</label><select class="form-select" id="saf_company_id"><option value="">選択...</option>${allCompanies.map(c=>`<option value="${c.id}" ${s.company_id===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">請求月 (YYYY-MM)</label><input class="form-input" id="saf_billing_month" value="${esc(s.billing_month||'')}"></div><div class="form-group"><label class="form-label">請求法人</label><select class="form-select" id="saf_kmt_entity">${['','株式会社KMT','一般社団法人KMT'].map(v=>`<option ${s.kmt_entity===v?'selected':''}>${v}</option>`).join('')}</select></div><div class="form-group full"><label class="form-label">項目名</label><input class="form-input" id="saf_item_name" value="${esc(s.item_name||'')}"></div><div class="form-group"><label class="form-label">単価（円）</label><input class="form-input" id="saf_unit_price" type="number" value="${s.unit_price??''}"></div><div class="form-group"><label class="form-label">数量</label><input class="form-input" id="saf_quantity" type="number" value="${s.quantity??''}"></div><div class="form-group"><label class="form-label">金額（税抜）</label><input class="form-input" id="saf_amount_excl" type="number" value="${s.amount_excl??''}"></div><div class="form-group"><label class="form-label">金額（税込）</label><input class="form-input" id="saf_amount_incl" type="number" value="${s.amount_incl??''}"></div><div class="form-group"><label class="form-label">確度</label><select class="form-select" id="saf_certainty">${['確定','50%','期待'].map(v=>`<option ${s.certainty===v?'selected':''}>${v}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">カテゴリ</label><select class="form-select" id="saf_category">${['委託費','初期費用','紹介費','その他'].map(v=>`<option ${s.category===v?'selected':''}>${v}</option>`).join('')}</select></div><div class="form-group full"><label class="form-label">備考</label><textarea class="form-textarea" id="saf_notes">${esc(s.notes||'')}</textarea></div></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)"><button class="btn btn-outline" onclick="closeGenModal('saleModal')">閉じる</button></div>`;}
 
-function buildUserModalBody(u){u=u||{};return `<div class="form-grid"><div class="section-title">ユーザー情報</div><div class="form-group full"><label class="form-label">名前 *</label><input class="form-input" id="uf_name" value="${esc(u.name||'')}"></div><div class="form-group"><label class="form-label">フリガナ</label><input class="form-input" id="uf_name_kana" value="${esc(u.name_kana||'')}"></div><div class="form-group"><label class="form-label">メール</label><input class="form-input" id="uf_email" type="email" value="${esc(u.email||'')}"></div><div class="form-group"><label class="form-label">役割</label><select class="form-select" id="uf_role">${['','管理者','一般','閲覧のみ'].map(s=>`<option ${u.role===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">チーム</label><input class="form-input" id="uf_team" value="${esc(u.team||'')}"></div><div class="form-group"><label class="form-label">アクティブ</label><select class="form-select" id="uf_active"><option value="true" ${u.is_active!==false?'selected':''}>有効</option><option value="false" ${u.is_active===false?'selected':''}>無効</option></select></div></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)"><button class="btn btn-outline" onclick="closeGenModal('userModal')">キャンセル</button><button class="btn btn-primary" onclick="saveUser()">💾 保存</button></div>`;}
+function buildUserModalBody(u){u=u||{};return `<div class="form-grid"><div class="section-title">ユーザー情報</div><div class="form-group full"><label class="form-label">名前 *</label><input class="form-input" id="uf_name" value="${esc(u.name||'')}"></div><div class="form-group"><label class="form-label">フリガナ</label><input class="form-input" id="uf_name_kana" value="${esc(u.name_kana||'')}"></div><div class="form-group"><label class="form-label">メール</label><input class="form-input" id="uf_email" type="email" value="${esc(u.email||'')}"></div><div class="form-group"><label class="form-label">役割</label><select class="form-select" id="uf_role">${['','管理者','一般','閲覧のみ'].map(s=>`<option ${u.role===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">チーム</label><input class="form-input" id="uf_team" value="${esc(u.team||'')}"></div><div class="form-group"><label class="form-label">アクティブ</label><select class="form-select" id="uf_active"><option value="true" ${u.is_active!==false?'selected':''}>有効</option><option value="false" ${u.is_active===false?'selected':''}>無効</option></select></div></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)"><button class="btn btn-outline" onclick="closeGenModal('userModal')">閉じる</button></div>`;}
 
 function clearApiKey() {
   if (!confirm('APIキーを削除しますか？')) return;
@@ -8163,7 +8209,7 @@ function clearSendingFilters(){const el=document.getElementById('sSearchInput');
 
 function clearUserFilters(){const el=document.getElementById('uSearchInput');if(el)el.value='';applyUserFilters();}
 
-function closeGenModal(id){const modal=document.getElementById(id);if(modal)modal.classList.remove('show');}
+function closeGenModal(id){if(_autoSaveActive)return;const modal=document.getElementById(id);if(modal)modal.classList.remove('show');}
 
 function ensureModals(targetId) {
   // targetId指定があればそれだけ、無ければ既知の全モーダルを生成
@@ -8719,7 +8765,7 @@ function saveApiKey() {
   loadUsers();
 }
 
-async function saveFee(){const g=id=>document.getElementById(id)?.value||null;const ni=id=>document.getElementById(id)?.value?parseInt(document.getElementById(id).value):null;const data={company_id:g('ff_company_id'),billing_month:g('ff_billing_month'),fee_type:g('ff_fee_type'),worker_count:ni('ff_worker_count'),unit_price:ni('ff_unit_price'),amount_excl:ni('ff_amount_excl'),amount_incl:ni('ff_amount_incl'),status:g('ff_status')||'未請求',billed_date:g('ff_billed_date'),paid_date:g('ff_paid_date'),notes:g('ff_notes'),updated_at:new Date().toISOString()};if(!data.billing_month){showToast('❌ 請求月は必須','error');return;}showLoading(true);try{if(editingFeeId){await sbFetch('support_fees?id=eq.'+editingFeeId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新','success');}else{await sbFetch('support_fees',{method:'POST',body:JSON.stringify(data)});showToast('✅ 登録','success');}closeGenModal('feeModal');await loadFees(feePage);}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
+async function saveFee(){const g=id=>document.getElementById(id)?.value||null;const ni=id=>document.getElementById(id)?.value?parseInt(document.getElementById(id).value):null;const data={company_id:g('ff_company_id'),billing_month:g('ff_billing_month'),fee_type:g('ff_fee_type'),worker_count:ni('ff_worker_count'),unit_price:ni('ff_unit_price'),amount_excl:ni('ff_amount_excl'),amount_incl:ni('ff_amount_incl'),status:g('ff_status')||'未請求',billed_date:g('ff_billed_date'),paid_date:g('ff_paid_date'),notes:g('ff_notes'),updated_at:new Date().toISOString()};if(!data.billing_month){showToast('❌ 請求月は必須','error');return;}showLoading(true);try{if(editingFeeId){await sbFetch('support_fees?id=eq.'+editingFeeId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新','success');}else{const _r=await sbFetch('support_fees',{method:'POST',body:JSON.stringify(data),prefer:'return=representation'});if(_r&&_r[0]&&_r[0].id)editingFeeId=_r[0].id;showToast('✅ 登録','success');}closeGenModal('feeModal');await loadFees(feePage);}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
 
 async function saveIntro() {
   const g=id=>document.getElementById(id)?.value||null;
@@ -8737,7 +8783,7 @@ async function saveIntro() {
   showLoading(true);
   try {
     if(editingIntroId){await sbFetch('introductions?id=eq.'+editingIntroId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新しました','success');}
-    else{await sbFetch('introductions',{method:'POST',body:JSON.stringify(data)});showToast('✅ 登録しました','success');}
+    else{const _r=await sbFetch('introductions',{method:'POST',body:JSON.stringify(data),prefer:'return=representation'});if(_r&&_r[0]&&_r[0].id)editingIntroId=_r[0].id;showToast('✅ 登録しました','success');}
     closeGenModal('introModal'); await loadIntroductions();
   }catch(e){showToast('❌ '+e.message,'error');}
   showLoading(false);
@@ -8758,10 +8804,17 @@ async function saveResume() {
   showLoading(false);
 }
 
-async function saveSale(){const g=id=>document.getElementById(id)?.value||null;const ni=id=>document.getElementById(id)?.value?parseInt(document.getElementById(id).value):null;const data={company_id:g('saf_company_id'),billing_month:g('saf_billing_month'),kmt_entity:g('saf_kmt_entity'),item_name:g('saf_item_name'),unit_price:ni('saf_unit_price'),quantity:ni('saf_quantity'),amount_excl:ni('saf_amount_excl'),amount_incl:ni('saf_amount_incl'),certainty:g('saf_certainty'),category:g('saf_category'),notes:g('saf_notes'),updated_at:new Date().toISOString()};if(!data.billing_month){showToast('❌ 請求月は必須','error');return;}showLoading(true);try{if(editingSaleId){await sbFetch('sales_forecast?id=eq.'+editingSaleId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新','success');}else{await sbFetch('sales_forecast',{method:'POST',body:JSON.stringify(data)});showToast('✅ 登録','success');}closeGenModal('saleModal');await loadSales(salePage);}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
+async function saveSale(){const g=id=>document.getElementById(id)?.value||null;const ni=id=>document.getElementById(id)?.value?parseInt(document.getElementById(id).value):null;const data={company_id:g('saf_company_id'),billing_month:g('saf_billing_month'),kmt_entity:g('saf_kmt_entity'),item_name:g('saf_item_name'),unit_price:ni('saf_unit_price'),quantity:ni('saf_quantity'),amount_excl:ni('saf_amount_excl'),amount_incl:ni('saf_amount_incl'),certainty:g('saf_certainty'),category:g('saf_category'),notes:g('saf_notes'),updated_at:new Date().toISOString()};if(!data.billing_month){showToast('❌ 請求月は必須','error');return;}showLoading(true);try{if(editingSaleId){await sbFetch('sales_forecast?id=eq.'+editingSaleId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新','success');}else{const _r=await sbFetch('sales_forecast',{method:'POST',body:JSON.stringify(data),prefer:'return=representation'});if(_r&&_r[0]&&_r[0].id)editingSaleId=_r[0].id;showToast('✅ 登録','success');}closeGenModal('saleModal');await loadSales(salePage);}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
 
-async function saveUser(){const g=id=>document.getElementById(id)?.value||null;const data={name:g('uf_name'),name_kana:g('uf_name_kana'),email:g('uf_email'),role:g('uf_role'),team:g('uf_team'),is_active:document.getElementById('uf_active')?.value!=='false',updated_at:new Date().toISOString()};if(!data.name){showToast('❌ 名前は必須','error');return;}showLoading(true);try{if(editingUserId){await sbFetch('users?id=eq.'+editingUserId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新','success');}else{await sbFetch('users',{method:'POST',body:JSON.stringify(data)});showToast('✅ 登録','success');}closeGenModal('userModal');await loadUsers();}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
+async function saveUser(){const g=id=>document.getElementById(id)?.value||null;const data={name:g('uf_name'),name_kana:g('uf_name_kana'),email:g('uf_email'),role:g('uf_role'),team:g('uf_team'),is_active:document.getElementById('uf_active')?.value!=='false',updated_at:new Date().toISOString()};if(!data.name){showToast('❌ 名前は必須','error');return;}showLoading(true);try{if(editingUserId){await sbFetch('users?id=eq.'+editingUserId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新','success');}else{const _r=await sbFetch('users',{method:'POST',body:JSON.stringify(data),prefer:'return=representation'});if(_r&&_r[0]&&_r[0].id)editingUserId=_r[0].id;showToast('✅ 登録','success');}closeGenModal('userModal');await loadUsers();}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
 
+// モーダルID → 保存関数名のマップ（自動保存対象）
+const _AUTOSAVE_MAP = {
+  expenseModal: 'saveExpense', partnerModal: 'savePartner', feeModal: 'saveFee',
+  saleModal: 'saveSale', userModal: 'saveUser', sendingModal: 'saveSending',
+  aiKnModal: 'saveAiKn', candidateModal: 'saveCandidate', jobModal: 'saveJob',
+  introModal: 'saveIntro', scheduleModal: null /* 引数必須のため除外 */,
+};
 function showGenModal(id, title, bodyHtml) {
   ensureModals(id);
   const modal=document.getElementById(id);
@@ -8770,6 +8823,11 @@ function showGenModal(id, title, bodyHtml) {
   if(titleEl) titleEl.textContent=title;
   if(bodyEl) bodyEl.innerHTML=bodyHtml;
   modal.classList.add('show');
+  // 自動保存フック
+  const fnName = _AUTOSAVE_MAP[id];
+  if (fnName && typeof window[fnName] === 'function') {
+    setTimeout(() => setupAutoSave(window[fnName]), 100);
+  }
 }
 
 function switchFeeTab(tab) {
