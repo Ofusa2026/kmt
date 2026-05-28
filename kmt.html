@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260528.21 -->
+<!-- KMT_VERSION ver.20260528.22 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -208,7 +208,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260528.21</div>
+    <div class="logo-ver">ver.20260528.22</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -5964,7 +5964,7 @@ async function openWorkerModal(id) {
     } catch(e) {}
   }
   showGenModal('workerModal', id ? '👤 外国人材詳細' : '👤 外国人材登録', buildWorkerModalBody(w));
-  setTimeout(() => setupAutoSave(saveWorker), 100);
+  setTimeout(() => { setupAutoSave(saveWorker); if (typeof updateWorkerPhotoPreview === 'function') updateWorkerPhotoPreview(); }, 100);
 }
 let editingWorkerId = null;
 let _savingWorkerNew = false;
@@ -6025,10 +6025,13 @@ function openDriveLink(inputId) {
 }
 
 // Google DriveのファイルURLを<img>表示可能なサムネイルURLに変換
+// 注意: フォルダURL(/folders/)は画像化できない。画像ファイル単体のURLが必要。
 function driveImageUrl(url) {
   if (!url) return '';
   url = url.trim();
-  // ファイルIDを抽出（/file/d/ID/ 形式 または ?id=ID 形式）
+  // フォルダURLは画像にできないので空を返す（プレビュー側で警告表示）
+  if (/\/folders\//.test(url)) return '';
+  // ファイルIDを抽出（/file/d/ID/ 形式 または ?id=ID / &id=ID 形式）
   let m = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
   if (m && m[1]) {
     return 'https://drive.google.com/thumbnail?id=' + m[1] + '&sz=w400';
@@ -6037,13 +6040,23 @@ function driveImageUrl(url) {
   return url;
 }
 
+// 顔写真URLがフォルダURLかどうか
+function isDriveFolderUrl(url) {
+  return /\/folders\//.test((url||'').trim());
+}
+
 // 顔写真プレビューを更新
 function updateWorkerPhotoPreview() {
   const url = (document.getElementById('wf_photo_url')?.value || '').trim();
   const box = document.getElementById('wf_photo_preview');
   if (!box) return;
   if (!url) { box.innerHTML = ''; return; }
+  if (isDriveFolderUrl(url)) {
+    box.innerHTML = '<div style="font-size:11px;color:#ef4444;line-height:1.6;">⚠️ これはフォルダのURLです。顔写真は<b>画像ファイル単体</b>のURLを貼ってください。<br>（Driveで画像を開く→右上「⋮」→「リンクをコピー」。<code>/file/d/...</code> の形式になります）</div>';
+    return;
+  }
   const img = driveImageUrl(url);
+  if (!img) { box.innerHTML = '<div style="font-size:11px;color:#ef4444;">画像URLを認識できません</div>'; return; }
   box.innerHTML = '<img src="' + esc(img) + '" style="max-width:140px;max-height:140px;border-radius:8px;border:1px solid var(--gray-200);object-fit:cover;" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'block\';"><div style="display:none;font-size:11px;color:#ef4444;">画像を表示できません（共有設定を確認）</div>';
 }
 
@@ -6104,7 +6117,7 @@ function buildWorkerModalBody(w) {
         <input class="form-input" id="wf_photo_url" value="${esc(w.photo_url||'')}" placeholder="https://drive.google.com/file/d/..." style="flex:1;" oninput="updateWorkerPhotoPreview()">
         <button type="button" class="btn btn-outline" title="リンク先を開く" style="font-size:16px;padding:4px 10px;flex-shrink:0;" onclick="openDriveLink('wf_photo_url')">📁</button>
       </div>
-      <div id="wf_photo_preview" style="margin-top:8px;">${w.photo_url ? `<img src="${esc(driveImageUrl(w.photo_url))}" style="max-width:140px;max-height:140px;border-radius:8px;border:1px solid var(--gray-200);object-fit:cover;" onerror="this.style.display='none';this.nextElementSibling.style.display='block';"><div style="display:none;font-size:11px;color:#ef4444;">画像を表示できません（共有設定を確認）</div>` : ''}</div>
+      <div id="wf_photo_preview" style="margin-top:8px;"></div>
     </div>
     <div class="section-title">基本情報</div>
     <div class="form-group full" style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:10px 12px;margin-bottom:4px;">
