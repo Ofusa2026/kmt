@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260528.08 -->
+<!-- KMT_VERSION ver.20260528.09 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -208,7 +208,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260528.08</div>
+    <div class="logo-ver">ver.20260528.09</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -698,7 +698,22 @@ const SB_URL = 'https://oyblvyocvdnhcxeeokuw.supabase.co';
 const SB_KEY = 'sb_publishable_4eI_7HdWRTnYaUpm7-mlRQ_4P3ialza';
 const KMT_REQUEST_GAS_URL = 'https://script.google.com/macros/s/AKfycbx5aKU_kjfJjl08yeLo62TcV7hNyut_ORXLuDx8ksbGlZEoMbBzj6t_eL7XfEmBBkIw/exec';
 
+const KMT_DEBUG = true; // コンソール詳細ログのON/OFF
+function kmtLog(tag, msg, data, color) {
+  if (!KMT_DEBUG) return;
+  const t = new Date().toLocaleTimeString('ja-JP', {hour12:false}) + '.' + String(new Date().getMilliseconds()).padStart(3,'0');
+  const style = 'color:' + (color||'#1a73e8') + ';font-weight:bold;';
+  if (data !== undefined) {
+    console.log('%c[KMT ' + t + '] ' + tag + ' %c' + msg, style, 'color:inherit;font-weight:normal;', data);
+  } else {
+    console.log('%c[KMT ' + t + '] ' + tag + ' %c' + msg, style, 'color:inherit;font-weight:normal;');
+  }
+}
+
 async function sbFetch(path, opts={}) {
+  const method = opts.method || 'GET';
+  const table = path.split('?')[0].split('/')[0];
+  const _t0 = performance.now();
   const headers = {
     'apikey': SB_KEY,
     'Authorization': 'Bearer ' + SB_KEY,
@@ -709,18 +724,31 @@ async function sbFetch(path, opts={}) {
   // ページネーション用: countも返す
   if (opts.count) headers['Prefer'] = (headers['Prefer'] ? headers['Prefer'] + ',' : '') + 'count=exact';
   const { headers: _h, prefer: _p, count: _c, ...restOpts } = opts;
-  const res = await fetch(SB_URL + '/rest/v1/' + path, { headers, ...restOpts });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.message || res.statusText);
+  const methodColor = method==='GET'?'#16a34a':method==='DELETE'?'#dc2626':'#d97706';
+  kmtLog('🌐 ' + method, table, opts.body ? JSON.parse(opts.body) : (path.includes('?')?path.split('?')[1]:''), methodColor);
+  try {
+    const res = await fetch(SB_URL + '/rest/v1/' + path, { headers, ...restOpts });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      kmtLog('❌ ' + method, table + ' 失敗: ' + (err.message || res.statusText), err, '#dc2626');
+      throw new Error(err.message || res.statusText);
+    }
+    if (opts.method === 'DELETE') {
+      kmtLog('✅ DELETE', table + ' (' + Math.round(performance.now()-_t0) + 'ms)', undefined, '#16a34a');
+      return null;
+    }
+    const data = await res.json();
+    const n = Array.isArray(data) ? data.length : 1;
+    kmtLog('✅ ' + method, table + ' → ' + n + '件 (' + Math.round(performance.now()-_t0) + 'ms)', undefined, '#16a34a');
+    if (opts.count) {
+      const total = parseInt(res.headers.get('content-range')?.split('/')[1] || '0');
+      return { data, total };
+    }
+    return data;
+  } catch(e) {
+    if (!e.message || !String(e.message).length) kmtLog('❌ ' + method, table + ' 例外', e, '#dc2626');
+    throw e;
   }
-  if (opts.method === 'DELETE') return null;
-  const data = await res.json();
-  if (opts.count) {
-    const total = parseInt(res.headers.get('content-range')?.split('/')[1] || '0');
-    return { data, total };
-  }
-  return data;
 }
 
 // サーバーサイドページネーション用fetch
@@ -759,6 +787,7 @@ let statFilter = 'all';
 window.addEventListener('DOMContentLoaded', () => {
   const ver = document.querySelector('.logo-ver')?.textContent || 'unknown';
   console.log('%c KMT案件管理システム ' + ver + ' ', 'background:#0f2040;color:#93c5fd;font-size:14px;font-weight:bold;padding:4px 8px;border-radius:4px;');
+  if (KMT_DEBUG) console.log('%c🔍 詳細ログ有効 — 画面切替・DB通信・自動保存をすべて出力します', 'color:#16a34a;font-weight:bold;');
   initSupabaseClient();
   // mainWrapを初期非表示
   document.getElementById('mainWrap').style.display = 'none';
@@ -2087,11 +2116,16 @@ async function runAutoSave() {
   _autoSaveStatus.innerHTML = '💾 保存中...';
   _autoSaveInFlight = true;
   _autoSaveActive = true;  // この間 closeGenModal/showLoading/showToast を抑制
+  const _fnName = _autoSaveFn.name || '(無名)';
+  kmtLog('💾 自動保存', _fnName + ' 開始', undefined, '#d97706');
+  const _t0 = performance.now();
   try {
     await _autoSaveFn(true);
+    kmtLog('✅ 自動保存', _fnName + ' 完了 (' + Math.round(performance.now()-_t0) + 'ms)', undefined, '#16a34a');
     _autoSaveStatus.innerHTML = '✅ 保存済 <span onclick="undoAutoSave()" style="cursor:pointer;color:#fbbf24;text-decoration:underline;font-size:11px;">↩ 取り消し</span>';
     setTimeout(() => { _autoSaveStatus.style.opacity='0'; }, 3000);
   } catch(e) {
+    kmtLog('❌ 自動保存', _fnName + ' 失敗: ' + e.message, e, '#dc2626');
     _autoSaveStatus.innerHTML = '⚠️ 保存失敗';
     setTimeout(() => { _autoSaveStatus.style.opacity='0'; }, 3000);
   } finally {
@@ -5181,7 +5215,8 @@ const SCREENS = {
 let currentScreen = 'companies';
 
 function showScreen(name) {
-  if (!SCREENS[name]) return;
+  if (!SCREENS[name]) { kmtLog('🚫 画面', '不明な画面: ' + name, undefined, '#dc2626'); return; }
+  kmtLog('📺 画面切替', name + ' (' + (SCREENS[name].title||'') + ')', undefined, '#7c3aed');
   currentScreen = name;
   document.getElementById('pageTitle').textContent = SCREENS[name].title;
 
@@ -8823,6 +8858,7 @@ function showGenModal(id, title, bodyHtml) {
   if(titleEl) titleEl.textContent=title;
   if(bodyEl) bodyEl.innerHTML=bodyHtml;
   modal.classList.add('show');
+  kmtLog('🪟 モーダル', id + ' を開く', undefined, '#0891b2');
   // 自動保存フック
   const fnName = _AUTOSAVE_MAP[id];
   if (fnName && typeof window[fnName] === 'function') {
