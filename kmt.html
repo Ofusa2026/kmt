@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260528.17 -->
+<!-- KMT_VERSION ver.20260528.18 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -208,7 +208,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260528.17</div>
+    <div class="logo-ver">ver.20260528.18</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -7530,46 +7530,54 @@ async function loadFees(page) {
   showLoading(true);
   try {
     const ym = `${feeYear}-${feeActiveTab}`;
+    // 人材数カウント用にallWorkersを確保
+    if (!allWorkers || !allWorkers.length) {
+      try { const wd = await sbFetch('workers?select=id,name,nationality,company_id,status&order=name.asc'); allWorkers = wd || []; } catch(e) {}
+    }
 
     // 1. DBに保存済みのレコードを取得（billing_monthで絞り込み・全件）
     const saved = await sbFetch(`support_fees?select=*,companies(name)&billing_month=eq.${encodeURIComponent(ym)}&order=created_at.asc`);
     allFees = saved || [];
 
     // 2. マスタ企業（支援中）からその月に請求対象になるべき企業を生成
-    //    billing_cycle: 月次 → 毎月、3ヶ月 → 3の倍数月、年次 → 1月のみ
-    const month = parseInt(feeActiveTab); // 1〜12
+    //    請求開始月(billing_start_month)を起点に、サイクルに合致する月だけ対象
     const activeCompanies = allCompanies.filter(c => c.status !== 'past' && c.fee_per_person);
-    const masterRows = activeCompanies.filter(c => {
-      const cycle = c.billing_cycle || '月次';
-      if (cycle === '月次') return true;
-      if (cycle === '3ヶ月') return month % 3 === 0; // 3,6,9,12月
-      if (cycle === '年次') return month === 1;
-      return true;
-    });
+    const masterRows = activeCompanies.filter(c => isBillingMonth(c, ym));
+
+    // 各企業に紐づく「在職」人材数を数える（在職中・一時帰国中）
+    const billableStatuses = ['在職中','一時帰国中'];
+    const countWorkers = (companyId) => (allWorkers || []).filter(w =>
+      w.company_id === companyId && billableStatuses.includes(w.status)
+    ).length;
 
     // 3. DBに未登録の企業を「仮行」として追加
     //    仮行: id=null, _draft=true
     const savedCompanyIds = new Set(allFees.map(f => f.company_id));
     const draftRows = masterRows
       .filter(c => !savedCompanyIds.has(c.id))
-      .map(c => ({
-        _draft: true,
-        id: null,
-        company_id: c.id,
-        companies: { name: c.name },
-        billing_month: ym,
-        worker_count: null,
-        unit_price: c.fee_per_person || null,
-        amount_excl: null,
-        amount_incl: null,
-        fee_type: '通常委託費',
-        status: '未請求',
-        billed_date: null,
-        paid_date: null,
-        notes: '',
-        payment_method: c.payment_method || '',
-        billing_cycle: c.billing_cycle || '月次',
-      }));
+      .map(c => {
+        const wc = countWorkers(c.id);
+        const up = c.fee_per_person || 0;
+        const excl = wc * up;
+        return {
+          _draft: true,
+          id: null,
+          company_id: c.id,
+          companies: { name: c.name },
+          billing_month: ym,
+          worker_count: wc || null,
+          unit_price: c.fee_per_person || null,
+          amount_excl: excl || null,
+          amount_incl: excl ? Math.round(excl * 1.1) : null,
+          fee_type: '通常委託費',
+          status: '未請求',
+          billed_date: null,
+          paid_date: null,
+          notes: '',
+          payment_method: c.payment_method || '',
+          billing_cycle: c.billing_cycle || '月次',
+        };
+      });
 
     // 4. 保存済み＋仮行をマージして表示（保存済み優先・上に）
     allFees = [...allFees, ...draftRows];
@@ -8199,7 +8207,44 @@ function applySendingFilters() {
 
 function applyUserFilters(){if(currentScreen!=='users')return;const q=(document.getElementById('uSearchInput')?.value||'').toLowerCase();filteredUsers=allUsers.filter(u=>!q||((u.name||'').toLowerCase().includes(q)||(u.email||'').toLowerCase().includes(q)));userPage=1;renderUserTable();}
 
-function buildFeeModalBody(f){f=f||{};const autoCalc=()=>{const wp=parseInt(document.getElementById('ff_worker_count')?.value||0);const up=parseInt(document.getElementById('ff_unit_price')?.value||0);const excl=wp*up;document.getElementById('ff_amount_excl').value=excl||'';document.getElementById('ff_amount_incl').value=excl?Math.round(excl*1.1):'';};return `<div class="form-grid"><div class="section-title">請求情報</div><div class="form-group full"><label class="form-label">企業</label><select class="form-select" id="ff_company_id"><option value="">選択...</option>${allCompanies.map(c=>`<option value="${c.id}" ${f.company_id===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">請求月 (YYYY-MM)</label><input class="form-input" id="ff_billing_month" value="${esc(f.billing_month||`${feeYear}-${feeActiveTab}`)}" placeholder="2026-04"></div><div class="form-group"><label class="form-label">費用種別</label><select class="form-select" id="ff_fee_type">${['通常委託費','新規委託費','初期費用','その他'].map(s=>`<option ${f.fee_type===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">対象人数</label><input class="form-input" id="ff_worker_count" type="number" value="${f.worker_count??''}" oninput="(${autoCalc.toString()})()"></div><div class="form-group"><label class="form-label">単価（税抜）</label><input class="form-input" id="ff_unit_price" type="number" value="${f.unit_price??''}" oninput="(${autoCalc.toString()})()"></div><div class="form-group"><label class="form-label">金額（税抜）</label><input class="form-input" id="ff_amount_excl" type="number" value="${f.amount_excl??''}"></div><div class="form-group"><label class="form-label">金額（税込）</label><input class="form-input" id="ff_amount_incl" type="number" value="${f.amount_incl??''}"></div><div class="form-group"><label class="form-label">ステータス</label><select class="form-select" id="ff_status">${['未請求','請求済','入金済','未入金'].map(s=>`<option ${f.status===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">請求日</label><input class="form-input" id="ff_billed_date" type="date" value="${f.billed_date||''}"></div><div class="form-group"><label class="form-label">入金日</label><input class="form-input" id="ff_paid_date" type="date" value="${f.paid_date||''}"></div><div class="form-group full"><label class="form-label">備考</label><textarea class="form-textarea" id="ff_notes">${esc(f.notes||'')}</textarea></div></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)"><button class="btn btn-outline" onclick="closeGenModal('feeModal')">閉じる</button></div>`;}
+function buildFeeModalBody(f){
+  f=f||{};
+  const autoCalc=()=>{const wp=parseInt(document.getElementById('ff_worker_count')?.value||0);const up=parseInt(document.getElementById('ff_unit_price')?.value||0);const excl=wp*up;document.getElementById('ff_amount_excl').value=excl||'';document.getElementById('ff_amount_incl').value=excl?Math.round(excl*1.1):'';};
+  // この企業に紐づく全人材（チェックで請求対象を選ぶ）
+  const billableStatuses = ['在職中','一時帰国中'];
+  const linkedWorkers = (allWorkers||[]).filter(w => w.company_id === f.company_id);
+  // 既存の選択（保存済みのworker_idsがあれば優先、なければ在職系を初期チェック）
+  const savedIds = Array.isArray(f.worker_ids) ? f.worker_ids : null;
+  const workerChecklist = linkedWorkers.length ? `
+    <div class="form-group full">
+      <label class="form-label">請求対象人材 <span style="font-size:11px;color:var(--gray-400);font-weight:400;">（チェックで人数・金額が変わります）</span></label>
+      <div style="max-height:160px;overflow-y:auto;border:1px solid var(--gray-200);border-radius:8px;padding:6px 10px;">
+        ${linkedWorkers.map(w => {
+          const checked = savedIds ? savedIds.includes(w.id) : billableStatuses.includes(w.status);
+          return `<label style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:13px;cursor:pointer;">
+            <input type="checkbox" class="ff_worker_chk" value="${w.id}" ${checked?'checked':''} onchange="recalcFeeWorkers()">
+            <span>${esc(w.name)}</span>
+            <span style="font-size:11px;color:var(--gray-400);">${esc(w.status||'')}</span>
+          </label>`;
+        }).join('')}
+      </div>
+    </div>` : (f.company_id ? `<div class="form-group full"><div style="font-size:12px;color:var(--gray-400);padding:4px 0;">この企業に紐づく人材がいません（人数は手入力できます）</div></div>` : '');
+  return `<div class="form-grid"><div class="section-title">請求情報</div><div class="form-group full"><label class="form-label">企業</label><select class="form-select" id="ff_company_id"><option value="">選択...</option>${allCompanies.map(c=>`<option value="${c.id}" ${f.company_id===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">請求月 (YYYY-MM)</label><input class="form-input" id="ff_billing_month" value="${esc(f.billing_month||`${feeYear}-${feeActiveTab}`)}" placeholder="2026-04"></div><div class="form-group"><label class="form-label">費用種別</label><select class="form-select" id="ff_fee_type">${['通常委託費','新規委託費','初期費用','その他'].map(s=>`<option ${f.fee_type===s?'selected':''}>${s}</option>`).join('')}</select></div>${workerChecklist}<div class="form-group"><label class="form-label">対象人数</label><input class="form-input" id="ff_worker_count" type="number" value="${f.worker_count??''}" oninput="(${autoCalc.toString()})()"></div><div class="form-group"><label class="form-label">単価（税抜）</label><input class="form-input" id="ff_unit_price" type="number" value="${f.unit_price??''}" oninput="(${autoCalc.toString()})()"></div><div class="form-group"><label class="form-label">金額（税抜）</label><input class="form-input" id="ff_amount_excl" type="number" value="${f.amount_excl??''}"></div><div class="form-group"><label class="form-label">金額（税込）</label><input class="form-input" id="ff_amount_incl" type="number" value="${f.amount_incl??''}"></div><div class="form-group"><label class="form-label">ステータス</label><select class="form-select" id="ff_status">${['未請求','請求済','入金済','未入金'].map(s=>`<option ${f.status===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">請求日</label><input class="form-input" id="ff_billed_date" type="date" value="${f.billed_date||''}"></div><div class="form-group"><label class="form-label">入金日</label><input class="form-input" id="ff_paid_date" type="date" value="${f.paid_date||''}"></div><div class="form-group full"><label class="form-label">備考</label><textarea class="form-textarea" id="ff_notes">${esc(f.notes||'')}</textarea></div></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)"><button class="btn btn-outline" onclick="closeGenModal('feeModal')">閉じる</button></div>`;
+}
+
+// 委託費モーダル: チェックされた人材数を対象人数に反映し金額再計算
+function recalcFeeWorkers() {
+  const checks = document.querySelectorAll('.ff_worker_chk');
+  const checked = Array.from(checks).filter(c => c.checked).length;
+  const wcInput = document.getElementById('ff_worker_count');
+  if (wcInput) wcInput.value = checked;
+  const up = parseInt(document.getElementById('ff_unit_price')?.value || 0);
+  const excl = checked * up;
+  const exclInput = document.getElementById('ff_amount_excl');
+  const inclInput = document.getElementById('ff_amount_incl');
+  if (exclInput) exclInput.value = excl || '';
+  if (inclInput) inclInput.value = excl ? Math.round(excl * 1.1) : '';
+}
 
 function buildIntroModalBody(i) {
   i=i||{};
@@ -8667,20 +8712,22 @@ function isBillingMonth(company, ym) {
   const cycle = company.billing_cycle || '月次';
   const start = company.billing_start_month; // 'YYYY-MM'
 
+  // 開始月が設定されている場合は、開始月起点で判定（月次含む）
+  if (start) {
+    const [sy, sm] = start.split('-').map(Number);
+    const [ty, tm] = ym.split('-').map(Number);
+    const diff = (ty - sy) * 12 + (tm - sm); // 開始月からの経過月数
+    if (diff < 0) return false; // 開始前は対象外
+    if (cycle === '月次') return true;
+    const cycleMap = {'2ヶ月':2, '3ヶ月':3, '6ヶ月':6, '年次':12};
+    const months = cycleMap[cycle];
+    if (!months) return true;
+    return diff % months === 0;
+  }
+
+  // 開始月が未設定の場合は従来挙動（月次は毎月、それ以外は対象外）
   if (cycle === '月次') return true;
-  if (!start) return false; // 開始月未設定は判定不能
-
-  const [sy, sm] = start.split('-').map(Number);
-  const [ty, tm] = ym.split('-').map(Number);
-
-  // 開始月からの経過月数
-  const diff = (ty - sy) * 12 + (tm - sm);
-  if (diff < 0) return false; // 開始前
-
-  const cycleMap = {'2ヶ月':2, '3ヶ月':3, '6ヶ月':6, '年次':12};
-  const months = cycleMap[cycle];
-  if (!months) return false;
-  return diff % months === 0;
+  return false;
 }
 
 function onFeeYearChange() {
@@ -8695,16 +8742,22 @@ function onSaleYearChange() {
 
 function openExpenseModal(id){const e=id?allExpenses.find(x=>x.id===id):null;editingExpenseId=id;showGenModal('expenseModal',id?'💸 立替詳細':'💸 立替登録',buildExpenseModalBody(e));}
 
-function openFeeModal(id){
+async function openFeeModal(id){
   const f=id?allFees.find(x=>x.id===id):null;
   editingFeeId=id;
   editingFeeDraft=null;
+  if (!allWorkers || !allWorkers.length) {
+    try { const wd = await sbFetch('workers?select=id,name,nationality,company_id,status&order=name.asc'); allWorkers = wd || []; } catch(e) {}
+  }
   showGenModal('feeModal',id?'💴 委託費詳細':'💴 委託費登録',buildFeeModalBody(f));
 }
 
-function openFeeModalForCompany(companyId, billingMonth) {
+async function openFeeModalForCompany(companyId, billingMonth) {
   const c = allCompanies.find(x => x.id === companyId);
   editingFeeId = null;
+  if (!allWorkers || !allWorkers.length) {
+    try { const wd = await sbFetch('workers?select=id,name,nationality,company_id,status&order=name.asc'); allWorkers = wd || []; } catch(e) {}
+  }
   const pseudo = {
     company_id: companyId,
     billing_month: billingMonth,
@@ -8713,6 +8766,8 @@ function openFeeModalForCompany(companyId, billingMonth) {
     status: '未請求',
   };
   showGenModal('feeModal', '💴 委託費登録', buildFeeModalBody(pseudo));
+  // チェック済み人材から人数・金額を初期反映
+  setTimeout(() => { if (typeof recalcFeeWorkers === 'function') recalcFeeWorkers(); }, 60);
   setTimeout(() => setupAutoSave(saveFee), 100);
 }
 
@@ -9089,7 +9144,7 @@ function saveApiKey() {
   loadUsers();
 }
 
-async function saveFee(){const g=id=>document.getElementById(id)?.value||null;const ni=id=>document.getElementById(id)?.value?parseInt(document.getElementById(id).value):null;const data={company_id:g('ff_company_id'),billing_month:g('ff_billing_month'),fee_type:g('ff_fee_type'),worker_count:ni('ff_worker_count'),unit_price:ni('ff_unit_price'),amount_excl:ni('ff_amount_excl'),amount_incl:ni('ff_amount_incl'),status:g('ff_status')||'未請求',billed_date:g('ff_billed_date'),paid_date:g('ff_paid_date'),notes:g('ff_notes'),updated_at:new Date().toISOString()};if(!data.billing_month){showToast('❌ 請求月は必須','error');return;}showLoading(true);try{if(editingFeeId){await sbFetch('support_fees?id=eq.'+editingFeeId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新','success');}else{const _r=await sbFetch('support_fees',{method:'POST',body:JSON.stringify(data),prefer:'return=representation'});if(_r&&_r[0]&&_r[0].id)editingFeeId=_r[0].id;showToast('✅ 登録','success');}closeGenModal('feeModal');await loadFees(feePage);}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
+async function saveFee(){const g=id=>document.getElementById(id)?.value||null;const ni=id=>document.getElementById(id)?.value?parseInt(document.getElementById(id).value):null;const chkIds=Array.from(document.querySelectorAll('.ff_worker_chk')).filter(c=>c.checked).map(c=>c.value);const data={company_id:g('ff_company_id'),billing_month:g('ff_billing_month'),fee_type:g('ff_fee_type'),worker_count:ni('ff_worker_count'),unit_price:ni('ff_unit_price'),amount_excl:ni('ff_amount_excl'),amount_incl:ni('ff_amount_incl'),status:g('ff_status')||'未請求',billed_date:g('ff_billed_date'),paid_date:g('ff_paid_date'),notes:g('ff_notes'),worker_ids:chkIds.length?chkIds:null,updated_at:new Date().toISOString()};if(!data.billing_month){showToast('❌ 請求月は必須','error');return;}showLoading(true);try{if(editingFeeId){await sbFetch('support_fees?id=eq.'+editingFeeId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新','success');}else{const _r=await sbFetch('support_fees',{method:'POST',body:JSON.stringify(data),prefer:'return=representation'});if(_r&&_r[0]&&_r[0].id)editingFeeId=_r[0].id;showToast('✅ 登録','success');}closeGenModal('feeModal');await loadFees(feePage);}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
 
 async function saveIntro() {
   const g=id=>document.getElementById(id)?.value||null;
