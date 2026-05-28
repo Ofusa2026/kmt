@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260528.22 -->
+<!-- KMT_VERSION ver.20260528.23 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -208,7 +208,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260528.22</div>
+    <div class="logo-ver">ver.20260528.23</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -5827,7 +5827,12 @@ function renderWorkerTable() {
       return '';
     })() : '';
     return `<tr onclick="openWorkerModal('${w.id}')">
-      <td><strong>${esc(w.name)}</strong>${w.name_kana?'<div style="font-size:10px;color:var(--gray-400)">'+esc(w.name_kana)+'</div>':''}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:8px;">
+          ${(() => { const img = driveImageUrl(w.photo_url); return img ? `<img src="${esc(img)}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;border:1px solid var(--gray-200);flex-shrink:0;" onerror="this.style.display='none';">` : ''; })()}
+          <div><strong>${esc(w.name)}</strong>${w.name_kana?'<div style="font-size:10px;color:var(--gray-400)">'+esc(w.name_kana)+'</div>':''}</div>
+        </div>
+      </td>
       <td>${natFlag(w.nationality)} ${esc(w.nationality||'-')}</td>
       <td style="font-size:12px">${esc(w.companies?.name||'-')}</td>
       <td style="font-size:11px;color:var(--gray-700)">${esc(w.applicant_field||'')}${w.job_category?'<br>'+esc(w.job_category):''}</td>
@@ -6057,7 +6062,7 @@ function updateWorkerPhotoPreview() {
   }
   const img = driveImageUrl(url);
   if (!img) { box.innerHTML = '<div style="font-size:11px;color:#ef4444;">画像URLを認識できません</div>'; return; }
-  box.innerHTML = '<img src="' + esc(img) + '" style="max-width:140px;max-height:140px;border-radius:8px;border:1px solid var(--gray-200);object-fit:cover;" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'block\';"><div style="display:none;font-size:11px;color:#ef4444;">画像を表示できません（共有設定を確認）</div>';
+  box.innerHTML = '<img src="' + esc(img) + '" style="max-width:90px;max-height:90px;border-radius:8px;border:1px solid var(--gray-200);object-fit:cover;" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'block\';"><div style="display:none;font-size:11px;color:#ef4444;">画像を表示できません（共有設定を確認）</div>';
 }
 
 function buildWorkerModalBody(w) {
