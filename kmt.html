@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260528.09 -->
+<!-- KMT_VERSION ver.20260528.10 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -208,7 +208,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260528.09</div>
+    <div class="logo-ver">ver.20260528.10</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -234,6 +234,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="nav-item" onclick="showScreen('sales')">📊 売上管理</div>
   <div class="nav-item" onclick="showScreen('expenses')">💸 立替管理</div>
   <div class="nav-item" onclick="showScreen('users')">⚙️ ユーザー設定</div>
+  <div class="nav-item" onclick="showScreen('audit_log')">📋 操作ログ</div>
   <div class="nav-item" onclick="showScreen('ai_knowledge')">🧠 AI記憶</div>
   <div class="sidebar-user">
     <div class="user-info">
@@ -721,6 +722,12 @@ async function sbFetch(path, opts={}) {
     'Prefer': opts.prefer || 'return=representation',
     ...opts.headers
   };
+  // 監査ログ用: 操作者名をヘッダに載せる（日本語対応のためURLエンコード→DB側_url_decodeで復号）
+  try {
+    if (typeof currentUser !== 'undefined' && currentUser && currentUser.name) {
+      headers['x-ofusa-user'] = encodeURIComponent(currentUser.name);
+    }
+  } catch(e) {}
   // ページネーション用: countも返す
   if (opts.count) headers['Prefer'] = (headers['Prefer'] ? headers['Prefer'] + ',' : '') + 'count=exact';
   const { headers: _h, prefer: _p, count: _c, ...restOpts } = opts;
@@ -2665,6 +2672,174 @@ async function loadMyAccount() {
   } catch(e) {}
   const cw = document.querySelector('.content-wrap');
   if (cw) cw.innerHTML = buildMyAccountScreen();
+}
+
+// ==============================
+// 📋 操作ログ（監査ログ閲覧）
+// ==============================
+const AUDIT_TABLE_LABELS = {
+  companies:'所属機関', workers:'外国人材', candidates:'候補者', job_openings:'求人',
+  introductions:'紹介案件', sending_orgs:'送り出し機関', partner_support_orgs:'提携支援機関',
+  support_fees:'支援委託費', sales_forecast:'売上', expenses:'立替', users:'ユーザー',
+  ai_knowledge:'AI記憶', task_requests:'タスク', support_schedules:'支援スケジュール',
+  chat_messages:'チャット', chat_rooms:'チャットルーム', chat_groups:'チャットグループ',
+  chat_reactions:'リアクション', chat_read_at:'既読', company_meetings:'会議',
+  candidate_companies:'候補者-企業', candidate_job_openings:'候補者-求人',
+  partner_org_companies:'提携-企業', user_presence:'プレゼンス', push_subscriptions:'プッシュ購読',
+  kmt_org:'KMT組織', audit_log:'監査ログ'
+};
+const AUDIT_OP_STYLE = {
+  INSERT:{label:'追加', bg:'#dcfce7', color:'#15803d'},
+  UPDATE:{label:'更新', bg:'#fef3c7', color:'#b45309'},
+  DELETE:{label:'削除', bg:'#fee2e2', color:'#b91c1c'},
+};
+let _auditPage = 0;
+const _AUDIT_PAGE_SIZE = 50;
+let _auditFilters = { table:'', op:'', user:'', q:'' };
+
+function buildAuditLogScreen() {
+  const tableOpts = ['<option value="">全テーブル</option>'].concat(
+    Object.keys(AUDIT_TABLE_LABELS).map(k => `<option value="${k}">${AUDIT_TABLE_LABELS[k]}</option>`)
+  ).join('');
+  return `
+  <div style="max-width:1200px;margin:0 auto;">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
+      <select id="auditFilterTable" class="form-select" style="width:auto;font-size:13px;" onchange="applyAuditFilter()">${tableOpts}</select>
+      <select id="auditFilterOp" class="form-select" style="width:auto;font-size:13px;" onchange="applyAuditFilter()">
+        <option value="">全操作</option><option value="INSERT">追加</option><option value="UPDATE">更新</option><option value="DELETE">削除</option>
+      </select>
+      <input id="auditFilterUser" class="form-input" placeholder="操作者名" style="width:140px;font-size:13px;" oninput="_auditDebounce()">
+      <button class="btn btn-outline" onclick="loadAuditLog()">🔄 更新</button>
+      <span id="auditCount" style="font-size:12px;color:var(--gray-500);margin-left:auto;"></span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th style="width:150px;">日時</th><th style="width:90px;">操作者</th>
+          <th style="width:120px;">テーブル</th><th style="width:70px;">操作</th>
+          <th>変更内容</th>
+        </tr></thead>
+        <tbody id="auditTbody"><tr><td colspan="5" style="text-align:center;padding:40px;color:var(--gray-400)">読み込み中...</td></tr></tbody>
+      </table>
+    </div>
+    <div style="display:flex;justify-content:center;gap:8px;margin-top:12px;">
+      <button class="btn btn-outline" id="auditPrev" onclick="auditPageMove(-1)">← 前</button>
+      <span id="auditPageLabel" style="align-self:center;font-size:13px;color:var(--gray-500);"></span>
+      <button class="btn btn-outline" id="auditNext" onclick="auditPageMove(1)">次 →</button>
+    </div>
+  </div>`;
+}
+
+let _auditDebounceTimer = null;
+function _auditDebounce() {
+  clearTimeout(_auditDebounceTimer);
+  _auditDebounceTimer = setTimeout(() => applyAuditFilter(), 400);
+}
+function applyAuditFilter() {
+  _auditFilters.table = document.getElementById('auditFilterTable')?.value || '';
+  _auditFilters.op = document.getElementById('auditFilterOp')?.value || '';
+  _auditFilters.user = document.getElementById('auditFilterUser')?.value.trim() || '';
+  _auditPage = 0;
+  loadAuditLog();
+}
+function auditPageMove(d) {
+  _auditPage = Math.max(0, _auditPage + d);
+  loadAuditLog();
+}
+
+async function loadAuditLog() {
+  const tb = document.getElementById('auditTbody');
+  if (!tb) return;
+  tb.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--gray-400)">読み込み中...</td></tr>';
+  // クエリ構築
+  let q = 'audit_log?select=*&order=created_at.desc';
+  if (_auditFilters.table) q += '&table_name=eq.' + encodeURIComponent(_auditFilters.table);
+  if (_auditFilters.op) q += '&operation=eq.' + _auditFilters.op;
+  if (_auditFilters.user) q += '&user_name=ilike.*' + encodeURIComponent(_auditFilters.user) + '*';
+  const from = _auditPage * _AUDIT_PAGE_SIZE;
+  const to = from + _AUDIT_PAGE_SIZE - 1;
+  try {
+    const rows = await sbFetch(q, { headers: { 'Range-Unit':'items', 'Range': from + '-' + to } });
+    renderAuditRows(rows || []);
+    const lbl = document.getElementById('auditPageLabel');
+    if (lbl) lbl.textContent = 'ページ ' + (_auditPage + 1);
+    const prev = document.getElementById('auditPrev'); if (prev) prev.disabled = _auditPage === 0;
+    const next = document.getElementById('auditNext'); if (next) next.disabled = (rows || []).length < _AUDIT_PAGE_SIZE;
+    const cnt = document.getElementById('auditCount'); if (cnt) cnt.textContent = (rows||[]).length + '件表示中';
+  } catch(e) {
+    tb.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:40px;color:#dc2626">読み込み失敗: ' + esc(e.message) + '</td></tr>';
+  }
+}
+
+function renderAuditRows(rows) {
+  const tb = document.getElementById('auditTbody');
+  if (!tb) return;
+  if (!rows.length) {
+    tb.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--gray-400)">ログがありません</td></tr>';
+    return;
+  }
+  tb.innerHTML = rows.map(r => {
+    const dt = new Date(r.created_at);
+    const dtStr = dt.toLocaleString('ja-JP', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    const op = AUDIT_OP_STYLE[r.operation] || {label:r.operation, bg:'#f1f5f9', color:'#475569'};
+    const tblLabel = AUDIT_TABLE_LABELS[r.table_name] || r.table_name;
+    let summary = '';
+    if (r.operation === 'UPDATE' && r.changed_fields) {
+      const keys = Object.keys(r.changed_fields);
+      summary = keys.slice(0, 4).map(k => {
+        const cf = r.changed_fields[k];
+        const oldV = _auditFmtVal(cf && cf.old);
+        const newV = _auditFmtVal(cf && cf.new);
+        return '<span style="display:inline-block;margin:1px 4px 1px 0;padding:1px 6px;background:#f8fafc;border-radius:4px;font-size:11px;"><b>' + esc(k) + '</b>: ' + esc(oldV) + ' → ' + esc(newV) + '</span>';
+      }).join('');
+      if (keys.length > 4) summary += '<span style="font-size:11px;color:var(--gray-400);">他' + (keys.length - 4) + '項目</span>';
+    } else if (r.operation === 'INSERT' && r.new_data) {
+      const nm = r.new_data.name || r.new_data.title || r.record_id || '';
+      summary = '<span style="font-size:12px;color:var(--gray-600);">' + esc(String(nm)) + '</span>';
+    } else if (r.operation === 'DELETE' && r.old_data) {
+      const nm = r.old_data.name || r.old_data.title || r.record_id || '';
+      summary = '<span style="font-size:12px;color:var(--gray-600);">' + esc(String(nm)) + ' を削除</span>';
+    }
+    const detailBtn = '<button onclick=\'showAuditDetail(' + r.id + ')\' style="margin-left:6px;font-size:10px;padding:1px 6px;border:1px solid var(--gray-300);border-radius:4px;background:white;cursor:pointer;">詳細</button>';
+    return '<tr>' +
+      '<td style="font-size:12px;white-space:nowrap;">' + dtStr + '</td>' +
+      '<td style="font-size:12px;">' + esc(r.user_name||'') + '</td>' +
+      '<td style="font-size:12px;">' + esc(tblLabel) + '</td>' +
+      '<td><span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:' + op.bg + ';color:' + op.color + ';">' + op.label + '</span></td>' +
+      '<td>' + summary + detailBtn + '</td>' +
+    '</tr>';
+  }).join('');
+  _auditRowCache = {};
+  rows.forEach(r => { _auditRowCache[r.id] = r; });
+}
+
+function _auditFmtVal(v) {
+  if (v === null || v === undefined) return '空';
+  if (typeof v === 'object') {
+    if (v._skipped) return '(大きいデータ)';
+    return JSON.stringify(v).slice(0, 40);
+  }
+  const s = String(v);
+  return s.length > 40 ? s.slice(0, 40) + '…' : s;
+}
+
+let _auditRowCache = {};
+function showAuditDetail(id) {
+  const r = _auditRowCache[id];
+  if (!r) return;
+  const dt = new Date(r.created_at).toLocaleString('ja-JP');
+  const tblLabel = AUDIT_TABLE_LABELS[r.table_name] || r.table_name;
+  let body = '<div style="font-size:13px;line-height:1.8;">' +
+    '<div><b>日時:</b> ' + dt + '</div>' +
+    '<div><b>操作者:</b> ' + esc(r.user_name||'') + '</div>' +
+    '<div><b>テーブル:</b> ' + esc(tblLabel) + ' (' + esc(r.table_name) + ')</div>' +
+    '<div><b>レコードID:</b> ' + esc(r.record_id||'') + '</div>' +
+    '<div><b>操作:</b> ' + esc(r.operation) + '</div></div>';
+  if (r.changed_fields) {
+    body += '<div style="margin-top:10px;font-weight:700;">変更フィールド</div><div style="max-height:300px;overflow:auto;background:#f8fafc;border-radius:6px;padding:8px;font-size:12px;font-family:monospace;white-space:pre-wrap;">' + esc(JSON.stringify(r.changed_fields, null, 2)) + '</div>';
+  }
+  showGenModal('auditDetailModal', '📋 ログ詳細', body +
+    '<div style="display:flex;justify-content:flex-end;margin-top:12px;"><button class="btn btn-outline" onclick="closeGenModal(\'auditDetailModal\')">閉じる</button></div>');
 }
 
 function previewMyAvatar() {
@@ -5210,6 +5385,7 @@ const SCREENS = {
   support_schedules: { title: '📅 支援スケジュール', init: loadSupportSchedules },
   chat: { title: '💬 チャット', init: loadChatScreen },
   my_account: { title: '👤 マイアカウント', init: loadMyAccount },
+  audit_log: { title: '📋 操作ログ', init: loadAuditLog },
 };
 
 let currentScreen = 'companies';
@@ -5331,6 +5507,13 @@ function renderScreenContent(name) {
     filtersSection.style.display = 'none';
     contentWrap.style.padding = '';
     contentWrap.innerHTML = buildAiKnowledgeScreen();
+    return;
+  }
+  if (name === 'audit_log') {
+    statsRow.style.display = 'none';
+    filtersSection.style.display = 'none';
+    contentWrap.style.padding = '12px 16px';
+    contentWrap.innerHTML = buildAuditLogScreen();
     return;
   }
   if (name === 'decision_report') {
@@ -8251,7 +8434,7 @@ function ensureModals(targetId) {
   const ids = targetId ? [targetId] : [
     'newRequestModal','aiKnModal','drivePickerModal','workerModal','candidateModal',
     'companyModal','saleModal','userModal','partnerModal','sendingModal','expenseModal',
-    'introductionModal','feeModal','resumeModal','meetingModal','taskModal'
+    'introductionModal','feeModal','resumeModal','meetingModal','taskModal','auditDetailModal'
   ];
   ids.forEach(id=>{
     if(!document.getElementById(id)){
