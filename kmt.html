@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260528.19 -->
+<!-- KMT_VERSION ver.20260528.20 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -208,7 +208,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260528.19</div>
+    <div class="logo-ver">ver.20260528.20</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -5672,6 +5672,7 @@ function buildWorkersScreen() {
       <option value="">KMT支援区分</option>
       <option>KMT支援</option><option>KMT支援外</option>
     </select>
+    <button class="btn btn-outline" id="wRetiredToggle" style="font-size:11px;padding:4px 10px" onclick="toggleRetired()">退職者等表示</button>
     <button class="btn btn-outline" style="font-size:11px;padding:4px 10px" onclick="clearWorkerFilters()">✕</button>
   </div>
   <div class="table-wrap">
@@ -5711,8 +5712,11 @@ function applyWorkerFilters() {
   const applyStatus = document.getElementById('wFilterApplyStatus')?.value||'';
   const nat = document.getElementById('wFilterNationality')?.value||'';
   const kmt = document.getElementById('wFilterKmt')?.value||'';
+  const retiredStatuses = ['退職済(帰国)','退職済(転職)'];
   filteredWorkers = allWorkers.filter(w => {
     if (q && !((w.name||'').toLowerCase().includes(q) || (w.nationality||'').toLowerCase().includes(q) || (w.companies?.name||'').toLowerCase().includes(q))) return false;
+    // デフォルトは在職者のみ。退職者等は「退職者等表示」ONか、在職ステータスを明示選択したときだけ表示
+    if (!_showRetired && !status && retiredStatuses.includes(w.status)) return false;
     if (status && w.status !== status) return false;
     if (applyStatus && (w.apply_status||'') !== applyStatus) return false;
     if (nat && w.nationality !== nat) return false;
@@ -5723,10 +5727,25 @@ function applyWorkerFilters() {
   renderWorkerTable();
 }
 
+let _showRetired = false;
+function toggleRetired() {
+  _showRetired = !_showRetired;
+  const btn = document.getElementById('wRetiredToggle');
+  if (btn) {
+    btn.textContent = _showRetired ? '在職者のみ表示' : '退職者等表示';
+    btn.classList.toggle('btn-primary', _showRetired);
+    btn.classList.toggle('btn-outline', !_showRetired);
+  }
+  applyWorkerFilters();
+}
+
 function clearWorkerFilters() {
   ['wSearchInput','wFilterStatus','wFilterApplyStatus','wFilterNationality','wFilterKmt'].forEach(id => {
     const el = document.getElementById(id); if(el) el.value='';
   });
+  _showRetired = false;
+  const btn = document.getElementById('wRetiredToggle');
+  if (btn) { btn.textContent = '退職者等表示'; btn.classList.remove('btn-primary'); btn.classList.add('btn-outline'); }
   applyWorkerFilters();
 }
 
