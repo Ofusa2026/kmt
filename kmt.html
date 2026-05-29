@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260528.27 -->
+<!-- KMT_VERSION ver.20260528.28 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -208,7 +208,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260528.27</div>
+    <div class="logo-ver">ver.20260528.28</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -3235,23 +3235,29 @@ async function loadChatScreen() {
       const gd = await sbFetch('chat_groups?select=*,companies(id,name)&order=created_at.desc');
       chatGroups = gd || [];
     } catch(e) { console.error('chat_groups load error:', e); }
-    // chat_roomsテーブルからチャット開始済みの案件のみ取得
-    const d = await sbFetch('chat_rooms?select=id,worker_id,group_id,status,completed_at,created_at,workers(id,name,nationality,drive_url,drive_url_kmt,company_id,companies(id,name))&order=created_at.desc');
-    chatRooms = (d||[]).map(r => ({
-      id: r.id,
-      worker_id: r.worker_id,
-      name: r.workers?.name || '',
-      subName: r.workers?.companies?.name || '',
-      nationality: r.workers?.nationality || '',
-      drive_url: r.workers?.drive_url || '',
-      drive_url_kmt: r.workers?.drive_url_kmt || '',
-      company_id: r.workers?.company_id || r.workers?.companies?.id || '',
-      group_id: r.group_id || null,
-      status: r.status || 'active',
-      completed_at: r.completed_at || null,
-      created_at: r.created_at,
-      lastMsg: null, // 後でセット
-    }));
+    // chat_roomsテーブルから取得（人材チャット + 企業チャット）
+    const d = await sbFetch('chat_rooms?select=id,worker_id,company_id,group_id,status,completed_at,created_at,workers(id,name,nationality,drive_url,drive_url_kmt,company_id,companies(id,name)),companies(id,name)&order=created_at.desc');
+    chatRooms = (d||[]).map(r => {
+      const isCompanyChat = !r.worker_id && !!r.company_id;
+      const directCompany = r.companies || null; // ルーム直結の企業（企業チャット）
+      const workerCompany = r.workers?.companies || null;
+      return {
+        id: r.id,
+        worker_id: r.worker_id,
+        is_company_chat: isCompanyChat,
+        name: isCompanyChat ? (directCompany?.name || '企業チャット') : (r.workers?.name || ''),
+        subName: isCompanyChat ? '企業チャット' : (workerCompany?.name || ''),
+        nationality: r.workers?.nationality || '',
+        drive_url: r.workers?.drive_url || '',
+        drive_url_kmt: r.workers?.drive_url_kmt || '',
+        company_id: isCompanyChat ? r.company_id : (r.workers?.company_id || workerCompany?.id || ''),
+        group_id: r.group_id || null,
+        status: r.status || 'active',
+        completed_at: r.completed_at || null,
+        created_at: r.created_at,
+        lastMsg: null,
+      };
+    });
     // 各ルームの最終メッセージを取得
     await loadRoomLastMessages();
     renderChatRooms();
@@ -3824,60 +3830,125 @@ function renderGroupRooms(companyId) {
   header.appendChild(title);
   list.appendChild(header);
 
-  if (!rooms.length) {
+  // 企業チャット（worker_idなし・company_idあり）と人材チャットに分ける
+  const companyChat = rooms.find(r => r.is_company_chat);
+  const workerRooms = rooms.filter(r => !r.is_company_chat);
+
+  // 企業の場合のみ、最上部に企業チャットを表示（無ければ作成ボタン）
+  if (!isNone) {
+    if (companyChat) {
+      // 企業チャット行を最上部に
+      const cRow = buildChatRoomRow(companyChat, companyId, true);
+      list.appendChild(cRow);
+    } else if (_chatTab !== 'done') {
+      // 未作成 → 開始ボタン
+      const startBox = document.createElement('div');
+      startBox.style.cssText = 'padding:8px 10px;margin:6px;background:#fef3c7;border:1px dashed #fbbf24;border-radius:10px;text-align:center;';
+      const startBtn = document.createElement('button');
+      startBtn.style.cssText = 'background:#1a73e8;color:white;border:none;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;';
+      startBtn.textContent = '💬 企業チャットを開始';
+      startBtn.onclick = () => startCompanyChat(companyId);
+      startBox.appendChild(startBtn);
+      list.appendChild(startBox);
+    }
+  }
+
+  if (!workerRooms.length && !companyChat) {
     const empty = document.createElement('div');
     empty.style.cssText = 'padding:20px;text-align:center;color:#94a3b8;font-size:12px;';
-    empty.innerHTML = (_chatTab==='done' ? 'この企業の完了チャットはありません' : 'この企業のチャットはありません');
+    empty.innerHTML = (_chatTab==='done' ? 'この企業の完了チャットはありません' : 'この企業の人材チャットはありません');
     list.appendChild(empty);
     return;
   }
 
-  rooms.forEach(r => {
-    const active = currentRoom?.id === r.id;
-    const lastMsg = r.lastMsg;
-    const lastTime = lastMsg ? (() => {
-      const d = new Date(lastMsg.created_at), today = new Date();
-      if (d.toDateString()===today.toDateString()) return d.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
-      return d.toLocaleDateString('ja-JP',{month:'numeric',day:'numeric'});
-    })() : '';
-    const _lc = lastMsg?.content||'';
-    const preview = lastMsg ? (esc(lastMsg.sender_name)+': '+esc(_lc||'📎ファイル').slice(0,18)) : '';
+  if (workerRooms.length && (companyChat || !isNone)) {
+    // 区切り
+    const sep = document.createElement('div');
+    sep.style.cssText = 'padding:6px 14px;font-size:10px;font-weight:700;color:#94a3b8;letter-spacing:.5px;border-top:1px solid #f0f0f0;margin-top:4px;';
+    sep.textContent = '人材チャット';
+    list.appendChild(sep);
+  }
 
-    const row = document.createElement('div');
-    row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;border-radius:8px;margin:2px 6px;transition:background .1s;background:'+(active?'#e8f0fe':'');
-    row.onmouseover = () => { if (!active) row.style.background='#f1f3f4'; };
-    row.onmouseout = () => { row.style.background = active?'#e8f0fe':''; };
-    row.onclick = () => openChatRoom(r.id);
-    const doneTag = r.status === 'done' ? '<span style="font-size:9px;color:#059669;font-weight:700;margin-left:4px;">✅</span>' : '';
-    row.innerHTML =
-      '<div style="width:36px;height:36px;border-radius:50%;background:#c7d2fe;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">'+natFlag(r.nationality||'')+'</div>'+
-      '<div style="flex:1;min-width:0;">'+
-        '<div style="display:flex;align-items:baseline;justify-content:space-between;">'+
-          '<span style="font-size:13px;font-weight:'+(r.unread>0?700:500)+';color:#202124;">'+esc(r.name)+doneTag+'</span>'+
-          '<span style="font-size:11px;color:#5f6368;">'+lastTime+'</span>'+
-        '</div>'+
-        '<span style="font-size:12px;color:#5f6368;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;">'+preview+'</span>'+
-      '</div>'+
-      (r.unread>0?'<span style="background:#1a73e8;color:white;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;margin-right:4px;">'+r.unread+'</span>':'');
-    // 完了/進行中トグル
-    const doneBtn = document.createElement('button');
-    const rIsDone = r.status === 'done';
-    doneBtn.style.cssText = 'background:none;border:1px solid '+(rIsDone?'#d1d5db':'#059669')+';color:'+(rIsDone?'#5f6368':'#059669')+';cursor:pointer;font-size:10px;padding:2px 7px;flex-shrink:0;border-radius:10px;font-weight:600;white-space:nowrap;';
-    doneBtn.textContent = rIsDone ? '↩' : '✅';
-    doneBtn.title = rIsDone ? '進行中に戻す' : '完了にする';
-    doneBtn.onclick = (e) => { e.stopPropagation(); setRoomStatus(r.id, rIsDone ? 'active' : 'done'); };
-    row.appendChild(doneBtn);
-    // 削除ボタン
-    const delBtn = document.createElement('button');
-    delBtn.style.cssText = 'background:none;border:none;cursor:pointer;color:#d1d5db;font-size:16px;padding:4px;flex-shrink:0;border-radius:4px;';
-    delBtn.textContent = '✕';
-    delBtn.title = 'チャット削除';
-    delBtn.onmouseover = () => delBtn.style.color = '#ef4444';
-    delBtn.onmouseout = () => delBtn.style.color = '#d1d5db';
-    delBtn.onclick = (e) => { e.stopPropagation(); openDeleteChatRoomModal(r.id, r.name, companyId); };
-    row.appendChild(delBtn);
-    list.appendChild(row);
+  workerRooms.forEach(r => {
+    list.appendChild(buildChatRoomRow(r, companyId, false));
   });
+}
+
+// チャットルーム行のDOM要素を生成（企業チャット/人材チャット共用）
+function buildChatRoomRow(r, companyId, isCompany) {
+  const active = currentRoom?.id === r.id;
+  const lastMsg = r.lastMsg;
+  const lastTime = lastMsg ? (() => {
+    const d = new Date(lastMsg.created_at), today = new Date();
+    if (d.toDateString()===today.toDateString()) return d.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
+    return d.toLocaleDateString('ja-JP',{month:'numeric',day:'numeric'});
+  })() : '';
+  const _lc = lastMsg?.content||'';
+  const preview = lastMsg ? (esc(lastMsg.sender_name)+': '+esc(_lc||'📎ファイル').slice(0,18)) : (isCompany?'企業全体のチャット':'');
+
+  const row = document.createElement('div');
+  const bg = isCompany ? (active?'#fef3c7':'#fffbeb') : (active?'#e8f0fe':'');
+  row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;border-radius:8px;margin:2px 6px;transition:background .1s;background:'+bg+(isCompany?';border:1px solid #fde68a':'');
+  row.onmouseover = () => { if (!active) row.style.background = isCompany?'#fde68a':'#f1f3f4'; };
+  row.onmouseout = () => { row.style.background = active?(isCompany?'#fef3c7':'#e8f0fe'):(isCompany?'#fffbeb':''); };
+  row.onclick = () => openChatRoom(r.id);
+  const doneTag = r.status === 'done' ? '<span style="font-size:9px;color:#059669;font-weight:700;margin-left:4px;">✅</span>' : '';
+  const icon = isCompany
+    ? '<div style="width:36px;height:36px;border-radius:50%;background:#fde68a;color:#92400e;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">🏢</div>'
+    : '<div style="width:36px;height:36px;border-radius:50%;background:#c7d2fe;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">'+natFlag(r.nationality||'')+'</div>';
+  row.innerHTML =
+    icon +
+    '<div style="flex:1;min-width:0;">'+
+      '<div style="display:flex;align-items:baseline;justify-content:space-between;">'+
+        '<span style="font-size:13px;font-weight:'+(r.unread>0?700:600)+';color:#202124;">'+(isCompany?'💬 ':'')+esc(r.name)+doneTag+'</span>'+
+        '<span style="font-size:11px;color:#5f6368;">'+lastTime+'</span>'+
+      '</div>'+
+      '<span style="font-size:12px;color:#5f6368;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;">'+preview+'</span>'+
+    '</div>'+
+    (r.unread>0?'<span style="background:#1a73e8;color:white;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;margin-right:4px;">'+r.unread+'</span>':'');
+  // 完了/進行中トグル
+  const doneBtn = document.createElement('button');
+  const rIsDone = r.status === 'done';
+  doneBtn.style.cssText = 'background:none;border:1px solid '+(rIsDone?'#d1d5db':'#059669')+';color:'+(rIsDone?'#5f6368':'#059669')+';cursor:pointer;font-size:10px;padding:2px 7px;flex-shrink:0;border-radius:10px;font-weight:600;white-space:nowrap;';
+  doneBtn.textContent = rIsDone ? '↩' : '✅';
+  doneBtn.title = rIsDone ? '進行中に戻す' : '完了にする';
+  doneBtn.onclick = (e) => { e.stopPropagation(); setRoomStatus(r.id, rIsDone ? 'active' : 'done'); };
+  row.appendChild(doneBtn);
+  // 削除ボタン
+  const delBtn = document.createElement('button');
+  delBtn.style.cssText = 'background:none;border:none;cursor:pointer;color:#d1d5db;font-size:16px;padding:4px;flex-shrink:0;border-radius:4px;';
+  delBtn.textContent = '✕';
+  delBtn.title = 'チャット削除';
+  delBtn.onmouseover = () => delBtn.style.color = '#ef4444';
+  delBtn.onmouseout = () => delBtn.style.color = '#d1d5db';
+  delBtn.onclick = (e) => { e.stopPropagation(); openDeleteChatRoomModal(r.id, r.name, companyId); };
+  row.appendChild(delBtn);
+  return row;
+}
+
+// 企業チャットを作成して開く
+async function startCompanyChat(companyId) {
+  if (!companyId || companyId === '__none__') { showToast('❌ 企業を選択してください', 'error'); return; }
+  showLoading(true);
+  try {
+    const _r = await sbFetch('chat_rooms', { method:'POST', body: JSON.stringify({ company_id: companyId, created_by: currentUser?.name || '', status:'active' }), prefer:'return=representation' });
+    showToast('✅ 企業チャットを開始しました', 'success');
+    await loadChatScreen();
+    if (_r && _r[0] && _r[0].id) {
+      openChatRoom(_r[0].id);
+    } else {
+      renderGroupRooms(companyId);
+    }
+  } catch(e) {
+    if (/duplicate|unique/i.test(e.message)) {
+      showToast('⚠️ この企業の企業チャットは既に存在します', 'error');
+      await loadChatScreen();
+      renderGroupRooms(companyId);
+    } else {
+      showToast('❌ ' + e.message, 'error');
+    }
+  }
+  showLoading(false);
 }
 
 // 個別チャット(人材ルーム)の完了/進行中を切り替え
@@ -4005,18 +4076,26 @@ async function openChatRoom(roomId) {
   header.innerHTML = `
     <div style="flex:1;min-width:0;">
       <div style="display:flex;align-items:center;gap:8px;">
-        <span onclick="openWorkerFromChat('${room.worker_id}')"
-          style="font-size:15px;font-weight:800;color:#202124;cursor:pointer;"
-          onmouseover="this.style.color='#1a73e8'" onmouseout="this.style.color='#202124'">
-          ${esc(room.name)}
-        </span>
-        ${room.subName ? `<span
-          onclick="openCompanyFromChat('${room.company_id}')"
-          style="font-size:13px;color:#5f6368;font-weight:400;cursor:pointer;"
-          onmouseover="this.style.color='#1a73e8';this.style.textDecoration='underline';"
-          onmouseout="this.style.color='#5f6368';this.style.textDecoration='none';">
-          ${esc(room.subName)}
-        </span>` : ''}
+        ${room.is_company_chat
+          ? `<span style="font-size:11px;background:#fde68a;color:#92400e;font-weight:700;padding:3px 10px;border-radius:12px;flex-shrink:0;">🏢 企業チャット</span>
+             <span onclick="openCompanyFromChat('${room.company_id}')"
+               style="font-size:15px;font-weight:800;color:#202124;cursor:pointer;"
+               onmouseover="this.style.color='#1a73e8'" onmouseout="this.style.color='#202124'">
+               ${esc(room.name)}
+             </span>`
+          : `<span onclick="openWorkerFromChat('${room.worker_id}')"
+              style="font-size:15px;font-weight:800;color:#202124;cursor:pointer;"
+              onmouseover="this.style.color='#1a73e8'" onmouseout="this.style.color='#202124'">
+              ${esc(room.name)}
+            </span>
+            ${room.subName ? `<span
+              onclick="openCompanyFromChat('${room.company_id}')"
+              style="font-size:13px;color:#5f6368;font-weight:400;cursor:pointer;"
+              onmouseover="this.style.color='#1a73e8';this.style.textDecoration='underline';"
+              onmouseout="this.style.color='#5f6368';this.style.textDecoration='none';">
+              ${esc(room.subName)}
+            </span>` : ''}`
+        }
       </div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
@@ -4025,21 +4104,21 @@ async function openChatRoom(roomId) {
            <button onclick="setChatStatus('${room.id}','active')" style="font-size:11px;background:none;border:1px solid #d1d5db;border-radius:8px;padding:3px 8px;cursor:pointer;color:#5f6368;">↩ 進行中に戻す</button>`
         : `<button onclick="confirmChatDone('${room.id}')" style="font-size:11px;background:none;border:1px solid #d1d5db;border-radius:8px;padding:3px 8px;cursor:pointer;color:#5f6368;font-weight:600;">✅ 完了にする</button>`
       }
-      ${room.drive_url
+      ${room.is_company_chat ? '' : (room.drive_url
         ? `<a href="${esc(room.drive_url)}" target="_blank" title="大房側Driveフォルダを開く"
             style="display:flex;align-items:center;gap:3px;height:34px;padding:0 10px;border-radius:17px;background:#e8f0fe;color:#1a73e8;font-size:12px;font-weight:600;text-decoration:none;transition:.15s;"
             onmouseover="this.style.background='#d2e3fc'" onmouseout="this.style.background='#e8f0fe'">📁 大房</a>`
         : `<button onclick="setChatDriveUrl('${room.id}','ofusa')" title="大房側DriveフォルダのURLを設定"
             style="display:flex;align-items:center;gap:3px;height:34px;padding:0 10px;border-radius:17px;background:#f1f3f4;color:#5f6368;border:1px dashed #bdc1c6;font-size:12px;font-weight:600;cursor:pointer;transition:.15s;"
-            onmouseover="this.style.background='#e8eaed'" onmouseout="this.style.background='#f1f3f4'">＋ 大房Drive</button>`
+            onmouseover="this.style.background='#e8eaed'" onmouseout="this.style.background='#f1f3f4'">＋ 大房Drive</button>`)
       }
-      ${room.drive_url_kmt
+      ${room.is_company_chat ? '' : (room.drive_url_kmt
         ? `<a href="${esc(room.drive_url_kmt)}" target="_blank" title="KMT側Driveフォルダを開く"
             style="display:flex;align-items:center;gap:3px;height:34px;padding:0 10px;border-radius:17px;background:#e6f4ea;color:#137333;font-size:12px;font-weight:600;text-decoration:none;transition:.15s;"
             onmouseover="this.style.background='#ceead6'" onmouseout="this.style.background='#e6f4ea'">📁 KMT</a>`
         : `<button onclick="setChatDriveUrl('${room.id}','kmt')" title="KMT側DriveフォルダのURLを設定"
             style="display:flex;align-items:center;gap:3px;height:34px;padding:0 10px;border-radius:17px;background:#f1f3f4;color:#5f6368;border:1px dashed #bdc1c6;font-size:12px;font-weight:600;cursor:pointer;transition:.15s;"
-            onmouseover="this.style.background='#e8eaed'" onmouseout="this.style.background='#f1f3f4'">＋ KMT Drive</button>`
+            onmouseover="this.style.background='#e8eaed'" onmouseout="this.style.background='#f1f3f4'">＋ KMT Drive</button>`)
       }
     </div>`;
 
