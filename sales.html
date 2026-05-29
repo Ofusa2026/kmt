@@ -1,1 +1,710 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KMT 売上管理</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f4f2ec; --surface:#ffffff; --surface-2:#faf9f5;
+    --ink:#1b1d1a; --ink-2:#5c5f57; --ink-3:#8d9086;
+    --line:#e4e1d7; --line-2:#efece4;
+    --accent:#0f5e52; --accent-soft:#e2efeb; --accent-ink:#0a4138;
+    --amber:#b4791b; --amber-soft:#f7ecd6;
+    --blue:#2a5d99; --blue-soft:#e1ebf6;
+    --green:#2e7d4f; --green-soft:#e0f0e6;
+    --red:#b23b3b; --red-soft:#f6e2e2;
+    --shadow:0 1px 2px rgba(27,29,26,.04),0 8px 24px -12px rgba(27,29,26,.18);
+    --r:14px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:"Noto Sans JP",sans-serif;background:var(--bg);color:var(--ink);
+    -webkit-font-smoothing:antialiased;line-height:1.5;font-size:14px}
+  .num{font-family:"JetBrains Mono","Noto Sans JP",monospace;font-feature-settings:"tnum";letter-spacing:-.02em}
+  .app{display:flex;min-height:100vh}
 
+  /* Sidebar */
+  .side{width:232px;background:var(--ink);color:#dcded6;position:fixed;top:0;bottom:0;left:0;
+    display:flex;flex-direction:column;padding:22px 14px;z-index:30}
+  .brand{display:flex;align-items:center;gap:11px;padding:6px 8px 22px}
+  .brand .mark{width:38px;height:38px;border-radius:10px;background:var(--accent);
+    display:grid;place-items:center;font-family:"Space Grotesk";font-weight:700;color:#fff;font-size:17px;letter-spacing:-.5px}
+  .brand b{font-family:"Space Grotesk";font-size:16px;color:#fff;letter-spacing:.3px;display:block}
+  .brand small{font-size:10.5px;color:#9a9d92;letter-spacing:.12em;text-transform:uppercase}
+  .nav{display:flex;flex-direction:column;gap:3px;margin-top:6px}
+  .nav button{display:flex;align-items:center;gap:11px;width:100%;background:none;border:none;
+    color:#b9bcb2;font-family:inherit;font-size:13.5px;font-weight:500;padding:10px 12px;border-radius:10px;
+    cursor:pointer;text-align:left;transition:.15s}
+  .nav button .ic{width:18px;text-align:center;font-size:15px;opacity:.85}
+  .nav button:hover{background:rgba(255,255,255,.06);color:#fff}
+  .nav button.on{background:var(--accent);color:#fff}
+  .nav button.on .ic{opacity:1}
+  .side .foot{margin-top:auto;padding:12px 10px 2px;border-top:1px solid rgba(255,255,255,.08);font-size:11px;color:#82857c}
+  .side .foot .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#5fb98a;margin-right:6px;vertical-align:middle}
+
+  /* Main */
+  .main{flex:1;margin-left:232px;min-width:0}
+  .top{position:sticky;top:0;background:rgba(244,242,236,.86);backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--line);padding:18px 30px;display:flex;align-items:center;gap:16px;z-index:20}
+  .top h1{font-size:19px;font-weight:700;letter-spacing:.01em}
+  .top .sub{color:var(--ink-3);font-size:12px;margin-top:1px}
+  .top .spacer{flex:1}
+  .monthsel{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);
+    border-radius:10px;padding:6px 8px 6px 12px;box-shadow:var(--shadow)}
+  .monthsel label{font-size:11px;color:var(--ink-3);font-weight:500}
+  .monthsel input{border:none;font-family:"JetBrains Mono";font-size:13px;color:var(--ink);background:none;outline:none;width:96px}
+  .wrap{padding:26px 30px 60px;max-width:1280px}
+  .page{display:none}.page.on{display:block;animation:fade .35s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  /* KPI */
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px}
+  .kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:17px 18px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+  .kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
+  .kpi.k-amber::before{background:var(--amber)}.kpi.k-blue::before{background:var(--blue)}.kpi.k-green::before{background:var(--green)}
+  .kpi .lab{font-size:11.5px;color:var(--ink-3);font-weight:500;display:flex;align-items:center;gap:6px}
+  .kpi .val{font-size:25px;font-weight:700;margin-top:7px}
+  .kpi .val small{font-size:13px;color:var(--ink-2);font-weight:500}
+  .kpi .meta{font-size:11px;color:var(--ink-3);margin-top:4px}
+
+  .grid2{display:grid;grid-template-columns:1.55fr 1fr;gap:14px;margin-bottom:14px}
+  .grid2b{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px 20px;box-shadow:var(--shadow)}
+  .card h3{font-size:13.5px;font-weight:700;margin-bottom:2px;display:flex;align-items:center;gap:8px}
+  .card .csub{font-size:11px;color:var(--ink-3);margin-bottom:14px}
+  .chartbox{position:relative;height:240px}
+  .chartbox.sm{height:210px}
+
+  /* ranking */
+  .rank{list-style:none;display:flex;flex-direction:column;gap:9px;margin-top:4px}
+  .rank li{display:flex;align-items:center;gap:10px;font-size:12.5px}
+  .rank .nm{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rank .bar{height:6px;border-radius:4px;background:var(--accent);min-width:3px}
+  .rank .amt{font-weight:700;width:96px;text-align:right}
+
+  /* table */
+  .toolbar{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+  .toolbar .grow{flex:1}
+  select,input[type=text],input[type=number],input[type=date],input[type=month]{
+    font-family:inherit;font-size:13px;color:var(--ink);background:var(--surface);
+    border:1px solid var(--line);border-radius:9px;padding:8px 11px;outline:none;transition:.15s}
+  select:focus,input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .btn{font-family:inherit;font-size:13px;font-weight:600;border:1px solid var(--line);background:var(--surface);
+    color:var(--ink);border-radius:9px;padding:8px 15px;cursor:pointer;transition:.15s;display:inline-flex;align-items:center;gap:7px}
+  .btn:hover{border-color:var(--ink-3)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn.primary:hover{background:var(--accent-ink)}
+  .btn.ghost{background:none}
+  .btn.sm{padding:5px 10px;font-size:12px}
+  .tablecard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden}
+  table{width:100%;border-collapse:collapse}
+  thead th{font-size:11px;color:var(--ink-3);font-weight:600;text-align:left;padding:11px 14px;
+    background:var(--surface-2);border-bottom:1px solid var(--line);white-space:nowrap;letter-spacing:.02em}
+  thead th.r,td.r{text-align:right}
+  tbody td{padding:11px 14px;border-bottom:1px solid var(--line-2);font-size:12.7px;vertical-align:middle}
+  tbody tr:last-child td{border-bottom:none}
+  tbody tr:hover{background:var(--surface-2)}
+  .tname{font-weight:600}
+  .tsub{font-size:11px;color:var(--ink-3)}
+  .badge{display:inline-block;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;white-space:nowrap}
+  .b-amber{background:var(--amber-soft);color:var(--amber)}
+  .b-blue{background:var(--blue-soft);color:var(--blue)}
+  .b-green{background:var(--green-soft);color:var(--green)}
+  .b-red{background:var(--red-soft);color:var(--red)}
+  .b-gray{background:#eceae3;color:var(--ink-2)}
+  .chip{font-size:11px;padding:2px 8px;border-radius:6px;background:var(--surface-2);border:1px solid var(--line);color:var(--ink-2)}
+  .rowact{display:flex;gap:5px;justify-content:flex-end}
+  .iconbtn{border:1px solid var(--line);background:var(--surface);border-radius:7px;width:28px;height:28px;
+    cursor:pointer;font-size:13px;color:var(--ink-2);transition:.15s}
+  .iconbtn:hover{border-color:var(--accent);color:var(--accent)}
+  .empty{padding:50px;text-align:center;color:var(--ink-3);font-size:13px}
+  .tfoot{padding:12px 14px;background:var(--surface-2);border-top:1px solid var(--line);font-size:12px;color:var(--ink-2);display:flex;justify-content:space-between;align-items:center}
+
+  /* modal */
+  .ov{position:fixed;inset:0;background:rgba(20,22,19,.42);backdrop-filter:blur(2px);display:none;
+    align-items:flex-start;justify-content:center;z-index:60;padding:40px 16px;overflow:auto}
+  .ov.on{display:flex}
+  .modal{background:var(--surface);border-radius:18px;width:100%;max-width:560px;box-shadow:0 30px 80px -20px rgba(0,0,0,.4);animation:pop .25s ease}
+  @keyframes pop{from{opacity:0;transform:translateY(14px) scale(.98)}to{opacity:1;transform:none}}
+  .modal .mh{padding:20px 24px;border-bottom:1px solid var(--line);display:flex;align-items:center}
+  .modal .mh h3{font-size:16px;font-weight:700}
+  .modal .mh .x{margin-left:auto;cursor:pointer;font-size:22px;color:var(--ink-3);line-height:1;border:none;background:none}
+  .modal .mb{padding:22px 24px}
+  .fgrid{display:grid;grid-template-columns:1fr 1fr;gap:13px 16px}
+  .f{display:flex;flex-direction:column;gap:5px}
+  .f.full{grid-column:1/-1}
+  .f label{font-size:11.5px;color:var(--ink-2);font-weight:600}
+  .f input,.f select,.f textarea{width:100%;font-family:inherit}
+  .f textarea{font-size:13px;border:1px solid var(--line);border-radius:9px;padding:8px 11px;resize:vertical;min-height:54px;outline:none}
+  .calcline{grid-column:1/-1;background:var(--accent-soft);border-radius:10px;padding:11px 14px;display:flex;justify-content:space-between;align-items:center}
+  .calcline .l{font-size:12px;color:var(--accent-ink);font-weight:600}
+  .calcline .v{font-size:18px;font-weight:700;color:var(--accent-ink)}
+  .modal .mf{padding:16px 24px;border-top:1px solid var(--line);display:flex;gap:10px;justify-content:flex-end}
+
+  /* gen preview */
+  .genbar{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);
+    border-radius:var(--r);padding:16px 18px;box-shadow:var(--shadow);margin-bottom:16px}
+  .gennum{font-weight:700}
+  .genrow-skip{opacity:.5}
+  .miniinput{width:74px;font-family:"JetBrains Mono";font-size:12.5px;padding:5px 8px;text-align:right}
+
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;
+    padding:12px 20px;border-radius:11px;font-size:13px;font-weight:500;box-shadow:0 12px 30px rgba(0,0,0,.3);
+    opacity:0;pointer-events:none;transition:.3s;z-index:90}
+  .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+  .loading{padding:60px;text-align:center;color:var(--ink-3)}
+  .spin{display:inline-block;width:22px;height:22px;border:3px solid var(--line);border-top-color:var(--accent);
+    border-radius:50%;animation:sp .7s linear infinite;vertical-align:middle;margin-right:9px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  @media(max-width:980px){.kpis{grid-template-columns:repeat(2,1fr)}.grid2,.grid2b{grid-template-columns:1fr}
+    .side{width:64px}.brand b,.brand small,.nav button span:not(.ic),.side .foot{display:none}.nav button{justify-content:center}.main{margin-left:64px}.wrap,.top{padding-left:16px;padding-right:16px}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand">
+      <div class="mark">K</div>
+      <div><b>KMT</b><small>売上管理</small></div>
+    </div>
+    <nav class="nav" id="nav">
+      <button data-pg="dash" class="on"><span class="ic">◧</span><span>ダッシュボード</span></button>
+      <button data-pg="sales"><span class="ic">¥</span><span>売上明細</span></button>
+      <button data-pg="gen"><span class="ic">⟳</span><span>月次委託費 生成</span></button>
+      <button data-pg="fc"><span class="ic">◔</span><span>売上見込み</span></button>
+      <button data-pg="comp"><span class="ic">▤</span><span>企業マスタ</span></button>
+    </nav>
+    <div class="foot"><span class="dot"></span>KMT案件管理DB 接続中<br><span style="font-size:9px;color:#6b6e65">ver.20260529.01</span></div>
+  </aside>
+
+  <main class="main">
+    <header class="top">
+      <div>
+        <h1 id="pgTitle">ダッシュボード</h1>
+        <div class="sub" id="pgSub">支援委託費・一時金・初期費用の売上集計</div>
+      </div>
+      <div class="spacer"></div>
+      <div class="monthsel">
+        <label>対象月</label>
+        <input type="month" id="globalMonth">
+      </div>
+      <button class="btn ghost sm" id="reloadBtn" title="再読込">⟲ 更新</button>
+    </header>
+
+    <div class="wrap">
+      <!-- DASHBOARD -->
+      <section class="page on" id="pg-dash">
+        <div class="kpis" id="kpis"></div>
+        <div class="grid2">
+          <div class="card">
+            <h3>月別売上推移</h3>
+            <div class="csub">税込・直近12ヶ月（請求ベース／入金済を色分け）</div>
+            <div class="chartbox"><canvas id="chMonthly"></canvas></div>
+          </div>
+          <div class="card">
+            <h3>種別構成</h3>
+            <div class="csub" id="pieSub">対象月の売上内訳</div>
+            <div class="chartbox sm"><canvas id="chType"></canvas></div>
+          </div>
+        </div>
+        <div class="grid2b">
+          <div class="card">
+            <h3>企業別売上ランキング</h3>
+            <div class="csub" id="rankSub">対象月・税込</div>
+            <ul class="rank" id="rankList"></ul>
+          </div>
+          <div class="card">
+            <h3>ステータス内訳</h3>
+            <div class="csub">対象月の請求状況（税込）</div>
+            <div class="chartbox sm"><canvas id="chStatus"></canvas></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SALES -->
+      <section class="page" id="pg-sales">
+        <div class="toolbar">
+          <select id="fMonth"><option value="">全期間</option></select>
+          <select id="fCompany"><option value="">全企業</option></select>
+          <select id="fType"><option value="">全種別</option></select>
+          <select id="fStatus">
+            <option value="">全ステータス</option>
+            <option>未請求</option><option>請求済</option><option>入金済</option><option>未入金</option>
+          </select>
+          <div class="grow"></div>
+          <button class="btn primary" id="addSale">＋ 売上を追加</button>
+        </div>
+        <div class="tablecard">
+          <table>
+            <thead><tr>
+              <th>請求月</th><th>企業</th><th>種別</th><th class="r">人数</th><th class="r">単価</th>
+              <th class="r">税抜</th><th class="r">税込</th><th>ステータス</th><th>入金日</th><th></th>
+            </tr></thead>
+            <tbody id="salesBody"></tbody>
+          </table>
+          <div class="tfoot" id="salesFoot"></div>
+        </div>
+      </section>
+
+      <!-- GEN monthly -->
+      <section class="page" id="pg-gen">
+        <div class="genbar">
+          <div class="f" style="gap:5px">
+            <label style="font-size:11.5px;color:var(--ink-2);font-weight:600">生成する請求月</label>
+            <input type="month" id="genMonth">
+          </div>
+          <div class="f" style="gap:5px">
+            <label style="font-size:11.5px;color:var(--ink-2);font-weight:600">対象</label>
+            <select id="genScope">
+              <option value="active">稼働中の企業（月次）</option>
+              <option value="all">全企業</option>
+            </select>
+          </div>
+          <button class="btn" id="genPreview">プレビュー算出</button>
+          <div class="grow"></div>
+          <button class="btn primary" id="genRun" disabled>選択した行を一括生成</button>
+        </div>
+        <div class="tablecard">
+          <table>
+            <thead><tr>
+              <th style="width:38px"><input type="checkbox" id="genAll"></th>
+              <th>企業</th><th>請求サイクル</th><th class="r">在職人数</th><th class="r">単価</th>
+              <th class="r">税抜</th><th class="r">税込</th><th>状態</th>
+            </tr></thead>
+            <tbody id="genBody"><tr><td colspan="8" class="empty">月を選んで「プレビュー算出」を押してください</td></tr></tbody>
+          </table>
+          <div class="tfoot" id="genFoot"><span></span></div>
+        </div>
+      </section>
+
+      <!-- FORECAST -->
+      <section class="page" id="pg-fc">
+        <div class="kpis" id="fcKpis" style="grid-template-columns:repeat(3,1fr)"></div>
+        <div class="toolbar">
+          <select id="fcMonth"><option value="">全期間</option></select>
+          <select id="fcCert">
+            <option value="">全確度</option><option>確定</option><option>50%</option><option>期待</option>
+          </select>
+          <div class="grow"></div>
+          <button class="btn primary" id="addFc">＋ 見込みを追加</button>
+        </div>
+        <div class="tablecard">
+          <table>
+            <thead><tr>
+              <th>見込月</th><th>企業</th><th>項目</th><th>カテゴリ</th><th>主体</th>
+              <th class="r">税抜</th><th class="r">税込</th><th>確度</th><th></th>
+            </tr></thead>
+            <tbody id="fcBody"></tbody>
+          </table>
+          <div class="tfoot" id="fcFoot"></div>
+        </div>
+      </section>
+
+      <!-- COMPANIES -->
+      <section class="page" id="pg-comp">
+        <div class="toolbar">
+          <input type="text" id="compSearch" placeholder="企業名で検索…" style="min-width:240px">
+          <div class="grow"></div>
+        </div>
+        <div class="tablecard">
+          <table>
+            <thead><tr>
+              <th>企業名</th><th>区分</th><th class="r">単価/人</th><th>請求サイクル</th>
+              <th>請求開始月</th><th>請求先</th><th>担当</th><th>状態</th><th></th>
+            </tr></thead>
+            <tbody id="compBody"></tbody>
+          </table>
+          <div class="tfoot" id="compFoot"></div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<!-- Sale modal -->
+<div class="ov" id="saleOv"><div class="modal">
+  <div class="mh"><h3 id="saleMTitle">売上を追加</h3><button class="x" data-close>×</button></div>
+  <div class="mb"><div class="fgrid">
+    <div class="f full"><label>企業</label><select id="s_company"></select></div>
+    <div class="f"><label>請求月</label><input type="month" id="s_month"></div>
+    <div class="f"><label>種別</label><select id="s_type">
+      <option>通常委託費</option><option>新規委託費</option><option>初期費用</option><option>一時金</option><option>紹介費</option><option>その他</option>
+    </select></div>
+    <div class="f"><label>単価（税抜）</label><input type="number" id="s_price" class="num"></div>
+    <div class="f"><label>人数 / 数量</label><input type="number" id="s_qty" class="num" value="1"></div>
+    <div class="calcline"><span class="l">税抜 → 税込（10%）</span><span class="v"><span id="s_excl" class="num">¥0</span> → <span id="s_incl" class="num">¥0</span></span></div>
+    <div class="f"><label>ステータス</label><select id="s_status">
+      <option>未請求</option><option>請求済</option><option>入金済</option><option>未入金</option>
+    </select></div>
+    <div class="f"><label>請求日</label><input type="date" id="s_billed"></div>
+    <div class="f"><label>入金日</label><input type="date" id="s_paid"></div>
+    <div class="f full"><label>メモ</label><textarea id="s_notes"></textarea></div>
+  </div></div>
+  <div class="mf"><button class="btn ghost" data-close>キャンセル</button><button class="btn primary" id="saleSave">保存</button></div>
+</div></div>
+
+<!-- Forecast modal -->
+<div class="ov" id="fcOv"><div class="modal">
+  <div class="mh"><h3 id="fcMTitle">見込みを追加</h3><button class="x" data-close>×</button></div>
+  <div class="mb"><div class="fgrid">
+    <div class="f full"><label>企業</label><select id="c_company"></select></div>
+    <div class="f"><label>見込月</label><input type="month" id="c_month"></div>
+    <div class="f"><label>カテゴリ</label><select id="c_category">
+      <option>委託費</option><option>初期費用</option><option>紹介費</option><option>その他</option>
+    </select></div>
+    <div class="f"><label>項目名</label><input type="text" id="c_item"></div>
+    <div class="f"><label>主体</label><select id="c_entity"><option>株式会社KMT</option><option>一般社団法人KMT</option></select></div>
+    <div class="f"><label>単価（税抜）</label><input type="number" id="c_price" class="num"></div>
+    <div class="f"><label>数量</label><input type="number" id="c_qty" class="num" value="1"></div>
+    <div class="calcline"><span class="l">税抜 → 税込（10%）</span><span class="v"><span id="c_excl" class="num">¥0</span> → <span id="c_incl" class="num">¥0</span></span></div>
+    <div class="f"><label>確度</label><select id="c_cert"><option>確定</option><option>50%</option><option>期待</option></select></div>
+    <div class="f full"><label>メモ</label><textarea id="c_notes"></textarea></div>
+  </div></div>
+  <div class="mf"><button class="btn ghost" data-close>キャンセル</button><button class="btn primary" id="fcSave">保存</button></div>
+</div></div>
+
+<!-- Company modal -->
+<div class="ov" id="compOv"><div class="modal">
+  <div class="mh"><h3 id="compMTitle">企業 請求設定</h3><button class="x" data-close>×</button></div>
+  <div class="mb"><div class="fgrid">
+    <div class="f full"><label>企業名</label><input type="text" id="m_name" disabled></div>
+    <div class="f"><label>単価 / 人（税抜）</label><input type="number" id="m_fee" class="num"></div>
+    <div class="f"><label>請求サイクル</label><select id="m_cycle"><option>月次</option><option>3ヶ月</option><option>6ヶ月</option><option>年次</option><option value="">未設定</option></select></div>
+    <div class="f"><label>請求開始月</label><input type="month" id="m_start"></div>
+    <div class="f"><label>状態</label><select id="m_status"><option value="active">稼働中</option><option value="inactive">停止</option><option value="ended">終了</option></select></div>
+    <div class="f full"><label>請求先</label><input type="text" id="m_invoice"></div>
+  </div></div>
+  <div class="mf"><button class="btn ghost" data-close>キャンセル</button><button class="btn primary" id="compSave">保存</button></div>
+</div></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SB="https://oyblvyocvdnhcxeeokuw.supabase.co";
+const KEY="sb_publishable_4eI_7HdWRTnYaUpm7-mlRQ_4P3ialza";
+const H={apikey:KEY,Authorization:"Bearer "+KEY,"Content-Type":"application/json"};
+const TAX=0.10;
+const yen=n=>"¥"+Math.round(n||0).toLocaleString("ja-JP");
+const incl=ex=>Math.round((ex||0)*(1+TAX));
+const $=id=>document.getElementById(id);
+const esc=s=>(s==null?"":String(s)).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const ym=d=>d.toISOString().slice(0,7);
+const toast=(m)=>{const t=$("toast");t.textContent=m;t.classList.add("on");setTimeout(()=>t.classList.remove("on"),2200);};
+
+// data stores
+let FEES=[],FC=[],COMP=[],WORKERS=[];
+let compMap={};
+let CUR_MONTH=ym(new Date());
+let charts={};
+
+async function api(path,opt={}){
+  const r=await fetch(SB+"/rest/v1/"+path,{headers:H,...opt});
+  if(!r.ok){const t=await r.text();throw new Error(r.status+" "+t);}
+  if(opt.method&&opt.method!=="GET"){const t=await r.text();return t?JSON.parse(t):null;}
+  return r.json();
+}
+async function loadAll(){
+  $("kpis").innerHTML='<div class="loading"><span class="spin"></span>読み込み中…</div>';
+  try{
+    [COMP,FEES,FC,WORKERS]=await Promise.all([
+      api("companies?select=id,name,name_kana,fee_per_person,billing_cycle,billing_start_month,invoice_to,status,kmt_corp_type,main_staff,sub_staff&order=name"),
+      api("support_fees?select=*,companies(name)&order=billing_month.desc"),
+      api("sales_forecast?select=*,companies(name)&order=billing_month.desc"),
+      api("workers?select=id,company_id,status,joined_date,left_date")
+    ]);
+    compMap={};COMP.forEach(c=>compMap[c.id]=c);
+    fillSelects();renderAll();
+  }catch(e){
+    $("kpis").innerHTML='<div class="card" style="grid-column:1/-1;color:var(--red)">接続エラー: '+esc(e.message)+'</div>';
+  }
+}
+const cname=row=>row.companies?.name||compMap[row.company_id]?.name||"(企業未設定)";
+
+function fillSelects(){
+  const months=[...new Set(FEES.map(f=>f.billing_month).filter(Boolean))].sort().reverse();
+  const fcMonths=[...new Set(FC.map(f=>f.billing_month).filter(Boolean))].sort().reverse();
+  const types=[...new Set(FEES.map(f=>f.fee_type).filter(Boolean))];
+  const opt=a=>a.map(v=>`<option>${esc(v)}</option>`).join("");
+  $("fMonth").innerHTML='<option value="">全期間</option>'+opt(months);
+  $("fcMonth").innerHTML='<option value="">全期間</option>'+opt(fcMonths);
+  $("fType").innerHTML='<option value="">全種別</option>'+opt(types);
+  const comps=COMP.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join("");
+  $("fCompany").innerHTML='<option value="">全企業</option>'+comps;
+  ["s_company","c_company"].forEach(id=>$(id).innerHTML=comps);
+}
+
+function renderAll(){renderDash();renderSales();renderFc();renderComp();}
+
+/* ---------- DASHBOARD ---------- */
+function monthFees(m){return FEES.filter(f=>f.billing_month===m);}
+function renderDash(){
+  const m=CUR_MONTH, mf=monthFees(m);
+  const sum=a=>a.reduce((s,f)=>s+(f.amount_incl||incl(f.amount_excl)),0);
+  const billed=sum(mf.filter(f=>f.status&&f.status!=="未請求"));
+  const paid=sum(mf.filter(f=>f.status==="入金済"));
+  const unbilled=sum(mf.filter(f=>!f.status||f.status==="未請求"));
+  const fy=fiscalRange(m);
+  const fyTotal=sum(FEES.filter(f=>f.billing_month>=fy.s&&f.billing_month<=fy.e));
+  const card=(cls,lab,val,meta)=>`<div class="kpi ${cls}"><div class="lab">${lab}</div><div class="val num">${val}</div><div class="meta">${meta}</div></div>`;
+  $("kpis").innerHTML=
+    card("k-blue","当月 請求額",yen(billed),m+"・"+mf.filter(f=>f.status&&f.status!=="未請求").length+"件")+
+    card("k-green","当月 入金済",yen(paid),(billed?Math.round(paid/billed*100):0)+"% 回収")+
+    card("k-amber","当月 未請求",yen(unbilled),mf.filter(f=>!f.status||f.status==="未請求").length+"件 未処理")+
+    card("","今期累計 (税込)",yen(fyTotal),fy.s+" 〜 "+fy.e);
+
+  // monthly trend 12m
+  const last=[];for(let i=11;i>=0;i--){const d=new Date(m+"-01");d.setMonth(d.getMonth()-i);last.push(ym(d));}
+  const billedArr=last.map(mm=>monthFees(mm).filter(f=>f.status&&f.status!=="未請求").reduce((s,f)=>s+(f.amount_incl||incl(f.amount_excl)),0));
+  const paidArr=last.map(mm=>monthFees(mm).filter(f=>f.status==="入金済").reduce((s,f)=>s+(f.amount_incl||incl(f.amount_excl)),0));
+  drawBar("chMonthly",last.map(x=>x.slice(2)),[
+    {label:"請求額",data:billedArr,color:getCss("--blue")},
+    {label:"入金済",data:paidArr,color:getCss("--accent")}
+  ]);
+
+  // type pie
+  $("pieSub").textContent=m+" の売上内訳（税込）";
+  const byType={};mf.forEach(f=>{const k=f.fee_type||"その他";byType[k]=(byType[k]||0)+(f.amount_incl||incl(f.amount_excl));});
+  drawDonut("chType",Object.keys(byType),Object.values(byType));
+
+  // ranking
+  const byComp={};mf.forEach(f=>{const k=cname(f);byComp[k]=(byComp[k]||0)+(f.amount_incl||incl(f.amount_excl));});
+  const ranked=Object.entries(byComp).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const mx=ranked.length?ranked[0][1]:1;
+  $("rankSub").textContent=m+"・税込（上位"+ranked.length+"社）";
+  $("rankList").innerHTML=ranked.length?ranked.map(([n,v])=>
+    `<li><span class="nm">${esc(n)}</span><span class="bar" style="width:${Math.max(3,v/mx*120)}px"></span><span class="amt num">${yen(v)}</span></li>`
+  ).join(""):'<li style="color:var(--ink-3)">この月のデータはありません</li>';
+
+  // status donut
+  const order=["未請求","請求済","入金済","未入金"];
+  const byStat={};mf.forEach(f=>{const k=f.status||"未請求";byStat[k]=(byStat[k]||0)+(f.amount_incl||incl(f.amount_excl));});
+  const labs=order.filter(o=>byStat[o]);
+  drawDonut("chStatus",labs,labs.map(l=>byStat[l]),labs.map(statColor));
+}
+function fiscalRange(m){ // KMT fiscal year guess: Apr-Mar
+  const [y,mo]=m.split("-").map(Number);
+  const sy=mo>=4?y:y-1;
+  return {s:sy+"-04",e:(sy+1)+"-03"};
+}
+function statColor(s){return {"未請求":getCss("--amber"),"請求済":getCss("--blue"),"入金済":getCss("--accent"),"未入金":getCss("--red")}[s]||getCss("--ink-3");}
+function getCss(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}
+
+function drawBar(id,labels,sets){
+  if(charts[id])charts[id].destroy();
+  charts[id]=new Chart($(id),{type:"bar",data:{labels,datasets:sets.map(s=>({label:s.label,data:s.data,backgroundColor:s.color,borderRadius:5,maxBarThickness:26}))},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom",labels:{font:{family:"Noto Sans JP",size:11},usePointStyle:true,pointStyle:"circle",padding:14}},
+      tooltip:{callbacks:{label:c=>c.dataset.label+": "+yen(c.raw)}}},
+      scales:{x:{grid:{display:false},ticks:{font:{family:"JetBrains Mono",size:10}}},
+        y:{grid:{color:getCss("--line-2")},ticks:{font:{family:"JetBrains Mono",size:10},callback:v=>v>=1e6?(v/1e6)+"M":v/1e3+"k"}}}}});
+}
+function drawDonut(id,labels,data,colors){
+  if(charts[id])charts[id].destroy();
+  const pal=colors||[getCss("--accent"),getCss("--blue"),getCss("--amber"),getCss("--green"),getCss("--red"),getCss("--ink-3")];
+  if(!data.length){const ctx=$(id).getContext("2d");charts[id]&&charts[id].destroy();ctx.clearRect(0,0,$(id).width,$(id).height);
+    charts[id]=new Chart($(id),{type:"doughnut",data:{labels:["データなし"],datasets:[{data:[1],backgroundColor:[getCss("--line")]}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{enabled:false}}}});return;}
+  charts[id]=new Chart($(id),{type:"doughnut",data:{labels,datasets:[{data,backgroundColor:pal,borderWidth:2,borderColor:getCss("--surface")}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:"60%",plugins:{legend:{position:"bottom",labels:{font:{family:"Noto Sans JP",size:11},usePointStyle:true,pointStyle:"circle",padding:12}},
+      tooltip:{callbacks:{label:c=>c.label+": "+yen(c.raw)}}}}});
+}
+
+/* ---------- SALES ---------- */
+function badgeStat(s){const map={"未請求":"b-amber","請求済":"b-blue","入金済":"b-green","未入金":"b-red"};return `<span class="badge ${map[s]||"b-gray"}">${esc(s||"未請求")}</span>`;}
+function renderSales(){
+  const fm=$("fMonth").value,fc=$("fCompany").value,ft=$("fType").value,fs=$("fStatus").value;
+  let rows=FEES.filter(f=>(!fm||f.billing_month===fm)&&(!fc||f.company_id===fc)&&(!ft||f.fee_type===ft)&&(!fs||(f.status||"未請求")===fs));
+  const body=$("salesBody");
+  if(!rows.length){body.innerHTML='<tr><td colspan="10" class="empty">該当する売上がありません</td></tr>';$("salesFoot").innerHTML="";return;}
+  body.innerHTML=rows.map(f=>{const ex=f.amount_excl||0,inc=f.amount_incl||incl(ex);
+    return `<tr>
+      <td class="num">${esc(f.billing_month||"")}</td>
+      <td class="tname">${esc(cname(f))}</td>
+      <td><span class="chip">${esc(f.fee_type||"-")}</span></td>
+      <td class="r num">${f.worker_count??""}</td>
+      <td class="r num">${ex&&f.worker_count?yen(f.unit_price||0):"-"}</td>
+      <td class="r num">${yen(ex)}</td>
+      <td class="r num" style="font-weight:700">${yen(inc)}</td>
+      <td>${badgeStat(f.status)}</td>
+      <td class="num tsub">${esc(f.paid_date||"")}</td>
+      <td><div class="rowact">
+        <button class="iconbtn" onclick="editSale('${f.id}')">✎</button>
+        <button class="iconbtn" onclick="delSale('${f.id}')">🗑</button>
+      </div></td></tr>`;}).join("");
+  const tx=rows.reduce((s,f)=>s+(f.amount_excl||0),0);
+  const ti=rows.reduce((s,f)=>s+(f.amount_incl||incl(f.amount_excl)),0);
+  $("salesFoot").innerHTML=`<span>${rows.length} 件</span><span>合計　税抜 <b class="num">${yen(tx)}</b>　／　税込 <b class="num">${yen(ti)}</b></span>`;
+}
+["fMonth","fCompany","fType","fStatus"].forEach(id=>document.addEventListener("change",e=>{if(e.target.id===id)renderSales();}));
+
+let editId=null;
+function openSale(){$("saleOv").classList.add("on");}
+function calcSale(){const ex=(+$("s_price").value||0)*(+$("s_qty").value||0);$("s_excl").textContent=yen(ex);$("s_incl").textContent=yen(incl(ex));}
+["s_price","s_qty"].forEach(id=>$(id).addEventListener("input",calcSale));
+$("addSale").onclick=()=>{editId=null;$("saleMTitle").textContent="売上を追加";
+  $("s_company").value=COMP[0]?.id||"";$("s_month").value=CUR_MONTH;$("s_type").value="通常委託費";
+  $("s_price").value="";$("s_qty").value=1;$("s_status").value="未請求";$("s_billed").value="";$("s_paid").value="";$("s_notes").value="";calcSale();openSale();};
+window.editSale=(id)=>{const f=FEES.find(x=>x.id===id);if(!f)return;editId=id;$("saleMTitle").textContent="売上を編集";
+  $("s_company").value=f.company_id||"";$("s_month").value=f.billing_month||"";$("s_type").value=f.fee_type||"通常委託費";
+  $("s_price").value=f.unit_price||(f.worker_count?Math.round(f.amount_excl/f.worker_count):f.amount_excl)||"";
+  $("s_qty").value=f.worker_count||1;$("s_status").value=f.status||"未請求";$("s_billed").value=f.billed_date||"";$("s_paid").value=f.paid_date||"";$("s_notes").value=f.notes||"";calcSale();openSale();};
+$("saleSave").onclick=async()=>{
+  const price=+$("s_price").value||0,qty=+$("s_qty").value||0,ex=price*qty;
+  const payload={company_id:$("s_company").value,billing_month:$("s_month").value,fee_type:$("s_type").value,
+    worker_count:qty,unit_price:price,amount_excl:ex,amount_incl:incl(ex),status:$("s_status").value,
+    billed_date:$("s_billed").value||null,paid_date:$("s_paid").value||null,notes:$("s_notes").value||null};
+  try{
+    if(editId)await api("support_fees?id=eq."+editId,{method:"PATCH",headers:{...H,Prefer:"return=minimal"},body:JSON.stringify(payload)});
+    else await api("support_fees",{method:"POST",headers:{...H,Prefer:"return=minimal"},body:JSON.stringify(payload)});
+    $("saleOv").classList.remove("on");toast(editId?"更新しました":"追加しました");await loadAll();
+  }catch(e){toast("保存失敗: "+e.message);}
+};
+window.delSale=async(id)=>{if(!confirm("この売上明細を削除しますか？"))return;
+  try{await api("support_fees?id=eq."+id,{method:"DELETE",headers:{...H,Prefer:"return=minimal"}});toast("削除しました");await loadAll();}
+  catch(e){toast("削除失敗: "+e.message);}};
+
+/* ---------- GEN monthly ---------- */
+let genRows=[];
+function activeCount(companyId,m){
+  const endM=m+"-31",startM=m+"-01";
+  return WORKERS.filter(w=>w.company_id===companyId
+    &&(!w.joined_date||w.joined_date<=endM)
+    &&(!w.left_date||w.left_date>=startM)
+    &&(!w.status||!["退職","帰国","失踪"].includes(w.status))).length;
+}
+$("genPreview").onclick=()=>{
+  const m=$("genMonth").value;if(!m){toast("生成する月を選んでください");return;}
+  const scope=$("genScope").value;
+  let comps=COMP.slice();
+  if(scope==="active")comps=comps.filter(c=>(c.status||"active")==="active"&&(c.billing_cycle||"月次")==="月次");
+  genRows=comps.map(c=>{
+    const exists=FEES.some(f=>f.company_id===c.id&&f.billing_month===m&&f.fee_type==="通常委託費");
+    const cnt=activeCount(c.id,m);const price=c.fee_per_person||0;
+    return {id:c.id,name:c.name,cycle:c.billing_cycle||"-",count:cnt,price,exists,sel:!exists&&cnt>0&&price>0};
+  });
+  drawGen(m);
+};
+function drawGen(m){
+  const body=$("genBody");
+  if(!genRows.length){body.innerHTML='<tr><td colspan="8" class="empty">対象企業がありません</td></tr>';$("genRun").disabled=true;return;}
+  body.innerHTML=genRows.map((r,i)=>{const ex=r.count*r.price;
+    return `<tr class="${r.exists?'genrow-skip':''}">
+      <td><input type="checkbox" ${r.sel?"checked":""} ${r.exists?"disabled":""} onchange="genRows[${i}].sel=this.checked;updGenFoot()"></td>
+      <td class="tname">${esc(r.name)}</td>
+      <td><span class="chip">${esc(r.cycle)}</span></td>
+      <td class="r"><input type="number" class="miniinput" value="${r.count}" onchange="genRows[${i}].count=+this.value;drawGen('${m}')"></td>
+      <td class="r"><input type="number" class="miniinput" value="${r.price}" onchange="genRows[${i}].price=+this.value;drawGen('${m}')"></td>
+      <td class="r num">${yen(ex)}</td>
+      <td class="r num" style="font-weight:700">${yen(incl(ex))}</td>
+      <td>${r.exists?'<span class="badge b-gray">生成済</span>':(r.count&&r.price?'<span class="badge b-green">対象</span>':'<span class="badge b-amber">要確認</span>')}</td>
+    </tr>`;}).join("");
+  updGenFoot();
+}
+window.updGenFoot=()=>{
+  const sel=genRows.filter(r=>r.sel);
+  const ti=sel.reduce((s,r)=>s+incl(r.count*r.price),0);
+  $("genFoot").innerHTML=`<span>選択 ${sel.length} 件</span><span>生成予定 税込合計 <b class="num">${yen(ti)}</b></span>`;
+  $("genRun").disabled=!sel.length;
+};
+$("genAll").onchange=function(){genRows.forEach(r=>{if(!r.exists)r.sel=this.checked;});drawGen($("genMonth").value);};
+$("genRun").onclick=async()=>{
+  const m=$("genMonth").value;const sel=genRows.filter(r=>r.sel);
+  if(!sel.length)return;
+  if(!confirm(m+" の通常委託費を "+sel.length+" 件生成します。よろしいですか？"))return;
+  const payload=sel.map(r=>({company_id:r.id,billing_month:m,fee_type:"通常委託費",worker_count:r.count,
+    unit_price:r.price,amount_excl:r.count*r.price,amount_incl:incl(r.count*r.price),status:"未請求"}));
+  try{await api("support_fees",{method:"POST",headers:{...H,Prefer:"return=minimal"},body:JSON.stringify(payload)});
+    toast(sel.length+"件 生成しました");genRows=[];$("genBody").innerHTML='<tr><td colspan="8" class="empty">生成完了。売上明細で確認できます</td></tr>';$("genRun").disabled=true;await loadAll();}
+  catch(e){toast("生成失敗: "+e.message);}
+};
+
+/* ---------- FORECAST ---------- */
+function renderFc(){
+  const fm=$("fcMonth").value,fcc=$("fcCert").value;
+  let rows=FC.filter(f=>(!fm||f.billing_month===fm)&&(!fcc||f.certainty===fcc));
+  const sumByCert=c=>FC.filter(f=>f.certainty===c).reduce((s,f)=>s+(f.amount_incl||incl(f.amount_excl)),0);
+  const cnt=c=>FC.filter(f=>f.certainty===c).length;
+  const k=(cls,l,c)=>`<div class="kpi ${cls}"><div class="lab">${l}</div><div class="val num">${yen(sumByCert(c))}</div><div class="meta">${cnt(c)}件</div></div>`;
+  $("fcKpis").innerHTML=k("k-green","確定 見込み","確定")+k("k-blue","50% 見込み","50%")+k("k-amber","期待 見込み","期待");
+  const body=$("fcBody");
+  if(!rows.length){body.innerHTML='<tr><td colspan="9" class="empty">見込みデータがありません</td></tr>';$("fcFoot").innerHTML="";return;}
+  const cb={"確定":"b-green","50%":"b-blue","期待":"b-amber"};
+  body.innerHTML=rows.map(f=>{const ex=f.amount_excl||0;return `<tr>
+    <td class="num">${esc(f.billing_month||"")}</td><td class="tname">${esc(cname(f))}</td>
+    <td>${esc(f.item_name||"-")}</td><td><span class="chip">${esc(f.category||"-")}</span></td>
+    <td class="tsub">${esc(f.kmt_entity||"")}</td>
+    <td class="r num">${yen(ex)}</td><td class="r num" style="font-weight:700">${yen(f.amount_incl||incl(ex))}</td>
+    <td><span class="badge ${cb[f.certainty]||"b-gray"}">${esc(f.certainty||"-")}</span></td>
+    <td><div class="rowact"><button class="iconbtn" onclick="editFc('${f.id}')">✎</button><button class="iconbtn" onclick="delFc('${f.id}')">🗑</button></div></td></tr>`;}).join("");
+  const ti=rows.reduce((s,f)=>s+(f.amount_incl||incl(f.amount_excl)),0);
+  $("fcFoot").innerHTML=`<span>${rows.length}件</span><span>税込合計 <b class="num">${yen(ti)}</b></span>`;
+}
+["fcMonth","fcCert"].forEach(id=>$(id).addEventListener("change",renderFc));
+let fcEditId=null;
+function calcFc(){const ex=(+$("c_price").value||0)*(+$("c_qty").value||0);$("c_excl").textContent=yen(ex);$("c_incl").textContent=yen(incl(ex));}
+["c_price","c_qty"].forEach(id=>$(id).addEventListener("input",calcFc));
+$("addFc").onclick=()=>{fcEditId=null;$("fcMTitle").textContent="見込みを追加";
+  $("c_company").value=COMP[0]?.id||"";$("c_month").value=CUR_MONTH;$("c_category").value="委託費";$("c_item").value="";
+  $("c_entity").value="株式会社KMT";$("c_price").value="";$("c_qty").value=1;$("c_cert").value="確定";$("c_notes").value="";calcFc();$("fcOv").classList.add("on");};
+window.editFc=id=>{const f=FC.find(x=>x.id===id);if(!f)return;fcEditId=id;$("fcMTitle").textContent="見込みを編集";
+  $("c_company").value=f.company_id||"";$("c_month").value=f.billing_month||"";$("c_category").value=f.category||"委託費";
+  $("c_item").value=f.item_name||"";$("c_entity").value=f.kmt_entity||"株式会社KMT";$("c_price").value=f.unit_price||"";
+  $("c_qty").value=f.quantity||1;$("c_cert").value=f.certainty||"確定";$("c_notes").value=f.notes||"";calcFc();$("fcOv").classList.add("on");};
+$("fcSave").onclick=async()=>{const price=+$("c_price").value||0,qty=+$("c_qty").value||0,ex=price*qty;
+  const payload={company_id:$("c_company").value,billing_month:$("c_month").value,category:$("c_category").value,
+    item_name:$("c_item").value||null,kmt_entity:$("c_entity").value,unit_price:price,quantity:qty,
+    amount_excl:ex,amount_incl:incl(ex),certainty:$("c_cert").value,notes:$("c_notes").value||null};
+  try{if(fcEditId)await api("sales_forecast?id=eq."+fcEditId,{method:"PATCH",headers:{...H,Prefer:"return=minimal"},body:JSON.stringify(payload)});
+    else await api("sales_forecast",{method:"POST",headers:{...H,Prefer:"return=minimal"},body:JSON.stringify(payload)});
+    $("fcOv").classList.remove("on");toast("保存しました");await loadAll();}catch(e){toast("保存失敗: "+e.message);}};
+window.delFc=async id=>{if(!confirm("この見込みを削除しますか？"))return;
+  try{await api("sales_forecast?id=eq."+id,{method:"DELETE",headers:{...H,Prefer:"return=minimal"}});toast("削除しました");await loadAll();}catch(e){toast("削除失敗: "+e.message);}};
+
+/* ---------- COMPANIES ---------- */
+function renderComp(){
+  const q=$("compSearch").value.trim();
+  let rows=COMP.filter(c=>!q||(c.name||"").includes(q)||(c.name_kana||"").includes(q));
+  const stMap={active:["稼働中","b-green"],inactive:["停止","b-gray"],ended:["終了","b-red"]};
+  $("compBody").innerHTML=rows.length?rows.map(c=>{const st=stMap[c.status||"active"]||["—","b-gray"];
+    return `<tr>
+      <td class="tname">${esc(c.name)}<div class="tsub">${esc(c.name_kana||"")}</div></td>
+      <td class="tsub">${esc(c.kmt_corp_type||"")}</td>
+      <td class="r num">${c.fee_per_person?yen(c.fee_per_person):"-"}</td>
+      <td><span class="chip">${esc(c.billing_cycle||"未設定")}</span></td>
+      <td class="num tsub">${esc(c.billing_start_month||"")}</td>
+      <td class="tsub">${esc(c.invoice_to||"")}</td>
+      <td class="tsub">${esc(c.main_staff||"")}</td>
+      <td><span class="badge ${st[1]}">${st[0]}</span></td>
+      <td><div class="rowact"><button class="iconbtn" onclick="editComp('${c.id}')">✎</button></div></td></tr>`;}).join(""):'<tr><td colspan="9" class="empty">企業がありません</td></tr>';
+  $("compFoot").innerHTML=`<span>${rows.length} 社</span><span>月次単価合計 <b class="num">${yen(rows.filter(c=>(c.billing_cycle||"月次")==="月次").reduce((s,c)=>s+(c.fee_per_person||0),0))}</b> / 人・月</span>`;
+}
+$("compSearch").addEventListener("input",renderComp);
+let compEditId=null;
+window.editComp=id=>{const c=compMap[id];if(!c)return;compEditId=id;
+  $("m_name").value=c.name;$("m_fee").value=c.fee_per_person||"";$("m_cycle").value=c.billing_cycle||"月次";
+  $("m_start").value=c.billing_start_month||"";$("m_status").value=c.status||"active";$("m_invoice").value=c.invoice_to||"";
+  $("compOv").classList.add("on");};
+$("compSave").onclick=async()=>{const payload={fee_per_person:+$("m_fee").value||null,billing_cycle:$("m_cycle").value||null,
+    billing_start_month:$("m_start").value||null,status:$("m_status").value,invoice_to:$("m_invoice").value||null};
+  try{await api("companies?id=eq."+compEditId,{method:"PATCH",headers:{...H,Prefer:"return=minimal"},body:JSON.stringify(payload)});
+    $("compOv").classList.remove("on");toast("更新しました");await loadAll();}catch(e){toast("保存失敗: "+e.message);}};
+
+/* ---------- nav / chrome ---------- */
+const TITLES={dash:["ダッシュボード","支援委託費・一時金・初期費用の売上集計"],sales:["売上明細","support_fees（委託費・一時金・初期費用）の登録・管理"],
+  gen:["月次委託費 生成","在職者数 × 単価 から当月の委託費をまとめて作成"],fc:["売上見込み","sales_forecast（確度別の売上予測）"],comp:["企業マスタ","受入企業の請求設定"]};
+document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll("#nav button").forEach(x=>x.classList.remove("on"));b.classList.add("on");
+  const pg=b.dataset.pg;document.querySelectorAll(".page").forEach(p=>p.classList.remove("on"));$("pg-"+pg).classList.add("on");
+  $("pgTitle").textContent=TITLES[pg][0];$("pgSub").textContent=TITLES[pg][1];
+});
+document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>document.querySelectorAll(".ov").forEach(o=>o.classList.remove("on")));
+document.querySelectorAll(".ov").forEach(o=>o.onclick=e=>{if(e.target===o)o.classList.remove("on");});
+$("globalMonth").value=CUR_MONTH;
+$("globalMonth").onchange=e=>{CUR_MONTH=e.target.value||CUR_MONTH;renderDash();};
+$("reloadBtn").onclick=loadAll;
+loadAll();
+</script>
+</body>
+</html>
