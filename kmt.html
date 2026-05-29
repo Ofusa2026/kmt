@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260528.28 -->
+<!-- KMT_VERSION ver.20260528.29 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -208,7 +208,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260528.28</div>
+    <div class="logo-ver">ver.20260528.29</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -1745,7 +1745,7 @@ function buildDecisionReportScreen() {
           <div class="form-group full"><label class="form-label">9. 案件名</label><input class="form-input" id="dr_case_name" placeholder="例: 【変更】210.らあめん花月嵐R8-①（ベトナム1名）"></div>
           <div class="form-group"><label class="form-label">10. 人材名</label><input class="form-input" id="dr_person_name" placeholder="例: NGUYEN VAN A"></div>
           <div class="form-group full"><label class="form-label">11. 企業名</label>
-            <select class="form-select" id="dr_company_name"><option value="">選択...</option>${companies.map(c=>`<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('')}</select>
+            <select class="form-select" id="dr_company_name" onchange="autoFillSupportFee()"><option value="">選択...</option>${companies.map(c=>`<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('')}</select>
             <div style="font-size:10px;color:var(--orange);margin-top:3px;">⚠️ 新規の場合は事前に「所属機関」メニューで登録してください</div></div>
           <div class="form-group"><label class="form-label">12. 在留期限</label><input class="form-input" id="dr_expire_date" type="date" onchange="autoFillTokurei()"></div>
           <div class="form-group"><label class="form-label">13. 特例期間<span style="font-size:11px;color:var(--gray-400);font-weight:400;">（在留期限の2ヶ月後・自動）</span></label><input class="form-input" id="dr_tokurei" type="date"></div>
@@ -1918,6 +1918,24 @@ async function loadDecisionReport() {
 
 // 在留期限の2ヶ月後を特例期間に自動セット
 // 2ヶ月後の同日が存在しない場合（例:12/31→2/31）はその月の末日にする
+// 決定報告: 所属機関を選んだら、その企業のfee_per_personを支援委託費に自動入力
+// （既に手入力がある場合は上書きしない）
+function autoFillSupportFee() {
+  const sel = document.getElementById('dr_company_name');
+  const feeInput = document.getElementById('dr_support_fee');
+  if (!sel || !feeInput) return;
+  const name = sel.value;
+  if (!name) return;
+  const co = (allCompanies || []).find(c => c.name === name);
+  if (!co || !co.fee_per_person) return;
+  // 現在値が空、または前回自動入力した値の場合のみ上書き
+  const current = (feeInput.value || '').trim();
+  if (current && current !== feeInput.dataset.autoFilled) return;
+  const formatted = Number(co.fee_per_person).toLocaleString() + '円';
+  feeInput.value = formatted;
+  feeInput.dataset.autoFilled = formatted; // 次の企業変更時に上書きしてよい印
+}
+
 function autoFillTokurei() {
   const exp = document.getElementById('dr_expire_date')?.value;
   const tok = document.getElementById('dr_tokurei');
