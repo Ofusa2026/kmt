@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260529.02 -->
+<!-- KMT_VERSION ver.20260529.03 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -208,7 +208,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260529.02</div>
+    <div class="logo-ver">ver.20260529.03</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -3201,6 +3201,16 @@ function buildChatScreen() {
             <span style="font-weight:700;color:#0369a1;font-size:11px;">📎 添付ファイル <span id="chatFileCount" style="color:#1a73e8;"></span></span>
             <button onclick="clearAllChatFiles()" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:11px;font-weight:600;">すべてクリア</button>
           </div>
+          <div id="chatFileUploadTarget" style="display:flex;align-items:center;gap:10px;padding:4px 0;border-top:1px solid #bae6fd;margin-top:2px;">
+            <span style="font-size:10px;font-weight:700;color:#0369a1;">アップロード先：</span>
+            <label style="display:flex;align-items:center;gap:3px;cursor:pointer;font-size:11px;color:#1a73e8;font-weight:600;">
+              <input type="radio" name="chatUploadTarget" value="ofusa" checked style="margin:0;cursor:pointer;"> 📁 大房Drive
+            </label>
+            <label style="display:flex;align-items:center;gap:3px;cursor:pointer;font-size:11px;color:#137333;font-weight:600;">
+              <input type="radio" name="chatUploadTarget" value="kmt" style="margin:0;cursor:pointer;"> 📁 KMT Drive
+            </label>
+            <span id="chatFileUploadHint" style="font-size:10px;color:#94a3b8;margin-left:auto;"></span>
+          </div>
           <div id="chatFileList" style="display:flex;flex-direction:column;gap:4px;"></div>
         </div>
         <!-- メンション候補 -->
@@ -4904,6 +4914,47 @@ function renderChatFilePreview() {
       '<button onclick="removeChatFile(\'' + item.id + '\')" title="削除" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:14px;padding:0 4px;flex-shrink:0;">✕</button>' +
     '</div>'
   ).join('');
+  updateChatUploadTargetUI();
+}
+
+// 添付ファイルのアップロード先選択UIの状態を、現在のルームのDrive設定に応じて更新
+function updateChatUploadTargetUI() {
+  if (!currentRoom) return;
+  const ofusaRadio = document.querySelector('input[name=chatUploadTarget][value=ofusa]');
+  const kmtRadio = document.querySelector('input[name=chatUploadTarget][value=kmt]');
+  const hint = document.getElementById('chatFileUploadHint');
+  if (!ofusaRadio || !kmtRadio) return;
+  const hasOfusa = !!currentRoom.drive_url;
+  const hasKmt = !!currentRoom.drive_url_kmt;
+  // ラベルを未設定の場合はグレーアウト
+  ofusaRadio.disabled = !hasOfusa;
+  kmtRadio.disabled = !hasKmt;
+  ofusaRadio.parentElement.style.opacity = hasOfusa ? '1' : '0.4';
+  ofusaRadio.parentElement.style.cursor = hasOfusa ? 'pointer' : 'not-allowed';
+  kmtRadio.parentElement.style.opacity = hasKmt ? '1' : '0.4';
+  kmtRadio.parentElement.style.cursor = hasKmt ? 'pointer' : 'not-allowed';
+  // 初期選択: 大房優先、なければKMT
+  if (!ofusaRadio.checked && !kmtRadio.checked) {
+    if (hasOfusa) ofusaRadio.checked = true;
+    else if (hasKmt) kmtRadio.checked = true;
+  }
+  // 選択中のドライブが未設定なら、もう片方に切り替え
+  if (ofusaRadio.checked && !hasOfusa) {
+    if (hasKmt) kmtRadio.checked = true;
+  }
+  if (kmtRadio.checked && !hasKmt) {
+    if (hasOfusa) ofusaRadio.checked = true;
+  }
+  // ヒント文
+  if (!hasOfusa && !hasKmt) {
+    hint.textContent = '⚠️ Drive未設定（ヘッダーから設定）';
+    hint.style.color = '#dc2626';
+  } else if (!hasOfusa || !hasKmt) {
+    hint.textContent = (hasOfusa ? 'KMT' : '大房') + 'は未設定';
+    hint.style.color = '#94a3b8';
+  } else {
+    hint.textContent = '';
+  }
 }
 
 function updateChatFileName(input) {
@@ -4951,7 +5002,17 @@ async function sendChatMessage() {
         if (btn) btn.disabled = false;
         return;
       }
-      const uploadDriveUrl = currentRoom.drive_url || currentRoom.drive_url_kmt;
+      // ラジオで選ばれたアップロード先（大房 or KMT）
+      const targetRadio = document.querySelector('input[name=chatUploadTarget]:checked');
+      const target = targetRadio?.value || 'ofusa';
+      const uploadDriveUrl = target === 'kmt'
+        ? (currentRoom.drive_url_kmt || currentRoom.drive_url)
+        : (currentRoom.drive_url || currentRoom.drive_url_kmt);
+      if (target === 'kmt' && !currentRoom.drive_url_kmt) {
+        showToast('⚠️ KMT Driveが未設定のため大房Driveに送信します', 'success');
+      } else if (target === 'ofusa' && !currentRoom.drive_url) {
+        showToast('⚠️ 大房Driveが未設定のためKMT Driveに送信します', 'success');
+      }
       const gasUrl = localStorage.getItem('kmt_gas_url') || '';
       if (!gasUrl) {
         showToast('⚠️ GAS URLが設定されていません（ユーザー設定で登録）', 'error');
