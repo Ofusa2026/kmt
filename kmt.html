@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260529.01 -->
+<!-- KMT_VERSION ver.20260529.02 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -208,7 +208,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260529.01</div>
+    <div class="logo-ver">ver.20260529.02</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -361,6 +361,21 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
       <!-- 基本情報 -->
       <div class="tab-panel active" id="tab-basic">
         <div class="form-grid">
+          <div class="section-title">📁 ドライブ</div>
+          <div class="form-group full">
+            <label class="form-label">大房側ドライブURL</label>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <input class="form-input" id="co_drive_url" placeholder="https://drive.google.com/..." style="flex:1;">
+              <button type="button" class="btn btn-outline" title="リンク先を開く" style="font-size:16px;padding:4px 10px;flex-shrink:0;" onclick="openDriveLink('co_drive_url')">📁</button>
+            </div>
+          </div>
+          <div class="form-group full">
+            <label class="form-label">KMTドライブURL</label>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <input class="form-input" id="co_drive_url_kmt" placeholder="https://drive.google.com/..." style="flex:1;">
+              <button type="button" class="btn btn-outline" title="リンク先を開く" style="font-size:16px;padding:4px 10px;flex-shrink:0;" onclick="openDriveLink('co_drive_url_kmt')">📁</button>
+            </div>
+          </div>
           <div class="section-title">📋 基本情報</div>
           <div class="form-group">
             <label class="form-label">機関番号</label>
@@ -483,14 +498,6 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
           <div class="form-group">
             <label class="form-label">KMTサブ担当</label>
             <input class="form-input" id="co_sub_staff" placeholder="例: ウスマン">
-          </div>
-          <div class="form-group full">
-            <label class="form-label">大房側ドライブURL</label>
-            <input class="form-input" id="co_drive_url" placeholder="https://drive.google.com/...">
-          </div>
-          <div class="form-group full">
-            <label class="form-label">KMTドライブURL</label>
-            <input class="form-input" id="co_drive_url_kmt" placeholder="https://drive.google.com/...">
           </div>
         </div>
       </div>
