@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260529.03 -->
+<!-- KMT_VERSION ver.20260529.04 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -208,7 +208,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260529.03</div>
+    <div class="logo-ver">ver.20260529.04</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -815,6 +815,33 @@ async function loadCompanies() {
   try {
     const data = await sbFetch('companies?select=*&order=company_no.asc.nullslast,name.asc');
     allCompanies = data || [];
+    // folder_no でソート: 数値部分を優先、'0'と'00'は長さで区別、枝番(11-1等)は本体の直後
+    allCompanies.sort((a, b) => {
+      const af = (a.folder_no || '').toString();
+      const bf = (b.folder_no || '').toString();
+      // 空欄は末尾
+      if (!af && !bf) return (a.name||'').localeCompare(b.name||'', 'ja');
+      if (!af) return 1;
+      if (!bf) return -1;
+      // 数値部分とサフィックス(枝番)を分離
+      const ma = af.match(/^(\d+)(?:-(\d+))?$/);
+      const mb = bf.match(/^(\d+)(?:-(\d+))?$/);
+      // 数値マッチしないものは末尾、互いに文字列比較
+      if (!ma && !mb) return af.localeCompare(bf);
+      if (!ma) return 1;
+      if (!mb) return -1;
+      const aMain = parseInt(ma[1], 10);
+      const bMain = parseInt(mb[1], 10);
+      if (aMain !== bMain) return aMain - bMain;
+      // 同じ数値: '0' vs '00' は短い方が先
+      const aLen = ma[1].length;
+      const bLen = mb[1].length;
+      if (aLen !== bLen) return aLen - bLen;
+      // 枝番: 本体(枝番なし)が先、枝番ありはその後で枝番番号順
+      const aSub = ma[2] ? parseInt(ma[2], 10) : -1;
+      const bSub = mb[2] ? parseInt(mb[2], 10) : -1;
+      return aSub - bSub;
+    });
     buildFilterOptions();
     updateStats();
     applyFilters();
