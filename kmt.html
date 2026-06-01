@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260601.04 -->
+<!-- KMT_VERSION ver.20260601.05 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -169,37 +169,36 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
 <body>
 
 <!-- ===== ログイン画面 ===== -->
+<!-- ===== ログイン画面: ユーザー選択 ===== -->
 <div id="loginScreen" style="display:none;position:fixed;inset:0;background:linear-gradient(135deg,#0f2040,#1a56db);z-index:99999;align-items:center;justify-content:center;">
-  <div style="background:white;border-radius:20px;padding:36px 32px;width:360px;box-shadow:0 24px 60px rgba(0,0,0,.3);">
-    <div style="text-align:center;margin-bottom:24px;">
+  <div style="background:white;border-radius:20px;padding:36px 32px;width:380px;max-height:85vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,.3);">
+    <div style="text-align:center;margin-bottom:20px;">
       <div style="font-size:32px;margin-bottom:8px;">🏢</div>
       <div style="font-size:18px;font-weight:900;color:#0f2040;">KMT案件管理システム</div>
-      <div style="font-size:12px;color:#64748b;margin-top:4px;">スタッフログイン</div>
+      <div style="font-size:12px;color:#64748b;margin-top:4px;">あなたを選んでください</div>
     </div>
-    <div style="display:flex;flex-direction:column;gap:12px;">
-      <div>
-        <label style="font-size:11px;font-weight:700;color:#475569;display:block;margin-bottom:4px;">メールアドレス</label>
-        <input id="loginEmail" type="email" class="form-input" value="kmt@k-m-t.jp">
-      </div>
-      <div>
-        <label style="font-size:11px;font-weight:700;color:#475569;display:block;margin-bottom:4px;">パスワード</label>
-        <input id="loginPassword" type="password" class="form-input" placeholder="パスワードを入力"
-          onkeydown="if(event.key==='Enter') loginStep1()">
-      </div>
-      <div id="loginError" style="display:none;font-size:11px;color:#dc2626;text-align:center;"></div>
-      <button class="btn btn-primary" style="width:100%;padding:10px;" onclick="loginStep1()">→ 次へ</button>
-    </div>
+    <input id="loginUserSearch" placeholder="🔍 名前で検索" oninput="renderLoginUserList()" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:12px;margin-bottom:12px;box-sizing:border-box;">
+    <div id="loginUserList" style="display:flex;flex-direction:column;gap:6px;"></div>
   </div>
 </div>
 
-<!-- ===== ユーザー選択画面 ===== -->
-<div id="userSelectScreen" style="display:none;position:fixed;inset:0;background:linear-gradient(135deg,#0f2040,#1a56db);z-index:99999;align-items:center;justify-content:center;">
-  <div style="background:white;border-radius:20px;padding:36px 32px;width:360px;max-height:80vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,.3);">
-    <div style="text-align:center;margin-bottom:20px;">
-      <div style="font-size:18px;font-weight:900;color:#0f2040;">あなたは誰ですか？</div>
-      <div style="font-size:12px;color:#64748b;margin-top:4px;">自分の名前を選んでください</div>
+<!-- ===== ログイン画面: 暗証番号 ===== -->
+<div id="pinScreen" style="display:none;position:fixed;inset:0;background:linear-gradient(135deg,#0f2040,#1a56db);z-index:99999;align-items:center;justify-content:center;">
+  <div style="background:white;border-radius:20px;padding:36px 32px;width:340px;box-shadow:0 24px 60px rgba(0,0,0,.3);">
+    <div style="text-align:center;margin-bottom:24px;">
+      <div style="font-size:32px;margin-bottom:8px;">🔐</div>
+      <div id="pinUserName" style="font-size:16px;font-weight:900;color:#0f2040;">-</div>
+      <div style="font-size:11px;color:#64748b;margin-top:4px;" id="pinUserEmail">-</div>
+      <div style="font-size:12px;color:#475569;margin-top:12px;">暗証番号(4桁)を入力</div>
     </div>
-    <div id="userSelectList" style="display:flex;flex-direction:column;gap:8px;"></div>
+    <div>
+      <input id="pinInput" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off"
+        style="width:100%;padding:14px;border:2px solid #e2e8f0;border-radius:10px;font-size:24px;text-align:center;letter-spacing:14px;box-sizing:border-box;font-weight:700;"
+        placeholder="••••" onkeydown="if(event.key==='Enter') checkPin()">
+      <div id="pinError" style="display:none;font-size:11px;color:#dc2626;text-align:center;margin-top:8px;"></div>
+      <button class="btn btn-primary" style="width:100%;padding:10px;margin-top:14px;" onclick="checkPin()">→ ログイン</button>
+      <button onclick="backToUserSelect()" style="width:100%;padding:8px;margin-top:8px;background:none;border:none;color:#64748b;font-size:11px;cursor:pointer;text-decoration:underline;">← 別の人を選ぶ</button>
+    </div>
   </div>
 </div>
 
@@ -208,7 +207,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260601.04</div>
+    <div class="logo-ver">ver.20260601.05</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -2981,6 +2980,27 @@ function buildMyAccountScreen() {
         </div>
       </div>
     </div>
+
+    <!-- 暗証番号変更 -->
+    <div style="background:white;border:1px solid var(--gray-200);border-radius:16px;padding:24px;box-shadow:var(--shadow);margin-top:16px;">
+      <div style="font-size:14px;font-weight:800;color:var(--navy);margin-bottom:14px;">🔐 暗証番号の変更</div>
+      <div style="font-size:11px;color:var(--gray-500);margin-bottom:12px;">ログイン時に使う4桁の暗証番号です。初期値は <code style="background:#f1f5f9;padding:1px 5px;border-radius:4px;">0000</code> です。</div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div>
+          <label style="font-size:11px;font-weight:700;color:var(--gray-600);display:block;margin-bottom:4px;">現在の暗証番号</label>
+          <input class="form-input" id="ma_pin_old" type="password" inputmode="numeric" maxlength="4" placeholder="••••" autocomplete="off">
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:700;color:var(--gray-600);display:block;margin-bottom:4px;">新しい暗証番号(4桁)</label>
+          <input class="form-input" id="ma_pin_new" type="password" inputmode="numeric" maxlength="4" placeholder="••••" autocomplete="off">
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:700;color:var(--gray-600);display:block;margin-bottom:4px;">新しい暗証番号(確認)</label>
+          <input class="form-input" id="ma_pin_new2" type="password" inputmode="numeric" maxlength="4" placeholder="••••" autocomplete="off">
+        </div>
+        <button class="btn btn-primary" style="margin-top:6px;" onclick="changePinCode()">🔐 暗証番号を変更</button>
+      </div>
+    </div>
   </div>`;
 }
 
@@ -2996,6 +3016,40 @@ async function loadMyAccount() {
   } catch(e) {}
   const cw = document.querySelector('.content-wrap');
   if (cw) cw.innerHTML = buildMyAccountScreen();
+}
+
+// 暗証番号の変更
+async function changePinCode() {
+  if (!currentUser?.id) return;
+  const oldPin = (document.getElementById('ma_pin_old').value || '').trim();
+  const newPin = (document.getElementById('ma_pin_new').value || '').trim();
+  const newPin2 = (document.getElementById('ma_pin_new2').value || '').trim();
+  if (!/^\d{4}$/.test(oldPin)) { showToast('❌ 現在の暗証番号は4桁の数字です', 'error'); return; }
+  if (!/^\d{4}$/.test(newPin)) { showToast('❌ 新しい暗証番号は4桁の数字です', 'error'); return; }
+  if (newPin !== newPin2) { showToast('❌ 新しい暗証番号と確認用が一致しません', 'error'); return; }
+  if (newPin === oldPin) { showToast('❌ 新しい暗証番号は現在のものと異なる必要があります', 'error'); return; }
+  showLoading(true);
+  try {
+    // 現在のpin_codeを照合
+    const rows = await sbFetch('users?id=eq.' + currentUser.id + '&select=pin_code&limit=1');
+    const cur = rows?.[0]?.pin_code;
+    if ((cur || '') !== oldPin) {
+      showToast('❌ 現在の暗証番号が違います', 'error');
+      showLoading(false);
+      return;
+    }
+    await sbFetch('users?id=eq.' + currentUser.id, {
+      method: 'PATCH',
+      body: JSON.stringify({ pin_code: newPin, updated_at: new Date().toISOString() })
+    });
+    showToast('✅ 暗証番号を変更しました', 'success');
+    document.getElementById('ma_pin_old').value = '';
+    document.getElementById('ma_pin_new').value = '';
+    document.getElementById('ma_pin_new2').value = '';
+  } catch(e) {
+    showToast('❌ ' + e.message, 'error');
+  }
+  showLoading(false);
 }
 
 // ==============================
@@ -3228,11 +3282,11 @@ async function saveMyAccount() {
 // ==============================
 // 🔐 ログイン・ユーザー管理
 // ==============================
-const SHARED_EMAIL = 'kmt@k-m-t.jp';
-const SHARED_PASSWORD = 'kmt2026';
 let currentUser = null; // { id, name, email, role }
+let _loginUsers = [];       // ログイン画面用に取得した全ユーザー
+let _loginPickedUser = null; // PIN入力中のユーザー
 
-function initLogin() {
+async function initLogin() {
   const saved = localStorage.getItem('kmt_current_user');
   if (saved) {
     try {
@@ -3241,52 +3295,106 @@ function initLogin() {
       return;
     } catch(e) {}
   }
+  // 全ユーザーを取得 → 選択画面表示
   document.getElementById('loginScreen').style.display = 'flex';
   document.getElementById('mainWrap').style.display = 'none';
+  try {
+    const users = await sbFetch('users?select=id,name,email,role,team,avatar_url&is_active=eq.true&order=name.asc');
+    _loginUsers = users || [];
+  } catch(e) {
+    _loginUsers = [];
+  }
+  renderLoginUserList();
 }
 
-async function loginStep1() {
-  const email = document.getElementById('loginEmail').value.trim();
-  const password = document.getElementById('loginPassword').value;
-  const errEl = document.getElementById('loginError');
+function renderLoginUserList() {
+  const q = (document.getElementById('loginUserSearch')?.value || '').toLowerCase().trim();
+  const list = document.getElementById('loginUserList');
+  if (!list) return;
+  const filtered = _loginUsers.filter(u => {
+    if (!q) return true;
+    return (u.name||'').toLowerCase().includes(q)
+        || (u.email||'').toLowerCase().includes(q)
+        || (u.team||'').toLowerCase().includes(q);
+  });
+  if (!filtered.length) {
+    list.innerHTML = '<div style="text-align:center;color:#94a3b8;font-size:12px;padding:20px;">該当ユーザーがいません</div>';
+    return;
+  }
+  list.innerHTML = filtered.map(u => {
+    const isAdmin = u.role === '管理者';
+    const teamLabel = u.team ? '<span style="font-size:9px;background:#e0e7ff;color:#3730a3;padding:1px 6px;border-radius:8px;margin-left:4px;font-weight:600;">' + esc(u.team) + '</span>' : '';
+    const adminLabel = isAdmin ? '<span style="font-size:9px;background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:8px;margin-left:4px;font-weight:700;">👑 管理者</span>' : '';
+    const avatar = u.avatar_url
+      ? '<img src="' + esc(u.avatar_url) + '" style="width:34px;height:34px;border-radius:50%;object-fit:cover;flex-shrink:0;">'
+      : '<div style="width:34px;height:34px;border-radius:50%;background:#c7d2fe;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;font-weight:700;color:#3730a3;">' + esc((u.name||'').slice(0,1)) + '</div>';
+    return '<button onclick="pickLoginUser(\'' + u.id + '\')" style="width:100%;padding:10px 12px;border:2px solid #e2e8f0;border-radius:10px;background:white;cursor:pointer;text-align:left;font-size:13px;color:#0f2040;transition:.15s;display:flex;align-items:center;gap:10px;" onmouseover="this.style.borderColor=\'#1a56db\';this.style.background=\'#eff6ff\';" onmouseout="this.style.borderColor=\'#e2e8f0\';this.style.background=\'white\';">'
+      + avatar
+      + '<div style="flex:1;min-width:0;">'
+      +   '<div style="font-weight:700;display:flex;align-items:center;flex-wrap:wrap;gap:2px;"><span>' + esc(u.name) + '</span>' + teamLabel + adminLabel + '</div>'
+      +   '<div style="font-size:10px;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px;">' + esc(u.email||'') + '</div>'
+      + '</div>'
+      + '</button>';
+  }).join('');
+}
+
+function pickLoginUser(id) {
+  const u = _loginUsers.find(x => x.id === id);
+  if (!u) return;
+  _loginPickedUser = u;
+  document.getElementById('pinUserName').textContent = u.name;
+  document.getElementById('pinUserEmail').textContent = u.email || '';
+  document.getElementById('pinInput').value = '';
+  document.getElementById('pinError').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('pinScreen').style.display = 'flex';
+  setTimeout(() => document.getElementById('pinInput').focus(), 80);
+}
+
+function backToUserSelect() {
+  _loginPickedUser = null;
+  document.getElementById('pinScreen').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'flex';
+}
+
+async function checkPin() {
+  if (!_loginPickedUser) return;
+  const pin = (document.getElementById('pinInput').value || '').trim();
+  const errEl = document.getElementById('pinError');
   errEl.style.display = 'none';
-  if (email !== SHARED_EMAIL || password !== SHARED_PASSWORD) {
-    errEl.textContent = 'メールアドレスまたはパスワードが違います';
+  if (!/^\d{4}$/.test(pin)) {
+    errEl.textContent = '4桁の数字を入力してください';
     errEl.style.display = '';
     return;
   }
-  // ユーザー一覧を取得して選択画面へ
   showLoading(true);
   try {
-    const users = await sbFetch('users?select=id,name,role&order=name.asc');
-    const list = document.getElementById('userSelectList');
-    list.innerHTML = (users||[]).map(u => `
-      <button onclick="selectUser('${u.id}','${esc(u.name)}','${esc(u.role||'')}','${email}')"
-        style="width:100%;padding:12px 16px;border:2px solid #e2e8f0;border-radius:10px;background:white;cursor:pointer;text-align:left;font-size:13px;font-weight:700;color:#0f2040;transition:.15s;"
-        onmouseover="this.style.borderColor='#1a56db';this.style.background='#eff6ff';"
-        onmouseout="this.style.borderColor='#e2e8f0';this.style.background='white';">
-        👤 ${esc(u.name)} <span style="font-size:10px;color:#64748b;font-weight:400;">${esc(u.role||'スタッフ')}</span>
-      </button>`).join('');
-    document.getElementById('loginScreen').style.display = 'none';
-    const sel = document.getElementById('userSelectScreen');
-    sel.style.display = 'flex';
+    // DBから最新のpin_codeを取得して照合
+    const rows = await sbFetch('users?id=eq.' + _loginPickedUser.id + '&select=id,name,email,role,pin_code&limit=1');
+    const u = (rows||[])[0];
+    if (!u) { errEl.textContent = 'ユーザーが見つかりません'; errEl.style.display = ''; showLoading(false); return; }
+    if ((u.pin_code || '') !== pin) {
+      errEl.textContent = '暗証番号が違います';
+      errEl.style.display = '';
+      document.getElementById('pinInput').value = '';
+      showLoading(false);
+      return;
+    }
+    // 成功
+    currentUser = { id: u.id, name: u.name, email: u.email, role: u.role };
+    safeSetItem('kmt_current_user', JSON.stringify(currentUser));
+    document.getElementById('pinScreen').style.display = 'none';
+    onLoginSuccess();
   } catch(e) {
-    errEl.textContent = 'サーバーエラー: ' + e.message;
+    errEl.textContent = 'エラー: ' + e.message;
     errEl.style.display = '';
   }
   showLoading(false);
 }
 
-function selectUser(id, name, role, email) {
-  currentUser = { id, name, email, role };
-  safeSetItem('kmt_current_user', JSON.stringify(currentUser));
-  document.getElementById('userSelectScreen').style.display = 'none';
-  onLoginSuccess();
-}
-
 function onLoginSuccess() {
   document.getElementById('loginScreen').style.display = 'none';
-  document.getElementById('userSelectScreen').style.display = 'none';
+  document.getElementById('pinScreen').style.display = 'none';
   document.getElementById('mainWrap').style.display = '';
   const badge = document.getElementById('currentUserBadge');
   if (badge && currentUser) {
