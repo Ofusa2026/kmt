@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260601.01 -->
+<!-- KMT_VERSION ver.20260601.02 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -208,7 +208,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260601.01</div>
+    <div class="logo-ver">ver.20260601.02</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -354,6 +354,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
       <div class="modal-tab" onclick="switchCoTab('contract')">契約・委託費</div>
       <div class="modal-tab" onclick="switchCoTab('finance')">財務情報</div>
       <div class="modal-tab" onclick="switchCoTab('memo')">メモ</div>
+      <div class="modal-tab" onclick="switchCoTab('workers')">👥 人材</div>
       <div class="modal-tab" onclick="switchCoTab('meetings')">📅 定期面談</div>
       <div class="modal-tab" onclick="switchCoTab('schedules')">📅 支援スケジュール</div>
     </div>
@@ -597,6 +598,15 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
             <input class="form-input" id="co_last_visit" type="date">
           </div>
         </div>
+      </div>
+
+      <!-- 人材タブ -->
+      <div class="tab-panel" id="tab-workers">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <div id="coWorkersCount" style="font-size:12px;color:var(--gray-600);">読み込み中...</div>
+          <input id="coWorkersSearch" placeholder="🔍 人材を検索（氏名・国籍・管理番号）" oninput="renderCompanyWorkers()" style="font-size:12px;padding:5px 10px;border:1px solid var(--gray-200);border-radius:6px;width:280px;">
+        </div>
+        <div id="coWorkersList"></div>
       </div>
 
       <!-- 定期面談タブ -->
@@ -1186,7 +1196,7 @@ async function deleteCompany() {
 }
 
 function switchCoTab(tab) {
-  const tabs = ['basic','contract','finance','memo','meetings','schedules'];
+  const tabs = ['basic','contract','finance','memo','workers','meetings','schedules'];
   const tabBar = document.getElementById('coModalTabs');
   if (tabBar) {
     tabBar.querySelectorAll('.modal-tab').forEach((t, i) => {
@@ -1200,12 +1210,125 @@ function switchCoTab(tab) {
       p.classList.toggle('active', p.id === 'tab-' + tab);
     });
   }
+  if (tab === 'workers' && editingCompanyId) {
+    loadCompanyWorkers(editingCompanyId);
+  }
   if (tab === 'meetings' && editingCompanyId) {
     loadMeetings(editingCompanyId);
   }
   if (tab === 'schedules' && editingCompanyId) {
     loadCompanySchedules(editingCompanyId);
   }
+}
+
+// 企業モーダル「人材」タブ用 - 紐づく人材を取得
+let _coWorkers = [];
+async function loadCompanyWorkers(companyId) {
+  const list = document.getElementById('coWorkersList');
+  const count = document.getElementById('coWorkersCount');
+  if (!list) return;
+  list.innerHTML = '<div style="text-align:center;padding:30px;color:var(--gray-400);font-size:13px;">読み込み中...</div>';
+  if (count) count.textContent = '';
+  try {
+    const data = await sbFetch('workers?company_id=eq.'+companyId+'&select=id,name,nationality,gender,management_no,visa_status,visa_expiry,status,staff&order=management_no.asc,name.asc');
+    _coWorkers = data || [];
+    renderCompanyWorkers();
+  } catch(e) {
+    list.innerHTML = '<div style="color:var(--red);padding:20px;">❌ '+esc(e.message)+'</div>';
+  }
+}
+
+function renderCompanyWorkers() {
+  const list = document.getElementById('coWorkersList');
+  const countEl = document.getElementById('coWorkersCount');
+  if (!list) return;
+  const q = (document.getElementById('coWorkersSearch')?.value || '').toLowerCase().trim();
+  const filtered = _coWorkers.filter(w => {
+    if (!q) return true;
+    return (w.name||'').toLowerCase().includes(q)
+        || (w.nationality||'').toLowerCase().includes(q)
+        || (w.management_no||'').toLowerCase().includes(q);
+  });
+  if (countEl) countEl.textContent = '全 ' + _coWorkers.length + ' 名' + (q ? '（'+filtered.length+'件表示）' : '');
+  if (!_coWorkers.length) {
+    list.innerHTML = '<div style="text-align:center;padding:30px;color:var(--gray-400);font-size:13px;">この所属機関に紐づく人材はありません</div>';
+    return;
+  }
+  if (!filtered.length) {
+    list.innerHTML = '<div style="text-align:center;padding:30px;color:var(--gray-400);font-size:13px;">該当する人材がいません</div>';
+    return;
+  }
+  // ステータス色
+  const stColor = (s) => s === '在職中' ? '#10b981' : (s === '退職済(帰国)' ? '#94a3b8' : '#f59e0b');
+  // テーブル風カードリスト
+  list.innerHTML = '<div style="border:1px solid var(--gray-200);border-radius:8px;overflow:hidden;">' +
+    '<div style="display:grid;grid-template-columns:80px 1fr 100px 110px 110px 90px 180px;gap:8px;padding:8px 12px;background:#f8fafc;border-bottom:1px solid var(--gray-200);font-size:11px;font-weight:700;color:var(--navy);">' +
+      '<div>管理番号</div><div>氏名</div><div>国籍</div><div>在留資格</div><div>在留期限</div><div>状態</div><div style="text-align:right;">操作</div>' +
+    '</div>' +
+    filtered.map(w => {
+      return '<div style="display:grid;grid-template-columns:80px 1fr 100px 110px 110px 90px 180px;gap:8px;padding:10px 12px;border-bottom:1px solid var(--gray-100);align-items:center;font-size:12px;">' +
+        '<div style="font-weight:600;color:var(--gray-600);">'+esc(w.management_no||'-')+'</div>' +
+        '<div style="font-weight:700;color:var(--navy);overflow:hidden;text-overflow:ellipsis;">'+esc(w.name||'')+'</div>' +
+        '<div>'+natFlag(w.nationality||'')+' '+esc(w.nationality||'-')+'</div>' +
+        '<div style="color:var(--gray-600);">'+esc(w.visa_status||'-')+'</div>' +
+        '<div style="color:var(--gray-600);">'+esc(w.visa_expiry||'-')+'</div>' +
+        '<div><span style="font-size:11px;color:white;background:'+stColor(w.status)+';padding:2px 8px;border-radius:10px;font-weight:600;white-space:nowrap;">'+esc(w.status||'-')+'</span></div>' +
+        '<div style="display:flex;gap:4px;justify-content:flex-end;">' +
+          '<button class="btn btn-outline" style="font-size:11px;padding:3px 10px;" onclick="openWorkerFromCompany(\''+w.id+'\')">👤 詳細</button>' +
+          '<button class="btn btn-primary" style="font-size:11px;padding:3px 10px;" onclick="openWorkerChatFromCompany(\''+w.id+'\')">💬 チャット</button>' +
+        '</div>' +
+      '</div>';
+    }).join('') +
+  '</div>';
+}
+
+// 人材詳細を開く（企業モーダルからの遷移用 - 企業モーダルは閉じる）
+async function openWorkerFromCompany(workerId) {
+  if (!workerId) return;
+  // 企業モーダルを閉じてから人材モーダルを開く
+  if (typeof closeCompanyModal === 'function') closeCompanyModal();
+  if (!allWorkers.length) {
+    try { const d = await sbFetch('workers?select=*&order=name.asc'); allWorkers = d||[]; } catch(e) {}
+  }
+  if (typeof openWorkerModal === 'function') openWorkerModal(workerId);
+}
+
+// 人材チャットを開く（既存ルームがあればそこへ、無ければ新規作成）
+async function openWorkerChatFromCompany(workerId) {
+  if (!workerId) return;
+  showLoading(true);
+  try {
+    // 既存ルームを探す（DBに直接問い合わせ。チャット未ロード時にも対応）
+    let existing = (chatRooms || []).find(r => r.worker_id === workerId);
+    let roomId = existing?.id;
+    if (!roomId) {
+      // DBから直接検索
+      const found = await sbFetch('chat_rooms?worker_id=eq.'+workerId+'&select=id&limit=1');
+      if (found && found[0]) {
+        roomId = found[0].id;
+      } else {
+        // 新規作成
+        const created = await sbFetch('chat_rooms', {
+          method:'POST',
+          body: JSON.stringify({ worker_id: workerId, created_by: currentUser?.name || '', status:'active' }),
+          prefer:'return=representation'
+        });
+        if (created && created[0]) roomId = created[0].id;
+      }
+    }
+    if (!roomId) { showToast('❌ チャットルームを作成できませんでした','error'); showLoading(false); return; }
+    // 企業モーダルを閉じてチャット画面へ
+    if (typeof closeCompanyModal === 'function') closeCompanyModal();
+    // チャット画面へ切替
+    if (typeof showScreen === 'function') showScreen('chat');
+    // loadChatScreenはshowScreen内のSCREENS[name].init()で走るが念のため待機してから開く
+    setTimeout(async () => {
+      if (typeof openChatRoom === 'function') await openChatRoom(roomId);
+    }, 300);
+  } catch(e) {
+    showToast('❌ '+e.message, 'error');
+  }
+  showLoading(false);
 }
 
 const CO_FIELDS = [
