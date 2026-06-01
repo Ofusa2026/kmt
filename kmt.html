@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260601.02 -->
+<!-- KMT_VERSION ver.20260601.03 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -208,7 +208,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260601.02</div>
+    <div class="logo-ver">ver.20260601.03</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -1893,16 +1893,16 @@ function buildDecisionReportScreen() {
           <div class="form-group"><label class="form-label">5. 【A区分】希望在留資格</label>
             <select class="form-select" id="dr_visa_type"><option value="">選択</option><option>特定技能1号</option><option>特定技能2号</option><option>特定活動</option><option>技人国</option></select></div>
           <div class="form-group"><label class="form-label">6. 【B区分】認定・変更・更新</label>
-            <select class="form-select" id="dr_app_type"><option value="">選択</option><option>認定</option><option>変更</option><option>更新</option></select></div>
+            <select class="form-select" id="dr_app_type" onchange="updateDrCaseName()"><option value="">選択</option><option>認定</option><option>変更</option><option>更新</option></select></div>
           <div class="form-group"><label class="form-label">7. 【C区分】特定技能受入経験</label>
             <select class="form-select" id="dr_experience"><option value="">選択</option><option>有</option><option>無</option></select></div>
           <div class="form-group"><label class="form-label">8. 【D区分】申請分野</label>
             <select class="form-select" id="dr_field"><option value="">選択</option><option>農業</option><option>漁業</option><option>建設</option><option>製造業</option><option>飲食料品製造業</option><option>外食業</option><option>介護</option><option>ビルクリーニング</option><option>宿泊</option><option>自動車整備</option><option>自動車運送</option><option>航空</option><option>造船・船用工業</option></select></div>
           <div class="section-title">案件・人材情報</div>
-          <div class="form-group full"><label class="form-label">9. 案件名</label><input class="form-input" id="dr_case_name" placeholder="例: 【変更】210.らあめん花月嵐R8-①（ベトナム1名）"></div>
-          <div class="form-group"><label class="form-label">10. 人材名</label><input class="form-input" id="dr_person_name" placeholder="例: NGUYEN VAN A"></div>
+          <div class="form-group full"><label class="form-label">9. 案件名 <span style="font-size:10px;color:var(--gray-400);font-weight:400;">（自動生成：B区分 + 企業名 + 人材名 ／ 必要なら手動修正可）</span></label><input class="form-input" id="dr_case_name" placeholder="自動生成されます（例: 【変更】株式会社○○ NGUYEN VAN A）"></div>
+          <div class="form-group"><label class="form-label">10. 人材名</label><input class="form-input" id="dr_person_name" placeholder="例: NGUYEN VAN A" oninput="updateDrCaseName()"></div>
           <div class="form-group full"><label class="form-label">11. 企業名</label>
-            <select class="form-select" id="dr_company_name" onchange="autoFillSupportFee()"><option value="">選択...</option>${companies.map(c=>`<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('')}</select>
+            <select class="form-select" id="dr_company_name" onchange="autoFillSupportFee();updateDrCaseName();"><option value="">選択...</option>${companies.map(c=>`<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('')}</select>
             <div style="font-size:10px;color:var(--orange);margin-top:3px;">⚠️ 新規の場合は事前に「所属機関」メニューで登録してください</div></div>
           <div class="form-group"><label class="form-label">12. 在留期限</label><input class="form-input" id="dr_expire_date" type="date" onchange="autoFillTokurei()"></div>
           <div class="form-group"><label class="form-label">13. 特例期間<span style="font-size:11px;color:var(--gray-400);font-weight:400;">（在留期限の2ヶ月後・自動）</span></label><input class="form-input" id="dr_tokurei" type="date"></div>
@@ -2075,6 +2075,31 @@ async function loadDecisionReport() {
 
 // 在留期限の2ヶ月後を特例期間に自動セット
 // 2ヶ月後の同日が存在しない場合（例:12/31→2/31）はその月の末日にする
+// 決定報告: 案件名(9)を 【B区分】(6) + 企業名(11) + 人材名(10) で自動生成
+// 自前で手動修正した内容は維持(直前の自動入力値と一致するときのみ上書き)
+function updateDrCaseName() {
+  const caseInput = document.getElementById('dr_case_name');
+  if (!caseInput) return;
+  const appType = (document.getElementById('dr_app_type')?.value || '').trim();
+  const company = (document.getElementById('dr_company_name')?.value || '').trim();
+  const person  = (document.getElementById('dr_person_name')?.value || '').trim();
+  // フォーマット: 【B区分】企業名 人材名(各要素は空ならスキップ)
+  const parts = [];
+  if (appType) parts.push('【' + appType + '】');
+  if (company) parts.push(company);
+  if (person)  parts.push(person);
+  // B区分は企業名と空白を挟まずくっつけ、企業名と人材名の間は半角スペース
+  let generated = '';
+  if (appType && company) generated = '【' + appType + '】' + company;
+  else generated = (appType ? '【' + appType + '】' : '') + (company || '');
+  if (person) generated = (generated ? generated + ' ' : '') + person;
+  // 手動編集を保護: 現在値が空、または直前の自動入力と同一の場合だけ上書き
+  const current = (caseInput.value || '').trim();
+  if (current && current !== caseInput.dataset.autoFilled) return;
+  caseInput.value = generated;
+  caseInput.dataset.autoFilled = generated;
+}
+
 // 決定報告: 所属機関を選んだら、その企業のfee_per_personを支援委託費に自動入力
 // （既に手入力がある場合は上書きしない）
 function autoFillSupportFee() {
