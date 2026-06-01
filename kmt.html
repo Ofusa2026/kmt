@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260601.03 -->
+<!-- KMT_VERSION ver.20260601.04 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -208,7 +208,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260601.03</div>
+    <div class="logo-ver">ver.20260601.04</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -379,8 +379,8 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
           </div>
           <div class="section-title">📋 基本情報</div>
           <div class="form-group">
-            <label class="form-label">機関番号</label>
-            <input class="form-input" id="co_no" type="number" placeholder="例: 1">
+            <label class="form-label">フォルダ番号</label>
+            <input class="form-input" id="co_no" type="text" placeholder="例: 1, 11-1, 00, 旧27">
           </div>
           <div class="form-group">
             <label class="form-label">ステータス</label>
@@ -823,7 +823,7 @@ window.addEventListener('DOMContentLoaded', () => {
 async function loadCompanies() {
   showLoading(true);
   try {
-    const data = await sbFetch('companies?select=*&order=company_no.asc.nullslast,name.asc');
+    const data = await sbFetch('companies?select=*&order=name.asc');
     allCompanies = data || [];
     // folder_no でソート: 数値部分を優先、'0'と'00'は長さで区別、枝番(11-1等)は本体の直後
     allCompanies.sort((a, b) => {
@@ -944,7 +944,7 @@ function renderTable() {
     const fee = c.fee_per_person ? Number(c.fee_per_person).toLocaleString() + '円' : '-';
     const cycle = c.billing_cycle || '-';
     return `<tr onclick="openCompanyModal('${c.id}')">
-      <td><span class="co-no">${c.company_no ?? '-'}</span></td>
+      <td><span class="co-no">${esc(c.folder_no ?? '-')}</span></td>
       <td><div class="co-name">${esc(c.name)}</div><div class="co-industry">${esc(c.industry||'')}</div></td>
       <td class="co-industry">${esc(c.industry||'-')}</td>
       <td>${esc(c.pref||'-')}</td>
@@ -1347,7 +1347,7 @@ function clearCoForm() { CO_FIELDS.forEach(f => { const el = document.getElement
 
 function fillCoForm(co) {
   const map = {
-    no:'company_no', status:'status', name:'name', corp_type:'corp_type', industry:'industry',
+    no:'folder_no', status:'status', name:'name', corp_type:'corp_type', industry:'industry',
     corp_no:'corp_no', tel:'tel', zip:'zip', pref:'pref', city:'city', address:'address',
     rep_name:'rep_name', rep_title:'rep_title', main_staff:'main_staff', sub_staff:'sub_staff',
     workplace_name:'workplace_name', workplace_zip:'workplace_zip',
@@ -1373,7 +1373,7 @@ function fillCoForm(co) {
 
 function getCoFormData() {
   return {
-    company_no: document.getElementById('co_no').value ? parseInt(document.getElementById('co_no').value) : null,
+    folder_no: (document.getElementById('co_no').value || '').trim() || null,
     status: document.getElementById('co_status').value || 'active',
     name: document.getElementById('co_name').value,
     corp_type: document.getElementById('co_corp_type').value || null,
@@ -9518,7 +9518,7 @@ function renderFeeMaster() {
     </tr></thead>
     <tbody>
       ${active.map(c => `<tr onclick="openCompanyModal('${c.id}')" style="cursor:pointer" title="所属機関画面で編集できます">
-        <td>${c.company_no??'-'}</td>
+        <td>${esc(c.folder_no??'-')}</td>
         <td><strong>${esc(c.name)}</strong></td>
         <td style="font-weight:700;color:var(--blue)">${c.fee_per_person ? Number(c.fee_per_person).toLocaleString()+'円' : '<span style=color:var(--gray-400)>未設定</span>'}</td>
         <td>${esc(c.billing_cycle||'-')}</td>
