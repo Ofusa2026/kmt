@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260601.12 -->
+<!-- KMT_VERSION ver.20260601.13 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -207,7 +207,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260601.12</div>
+    <div class="logo-ver">ver.20260601.13</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -4327,8 +4327,17 @@ function renderGroupList() {
     const typeBadge = _chatGroupByApplyType
       ? '<span style="font-size:9px;background:' + stType.bg + ';color:' + stType.color + ';padding:1px 5px;border-radius:6px;margin-right:3px;font-weight:700;white-space:nowrap;">' + stType.icon + esc(e.applyType) + '</span>'
       : '';
+    // フォルダ番号アイコン: 企業のfolder_noを大きく表示
+    const cObj = !isNone ? (allCompanies||[]).find(x => x.id === e.cid) : null;
+    const folderLabel = cObj?.folder_no ? String(cObj.folder_no) : '';
+    const folderFontSize = !folderLabel ? '20px'
+      : folderLabel.length <= 2 ? '18px'
+      : folderLabel.length <= 3 ? '16px'
+      : folderLabel.length <= 4 ? '13px'
+      : '11px';
+    const folderDisplay = isNone ? '?' : (folderLabel || '-');
     div.innerHTML =
-      '<div style="width:40px;height:40px;border-radius:12px;background:'+(isNone?'#94a3b8':'linear-gradient(135deg,#1a73e8,#7c3aed)')+';display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">🏢</div>' +
+      '<div style="width:44px;height:44px;border-radius:12px;background:'+(isNone?'#94a3b8':'linear-gradient(135deg,#1a73e8,#7c3aed)')+';display:flex;align-items:center;justify-content:center;font-size:'+folderFontSize+';font-weight:800;color:white;flex-shrink:0;letter-spacing:.5px;">'+esc(folderDisplay)+'</div>' +
       '<div style="flex:1;min-width:0;">' +
         '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:4px;margin-bottom:2px;">' +
           '<div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
