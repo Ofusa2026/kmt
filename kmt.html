@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260601.11 -->
+<!-- KMT_VERSION ver.20260601.12 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -207,7 +207,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260601.11</div>
+    <div class="logo-ver">ver.20260601.12</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -761,7 +761,22 @@ async function sbFetch(path, opts={}) {
       kmtLog('✅ DELETE', table + ' (' + Math.round(performance.now()-_t0) + 'ms)', undefined, '#16a34a');
       return null;
     }
-    const data = await res.json();
+    // 204 No Content や空ボディに対応
+    if (res.status === 204) {
+      kmtLog('✅ ' + method, table + ' (204 No Content, ' + Math.round(performance.now()-_t0) + 'ms)', undefined, '#16a34a');
+      return null;
+    }
+    const text = await res.text();
+    if (!text) {
+      kmtLog('✅ ' + method, table + ' (空レスポンス, ' + Math.round(performance.now()-_t0) + 'ms)', undefined, '#16a34a');
+      return null;
+    }
+    let data;
+    try { data = JSON.parse(text); }
+    catch(e) {
+      kmtLog('⚠️ ' + method, table + ' JSON parse失敗', { text: text.slice(0,200) }, '#f59e0b');
+      return null;
+    }
     const n = Array.isArray(data) ? data.length : 1;
     kmtLog('✅ ' + method, table + ' → ' + n + '件 (' + Math.round(performance.now()-_t0) + 'ms)', undefined, '#16a34a');
     if (opts.count) {
@@ -4407,7 +4422,7 @@ async function toggleCompanyRoomsReadStatus(roomIds, markUnread) {
       const bodyRows = roomIds.map(rid => ({ user_id: currentUser.id, room_id: rid, read_at: now }));
       await sbFetch('chat_read_at?on_conflict=user_id,room_id', {
         method: 'POST',
-        headers: { 'Prefer': 'resolution=merge-duplicates' },
+        prefer: 'return=representation,resolution=merge-duplicates',
         body: JSON.stringify(bodyRows)
       });
       showToast('✓ ' + roomIds.length + '件のチャットを既読にしました', 'success');
@@ -4550,7 +4565,7 @@ async function toggleRoomReadStatus(roomId, markUnread) {
       // 既読にする(現在時刻でupsert)
       await sbFetch('chat_read_at?on_conflict=user_id,room_id', {
         method: 'POST',
-        headers: { 'Prefer': 'resolution=merge-duplicates' },
+        prefer: 'return=representation,resolution=merge-duplicates',
         body: JSON.stringify({ user_id: currentUser.id, room_id: roomId, read_at: new Date().toISOString() })
       });
       showToast('✓ 既読にしました', 'success');
@@ -4580,7 +4595,7 @@ async function markUnreadFromMessage(messageId) {
   try {
     await sbFetch('chat_read_at?on_conflict=user_id,room_id', {
       method: 'POST',
-      headers: { 'Prefer': 'resolution=merge-duplicates' },
+      prefer: 'return=representation,resolution=merge-duplicates',
       body: JSON.stringify({ user_id: currentUser.id, room_id: roomId, read_at: newReadAt })
     });
     showToast('🔵 ここから未読に戻しました', 'success');
@@ -5142,7 +5157,7 @@ async function markChatRead(roomId) {
   try {
     await sbFetch('chat_read_at?on_conflict=user_id,room_id', {
       method: 'POST',
-      headers: { 'Prefer': 'resolution=merge-duplicates' },
+      prefer: 'return=representation,resolution=merge-duplicates',
       body: JSON.stringify({ user_id: currentUser.id, room_id: roomId, read_at: new Date().toISOString() })
     });
     const room = chatRooms.find(r => r.id === roomId);
@@ -6015,7 +6030,7 @@ async function updateMyPresence(status) {
     // upsert
     await sbFetch('user_presence?on_conflict=user_id', {
       method: 'POST',
-      headers: { 'Prefer': 'resolution=merge-duplicates' },
+      prefer: 'return=representation,resolution=merge-duplicates',
       body: JSON.stringify({
         user_id: currentUser.id,
         user_name: currentUser.name || '',
