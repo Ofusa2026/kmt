@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260601.14 -->
+<!-- KMT_VERSION ver.20260601.15 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -207,7 +207,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260601.14</div>
+    <div class="logo-ver">ver.20260601.15</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -10059,10 +10059,11 @@ function renderFeeMonthTable(ym) {
     w.company_id === companyId && billableStatuses.includes(w.status)
   ).length;
 
-  // 合計計算
-  const totalExcl = allFees.reduce((s, f) => s + (f.amount_excl||0), 0);
-  const totalIncl = allFees.reduce((s, f) => s + (f.amount_incl||0), 0);
-  const paidCount = allFees.filter(f => f.status === '入金済').length;
+  // 合計計算: 実績は draft 行(未登録)を除外。入金済件数も同様
+  const realFees = allFees.filter(f => !f._draft && f.id);
+  const totalExcl = realFees.reduce((s, f) => s + (f.amount_excl||0), 0);
+  const totalIncl = realFees.reduce((s, f) => s + (f.amount_incl||0), 0);
+  const paidCount = realFees.filter(f => f.status === '入金済').length;
   // 予定合計 = 各企業の (単価 × 在職人材数) の合計
   const masterTotalExcl = masterCompanies.reduce((s, c) => {
     const wc = countWorkersInRender(c.id);
@@ -10094,16 +10095,20 @@ function renderFeeMonthTable(ym) {
       <th>人数</th><th>税抜（実績）</th><th>税込（実績）</th><th>請求日</th><th>入金日</th><th>ステータス</th>
     </tr></thead><tbody>
     ${masterCompanies.length ? masterCompanies.map(c => {
-      const f = feeMap[c.id];
+      const fRaw = feeMap[c.id];
+      const isDraft = !fRaw || fRaw._draft;
+      const f = isDraft ? null : fRaw;
+      const fDraft = isDraft ? fRaw : null; // 未登録時の予定値(人数・金額を表示用)
       const stBadge = f ? `<span class="st-badge ${stCls[f.status]||'st-none'}">${esc(f.status||'-')}</span>` : '<span class="st-badge st-add">未登録</span>';
-      const rowStyle = f && f.status === '入金済' ? 'background:#f0fdf4;' : !f ? 'background:#fffbeb;' : '';
-      const clickFn = f ? `openFeeModal('${f.id}')` : `openFeeModalForCompany('${c.id}','${ym}')`;
+      const rowStyle = f && f.status === '入金済' ? 'background:#f0fdf4;' : isDraft ? 'background:#fffbeb;' : '';
+      const clickFn = (f && f.id) ? `openFeeModal('${f.id}')` : `openFeeModalForCompany('${c.id}','${ym}')`;
+      const wcShow = f?.worker_count ?? fDraft?.worker_count ?? null;
       return `<tr onclick="${clickFn}" style="cursor:pointer;${rowStyle}">
         <td style="font-weight:600">${esc(c.name)}</td>
         <td style="font-size:11px">${esc(c.billing_cycle||'月次')}</td>
         <td style="color:var(--blue);font-weight:700">${Number(c.fee_per_person).toLocaleString()}円</td>
         <td>${payBadge(c.payment_method)}</td>
-        <td style="text-align:center">${f?.worker_count??'<span style=color:var(--gray-400)>-</span>'}</td>
+        <td style="text-align:center">${wcShow!==null && wcShow!==undefined ? wcShow : '<span style=color:var(--gray-400)>-</span>'}</td>
         <td style="font-weight:700">${f?.amount_excl?Number(f.amount_excl).toLocaleString()+'円':'<span style=color:var(--gray-400)>-</span>'}</td>
         <td>${f?.amount_incl?Number(f.amount_incl).toLocaleString()+'円':'<span style=color:var(--gray-400)>-</span>'}</td>
         <td style="font-size:12px">${f?.billed_date?formatDate(f.billed_date):'<span style=color:var(--gray-400)>-</span>'}</td>
