@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260601.07 -->
+<!-- KMT_VERSION ver.20260601.08 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -207,7 +207,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260601.07</div>
+    <div class="logo-ver">ver.20260601.08</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -1517,7 +1517,7 @@ function openNewRequestModal() {
 }
 
 function buildNewRequestModalBody() {
-  const companies = allCompanies.filter(c=>c.status!=='past');
+  const companies = allCompanies.filter(c=>c.status!=='past').slice().sort(cmpFolderNo);
   return `
   <div style="font-size:11px;color:var(--gray-400);margin-bottom:12px;">※ 必要事項を入力してください。</div>
   <div class="form-grid">
@@ -1582,7 +1582,7 @@ function buildNewRequestModalBody() {
       <label class="form-label">11. 企業名</label>
       <select class="form-select" id="nr_company_name">
         <option value="">選択...</option>
-        ${companies.map(c=>`<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('')}
+        ${companies.map(c=>`<option value="${esc(c.name)}">${esc(companyOptionLabel(c))}</option>`).join('')}
       </select>
       <div style="font-size:10px;color:var(--orange);margin-top:3px;">⚠️ 新規所属機関の場合は事前に「所属機関」メニューで登録してください</div>
     </div>
@@ -1859,7 +1859,7 @@ async function submitNewRequest() {
 let decisionReportType = 'kmt'; // 'kmt' | 'solo' | 'other'
 
 function buildDecisionReportScreen() {
-  const companies = allCompanies.filter(c=>c.status!=='past');
+  const companies = allCompanies.filter(c=>c.status!=='past').slice().sort(cmpFolderNo);
   return `
   <div style="max-width:860px;margin:0 auto;">
     <!-- パターン切り替えタブ -->
@@ -1901,7 +1901,7 @@ function buildDecisionReportScreen() {
           <div class="form-group full"><label class="form-label">9. 案件名 <span style="font-size:10px;color:var(--gray-400);font-weight:400;">（自動生成：B区分 + 企業名 + 人材名 ／ 必要なら手動修正可）</span></label><input class="form-input" id="dr_case_name" placeholder="自動生成されます（例: 【変更】株式会社○○ NGUYEN VAN A）"></div>
           <div class="form-group"><label class="form-label">10. 人材名</label><input class="form-input" id="dr_person_name" placeholder="例: NGUYEN VAN A" oninput="updateDrCaseName()"></div>
           <div class="form-group full"><label class="form-label">11. 企業名</label>
-            <select class="form-select" id="dr_company_name" onchange="autoFillSupportFee();updateDrCaseName();"><option value="">選択...</option>${companies.map(c=>`<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('')}</select>
+            <select class="form-select" id="dr_company_name" onchange="autoFillSupportFee();updateDrCaseName();"><option value="">選択...</option>${companies.map(c=>`<option value="${esc(c.name)}">${esc(companyOptionLabel(c))}</option>`).join('')}</select>
             <div style="font-size:10px;color:var(--orange);margin-top:3px;">⚠️ 新規の場合は事前に「所属機関」メニューで登録してください</div></div>
           <div class="form-group"><label class="form-label">12. 在留期限</label><input class="form-input" id="dr_expire_date" type="date" onchange="autoFillTokurei()"></div>
           <div class="form-group"><label class="form-label">13. 特例期間<span style="font-size:11px;color:var(--gray-400);font-weight:400;">（在留期限の2ヶ月後・自動）</span></label><input class="form-input" id="dr_tokurei" type="date"></div>
@@ -2390,6 +2390,31 @@ function formatDate(d){if(!d)return'-';const dt=new Date(d);if(isNaN(dt))return 
 function daysDiff(d){if(!d)return 9999;return Math.floor((new Date(d)-new Date())/(1000*60*60*24));}
 function natFlag(nat){const m={'インドネシア':'🇮🇩','ベトナム':'🇻🇳','タイ':'🇹🇭','カンボジア':'🇰🇭','ミャンマー':'🇲🇲','中国':'🇨🇳','フィリピン':'🇵🇭'};return m[nat]||'🌏';}
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// フォルダ番号での比較関数(0,00,1..11,11-1,11-2..)。両方nullなら名前順
+function cmpFolderNo(a, b) {
+  const af = (a?.folder_no || '').toString();
+  const bf = (b?.folder_no || '').toString();
+  if (!af && !bf) return (a?.name||'').localeCompare(b?.name||'', 'ja');
+  if (!af) return 1;
+  if (!bf) return -1;
+  const ma = af.match(/^(\d+)(?:-(\d+))?$/);
+  const mb = bf.match(/^(\d+)(?:-(\d+))?$/);
+  if (!ma && !mb) return af.localeCompare(bf);
+  if (!ma) return 1;
+  if (!mb) return -1;
+  const aMain = parseInt(ma[1],10), bMain = parseInt(mb[1],10);
+  if (aMain !== bMain) return aMain - bMain;
+  if (ma[1].length !== mb[1].length) return ma[1].length - mb[1].length;
+  const aSub = ma[2] ? parseInt(ma[2],10) : -1;
+  const bSub = mb[2] ? parseInt(mb[2],10) : -1;
+  return aSub - bSub;
+}
+// セレクトボックス用ラベル: 「[091] 株式会社YSK」「株式会社XXX」(folder_noなし)
+function companyOptionLabel(c) {
+  const fno = (c?.folder_no || '').toString().trim();
+  return (fno ? '[' + fno + '] ' : '') + (c?.name || '');
+}
 function safeSetItem(key, value) { try { localStorage.setItem(key, value); } catch(e) { console.warn('localStorage quota exceeded:', key); } }
 function calcAge(birthdate) {
   if (!birthdate) return '?';
@@ -6728,7 +6753,7 @@ function buildWorkerModalBody(w) {
     <div class="form-group full"><label class="form-label">所属機関</label>
       <select class="form-select" id="wf_company_id" onchange="onWorkerCompanyChange()">
         <option value="">選択...</option>
-        ${allCompanies.map(c=>`<option value="${c.id}" ${w.company_id===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}
+        ${allCompanies.slice().sort(cmpFolderNo).map(c=>`<option value="${c.id}" ${w.company_id===c.id?'selected':''}>${esc(companyOptionLabel(c))}</option>`).join('')}
       </select></div>
     <div class="form-group"><label class="form-label">管理番号 <span style="font-size:10px;color:var(--gray-400);font-weight:400;">（新規時は企業選択で自動採番）</span></label>
       <input class="form-input" id="wf_management_no" value="${esc(w.management_no||'')}" placeholder="例: 091-006">
