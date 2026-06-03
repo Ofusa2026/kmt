@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260601.20 -->
+<!-- KMT_VERSION ver.20260601.21 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -207,7 +207,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260601.20</div>
+    <div class="logo-ver">ver.20260601.21</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -3475,7 +3475,7 @@ function logoutUser() {
 let chatRooms = [];
 let chatGroups = [];
 let _selectedGroupId = null;
-let _chatSortMode = 'folder'; // 'folder' | 'recent'
+let _chatSortMode = 'recent'; // 'folder' | 'recent' (デフォルト: 受信時間順)
 let _chatStaffOnly = false;   // true: ログイン中ユーザーが担当の人材/企業のみ表示
 let _chatMentionOnly = false; // true: 自分宛メンションの未読がある企業のみ表示
 let _chatGroupByApplyType = false; // true: 企業を申請種別ごとに見出し付きグループ表示
@@ -3500,19 +3500,22 @@ function buildChatScreen() {
         <input id="chatRoomSearch" placeholder="チャットを検索" oninput="chatSearch()" style="width:100%;font-size:13px;padding:8px 14px;border:1px solid #e0e0e0;border-radius:24px;outline:none;background:#f1f3f4;box-sizing:border-box;font-family:inherit;">
         <div id="chatSearchResults" style="display:none;margin-top:6px;"></div>
       </div>
-      <!-- ソート切替+担当フィルタ+メンションフィルタ -->
-      <div style="display:flex;gap:6px;align-items:center;padding:6px 10px;border-bottom:1px solid #e0e0e0;flex-shrink:0;background:#fafbfc;flex-wrap:wrap;">
-        <select id="chatSortMode" onchange="setChatSortMode(this.value)" style="font-size:11px;padding:3px 6px;border:1px solid #d1d5db;border-radius:6px;background:white;cursor:pointer;flex:1;min-width:0;">
-          <option value="folder">📂 フォルダ順</option>
+      <!-- ソート(1行目) -->
+      <div style="display:flex;gap:6px;align-items:center;padding:6px 10px 4px;border-bottom:1px solid #f1f5f9;flex-shrink:0;background:#fafbfc;">
+        <select id="chatSortMode" onchange="setChatSortMode(this.value)" style="font-size:11px;padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;background:white;cursor:pointer;flex:1;min-width:0;">
           <option value="recent">🕐 受信時間順</option>
+          <option value="folder">📂 フォルダ順</option>
         </select>
-        <label style="display:flex;align-items:center;gap:3px;font-size:11px;color:#5f6368;cursor:pointer;white-space:nowrap;font-weight:600;">
+      </div>
+      <!-- フィルタ(2行目) -->
+      <div style="display:flex;gap:14px;align-items:center;padding:6px 10px;border-bottom:1px solid #e0e0e0;flex-shrink:0;background:#fafbfc;flex-wrap:wrap;">
+        <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:#5f6368;cursor:pointer;white-space:nowrap;font-weight:600;">
           <input type="checkbox" id="chatStaffOnly" onchange="setChatStaffFilter(this.checked)" style="cursor:pointer;margin:0;"> 👤 担当のみ
         </label>
-        <label style="display:flex;align-items:center;gap:3px;font-size:11px;color:#f59e0b;cursor:pointer;white-space:nowrap;font-weight:700;">
+        <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:#f59e0b;cursor:pointer;white-space:nowrap;font-weight:700;">
           <input type="checkbox" id="chatMentionOnly" onchange="setChatMentionFilter(this.checked)" style="cursor:pointer;margin:0;"> @メンション
         </label>
-        <label style="display:flex;align-items:center;gap:3px;font-size:11px;color:#7c3aed;cursor:pointer;white-space:nowrap;font-weight:700;">
+        <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:#7c3aed;cursor:pointer;white-space:nowrap;font-weight:700;">
           <input type="checkbox" id="chatGroupByType" onchange="setChatGroupByType(this.checked)" style="cursor:pointer;margin:0;"> 📑 申請種別
         </label>
       </div>
@@ -3890,6 +3893,18 @@ async function loadRoomLastMessages() {
 
 async function loadChatUnread() {
   if (!currentUser) return;
+  // 自分のメンションかどうかを判定(部分一致でOK)
+  // 例: DBに["神出"]だけ入っていても currentUser.name="神出　紘陽" にマッチする
+  const isMentionForMe = (mentions) => {
+    if (!mentions || !Array.isArray(mentions) || !currentUser?.name) return false;
+    const myName = String(currentUser.name).replace(/[\s　]/g, ''); // 空白除去
+    return mentions.some(mn => {
+      if (!mn) return false;
+      const mnNorm = String(mn).replace(/[\s　]/g, '');
+      if (!mnNorm) return false;
+      return myName === mnNorm || myName.includes(mnNorm) || mnNorm.includes(myName);
+    });
+  };
   try {
     // chat_room_id ベースで未読を計算
     const [msgs, reads] = await Promise.all([
@@ -3910,7 +3925,7 @@ async function loadChatUnread() {
       const readAt = readMap[roomId];
       if (!readAt || m.created_at > readAt) {
         unreadByRoom[roomId] = (unreadByRoom[roomId] || 0) + 1;
-        if (m.mentions && Array.isArray(m.mentions) && m.mentions.includes(currentUser?.name)) {
+        if (isMentionForMe(m.mentions)) {
           mentionByRoom[roomId] = (mentionByRoom[roomId] || 0) + 1;
         }
       }
@@ -3920,14 +3935,12 @@ async function loadChatUnread() {
       r.mentionUnread = mentionByRoom[r.id] || 0;
     });
     const total = Object.values(unreadByRoom).reduce((s,v) => s+v, 0);
-    // メンション未読をチェック（自分のメンションのみ）
+    // メンション未読をチェック（自分のメンションのみ、部分一致）
     const mentionCount = (msgs||[]).filter(m => {
       if (m.deleted_at) return false;
       if (m.sender_name === currentUser?.name) return false;
       const readAt = readMap[m.chat_room_id];
-      return m.mentions && Array.isArray(m.mentions) &&
-        m.mentions.includes(currentUser?.name) &&
-        (!readAt || m.created_at > readAt);
+      return isMentionForMe(m.mentions) && (!readAt || m.created_at > readAt);
     }).length;
     const badge = document.getElementById('chatUnreadBadge');
     if (badge) {
