@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260601.19 -->
+<!-- KMT_VERSION ver.20260601.20 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -207,7 +207,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260601.19</div>
+    <div class="logo-ver">ver.20260601.20</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -3696,6 +3696,10 @@ async function saveWorker(returnResult=false) {
     apply_status:     g('wf_apply_status'),
     apply_type:       g('wf_apply_type'),
     desired_visa:     g('wf_desired_visa'),
+    worker_whatsapp:    g('wf_worker_whatsapp'),
+    worker_fb:          g('wf_worker_fb'),
+    worker_instagram:   g('wf_worker_instagram'),
+    worker_sns_other:   g('wf_worker_sns_other'),
     emergency_contact_name:     g('wf_emergency_name'),
     emergency_contact_relation: g('wf_emergency_relation'),
     emergency_contact_phone:    g('wf_emergency_phone'),
@@ -7016,6 +7020,19 @@ function buildWorkerModalBody(w) {
       <select class="form-select" id="wf_desired_visa">
         ${['','特定技能1号','特定技能2号','特定活動'].map(s=>`<option value="${s}" ${(w.desired_visa||'')===s?'selected':''}>${s||'─ 選択 ─'}</option>`).join('')}
       </select></div>
+    <div class="section-title">📱 本人SNS</div>
+    <div class="form-group"><label class="form-label">WhatsApp</label>
+      <input class="form-input" id="wf_worker_whatsapp" value="${esc(w.worker_whatsapp||'')}" placeholder="例: +62 821-xxxx-xxxx">
+    </div>
+    <div class="form-group"><label class="form-label">Facebook</label>
+      <input class="form-input" id="wf_worker_fb" value="${esc(w.worker_fb||'')}" placeholder="URL or ユーザー名">
+    </div>
+    <div class="form-group"><label class="form-label">Instagram</label>
+      <input class="form-input" id="wf_worker_instagram" value="${esc(w.worker_instagram||'')}" placeholder="例: @username">
+    </div>
+    <div class="form-group"><label class="form-label">その他SNS</label>
+      <input class="form-input" id="wf_worker_sns_other" value="${esc(w.worker_sns_other||'')}" placeholder="LINE個人ID / Telegram 等">
+    </div>
     <div class="section-title" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;user-select:none;" onclick="toggleEmergencySection()">
       <span>🆘 緊急連絡先</span>
       <span id="wf_emergency_arrow" style="font-size:14px;color:var(--gray-500);transition:transform .15s;">▼</span>
