@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260601.21 -->
+<!-- KMT_VERSION ver.20260603.01 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -207,7 +207,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260601.21</div>
+    <div class="logo-ver">ver.20260603.01</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -3703,6 +3703,8 @@ async function saveWorker(returnResult=false) {
     worker_fb:          g('wf_worker_fb'),
     worker_instagram:   g('wf_worker_instagram'),
     worker_sns_other:   g('wf_worker_sns_other'),
+    support_type_2go:   g('wf_support_type_2go'),
+    missing_documents:  g('wf_missing_documents'),
     emergency_contact_name:     g('wf_emergency_name'),
     emergency_contact_relation: g('wf_emergency_relation'),
     emergency_contact_phone:    g('wf_emergency_phone'),
@@ -3760,6 +3762,24 @@ function toggleEmergencySection() {
   fields.forEach(f => f.style.display = isHidden ? '' : 'none');
   const arrow = document.getElementById('wf_emergency_arrow');
   if (arrow) arrow.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
+}
+
+// 人材モーダル: 特定技能2号支援区分セクションの開閉
+function toggle2goSupportSection() {
+  const fields = document.querySelectorAll('.support2go-field');
+  if (!fields.length) return;
+  const isHidden = fields[0].style.display === 'none';
+  fields.forEach(f => f.style.display = isHidden ? '' : 'none');
+  const arrow = document.getElementById('wf_2go_arrow');
+  if (arrow) arrow.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
+}
+
+// 人材モーダル: 申請ステータス変更時、「申請済み(不足あり)」のときだけ不足書類欄を表示
+function onWorkerApplyStatusChange() {
+  const sel = document.getElementById('wf_apply_status');
+  const wrap = document.getElementById('wf_missing_docs_wrap');
+  if (!sel || !wrap) return;
+  wrap.style.display = (sel.value === '申請済み(不足あり)') ? '' : 'none';
 }
 
 // 人材モーダル: 所属機関の変更時に管理番号を自動採番(新規のみ・空欄のときのみ)
@@ -6614,7 +6634,11 @@ function buildWorkersScreen() {
     </select>
     <select class="filter-select" id="wFilterApplyStatus" onchange="applyWorkerFilters()">
       <option value="">全申請ステータス</option>
-      <option>申請予定なし</option><option>申請準備中</option><option>審査中</option>
+      <option>申請予定なし</option>
+      <option>認定申請準備中</option><option>1号変更準備中</option><option>2号変更準備中</option><option>更新準備中</option>
+      <option>申請済み(不足なし)</option><option>申請済み(不足あり)</option>
+      <option>許可済み・発行待ち</option><option>郵送交付中</option><option>窓口受け取り予定</option>
+      <option>再入国待ち</option><option>完了(本人/会社に返送済み)</option>
     </select>
     <select class="filter-select" id="wFilterNationality" onchange="applyWorkerFilters()">
       <option value="">全国籍</option>
@@ -6624,6 +6648,19 @@ function buildWorkersScreen() {
     <select class="filter-select" id="wFilterKmt" onchange="applyWorkerFilters()">
       <option value="">KMT支援区分</option>
       <option>KMT支援</option><option>KMT支援外</option>
+    </select>
+    <select class="filter-select" id="wFilterMainStaff" onchange="applyWorkerFilters()">
+      <option value="">全メイン担当</option>
+    </select>
+    <select class="filter-select" id="wFilterSubStaff" onchange="applyWorkerFilters()">
+      <option value="">全サブ担当</option>
+    </select>
+    <select class="filter-select" id="wFilterExpiry" onchange="applyWorkerFilters()" title="在留期限の残日数で絞り込み">
+      <option value="">全在留期限</option>
+      <option value="90">🟠 90日以内</option>
+      <option value="30">🔴 30日以内</option>
+      <option value="tokurei">⚠️ 特例期間中</option>
+      <option value="expired">⛔ 期限切れ(特例なし)</option>
     </select>
     <button class="btn btn-outline" id="wRetiredToggle" style="font-size:11px;padding:4px 10px" onclick="toggleRetired()">退職者等表示</button>
     <button class="btn btn-outline" style="font-size:11px;padding:4px 10px" onclick="clearWorkerFilters()">✕</button>
@@ -6652,11 +6689,33 @@ function buildWorkersScreen() {
 async function loadWorkers() {
   showLoading(true);
   try {
-    const data = await sbFetch('workers?select=*,companies(name)&order=joined_date.desc.nullslast,name.asc');
+    const data = await sbFetch('workers?select=*,companies(name,main_staff,sub_staff)&order=joined_date.desc.nullslast,name.asc');
     allWorkers = data || [];
+    refreshWorkerStaffFilters();
     applyWorkerFilters();
   } catch(e) { showToast('❌ ' + e.message, 'error'); }
   showLoading(false);
+}
+
+// 人材一覧の担当フィルタセレクトに、companies.main_staff / sub_staff のユニーク値を投入
+function refreshWorkerStaffFilters() {
+  const mainSet = new Set();
+  const subSet = new Set();
+  (allWorkers||[]).forEach(w => {
+    const ms = w.companies?.main_staff;
+    const ss = w.companies?.sub_staff;
+    if (ms) String(ms).split(/[,、，\s]+/).forEach(s => { const t=s.trim(); if(t) mainSet.add(t); });
+    if (ss) String(ss).split(/[,、，\s]+/).forEach(s => { const t=s.trim(); if(t) subSet.add(t); });
+  });
+  const fill = (id, set) => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    const cur = sel.value;
+    const placeholder = sel.options[0]?.textContent || '';
+    sel.innerHTML = `<option value="">${placeholder}</option>` + [...set].sort((a,b)=>a.localeCompare(b,'ja')).map(s=>`<option ${cur===s?'selected':''}>${s}</option>`).join('');
+  };
+  fill('wFilterMainStaff', mainSet);
+  fill('wFilterSubStaff', subSet);
 }
 
 function applyWorkerFilters() {
@@ -6666,15 +6725,48 @@ function applyWorkerFilters() {
   const applyStatus = document.getElementById('wFilterApplyStatus')?.value||'';
   const nat = document.getElementById('wFilterNationality')?.value||'';
   const kmt = document.getElementById('wFilterKmt')?.value||'';
+  const mainStaff = document.getElementById('wFilterMainStaff')?.value||'';
+  const subStaff = document.getElementById('wFilterSubStaff')?.value||'';
+  const expiryFilter = document.getElementById('wFilterExpiry')?.value||'';
   const retiredStatuses = ['退職済(帰国)','退職済(転職)'];
+  const today = new Date(); today.setHours(0,0,0,0);
+  const daysTo = (dt) => dt ? Math.floor((new Date(dt) - today) / 86400000) : null;
   filteredWorkers = allWorkers.filter(w => {
     if (q && !((w.name||'').toLowerCase().includes(q) || (w.nationality||'').toLowerCase().includes(q) || (w.companies?.name||'').toLowerCase().includes(q) || (w.management_no||'').toLowerCase().includes(q))) return false;
-    // デフォルトは在職者のみ。退職者等は「退職者等表示」ONか、在職ステータスを明示選択したときだけ表示
     if (!_showRetired && !status && retiredStatuses.includes(w.status)) return false;
     if (status && w.status !== status) return false;
     if (applyStatus && (w.apply_status||'') !== applyStatus) return false;
     if (nat && w.nationality !== nat) return false;
     if (kmt && w.kmt_support !== kmt) return false;
+    // 企業のメイン担当フィルタ(カンマ区切り or 単一値で部分一致)
+    if (mainStaff) {
+      const ms = w.companies?.main_staff || '';
+      const arr = String(ms).split(/[,、，\s]+/).map(s=>s.trim()).filter(Boolean);
+      if (!arr.includes(mainStaff)) return false;
+    }
+    if (subStaff) {
+      const ss = w.companies?.sub_staff || '';
+      const arr = String(ss).split(/[,、，\s]+/).map(s=>s.trim()).filter(Boolean);
+      if (!arr.includes(subStaff)) return false;
+    }
+    // 在留期限フィルタ
+    if (expiryFilter) {
+      const d = daysTo(w.visa_expiry);
+      const td = daysTo(w.tokurei_date);
+      if (expiryFilter === '90') {
+        if (d === null || d > 90 || d < 0) return false;
+      } else if (expiryFilter === '30') {
+        if (d === null || d > 30 || d < 0) return false;
+      } else if (expiryFilter === 'tokurei') {
+        // 期限切れ かつ tokurei_date が今日以降
+        if (d === null || d >= 0) return false;
+        if (td === null || td < 0) return false;
+      } else if (expiryFilter === 'expired') {
+        // 期限切れ かつ tokurei_date 無し or 過ぎている
+        if (d === null || d >= 0) return false;
+        if (td !== null && td >= 0) return false;
+      }
+    }
     return true;
   });
   workerPage = 1;
@@ -6694,7 +6786,7 @@ function toggleRetired() {
 }
 
 function clearWorkerFilters() {
-  ['wSearchInput','wFilterStatus','wFilterApplyStatus','wFilterNationality','wFilterKmt'].forEach(id => {
+  ['wSearchInput','wFilterStatus','wFilterApplyStatus','wFilterNationality','wFilterKmt','wFilterMainStaff','wFilterSubStaff','wFilterExpiry'].forEach(id => {
     const el = document.getElementById(id); if(el) el.value='';
   });
   _showRetired = false;
@@ -6739,14 +6831,24 @@ function renderWorkerTable() {
     const cls = STATUS_COLORS[w.status] || 'st-none';
     const applyCls = APPLY_STATUS_COLORS[w.apply_status] || 'st-none';
     const expiry = w.visa_expiry ? formatDate(w.visa_expiry) : '-';
-    const expWarn = w.visa_expiry && daysDiff(w.visa_expiry) < 120 ? ' style="color:var(--red);font-weight:700"' : '';
-    const expiryAlert = w.visa_expiry ? (() => {
-      const days = Math.floor((new Date(w.visa_expiry)-new Date())/86400000);
-      if (days<=30) return ' style="color:#dc2626;font-weight:700;"';
-      if (days<=60) return ' style="color:#ea580c;font-weight:700;"';
-      if (days<=90) return ' style="color:#d97706;font-weight:700;"';
-      return '';
-    })() : '';
+    // 在留期限の色分け: 90日以内=薄い赤、30日以内=濃い赤、特例期間中=赤太字
+    const today0 = new Date(); today0.setHours(0,0,0,0);
+    const dDay = w.visa_expiry ? Math.floor((new Date(w.visa_expiry) - today0)/86400000) : null;
+    const tDay = w.tokurei_date ? Math.floor((new Date(w.tokurei_date) - today0)/86400000) : null;
+    let expiryStyle = '';
+    let expiryNote = '';
+    if (dDay !== null) {
+      if (dDay >= 0 && dDay <= 30) {
+        expiryStyle = ' style="color:#dc2626;font-weight:800;background:#fef2f2;"';
+      } else if (dDay > 30 && dDay <= 90) {
+        expiryStyle = ' style="color:#b91c1c;font-weight:700;background:#fef7f7;"';
+      } else if (dDay < 0 && tDay !== null && tDay >= 0) {
+        expiryStyle = ' style="color:#dc2626;font-weight:800;background:#fef2f2;"';
+        expiryNote = '<br><span style="font-size:10px;color:#dc2626;">⚠️ 特例期間中 ~' + formatDate(w.tokurei_date) + '</span>';
+      } else if (dDay < 0) {
+        expiryStyle = ' style="color:#7c2d12;font-weight:600;text-decoration:line-through;"';
+      }
+    }
     return `<tr onclick="openWorkerModal('${w.id}')">
       <td style="font-size:12px;font-weight:600;color:var(--gray-700);white-space:nowrap;">${esc(w.management_no||'-')}</td>
       <td>
@@ -6759,7 +6861,7 @@ function renderWorkerTable() {
       <td style="font-size:12px">${esc(w.companies?.name||'-')}</td>
       <td style="font-size:11px;color:var(--gray-700)">${esc(w.applicant_field||'')}${w.job_category?'<br>'+esc(w.job_category):''}</td>
       <td style="font-size:12px">${esc(w.visa_status||'-')}</td>
-      <td${expiryAlert}>${expiry}</td>
+      <td${expiryStyle}>${expiry}${expiryNote}</td>
       <td style="font-size:12px">${w.joined_date?formatDate(w.joined_date):'-'}</td>
       <td><span class="st-badge ${cls}">${esc(w.status||'-')}</span><br><span class="st-badge ${applyCls}" style="margin-top:2px;display:inline-block;">${esc(w.apply_status||'申請予定なし')}</span></td>
       <td style="font-size:12px">${esc(w.staff||'-')}</td>
@@ -7022,9 +7124,12 @@ function buildWorkerModalBody(w) {
         ${['配属前','在職中','在職中(一時帰国中)','退職済(帰国)','退職済(転職)'].map(s=>`<option ${w.status===s?'selected':''}>${s}</option>`).join('')}
       </select></div>
     <div class="form-group"><label class="form-label">申請ステータス</label>
-      <select class="form-select" id="wf_apply_status">
-        ${['申請予定なし','申請準備中','審査中'].map(s=>`<option ${(w.apply_status||'申請予定なし')===s?'selected':''}>${s}</option>`).join('')}
+      <select class="form-select" id="wf_apply_status" onchange="onWorkerApplyStatusChange()">
+        ${['申請予定なし','認定申請準備中','1号変更準備中','2号変更準備中','更新準備中','申請済み(不足なし)','申請済み(不足あり)','許可済み・発行待ち','郵送交付中','窓口受け取り予定','再入国待ち','完了(本人/会社に返送済み)'].map(s=>`<option ${(w.apply_status||'申請予定なし')===s?'selected':''}>${s}</option>`).join('')}
       </select></div>
+    <div class="form-group full" id="wf_missing_docs_wrap" style="display:${w.apply_status==='申請済み(不足あり)'?'':'none'};"><label class="form-label">不足書類 <span style="font-size:10px;color:var(--gray-400);font-weight:400;">— 「申請済み(不足あり)」のときのみ表示</span></label>
+      <textarea class="form-textarea" id="wf_missing_documents" rows="2" placeholder="例: 給与明細(直近3ヶ月分)、預金通帳コピー">${esc(w.missing_documents||'')}</textarea>
+    </div>
     <div class="form-group"><label class="form-label">申請種別</label>
       <select class="form-select" id="wf_apply_type">
         ${['','認定','変更','更新','申請なし'].map(s=>`<option value="${s}" ${(w.apply_type||'')===s?'selected':''}>${s||'─ 選択 ─'}</option>`).join('')}
@@ -7161,6 +7266,20 @@ function buildWorkerModalBody(w) {
     <div class="form-group full"><label class="form-label">日本住所</label><input class="form-input" id="wf_jp_address" value="${esc(w.jp_address||'')}"></div>
     <div class="section-title">メモ</div>
     <div class="form-group full"><label class="form-label">備考</label><textarea class="form-textarea" id="wf_memo">${esc(w.memo||'')}</textarea></div>
+    <div class="section-title" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;user-select:none;" onclick="toggle2goSupportSection()">
+      <span>🛡️ 特定技能2号支援区分</span>
+      <span id="wf_2go_arrow" style="font-size:14px;color:var(--gray-500);transition:transform .15s;">▼</span>
+    </div>
+    <div class="form-group full support2go-field" style="display:none;"><label class="form-label">支援区分</label>
+      <select class="form-select" id="wf_support_type_2go">
+        ${['','2号支援継続','2号支援終了・書類サポート','2号企業単独'].map(s=>`<option value="${s}" ${(w.support_type_2go||'')===s?'selected':''}>${s||'─ 選択 ─'}</option>`).join('')}
+      </select>
+      <div style="font-size:10px;color:var(--gray-400);font-weight:400;margin-top:4px;line-height:1.5;">
+        <strong>2号支援継続</strong>: 特定技能2号で引き続きKMTが全面支援<br>
+        <strong>2号支援終了・書類サポート</strong>: 支援は終了、更新と定期報告はKMTが書類サポート<br>
+        <strong>2号企業単独</strong>: 更新や定期報告も書類も企業単独又は人材本人で対応
+      </div>
+    </div>
   </div>
   </div>
   <!-- ノートタブ -->
