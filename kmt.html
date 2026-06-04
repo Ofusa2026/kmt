@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260603.02 -->
+<!-- KMT_VERSION ver.20260603.03 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -207,7 +207,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260603.02</div>
+    <div class="logo-ver">ver.20260603.03</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -6865,21 +6865,60 @@ function renderWorkerAlerts() {
   if (!banner) return;
   const today = new Date(); today.setHours(0,0,0,0);
   const alerts = { 1:[], 2:[], 3:[] };
+  // 🚨 申請忘れ警告: 75日以内 かつ 申請予定なし(または未設定)
+  const missAlert = [];
   (filteredWorkers.length ? filteredWorkers : allWorkers).forEach(w => {
     if (!w.visa_expiry) return;
-    if (w.request_date) return; // 申請依頼日が入っていればアラート除外
     const exp = new Date(w.visa_expiry); exp.setHours(0,0,0,0);
     const days = Math.floor((exp-today)/86400000);
+    // 退職者は除外
+    if (['退職済(帰国)','退職済(転職)'].includes(w.status)) return;
+    // 申請忘れ判定(75日以内・期限切れ含む・申請予定なしor未設定)
+    const applyStatus = w.apply_status || '申請予定なし';
+    if (days <= 75 && applyStatus === '申請予定なし') {
+      missAlert.push({w, days});
+    }
+    if (w.request_date) return; // 申請依頼日が入っていれば残り日数アラートは除外
     if (days < 0) return;
     if (days <= 30) alerts[1].push({w, days});
     else if (days <= 60) alerts[2].push({w, days});
     else if (days <= 90) alerts[3].push({w, days});
   });
   const total = alerts[1].length + alerts[2].length + alerts[3].length;
-  if (!total) { banner.innerHTML=''; return; }
-  // 1行3列・クリックで人材リスト展開
+  if (!total && !missAlert.length) { banner.innerHTML=''; return; }
+  // 残り日数で昇順ソート(期限切れも含めて期日が近い順)
+  missAlert.sort((a,b) => a.days - b.days);
   const wrap = document.createElement('div');
   wrap.style.cssText = 'margin-bottom:12px;';
+
+  // 🚨 申請忘れ警告(独立した大きなバナー)
+  if (missAlert.length) {
+    const miss = document.createElement('div');
+    miss.style.cssText = 'background:linear-gradient(135deg,#fef2f2 0%,#fee2e2 100%);border:2px solid #dc2626;border-radius:10px;padding:12px 16px;margin-bottom:10px;cursor:pointer;transition:.15s;box-shadow:0 2px 8px rgba(220,38,38,0.12);';
+    miss.onmouseover = () => miss.style.opacity = '0.92';
+    miss.onmouseout = () => miss.style.opacity = '1';
+    miss.innerHTML =
+      '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">'+
+        '<div style="display:flex;align-items:center;gap:10px;">'+
+          '<div style="font-size:28px;">🚨</div>'+
+          '<div>'+
+            '<div style="font-size:13px;font-weight:900;color:#dc2626;">申請忘れ警告 — 在留期限75日以内 × 申請予定なし</div>'+
+            '<div style="font-size:11px;color:#7f1d1d;margin-top:2px;">該当人材の申請ステータスを早急に更新してください</div>'+
+          '</div>'+
+        '</div>'+
+        '<div style="text-align:right;">'+
+          '<div style="font-size:26px;font-weight:900;color:#dc2626;line-height:1;">'+missAlert.length+'<span style="font-size:13px;font-weight:600;">名</span></div>'+
+          '<div style="font-size:10px;color:#dc2626;margin-top:2px;">クリックで一覧表示 ▼</div>'+
+        '</div>'+
+      '</div>';
+    miss.onclick = () => toggleMissAlertList(missAlert);
+    wrap.appendChild(miss);
+    // 展開リスト(申請忘れ警告用)
+    const missList = document.createElement('div');
+    missList.id = 'workerMissAlertList';
+    wrap.appendChild(missList);
+  }
+
   const alertDefs = [
     {list: alerts[1], label:'🔴 1ヶ月以内', color:'#dc2626', bg:'#fef2f2', border:'#fecaca', key:'a1'},
     {list: alerts[2], label:'🟠 2ヶ月以内', color:'#ea580c', bg:'#fff7ed', border:'#fed7aa', key:'a2'},
@@ -6911,6 +6950,33 @@ function renderWorkerAlerts() {
   wrap.appendChild(listArea);
   banner.innerHTML = '';
   banner.appendChild(wrap);
+}
+
+// 申請忘れ警告の人材リストを開閉
+function toggleMissAlertList(list) {
+  const area = document.getElementById('workerMissAlertList');
+  if (!area) return;
+  if (area.dataset.open === '1') {
+    area.innerHTML = '';
+    area.dataset.open = '';
+    return;
+  }
+  const today = new Date(); today.setHours(0,0,0,0);
+  const rows = list.map(({w, days}) => {
+    let badge = '';
+    if (days < 0) badge = '<span style="background:#7f1d1d;color:white;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:800;">期限切れ '+Math.abs(days)+'日</span>';
+    else if (days <= 30) badge = '<span style="background:#dc2626;color:white;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:800;">'+days+'日</span>';
+    else badge = '<span style="background:#ea580c;color:white;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;">'+days+'日</span>';
+    return '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #fee2e2;cursor:pointer;background:white;" onclick="event.stopPropagation();openWorkerModal(\''+w.id+'\')">'+
+      '<div style="min-width:80px;font-size:11px;font-weight:600;color:#64748b;">'+esc(w.management_no||'-')+'</div>'+
+      '<div style="flex:1;font-size:12px;"><strong>'+esc(w.name)+'</strong> <span style="color:#94a3b8;font-size:11px;">('+esc(w.nationality||'-')+')</span></div>'+
+      '<div style="font-size:11px;color:#64748b;flex:1;">'+esc(w.companies?.name||'-')+'</div>'+
+      '<div style="font-size:11px;color:#7f1d1d;font-weight:700;">'+formatDate(w.visa_expiry)+'</div>'+
+      '<div>'+badge+'</div>'+
+    '</div>';
+  }).join('');
+  area.innerHTML = '<div style="margin-top:-2px;margin-bottom:10px;background:white;border:2px solid #dc2626;border-top:none;border-radius:0 0 10px 10px;overflow:hidden;">'+rows+'</div>';
+  area.dataset.open = '1';
 }
 
 function toggleAlertList(key, alertDef, grid) {
