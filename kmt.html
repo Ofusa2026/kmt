@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260603.01 -->
+<!-- KMT_VERSION ver.20260603.02 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -207,7 +207,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260603.01</div>
+    <div class="logo-ver">ver.20260603.02</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -3704,7 +3704,6 @@ async function saveWorker(returnResult=false) {
     worker_instagram:   g('wf_worker_instagram'),
     worker_sns_other:   g('wf_worker_sns_other'),
     support_type_2go:   g('wf_support_type_2go'),
-    missing_documents:  g('wf_missing_documents'),
     emergency_contact_name:     g('wf_emergency_name'),
     emergency_contact_relation: g('wf_emergency_relation'),
     emergency_contact_phone:    g('wf_emergency_phone'),
@@ -3772,14 +3771,6 @@ function toggle2goSupportSection() {
   fields.forEach(f => f.style.display = isHidden ? '' : 'none');
   const arrow = document.getElementById('wf_2go_arrow');
   if (arrow) arrow.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
-}
-
-// 人材モーダル: 申請ステータス変更時、「申請済み(不足あり)」のときだけ不足書類欄を表示
-function onWorkerApplyStatusChange() {
-  const sel = document.getElementById('wf_apply_status');
-  const wrap = document.getElementById('wf_missing_docs_wrap');
-  if (!sel || !wrap) return;
-  wrap.style.display = (sel.value === '申請済み(不足あり)') ? '' : 'none';
 }
 
 // 人材モーダル: 所属機関の変更時に管理番号を自動採番(新規のみ・空欄のときのみ)
@@ -6634,11 +6625,7 @@ function buildWorkersScreen() {
     </select>
     <select class="filter-select" id="wFilterApplyStatus" onchange="applyWorkerFilters()">
       <option value="">全申請ステータス</option>
-      <option>申請予定なし</option>
-      <option>認定申請準備中</option><option>1号変更準備中</option><option>2号変更準備中</option><option>更新準備中</option>
-      <option>申請済み(不足なし)</option><option>申請済み(不足あり)</option>
-      <option>許可済み・発行待ち</option><option>郵送交付中</option><option>窓口受け取り予定</option>
-      <option>再入国待ち</option><option>完了(本人/会社に返送済み)</option>
+      <option>申請予定なし</option><option>申請準備中</option><option>審査中</option>
     </select>
     <select class="filter-select" id="wFilterNationality" onchange="applyWorkerFilters()">
       <option value="">全国籍</option>
@@ -7124,12 +7111,9 @@ function buildWorkerModalBody(w) {
         ${['配属前','在職中','在職中(一時帰国中)','退職済(帰国)','退職済(転職)'].map(s=>`<option ${w.status===s?'selected':''}>${s}</option>`).join('')}
       </select></div>
     <div class="form-group"><label class="form-label">申請ステータス</label>
-      <select class="form-select" id="wf_apply_status" onchange="onWorkerApplyStatusChange()">
-        ${['申請予定なし','認定申請準備中','1号変更準備中','2号変更準備中','更新準備中','申請済み(不足なし)','申請済み(不足あり)','許可済み・発行待ち','郵送交付中','窓口受け取り予定','再入国待ち','完了(本人/会社に返送済み)'].map(s=>`<option ${(w.apply_status||'申請予定なし')===s?'selected':''}>${s}</option>`).join('')}
+      <select class="form-select" id="wf_apply_status">
+        ${['申請予定なし','申請準備中','審査中'].map(s=>`<option ${(w.apply_status||'申請予定なし')===s?'selected':''}>${s}</option>`).join('')}
       </select></div>
-    <div class="form-group full" id="wf_missing_docs_wrap" style="display:${w.apply_status==='申請済み(不足あり)'?'':'none'};"><label class="form-label">不足書類 <span style="font-size:10px;color:var(--gray-400);font-weight:400;">— 「申請済み(不足あり)」のときのみ表示</span></label>
-      <textarea class="form-textarea" id="wf_missing_documents" rows="2" placeholder="例: 給与明細(直近3ヶ月分)、預金通帳コピー">${esc(w.missing_documents||'')}</textarea>
-    </div>
     <div class="form-group"><label class="form-label">申請種別</label>
       <select class="form-select" id="wf_apply_type">
         ${['','認定','変更','更新','申請なし'].map(s=>`<option value="${s}" ${(w.apply_type||'')===s?'selected':''}>${s||'─ 選択 ─'}</option>`).join('')}
