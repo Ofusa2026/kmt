@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260603.03 -->
+<!-- KMT_VERSION ver.20260603.04 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -39,6 +39,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .main-wrap{margin-left:220px;display:flex;flex-direction:column;min-height:100vh;transition:margin-left 0.2s ease;}
 .main-wrap.collapsed{margin-left:0;}
 .topbar{background:white;border-bottom:1px solid var(--gray-200);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:0;z-index:50;}
+@keyframes kmtBadgePulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
 .page-title{font-size:18px;font-weight:800;color:var(--navy);}
 .topbar-actions{display:flex;align-items:center;gap:8px;}
 
@@ -207,7 +211,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260603.03</div>
+    <div class="logo-ver">ver.20260603.04</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -257,6 +261,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
       <div class="page-title" id="pageTitle">🏢 所属機関</div>
     </div>
     <div class="topbar-actions">
+      <button id="notifPermBtn" onclick="requestNotificationPermission()" title="クリックして通知を有効化" style="background:none;border:1px solid #e5e7eb;border-radius:8px;width:34px;height:34px;font-size:16px;cursor:pointer;color:#ea580c;display:flex;align-items:center;justify-content:center;padding:0;">🔔</button>
       <button class="btn btn-outline" onclick="loadCompanies()">🔄 更新</button>
       <button class="btn btn-primary" onclick="openCompanyModal(null)">＋ 新規登録</button>
     </div>
@@ -3460,6 +3465,7 @@ function onLoginSuccess() {
   loadChatUnread();
   startPresenceHeartbeat();
   refreshSupportScheduleBadge();
+  updateNotifButton();
 }
 
 function logoutUser() {
@@ -3902,6 +3908,110 @@ async function loadRoomLastMessages() {
   } catch(e) {}
 }
 
+// ==============================
+// 🔔 通知システム(タブタイトル/ブラウザ通知/バッジ強化)
+// ==============================
+let _originalTitle = document.title;
+let _lastUnreadTotal = 0;
+let _lastMentionTotal = 0;
+let _notifSeen = new Set(); // 通知済みメッセージID
+
+// タブタイトルに未読数を表示
+function updateTabTitle(unread, mention) {
+  if (!_originalTitle || _originalTitle === '(') _originalTitle = 'KMT案件管理';
+  // 「(N) 元タイトル」形式
+  if (mention > 0) {
+    document.title = `🔴(${unread}) ${_originalTitle}`;
+  } else if (unread > 0) {
+    document.title = `(${unread}) ${_originalTitle}`;
+  } else {
+    document.title = _originalTitle;
+  }
+}
+
+// 通知許可をリクエスト(ユーザーがボタン押した時)
+async function requestNotificationPermission() {
+  if (!('Notification' in window)) {
+    showToast('❌ このブラウザは通知に対応していません', 'error');
+    return false;
+  }
+  if (Notification.permission === 'granted') {
+    showToast('✅ すでに通知は有効です', 'success');
+    return true;
+  }
+  if (Notification.permission === 'denied') {
+    showToast('⚠️ 通知が拒否されています。ブラウザ設定から手動で許可してください', 'error');
+    return false;
+  }
+  const result = await Notification.requestPermission();
+  if (result === 'granted') {
+    showToast('🔔 通知を有効にしました', 'success');
+    // テスト通知
+    new Notification('KMT案件管理', { body: '通知が有効になりました', icon: '/favicon.ico', tag: 'kmt-test' });
+    updateNotifButton();
+    return true;
+  } else {
+    showToast('⚠️ 通知が許可されませんでした', 'error');
+    return false;
+  }
+}
+
+// 通知許可ボタンの表示状態を更新
+function updateNotifButton() {
+  const btn = document.getElementById('notifPermBtn');
+  if (!btn) return;
+  if (!('Notification' in window)) { btn.style.display = 'none'; return; }
+  if (Notification.permission === 'granted') {
+    btn.innerHTML = '🔔';
+    btn.title = '通知ON';
+    btn.style.color = '#16a34a';
+  } else if (Notification.permission === 'denied') {
+    btn.innerHTML = '🔕';
+    btn.title = '通知OFF (ブラウザ設定で許可してください)';
+    btn.style.color = '#94a3b8';
+  } else {
+    btn.innerHTML = '🔔';
+    btn.title = 'クリックして通知を有効化';
+    btn.style.color = '#ea580c';
+  }
+}
+
+// 新着メッセージをブラウザ通知
+function notifyNewMessages(newMessages) {
+  if (!('Notification' in window)) return;
+  if (Notification.permission !== 'granted') return;
+  if (!Array.isArray(newMessages) || !newMessages.length) return;
+  // 直近5件のみ通知(多すぎる場合は集約)
+  if (newMessages.length > 5) {
+    const mentionCnt = newMessages.filter(m => isMentionForMe(m.mentions)).length;
+    const body = mentionCnt > 0
+      ? `新着 ${newMessages.length} 件 (うち @メンション ${mentionCnt} 件)`
+      : `新着メッセージ ${newMessages.length} 件`;
+    const n = new Notification('KMT 新着チャット', { body, tag: 'kmt-chat-bulk', requireInteraction: mentionCnt > 0 });
+    n.onclick = () => { window.focus(); if (typeof showScreen === 'function') showScreen('chats'); n.close(); };
+    return;
+  }
+  newMessages.forEach(m => {
+    if (_notifSeen.has(m.id)) return;
+    _notifSeen.add(m.id);
+    const isMention = isMentionForMe(m.mentions);
+    const title = isMention ? `🔴 @メンション — ${m.sender_name || '不明'}` : `💬 ${m.sender_name || '不明'}`;
+    const body = (m.content || '').slice(0, 120);
+    const n = new Notification(title, {
+      body,
+      tag: 'kmt-chat-' + m.id,
+      requireInteraction: isMention, // メンションは閉じるまで残る
+    });
+    n.onclick = () => { window.focus(); if (typeof showScreen === 'function') showScreen('chats'); n.close(); };
+    // 通常メッセージは8秒で自動消去
+    if (!isMention) setTimeout(() => { try { n.close(); } catch(e) {} }, 8000);
+  });
+  // メモリ制限(古い既知IDを切り捨て)
+  if (_notifSeen.size > 200) {
+    _notifSeen = new Set([..._notifSeen].slice(-100));
+  }
+}
+
 async function loadChatUnread() {
   if (!currentUser) return;
   // 自分のメンションかどうかを判定(部分一致でOK)
@@ -3959,7 +4069,40 @@ async function loadChatUnread() {
       badge.style.display = total > 0 ? '' : 'none';
       badge.style.background = mentionCount > 0 ? '#f59e0b' : '#ef4444';
       badge.title = mentionCount > 0 ? `${mentionCount}件のメンションあり` : '';
+      // メンション時は脈動アニメーション
+      if (mentionCount > 0) {
+        badge.style.animation = 'kmtBadgePulse 1.5s ease-in-out infinite';
+        badge.style.boxShadow = '0 0 0 3px rgba(245,158,11,0.35)';
+      } else if (total > 0) {
+        badge.style.animation = '';
+        badge.style.boxShadow = '0 0 0 2px rgba(239,68,68,0.25)';
+      } else {
+        badge.style.animation = '';
+        badge.style.boxShadow = '';
+      }
     }
+    // 🔔 タブタイトル更新
+    updateTabTitle(total, mentionCount);
+    // 🔔 新着通知: 前回より未読が増えていれば、増分メッセージを通知
+    if (total > _lastUnreadTotal || mentionCount > _lastMentionTotal) {
+      // 未読のメッセージ(自分以外、未読、初回ロード除く)
+      const newMessages = (msgs||[]).filter(m => {
+        if (m.deleted_at) return false;
+        if (m.sender_name === currentUser?.name) return false;
+        if (_notifSeen.has(m.id)) return false;
+        const readAt = readMap[m.chat_room_id];
+        return (!readAt || m.created_at > readAt);
+      });
+      // 初回ロード時は通知しない(_lastUnreadTotalが0で実際は履歴大量のケース)
+      if (_lastUnreadTotal > 0 || _lastMentionTotal > 0 || newMessages.length <= 10) {
+        notifyNewMessages(newMessages);
+      } else {
+        // 初回は既存IDだけマークして次回以降のみ通知
+        newMessages.forEach(m => _notifSeen.add(m.id));
+      }
+    }
+    _lastUnreadTotal = total;
+    _lastMentionTotal = mentionCount;
     renderChatRooms();
   } catch(e) {}
 }
