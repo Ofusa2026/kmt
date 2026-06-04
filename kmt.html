@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260603.05 -->
+<!-- KMT_VERSION ver.20260603.06 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -211,7 +211,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260603.05</div>
+    <div class="logo-ver">ver.20260603.06</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -3501,31 +3501,31 @@ function buildChatScreen() {
   return `
   <div id="chatFullWrap" style="display:flex;gap:0;height:calc(100vh - 110px);overflow:hidden;">
     <!-- 左：ルーム一覧 -->
-    <div style="width:280px;flex-shrink:0;border-right:1px solid #e0e0e0;background:white;display:flex;flex-direction:column;">
-      <div style="padding:10px 12px;border-bottom:1px solid #e0e0e0;">
-        <input id="chatRoomSearch" placeholder="チャットを検索" oninput="chatSearch()" style="width:100%;font-size:13px;padding:8px 14px;border:1px solid #e0e0e0;border-radius:24px;outline:none;background:#f1f3f4;box-sizing:border-box;font-family:inherit;">
+    <div style="width:400px;flex-shrink:0;border-right:1px solid #e0e0e0;background:white;display:flex;flex-direction:column;">
+      <div style="padding:12px 14px;border-bottom:1px solid #e0e0e0;">
+        <input id="chatRoomSearch" placeholder="🔍 チャットを検索" oninput="chatSearch()" style="width:100%;font-size:14px;padding:10px 16px;border:1px solid #e0e0e0;border-radius:24px;outline:none;background:#f1f3f4;box-sizing:border-box;font-family:inherit;">
         <div id="chatSearchResults" style="display:none;margin-top:6px;"></div>
       </div>
       <!-- ソート(1行目) -->
-      <div style="display:flex;gap:6px;align-items:center;padding:6px 10px 4px;border-bottom:1px solid #f1f5f9;flex-shrink:0;background:#fafbfc;">
-        <select id="chatSortMode" onchange="setChatSortMode(this.value)" style="font-size:11px;padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;background:white;cursor:pointer;flex:1;min-width:0;">
+      <div style="display:flex;gap:6px;align-items:center;padding:8px 12px 6px;border-bottom:1px solid #f1f5f9;flex-shrink:0;background:#fafbfc;">
+        <select id="chatSortMode" onchange="setChatSortMode(this.value)" style="font-size:12px;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;background:white;cursor:pointer;flex:1;min-width:0;font-weight:600;">
           <option value="recent">🕐 受信時間順</option>
           <option value="folder">📂 フォルダ順</option>
         </select>
       </div>
       <!-- フィルタ(2行目) -->
-      <div style="display:flex;gap:14px;align-items:center;padding:6px 10px;border-bottom:1px solid #e0e0e0;flex-shrink:0;background:#fafbfc;flex-wrap:wrap;">
-        <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:#5f6368;cursor:pointer;white-space:nowrap;font-weight:600;">
-          <input type="checkbox" id="chatStaffOnly" onchange="setChatStaffFilter(this.checked)" style="cursor:pointer;margin:0;"> 👤 担当のみ
+      <div style="display:flex;gap:16px;align-items:center;padding:8px 12px;border-bottom:1px solid #e0e0e0;flex-shrink:0;background:#fafbfc;flex-wrap:wrap;">
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:#5f6368;cursor:pointer;white-space:nowrap;font-weight:600;">
+          <input type="checkbox" id="chatStaffOnly" onchange="setChatStaffFilter(this.checked)" style="cursor:pointer;margin:0;width:14px;height:14px;"> 👤 担当のみ
         </label>
-        <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:#f59e0b;cursor:pointer;white-space:nowrap;font-weight:700;">
-          <input type="checkbox" id="chatMentionOnly" onchange="setChatMentionFilter(this.checked)" style="cursor:pointer;margin:0;"> @メンション
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:#f59e0b;cursor:pointer;white-space:nowrap;font-weight:700;">
+          <input type="checkbox" id="chatMentionOnly" onchange="setChatMentionFilter(this.checked)" style="cursor:pointer;margin:0;width:14px;height:14px;"> @メンション
         </label>
-        <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:#7c3aed;cursor:pointer;white-space:nowrap;font-weight:700;">
-          <input type="checkbox" id="chatGroupByType" onchange="setChatGroupByType(this.checked)" style="cursor:pointer;margin:0;"> 📑 申請種別
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:#7c3aed;cursor:pointer;white-space:nowrap;font-weight:700;">
+          <input type="checkbox" id="chatGroupByType" onchange="setChatGroupByType(this.checked)" style="cursor:pointer;margin:0;width:14px;height:14px;"> 📑 申請種別
         </label>
       </div>
-      <div style="padding:8px 12px;border-bottom:1px solid #e0e0e0;flex-shrink:0;font-size:11px;color:#94a3b8;">🏢 企業ごとにチャットがまとまります</div>
+      <div style="padding:10px 14px;border-bottom:1px solid #e0e0e0;flex-shrink:0;font-size:12px;color:#94a3b8;">🏢 企業ごとにチャットがまとまります</div>
       <div id="chatRoomList" style="flex:1;overflow-y:auto;"></div>
     </div>
     <!-- 右：メッセージエリア -->
@@ -4516,44 +4516,44 @@ function renderGroupList() {
     const isPinned = !isNone && _chatPinnedCompanyIds.has(e.cid);
     const div = document.createElement('div');
     div.dataset.cid = e.cid;
-    div.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;border-radius:8px;margin:2px 6px;transition:background .1s;' + (isPinned ? 'background:#fefce8;' : (mentionUnread>0?'background:#fffbeb;border-left:3px solid #f59e0b;':''));
+    div.style.cssText = 'display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;border-radius:10px;margin:3px 8px;transition:background .1s;' + (isPinned ? 'background:#fefce8;' : (mentionUnread>0?'background:#fffbeb;border-left:4px solid #f59e0b;':''));
     const pinBtn = isNone ? '' :
       '<button class="_pinBtn" data-cid="' + e.cid + '" title="' + (isPinned ? 'ピン留めを外す' : 'ピン留めする') + '" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px 4px;flex-shrink:0;opacity:' + (isPinned ? '1' : '.3') + ';">' + (isPinned ? '📌' : '📍') + '</button>';
     const roomIds = rooms.map(r => r.id);
     const unreadBtn = isNone ? '' :
       '<button class="_unreadBtn" data-rids="' + roomIds.join(',') + '" title="' + (unread > 0 ? 'この企業のチャットを全て既読にする' : 'この企業のチャットを未読に戻す') + '" style="background:none;border:none;cursor:pointer;font-size:12px;padding:2px 4px;flex-shrink:0;color:#94a3b8;opacity:.6;">' + (unread > 0 ? '✓' : '◉') + '</button>';
     const mentionBadge = mentionUnread > 0
-      ? '<span style="background:#f59e0b;color:white;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;margin-right:3px;" title="未読のメンション">@'+mentionUnread+'</span>'
+      ? '<span style="background:#f59e0b;color:white;font-size:12px;font-weight:800;padding:2px 8px;border-radius:12px;margin-right:4px;" title="未読のメンション">@'+mentionUnread+'</span>'
       : '';
     // applyTypeバッジ(グループモードON時に表示)
     const stType = APPLY_TYPE_STYLE[e.applyType] || APPLY_TYPE_STYLE['未設定'];
     const typeBadge = _chatGroupByApplyType
-      ? '<span style="font-size:9px;background:' + stType.bg + ';color:' + stType.color + ';padding:1px 5px;border-radius:6px;margin-right:3px;font-weight:700;white-space:nowrap;">' + stType.icon + esc(e.applyType) + '</span>'
+      ? '<span style="font-size:10px;background:' + stType.bg + ';color:' + stType.color + ';padding:2px 6px;border-radius:6px;margin-right:4px;font-weight:700;white-space:nowrap;">' + stType.icon + esc(e.applyType) + '</span>'
       : '';
     // フォルダ番号アイコン: 企業のfolder_noを大きく表示
     const cObj = !isNone ? (allCompanies||[]).find(x => x.id === e.cid) : null;
     const folderLabel = cObj?.folder_no ? String(cObj.folder_no) : '';
-    const folderFontSize = !folderLabel ? '20px'
-      : folderLabel.length <= 2 ? '18px'
-      : folderLabel.length <= 3 ? '16px'
-      : folderLabel.length <= 4 ? '13px'
-      : '11px';
+    const folderFontSize = !folderLabel ? '26px'
+      : folderLabel.length <= 2 ? '23px'
+      : folderLabel.length <= 3 ? '20px'
+      : folderLabel.length <= 4 ? '16px'
+      : '14px';
     const folderDisplay = isNone ? '?' : (folderLabel || '-');
     div.innerHTML =
-      '<div style="width:44px;height:44px;border-radius:12px;background:'+(isNone?'#94a3b8':'linear-gradient(135deg,#1a73e8,#7c3aed)')+';display:flex;align-items:center;justify-content:center;font-size:'+folderFontSize+';font-weight:800;color:white;flex-shrink:0;letter-spacing:.5px;">'+esc(folderDisplay)+'</div>' +
+      '<div style="width:56px;height:56px;border-radius:14px;background:'+(isNone?'#94a3b8':'linear-gradient(135deg,#1a73e8,#7c3aed)')+';display:flex;align-items:center;justify-content:center;font-size:'+folderFontSize+';font-weight:800;color:white;flex-shrink:0;letter-spacing:.5px;">'+esc(folderDisplay)+'</div>' +
       '<div style="flex:1;min-width:0;">' +
-        '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:4px;margin-bottom:2px;">' +
+        '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:6px;margin-bottom:4px;">' +
           '<div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
-          (isPinned ? '<span style="font-size:11px;margin-right:3px;">📌</span>' : '') +
+          (isPinned ? '<span style="font-size:13px;margin-right:4px;">📌</span>' : '') +
           typeBadge +
-          '<span style="font-size:13px;font-weight:'+(unread>0?700:600)+';color:#202124;">'+esc(e.cname)+'</span>' +
+          '<span style="font-size:15px;font-weight:'+(unread>0?700:600)+';color:#202124;">'+esc(e.cname)+'</span>' +
           '</div>' +
-          '<span style="font-size:11px;color:#5f6368;white-space:nowrap;">'+lastTime+'</span>' +
+          '<span style="font-size:12px;color:#5f6368;white-space:nowrap;">'+lastTime+'</span>' +
         '</div>' +
-        '<div style="display:flex;align-items:center;justify-content:space-between;gap:4px;">' +
-          '<span style="font-size:12px;color:#5f6368;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;"><span style="color:#94a3b8;font-size:11px;">👥'+rooms.length+'名</span> '+preview+'</span>' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">' +
+          '<span style="font-size:13px;color:#5f6368;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;"><span style="color:#94a3b8;font-size:12px;">👥'+rooms.length+'名</span> '+preview+'</span>' +
           mentionBadge +
-          (unread>0?'<span style="background:#1a73e8;color:white;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;">'+unread+'</span>':'') +
+          (unread>0?'<span style="background:#1a73e8;color:white;font-size:12px;font-weight:800;padding:2px 8px;border-radius:12px;">'+unread+'</span>':'') +
         '</div>' +
       '</div>' +
       unreadBtn +
