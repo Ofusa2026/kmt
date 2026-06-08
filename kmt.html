@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260609.08 -->
+<!-- KMT_VERSION ver.20260609.09 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -219,7 +219,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260609.08</div>
+    <div class="logo-ver">ver.20260609.09</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -3226,7 +3226,7 @@ function renderAuditRows(rows) {
   }
   tb.innerHTML = rows.map(r => {
     const dt = new Date(r.created_at);
-    const dtStr = dt.toLocaleString('ja-JP', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    const dtStr = dt.toLocaleString('ja-JP', { timeZone:'Asia/Tokyo', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit' });
     const op = AUDIT_OP_STYLE[r.operation] || {label:r.operation, bg:'#f1f5f9', color:'#475569'};
     const tblLabel = AUDIT_TABLE_LABELS[r.table_name] || r.table_name;
     let summary = '';
@@ -3266,6 +3266,15 @@ function _auditFmtVal(v) {
     return JSON.stringify(v).slice(0, 40);
   }
   const s = String(v);
+  // ISO 8601 タイムスタンプを日本時間表記に変換 (例: 2026-06-08T22:46:55.248+00:00 → 26/06/09 07:46:55)
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(s)) {
+    try {
+      const d = new Date(s);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleString('ja-JP', { timeZone:'Asia/Tokyo', year:'2-digit', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit' });
+      }
+    } catch(e) {}
+  }
   return s.length > 40 ? s.slice(0, 40) + '…' : s;
 }
 
@@ -3273,7 +3282,7 @@ let _auditRowCache = {};
 function showAuditDetail(id) {
   const r = _auditRowCache[id];
   if (!r) return;
-  const dt = new Date(r.created_at).toLocaleString('ja-JP');
+  const dt = new Date(r.created_at).toLocaleString('ja-JP', { timeZone:'Asia/Tokyo' });
   const tblLabel = AUDIT_TABLE_LABELS[r.table_name] || r.table_name;
   let body = '<div style="font-size:13px;line-height:1.8;">' +
     '<div><b>日時:</b> ' + dt + '</div>' +
@@ -9913,9 +9922,9 @@ function buildShiftKanriScreen() {
 
 async function loadShiftKanri() {
   if (!_shiftState.anchor || isNaN(_shiftState.anchor.getTime())) _shiftState.anchor = new Date();
-  // ユーザー一覧をロード(allUsersが空なら)
-  if (!allUsers || !allUsers.length) {
-    try { const ud = await sbFetch('users?select=id,name,team,role,is_active&order=name.asc'); allUsers = ud || []; } catch(e) {}
+  // ユーザー一覧をロード(allUsersが空 or positionが未含み なら再取得)
+  if (!allUsers || !allUsers.length || !allUsers.some(u=>'position' in u)) {
+    try { const ud = await sbFetch('users?select=id,name,team,role,position,is_active&order=name.asc'); allUsers = ud || []; } catch(e) {}
   }
   await loadShiftData();
 }
@@ -9974,25 +9983,18 @@ function _shiftListDates() {
   while (cur <= range.end) { dates.push(new Date(cur)); cur.setDate(cur.getDate()+1); }
   return dates;
 }
-// allUsersからスタッフ一覧(role=パート優先、is_active=trueのみ)
+// allUsersからシフト管理対象を取得: position='パート' のみ表示(is_active=true)
 function _shiftBuildStaffList() {
-  const list = (allUsers || []).filter(u => u.name && (u.is_active !== false));
-  // ユニーク化(name正規化)
+  const list = (allUsers || []).filter(u => u.name && (u.is_active !== false) && u.position === 'パート');
   const seen = new Set();
   const unique = [];
   list.forEach(u => {
     const nn = String(u.name||'').replace(/\s+/g,'');
     if (!nn || seen.has(nn)) return;
     seen.add(nn);
-    unique.push({ name: u.name, role: u.role || '', team: u.team || '' });
+    unique.push({ name: u.name, position: u.position || '', team: u.team || '' });
   });
-  // パート優先 → 名前順
-  unique.sort((a,b) => {
-    const ap = a.role === 'パート' ? 0 : 1;
-    const bp = b.role === 'パート' ? 0 : 1;
-    if (ap !== bp) return ap - bp;
-    return (a.name||'').localeCompare(b.name||'', 'ja');
-  });
+  unique.sort((a,b) => (a.name||'').localeCompare(b.name||'', 'ja'));
   return unique;
 }
 async function loadShiftData() {
@@ -10026,14 +10028,16 @@ function _renderShiftKanri() {
   const dates = _shiftListDates();
   const staffList = _shiftState.staffList || [];
   if (!staffList.length) {
-    body.innerHTML = '<div style="text-align:center;padding:60px;color:#94a3b8;">スタッフが登録されていません</div>';
+    body.innerHTML = '<div style="text-align:center;padding:60px;color:#94a3b8;font-size:13px;">役職が「パート」のユーザーが登録されていません<br><span style="font-size:11px;color:#cbd5e1;margin-top:8px;display:inline-block;">⚙️ ユーザー設定からユーザーの役職を「パート」に変更してください</span></div>';
     return;
   }
   const todayStr = _shiftDateStr(new Date());
   const myName = currentUser?.name || '';
+  const myPosition = currentUser?.position || '';
   const myRole = currentUser?.role || '';
-  const isAdminLike = currentUser?.role === '管理者' || currentUser?.role === 'マネージャー' || currentUser?.role === '社員';
-  const isPart = myRole === 'パート' || myRole === 'その他';
+  // 編集権限: 管理者role or 管理職position(管理者/代表/マネージャー/リーダー/社員) → 全員編集可
+  const isAdminLike = myRole === '管理者' || ['管理者','代表','マネージャー','リーダー','社員'].includes(myPosition);
+  const isPart = myPosition === 'パート' || myPosition === 'その他';
   const myNN = myName.replace(/\s+/g,'');
 
   let html = '<table>';
@@ -10052,7 +10056,7 @@ function _renderShiftKanri() {
     const nn = s.name.replace(/\s+/g,'');
     const canEdit = isAdminLike || (isPart && (nn === myNN || (myNN && nn && (myNN.indexOf(nn) >= 0 || nn.indexOf(myNN) >= 0))));
     html += '<tr>';
-    const roleBadge = s.role === 'パート' ? '<span style="background:#fef3c7;color:#92400e;font-size:9px;padding:1px 5px;border-radius:99px;margin-left:4px;font-weight:700;">パート</span>' : '';
+    const roleBadge = s.position === 'パート' ? '<span style="background:#fef3c7;color:#92400e;font-size:9px;padding:1px 5px;border-radius:99px;margin-left:4px;font-weight:700;">パート</span>' : '';
     html += '<td class="shift-staff-col">'+_shiftEsc(s.name)+roleBadge+'</td>';
     let workDays = 0;
     dates.forEach(d => {
@@ -10093,8 +10097,9 @@ function _shiftEditCell(staffName, dateStr) {
   const nn = staffName.replace(/\s+/g,'');
   const key = nn + '||' + dateStr;
   const e = _shiftState.entries[key] || null;
+  const myPosition = currentUser?.position || '';
   const myRole = currentUser?.role || '';
-  const isAdminLike = myRole === '管理者' || myRole === 'マネージャー' || myRole === '社員';
+  const isAdminLike = myRole === '管理者' || ['管理者','代表','マネージャー','リーダー','社員'].includes(myPosition);
   const defStart = e ? (e.start_time||'09:00') : '09:00';
   const defEnd = e ? (e.end_time||'13:00') : '13:00';
   const defStatus = e ? e.status : (isAdminLike ? 'confirmed' : 'request');
