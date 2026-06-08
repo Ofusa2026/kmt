@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260609.07 -->
+<!-- KMT_VERSION ver.20260609.08 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -219,7 +219,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260609.07</div>
+    <div class="logo-ver">ver.20260609.08</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -245,6 +245,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="nav-item" onclick="showScreen('sales')">📊 売上管理</div>
   <div class="nav-item" onclick="showScreen('expenses')">💸 立替管理</div>
   <div class="nav-item" onclick="showScreen('users')">⚙️ ユーザー設定</div>
+  <div class="nav-item" onclick="showScreen('shift_kanri')">📅 シフト管理</div>
   <div class="nav-item" onclick="showScreen('chat_teams')">💬 チャットグループ</div>
   <div class="nav-item" onclick="showScreen('audit_log')">📋 操作ログ</div>
   <div class="nav-item" onclick="showScreen('ai_knowledge')">🧠 AI記憶</div>
@@ -6666,6 +6667,7 @@ const SCREENS = {
   sales:     { title: '📊 売上管理', init: initSalesScreen },
   expenses:  { title: '💸 立替管理', init: loadExpenses },
   users:     { title: '⚙️ ユーザー設定', init: loadUsers },
+  shift_kanri:{ title: '📅 シフト管理', init: loadShiftKanri },
   chat_teams:{ title: '💬 チャットグループ', init: loadChatTeams },
   ofusa_view:{ title: '📊 案件進捗確認', init: loadOfusaView },
   decision_report:{ title: '📋 決定報告', init: loadDecisionReport },
@@ -6747,6 +6749,7 @@ function renderScreenContent(name) {
     sales: buildSalesScreen(),
     expenses: buildExpensesScreen(),
     users: buildUsersScreen(),
+    shift_kanri: buildShiftKanriScreen(),
     chat_teams: buildChatTeamsScreen(),
     ofusa_view: buildOfusaViewScreen(),
     resume: buildResumeScreen(),
@@ -9858,6 +9861,332 @@ function buildJobsScreen() {
   </tr></thead>
   <tbody id="jobTbody"><tr><td colspan="10" style="text-align:center;padding:40px;color:var(--gray-400)">読み込み中...</td></tr></tbody>
   </table><div class="pagination-bar" id="jobPagination"></div></div>`;
+}
+
+// ==============================
+// 📅 シフト管理(大房システムから移植)
+// ==============================
+let _shiftState = { view: 'week', anchor: new Date(), entries: {}, staffList: [] };
+
+function buildShiftKanriScreen() {
+  return `
+  <style>
+    #shiftKanriBody table{border-collapse:collapse;background:white;font-size:12px;width:100%;}
+    #shiftKanriBody th, #shiftKanriBody td{border:1px solid #e2e8f0;padding:6px 8px;text-align:center;min-width:90px;}
+    #shiftKanriBody th.shift-staff-col, #shiftKanriBody td.shift-staff-col{position:sticky;left:0;background:#f8fafc;z-index:1;text-align:left;font-weight:700;color:var(--navy);min-width:140px;}
+    #shiftKanriBody td.shift-staff-col{background:white;}
+    #shiftKanriBody th{background:#f1f5f9;font-size:11px;color:#475569;position:sticky;top:0;z-index:1;}
+    #shiftKanriBody th.shift-today{background:#dbeafe;color:#1e40af;}
+    #shiftKanriBody td.shift-today{background:#eff6ff;}
+    #shiftKanriBody td.shift-cell{cursor:pointer;height:42px;}
+    #shiftKanriBody td.shift-cell.editable:hover{background:#f0f9ff;}
+    #shiftKanriBody td.shift-cell.readonly{cursor:default;background:#f8fafc;}
+    #shiftKanriBody .shift-confirmed{background:#dcfce7;border-left:3px solid #16a34a;color:#14532d;font-weight:700;}
+    #shiftKanriBody .shift-request{background:#fef3c7;border-left:3px dashed #d97706;color:#78350f;font-style:italic;}
+    #shiftKanriBody .shift-off{background:#fee2e2;color:#7f1d1d;font-weight:700;}
+    #shiftKanriBody .shift-empty{color:#cbd5e1;}
+    #shiftKanriBody .shift-saturday{color:#2563eb;}
+    #shiftKanriBody .shift-sunday{color:#dc2626;}
+  </style>
+  <div style="display:flex;flex-direction:column;gap:12px;">
+    <div style="background:white;border:1px solid var(--gray-200);border-radius:8px;padding:10px 14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+      <button onclick="_shiftPrev()" style="font-size:12px;padding:5px 10px;background:white;color:var(--navy);border:1.5px solid var(--gray-200);border-radius:8px;cursor:pointer;font-weight:700;">◀ 前</button>
+      <span id="shiftPeriodLabel" style="font-size:13px;font-weight:800;color:var(--navy);min-width:200px;text-align:center;">―</span>
+      <button onclick="_shiftNext()" style="font-size:12px;padding:5px 10px;background:white;color:var(--navy);border:1.5px solid var(--gray-200);border-radius:8px;cursor:pointer;font-weight:700;">次 ▶</button>
+      <button onclick="_shiftThis()" style="font-size:11px;padding:5px 10px;background:#f8fafc;color:var(--navy);border:1px solid var(--gray-200);border-radius:8px;cursor:pointer;font-weight:700;">今週</button>
+      <span style="margin-left:8px;display:inline-flex;border:1px solid var(--gray-200);border-radius:6px;overflow:hidden;">
+        <button id="shiftViewWeekBtn" onclick="_shiftSetView('week')" style="font-size:11px;padding:5px 10px;background:var(--navy);color:white;border:none;cursor:pointer;font-weight:700;">週</button>
+        <button id="shiftViewMonthBtn" onclick="_shiftSetView('month')" style="font-size:11px;padding:5px 10px;background:white;color:var(--navy);border:none;border-left:1px solid var(--gray-200);cursor:pointer;font-weight:700;">月</button>
+      </span>
+    </div>
+    <div id="shiftLegend" style="background:white;padding:8px 14px;font-size:11px;color:#64748b;display:flex;gap:14px;align-items:center;flex-wrap:wrap;border:1px solid var(--gray-200);border-radius:8px;">
+      <span style="display:inline-flex;align-items:center;gap:4px;"><span style="display:inline-block;width:18px;height:14px;background:#dcfce7;border-left:3px solid #16a34a;"></span>✅ 確定</span>
+      <span style="display:inline-flex;align-items:center;gap:4px;"><span style="display:inline-block;width:18px;height:14px;background:#fef3c7;border-left:3px dashed #d97706;"></span>🟡 希望</span>
+      <span style="display:inline-flex;align-items:center;gap:4px;"><span style="display:inline-block;width:18px;height:14px;background:#fee2e2;"></span>❌ 欠勤</span>
+      <span style="margin-left:auto;color:#94a3b8;">セルクリックで編集</span>
+    </div>
+    <div id="shiftKanriBody" style="background:white;border:1px solid var(--gray-200);border-radius:8px;overflow:auto;max-height:calc(100vh - 250px);">
+      <div style="text-align:center;padding:60px;color:#94a3b8;">読み込み中...</div>
+    </div>
+  </div>`;
+}
+
+async function loadShiftKanri() {
+  if (!_shiftState.anchor || isNaN(_shiftState.anchor.getTime())) _shiftState.anchor = new Date();
+  // ユーザー一覧をロード(allUsersが空なら)
+  if (!allUsers || !allUsers.length) {
+    try { const ud = await sbFetch('users?select=id,name,team,role,is_active&order=name.asc'); allUsers = ud || []; } catch(e) {}
+  }
+  await loadShiftData();
+}
+
+function _shiftSetView(v) {
+  _shiftState.view = v;
+  const b1 = document.getElementById('shiftViewWeekBtn');
+  const b2 = document.getElementById('shiftViewMonthBtn');
+  if (b1 && b2) {
+    b1.style.background = v === 'week' ? 'var(--navy)' : 'white';
+    b1.style.color = v === 'week' ? 'white' : 'var(--navy)';
+    b2.style.background = v === 'month' ? 'var(--navy)' : 'white';
+    b2.style.color = v === 'month' ? 'white' : 'var(--navy)';
+  }
+  loadShiftData();
+}
+function _shiftPrev() {
+  const d = new Date(_shiftState.anchor);
+  if (_shiftState.view === 'week') d.setDate(d.getDate() - 7);
+  else d.setMonth(d.getMonth() - 1);
+  _shiftState.anchor = d;
+  loadShiftData();
+}
+function _shiftNext() {
+  const d = new Date(_shiftState.anchor);
+  if (_shiftState.view === 'week') d.setDate(d.getDate() + 7);
+  else d.setMonth(d.getMonth() + 1);
+  _shiftState.anchor = d;
+  loadShiftData();
+}
+function _shiftThis() {
+  _shiftState.anchor = new Date();
+  loadShiftData();
+}
+function _shiftRange() {
+  const anchor = new Date(_shiftState.anchor); anchor.setHours(0,0,0,0);
+  let start, end;
+  if (_shiftState.view === 'week') {
+    const dow = anchor.getDay();
+    const monOffset = dow === 0 ? -6 : 1 - dow;
+    start = new Date(anchor); start.setDate(anchor.getDate() + monOffset);
+    end = new Date(start); end.setDate(start.getDate() + 6);
+  } else {
+    start = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
+    end = new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0);
+  }
+  return { start, end };
+}
+function _shiftDateStr(d) {
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function _shiftListDates() {
+  const range = _shiftRange();
+  const dates = [];
+  const cur = new Date(range.start);
+  while (cur <= range.end) { dates.push(new Date(cur)); cur.setDate(cur.getDate()+1); }
+  return dates;
+}
+// allUsersからスタッフ一覧(role=パート優先、is_active=trueのみ)
+function _shiftBuildStaffList() {
+  const list = (allUsers || []).filter(u => u.name && (u.is_active !== false));
+  // ユニーク化(name正規化)
+  const seen = new Set();
+  const unique = [];
+  list.forEach(u => {
+    const nn = String(u.name||'').replace(/\s+/g,'');
+    if (!nn || seen.has(nn)) return;
+    seen.add(nn);
+    unique.push({ name: u.name, role: u.role || '', team: u.team || '' });
+  });
+  // パート優先 → 名前順
+  unique.sort((a,b) => {
+    const ap = a.role === 'パート' ? 0 : 1;
+    const bp = b.role === 'パート' ? 0 : 1;
+    if (ap !== bp) return ap - bp;
+    return (a.name||'').localeCompare(b.name||'', 'ja');
+  });
+  return unique;
+}
+async function loadShiftData() {
+  const range = _shiftRange();
+  const startStr = _shiftDateStr(range.start);
+  const endStr = _shiftDateStr(range.end);
+  // ラベル更新
+  const lbl = document.getElementById('shiftPeriodLabel');
+  if (lbl) {
+    if (_shiftState.view === 'week') lbl.textContent = startStr + ' 〜 ' + endStr;
+    else lbl.textContent = range.start.getFullYear() + '年' + (range.start.getMonth()+1) + '月';
+  }
+  _shiftState.staffList = _shiftBuildStaffList();
+  try {
+    const rows = await sbFetch('shift_entries?select=*&shift_date=gte.' + startStr + '&shift_date=lte.' + endStr);
+    const entries = {};
+    (rows||[]).forEach(e => {
+      const nn = String(e.staff_name||'').replace(/\s+/g,'');
+      entries[nn + '||' + e.shift_date] = e;
+    });
+    _shiftState.entries = entries;
+    _renderShiftKanri();
+  } catch(e) {
+    showToast('❌ シフト取得失敗: ' + e.message, 'error');
+  }
+}
+function _shiftEsc(s) { return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function _renderShiftKanri() {
+  const body = document.getElementById('shiftKanriBody');
+  if (!body) return;
+  const dates = _shiftListDates();
+  const staffList = _shiftState.staffList || [];
+  if (!staffList.length) {
+    body.innerHTML = '<div style="text-align:center;padding:60px;color:#94a3b8;">スタッフが登録されていません</div>';
+    return;
+  }
+  const todayStr = _shiftDateStr(new Date());
+  const myName = currentUser?.name || '';
+  const myRole = currentUser?.role || '';
+  const isAdminLike = currentUser?.role === '管理者' || currentUser?.role === 'マネージャー' || currentUser?.role === '社員';
+  const isPart = myRole === 'パート' || myRole === 'その他';
+  const myNN = myName.replace(/\s+/g,'');
+
+  let html = '<table>';
+  html += '<tr><th class="shift-staff-col">スタッフ</th>';
+  dates.forEach(d => {
+    const ds = _shiftDateStr(d);
+    const dow = d.getDay();
+    const dowLabel = ['日','月','火','水','木','金','土'][dow];
+    const dowCls = dow === 0 ? 'shift-sunday' : (dow === 6 ? 'shift-saturday' : '');
+    const todayCls = ds === todayStr ? 'shift-today' : '';
+    html += '<th class="'+todayCls+'"><div style="font-size:10px;color:#94a3b8;">'+(d.getMonth()+1)+'/'+d.getDate()+'</div><div class="'+dowCls+'" style="font-weight:800;">'+dowLabel+'</div></th>';
+  });
+  html += '<th style="background:#f8fafc;font-size:10px;">勤務日数</th></tr>';
+
+  staffList.forEach(s => {
+    const nn = s.name.replace(/\s+/g,'');
+    const canEdit = isAdminLike || (isPart && (nn === myNN || (myNN && nn && (myNN.indexOf(nn) >= 0 || nn.indexOf(myNN) >= 0))));
+    html += '<tr>';
+    const roleBadge = s.role === 'パート' ? '<span style="background:#fef3c7;color:#92400e;font-size:9px;padding:1px 5px;border-radius:99px;margin-left:4px;font-weight:700;">パート</span>' : '';
+    html += '<td class="shift-staff-col">'+_shiftEsc(s.name)+roleBadge+'</td>';
+    let workDays = 0;
+    dates.forEach(d => {
+      const ds = _shiftDateStr(d);
+      const key = nn + '||' + ds;
+      const e = _shiftState.entries[key];
+      const todayCls = ds === todayStr ? 'shift-today' : '';
+      const editCls = canEdit ? 'editable' : 'readonly';
+      const clickAttr = canEdit ? ' onclick="_shiftEditCell(\''+_shiftEsc(s.name)+'\',\''+ds+'\')"' : '';
+      let content = '';
+      let cellCls = '';
+      if (e) {
+        if (e.status === 'off') { content = '欠勤'; cellCls = 'shift-off'; }
+        else if (e.status === 'request') {
+          content = (e.start_time||'') + (e.start_time||e.end_time?'-':'') + (e.end_time||'');
+          if (!content) content = '希望';
+          cellCls = 'shift-request';
+          workDays++;
+        } else {
+          content = (e.start_time||'') + (e.start_time||e.end_time?'-':'') + (e.end_time||'');
+          if (!content) content = '出勤';
+          cellCls = 'shift-confirmed';
+          workDays++;
+        }
+        if (e.note) content += '<div style="font-size:9px;color:#64748b;">' + _shiftEsc(e.note) + '</div>';
+      } else {
+        content = '<span class="shift-empty">―</span>';
+      }
+      html += '<td class="shift-cell '+editCls+' '+cellCls+' '+todayCls+'"'+clickAttr+'>'+content+'</td>';
+    });
+    html += '<td style="background:#f8fafc;font-weight:800;color:var(--navy);">'+workDays+'日</td></tr>';
+  });
+  html += '</table>';
+  body.innerHTML = html;
+}
+
+function _shiftEditCell(staffName, dateStr) {
+  const nn = staffName.replace(/\s+/g,'');
+  const key = nn + '||' + dateStr;
+  const e = _shiftState.entries[key] || null;
+  const myRole = currentUser?.role || '';
+  const isAdminLike = myRole === '管理者' || myRole === 'マネージャー' || myRole === '社員';
+  const defStart = e ? (e.start_time||'09:00') : '09:00';
+  const defEnd = e ? (e.end_time||'13:00') : '13:00';
+  const defStatus = e ? e.status : (isAdminLike ? 'confirmed' : 'request');
+  const defNote = e ? (e.note||'') : '';
+  const ex = document.getElementById('_shiftEditModal'); if (ex) ex.remove();
+  const modal = document.createElement('div');
+  modal.id = '_shiftEditModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:10003;display:flex;align-items:center;justify-content:center;padding:16px;';
+  modal.onclick = (ev) => { if (ev.target === modal) modal.remove(); };
+  const dt = new Date(dateStr.replace(/-/g,'/'));
+  const dowLabel = ['日','月','火','水','木','金','土'][dt.getDay()];
+  let h = '<div onclick="event.stopPropagation()" style="background:white;border-radius:14px;padding:22px;width:100%;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,.3);">';
+  h += '<div style="font-size:15px;font-weight:800;color:#0f2040;margin-bottom:4px;">📅 シフト編集</div>';
+  h += '<div style="font-size:13px;color:#475569;margin-bottom:16px;">'+_shiftEsc(staffName)+' / '+dateStr+'('+dowLabel+')</div>';
+  h += '<div style="margin-bottom:12px;"><label style="font-size:11px;font-weight:700;color:#475569;display:block;margin-bottom:4px;">区分</label>';
+  h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">';
+  if (isAdminLike) {
+    h += '<button id="_shsBtn_confirmed" onclick="_shiftSetStatus(\'confirmed\')" style="padding:8px;border:1.5px solid #16a34a;background:'+(defStatus==='confirmed'?'#dcfce7':'white')+';color:#14532d;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;">✅ 確定</button>';
+  }
+  h += '<button id="_shsBtn_request" onclick="_shiftSetStatus(\'request\')" style="padding:8px;border:1.5px dashed #d97706;background:'+(defStatus==='request'?'#fef3c7':'white')+';color:#78350f;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;">🟡 希望</button>';
+  h += '<button id="_shsBtn_off" onclick="_shiftSetStatus(\'off\')" style="padding:8px;border:1.5px solid #dc2626;background:'+(defStatus==='off'?'#fee2e2':'white')+';color:#7f1d1d;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;">❌ 欠勤</button>';
+  h += '</div><input type="hidden" id="_shsHiddenStatus" value="'+defStatus+'"></div>';
+  h += '<div id="_shsTimeRow" style="display:flex;gap:8px;margin-bottom:12px;">';
+  h += '<div style="flex:1;"><label style="font-size:11px;font-weight:700;color:#475569;display:block;margin-bottom:4px;">開始</label><input type="time" id="_shsStart" value="'+defStart+'" style="width:100%;padding:6px 8px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px;"></div>';
+  h += '<div style="flex:1;"><label style="font-size:11px;font-weight:700;color:#475569;display:block;margin-bottom:4px;">終了</label><input type="time" id="_shsEnd" value="'+defEnd+'" style="width:100%;padding:6px 8px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px;"></div></div>';
+  h += '<div style="margin-bottom:16px;"><label style="font-size:11px;font-weight:700;color:#475569;display:block;margin-bottom:4px;">メモ（任意）</label>';
+  h += '<input type="text" id="_shsNote" value="'+_shiftEsc(defNote)+'" placeholder="例: 有給/早退" style="width:100%;padding:6px 8px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:12px;"></div>';
+  h += '<div style="display:flex;gap:6px;justify-content:space-between;align-items:center;">';
+  if (e) h += '<button onclick="_shiftDelete(\''+_shiftEsc(staffName)+'\',\''+dateStr+'\')" style="padding:8px 12px;background:white;color:#dc2626;border:1.5px solid #fca5a5;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;">🗑 削除</button>';
+  else h += '<span></span>';
+  h += '<div style="display:flex;gap:6px;">';
+  h += '<button onclick="document.getElementById(\'_shiftEditModal\').remove()" style="padding:8px 14px;background:#f1f5f9;color:#64748b;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;">キャンセル</button>';
+  h += '<button onclick="_shiftSave(\''+_shiftEsc(staffName)+'\',\''+dateStr+'\')" style="padding:8px 18px;background:var(--navy);color:white;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:800;">保存</button>';
+  h += '</div></div></div>';
+  modal.innerHTML = h;
+  document.body.appendChild(modal);
+  _shiftSetStatus(defStatus);
+}
+function _shiftSetStatus(s) {
+  const hid = document.getElementById('_shsHiddenStatus');
+  if (hid) hid.value = s;
+  ['confirmed','request','off'].forEach(k => {
+    const b = document.getElementById('_shsBtn_'+k);
+    if (!b) return;
+    if (k === s) b.style.background = k==='confirmed' ? '#dcfce7' : k==='request' ? '#fef3c7' : '#fee2e2';
+    else b.style.background = 'white';
+  });
+  const tr = document.getElementById('_shsTimeRow');
+  if (tr) tr.style.display = (s === 'off') ? 'none' : 'flex';
+}
+async function _shiftSave(staffName, dateStr) {
+  const statusEl = document.getElementById('_shsHiddenStatus');
+  const startEl = document.getElementById('_shsStart');
+  const endEl = document.getElementById('_shsEnd');
+  const noteEl = document.getElementById('_shsNote');
+  const status = statusEl ? statusEl.value : 'request';
+  const startT = (status === 'off') ? null : (startEl ? startEl.value : null);
+  const endT = (status === 'off') ? null : (endEl ? endEl.value : null);
+  const note = noteEl ? noteEl.value.trim() : '';
+  const payload = {
+    staff_name: staffName,
+    shift_date: dateStr,
+    start_time: startT || null,
+    end_time: endT || null,
+    status: status,
+    note: note || null,
+    created_by: currentUser?.name || 'unknown',
+    updated_at: new Date().toISOString()
+  };
+  try {
+    await sbFetch('shift_entries?on_conflict=staff_name,shift_date', {
+      method: 'POST',
+      headers: { 'Prefer': 'resolution=merge-duplicates,return=representation' },
+      body: JSON.stringify(payload)
+    });
+    const m = document.getElementById('_shiftEditModal'); if (m) m.remove();
+    showToast('✅ シフトを保存しました', 'success');
+    await loadShiftData();
+  } catch(e) {
+    showToast('❌ 保存失敗: ' + e.message, 'error');
+  }
+}
+async function _shiftDelete(staffName, dateStr) {
+  if (!confirm('シフトを削除しますか?')) return;
+  try {
+    await sbFetch('shift_entries?staff_name=eq.' + encodeURIComponent(staffName) + '&shift_date=eq.' + dateStr, { method: 'DELETE' });
+    const m = document.getElementById('_shiftEditModal'); if (m) m.remove();
+    showToast('🗑 削除しました', 'success');
+    await loadShiftData();
+  } catch(e) {
+    showToast('❌ 削除失敗: ' + e.message, 'error');
+  }
 }
 
 // ==============================
