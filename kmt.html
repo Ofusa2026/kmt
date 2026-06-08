@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260609.03 -->
+<!-- KMT_VERSION ver.20260609.04 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -219,7 +219,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260609.03</div>
+    <div class="logo-ver">ver.20260609.04</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -1949,7 +1949,7 @@ function buildDecisionReportScreen() {
           <div class="form-group"><label class="form-label">14. 一時帰国日</label><input class="form-input" id="dr_temp_return" type="date"></div>
           <div class="form-group"><label class="form-label">15. 特定技能通算期間</label><input class="form-input" id="dr_total_period" placeholder="例: 2年3ヶ月"></div>
           <div class="form-group"><label class="form-label">16. 人材国籍</label>
-            <select class="form-select" id="dr_nationality"><option value="">選択</option><option>インドネシア</option><option>ベトナム</option><option>タイ</option><option>カンボジア</option><option>ミャンマー</option><option>その他</option></select></div>
+            <select class="form-select" id="dr_nationality"><option value="">選択</option><option>インドネシア</option><option>ベトナム</option><option>タイ</option><option>カンボジア</option><option>ミャンマー</option><option>バングラデシュ</option><option>スリランカ</option><option>フィリピン</option><option>中国</option><option>その他</option></select></div>
           <div class="form-group"><label class="form-label">17. 現在の在留資格</label><select class="form-select" id="dr_current_visa"><option value="">選択...</option><option value="特定技能1号">特定技能1号</option><option value="特定技能2号">特定技能2号</option><option value="技能実習1号">技能実習1号</option><option value="技能実習2号">技能実習2号</option><option value="技能実習3号">技能実習3号</option><option value="家族滞在">家族滞在</option><option value="特定活動">特定活動</option><option value="留学">留学</option></select></div>
           <div class="form-group"><label class="form-label">18. 技能実習修了日</label><input class="form-input" id="dr_ginou_end" type="date"></div>
           <div class="section-title">担当</div>
@@ -1996,7 +1996,7 @@ function buildDecisionReportScreen() {
           <div class="form-group full"><label class="form-label">企業名</label><input class="form-input" id="ot_company" placeholder="例: 医療法人明和会　辻村外科病院"></div>
           <div class="form-group"><label class="form-label">採用人数</label><div style="display:flex;align-items:center;gap:6px;"><input class="form-input" id="ot_count" type="number" placeholder="4" style="flex:1;"><span style="font-size:13px">名</span></div></div>
           <div class="form-group"><label class="form-label">国籍</label>
-            <select class="form-select" id="ot_nationality"><option value="">選択</option><option>インドネシア</option><option>ベトナム</option><option>タイ</option><option>カンボジア</option><option>ミャンマー</option><option>その他</option></select></div>
+            <select class="form-select" id="ot_nationality"><option value="">選択</option><option>インドネシア</option><option>ベトナム</option><option>タイ</option><option>カンボジア</option><option>ミャンマー</option><option>バングラデシュ</option><option>スリランカ</option><option>フィリピン</option><option>中国</option><option>その他</option></select></div>
           <div class="form-group"><label class="form-label">申請内容</label>
             <select class="form-select" id="ot_app_type"><option value="">選択</option><option>認定申請</option><option>変更申請</option><option>更新申請</option></select></div>
           <div class="section-title">■ 人材名</div>
@@ -2069,7 +2069,7 @@ function buildDecisionReportScreen() {
           <div class="section-title">■ 本人ステータス</div>
           <div class="form-group full"><label class="form-label">名前</label><input class="form-input" id="sl_person_name" placeholder="例: RENDI SAHPUTRA"></div>
           <div class="form-group"><label class="form-label">国籍</label>
-            <select class="form-select" id="sl_nationality"><option value="">選択</option><option>インドネシア</option><option>ベトナム</option><option>タイ</option><option>カンボジア</option><option>ミャンマー</option><option>その他</option></select></div>
+            <select class="form-select" id="sl_nationality"><option value="">選択</option><option>インドネシア</option><option>ベトナム</option><option>タイ</option><option>カンボジア</option><option>ミャンマー</option><option>バングラデシュ</option><option>スリランカ</option><option>フィリピン</option><option>中国</option><option>その他</option></select></div>
           <div class="form-group"><label class="form-label">申請内容</label><input class="form-input" id="sl_app_type" placeholder="例: 【認定】特定技能１号"></div>
           <div class="form-group"><label class="form-label">通算在留期間</label><input class="form-input" id="sl_total_period" placeholder="例: ―"></div>
           <div class="form-group"><label class="form-label">★ 目標申請日</label><input class="form-input" id="sl_target_date" placeholder="例: 2026/4/18"></div>
@@ -2429,7 +2429,7 @@ function copySoloReport() {
 // ===== UTILS =====
 function formatDate(d){if(!d)return'-';const dt=new Date(d);if(isNaN(dt))return d;return dt.getFullYear()+'/'+(dt.getMonth()+1).toString().padStart(2,'0')+'/'+dt.getDate().toString().padStart(2,'0');}
 function daysDiff(d){if(!d)return 9999;return Math.floor((new Date(d)-new Date())/(1000*60*60*24));}
-function natFlag(nat){const m={'インドネシア':'🇮🇩','ベトナム':'🇻🇳','タイ':'🇹🇭','カンボジア':'🇰🇭','ミャンマー':'🇲🇲','中国':'🇨🇳','フィリピン':'🇵🇭'};return m[nat]||'🌏';}
+function natFlag(nat){const m={'インドネシア':'🇮🇩','ベトナム':'🇻🇳','タイ':'🇹🇭','カンボジア':'🇰🇭','ミャンマー':'🇲🇲','中国':'🇨🇳','フィリピン':'🇵🇭','バングラデシュ':'🇧🇩','スリランカ':'🇱🇰'};return m[nat]||'🌏';}
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 // フォルダ番号での比較関数(0,00,1..11,11-1,11-2..)。両方nullなら名前順
@@ -3706,6 +3706,8 @@ async function saveWorker(returnResult=false) {
     left_date:        g('wf_left_date'),
     visa_status:      g('wf_visa_status'),
     visa_expiry:      g('wf_visa_expiry'),
+    first_tokutei_date: g('wf_first_tokutei_date'),
+    residence_card_history: g('wf_residence_card_history'),
     residence_card:   g('wf_residence_card'),
     entry_date:       g('wf_entry_date'),
     request_date:     g('wf_request_date'),
@@ -5284,8 +5286,15 @@ function renderSingleMessage(m, opts) {
     : '';
 
   // アクションメニュー
-  const senderEsc = esc(m.sender_name).replace(/'/g, "\\'");
-  const contentEsc = esc(m.content||'').replace(/'/g, "\\'").slice(0,80);
+  // 属性値内のJS呼び出し用エスケープ: HTML属性( "..." ) 内のJS文字列( '...' ) として安全になるよう、
+  // ダブルクォート/シングルクォート/改行/バックスラッシュをすべてエスケープ
+  const escAttr = (s) => String(s||'')
+    .replace(/\\/g, '\\\\')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+    .replace(/'/g, "\\'")
+    .replace(/\n/g, ' ').replace(/\r/g, '');
+  const senderEsc = escAttr(m.sender_name);
+  const contentEsc = escAttr((m.content||'').slice(0,80));
   const actionsHtml = isDeleted ? '' : (
     '<div class="msg-actions" style="opacity:0;position:absolute;top:-14px;' + (isMine?'left':'right') + ':4px;background:white;border:1px solid #dadce0;border-radius:16px;padding:2px 4px;box-shadow:0 1px 4px rgba(0,0,0,.15);display:flex;gap:2px;transition:opacity .15s;z-index:5;">' +
       '<button onclick="openReactionPicker(\'' + m.id + '\', this)" title="リアクション" style="background:none;border:none;cursor:pointer;font-size:13px;padding:3px 5px;border-radius:50%;">😊</button>' +
@@ -6788,7 +6797,9 @@ function buildWorkersScreen() {
     <select class="filter-select" id="wFilterNationality" onchange="applyWorkerFilters()">
       <option value="">全国籍</option>
       <option>インドネシア</option><option>ベトナム</option><option>タイ</option>
-      <option>カンボジア</option><option>ミャンマー</option><option>その他</option>
+      <option>カンボジア</option><option>ミャンマー</option>
+      <option>バングラデシュ</option><option>スリランカ</option><option>フィリピン</option><option>中国</option>
+      <option>その他</option>
     </select>
     <select class="filter-select" id="wFilterKmt" onchange="applyWorkerFilters()">
       <option value="">KMT支援区分</option>
@@ -7530,7 +7541,7 @@ function buildWorkerModalBody(w) {
     <div class="form-group"><label class="form-label">フリガナ</label><input class="form-input" id="wf_name_kana" value="${esc(w.name_kana||'')}"></div>
     <div class="form-group"><label class="form-label">国籍</label>
       <select class="form-select" id="wf_nationality">
-        ${['','インドネシア','ベトナム','タイ','カンボジア','ミャンマー','その他'].map(n=>`<option ${w.nationality===n?'selected':''}>${n}</option>`).join('')}
+        ${['','インドネシア','ベトナム','タイ','カンボジア','ミャンマー','バングラデシュ','スリランカ','フィリピン','中国','その他'].map(n=>`<option ${w.nationality===n?'selected':''}>${n}</option>`).join('')}
       </select></div>
     <div class="form-group"><label class="form-label">性別</label>
       <select class="form-select" id="wf_gender">
@@ -7563,6 +7574,10 @@ function buildWorkerModalBody(w) {
     <div class="form-group"><label class="form-label">在留期限</label><input class="form-input" id="wf_visa_expiry" type="date" value="${w.visa_expiry||''}"></div>
     <div class="form-group"><label class="form-label">在留カード番号</label><input class="form-input" id="wf_residence_card" value="${esc(w.residence_card||'')}"></div>
     <div class="form-group"><label class="form-label">入国日</label><input class="form-input" id="wf_entry_date" type="date" value="${w.entry_date||''}"></div>
+    <div class="form-group"><label class="form-label">初回特定技能取得日</label><input class="form-input" id="wf_first_tokutei_date" type="date" value="${w.first_tokutei_date||''}"></div>
+    <div class="form-group full"><label class="form-label">在留カードの履歴 <span style="font-size:10px;color:var(--gray-400);font-weight:400;">— 過去の在留カード番号・期限・資格などの履歴をテキストで記録(STOCKデータ移行用)</span></label>
+      <textarea class="form-textarea" id="wf_residence_card_history" rows="3" placeholder="例: 2022/04/15 留学 在留カード番号XXXX 期限2024/04/15&#10;2024/04/16 特定技能1号 在留カード番号YYYY 期限2025/04/16">${esc(w.residence_card_history||'')}</textarea>
+    </div>
     <div class="section-title">申請情報</div>
     <div class="form-group"><label class="form-label">申請依頼日 <span style="font-size:10px;color:var(--gray-400);">（入力でアラートから除外）</span></label><input class="form-input" id="wf_request_date" type="date" value="${w.request_date||''}"></div>
     <div class="form-group"><label class="form-label">申請日</label><input class="form-input" id="wf_apply_date" type="date" value="${w.apply_date||''}"></div>
@@ -7793,7 +7808,7 @@ const SCHEDULE_EVENT_TYPES = {
 const SCHEDULE_METHOD_LABEL = { online: '🖥️ オンライン', visit: '🏢 訪問' };
 
 let _supportSchedules = [];
-let _scheduleFilter = { type: 'all', status: 'planned', company: 'all', worker: 'all', search: '' };
+let _scheduleFilter = { type: 'all', status: 'planned', company: 'all', worker: 'all', mainStaff: 'all', subStaff: 'all', search: '' };
 
 // 表示モード: 'calendar' | 'table'
 let _scheduleViewMode = 'calendar';
@@ -7828,6 +7843,12 @@ function buildSupportSchedulesScreen() {
       <span style="font-size:11px;font-weight:700;color:var(--gray-500);">🔍 絞り込み：</span>
       <select id="scheduleCompanyFilter" onchange="onScheduleFilterChange()" style="padding:5px 10px;border:1px solid var(--gray-300);border-radius:6px;font-size:12px;min-width:160px;">
         <option value="all">🏢 すべての企業</option>
+      </select>
+      <select id="scheduleMainStaffFilter" onchange="onScheduleFilterChange()" style="padding:5px 10px;border:1px solid var(--gray-300);border-radius:6px;font-size:12px;">
+        <option value="all">👤 全メイン担当</option>
+      </select>
+      <select id="scheduleSubStaffFilter" onchange="onScheduleFilterChange()" style="padding:5px 10px;border:1px solid var(--gray-300);border-radius:6px;font-size:12px;">
+        <option value="all">👥 全サブ担当</option>
       </select>
       <select id="scheduleWorkerFilter" onchange="onScheduleFilterChange()" style="padding:5px 10px;border:1px solid var(--gray-300);border-radius:6px;font-size:12px;min-width:160px;">
         <option value="all">👤 すべての人材</option>
@@ -7933,20 +7954,58 @@ function setScheduleViewMode(mode) {
 function populateScheduleFilters() {
   const compSel = document.getElementById('scheduleCompanyFilter');
   const wkSel = document.getElementById('scheduleWorkerFilter');
+  const mainSel = document.getElementById('scheduleMainStaffFilter');
+  const subSel = document.getElementById('scheduleSubStaffFilter');
   if (!compSel || !wkSel) return;
   // 既存の選択値を保持
   const prevComp = compSel.value;
   const prevWk = wkSel.value;
+  const prevMain = mainSel?.value;
+  const prevSub = subSel?.value;
   // 企業
   const companies = (allCompanies || []).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'','ja'));
   compSel.innerHTML = '<option value="all">🏢 すべての企業</option>' +
     companies.map(c => '<option value="' + c.id + '">' + esc(c.name||'') + '</option>').join('');
   if (prevComp && (prevComp === 'all' || companies.find(c => c.id === prevComp))) compSel.value = prevComp;
-  // 人材（企業選択時はその企業の人材だけに絞る）
+  // 担当者選択肢(companies の main_staff / sub_staff からユニーク値)
+  if (mainSel) {
+    const mainSet = new Set(), subSet = new Set();
+    (allCompanies||[]).forEach(c => {
+      if (c.main_staff) String(c.main_staff).split(/[,、，\s]+/).forEach(s => { const t=s.trim(); if(t) mainSet.add(t); });
+      if (c.sub_staff) String(c.sub_staff).split(/[,、，\s]+/).forEach(s => { const t=s.trim(); if(t) subSet.add(t); });
+    });
+    mainSel.innerHTML = '<option value="all">👤 全メイン担当</option>' +
+      [...mainSet].sort((a,b)=>a.localeCompare(b,'ja')).map(s => '<option value="' + esc(s) + '">' + esc(s) + '</option>').join('');
+    if (prevMain) mainSel.value = prevMain;
+    if (subSel) {
+      subSel.innerHTML = '<option value="all">👥 全サブ担当</option>' +
+        [...subSet].sort((a,b)=>a.localeCompare(b,'ja')).map(s => '<option value="' + esc(s) + '">' + esc(s) + '</option>').join('');
+      if (prevSub) subSel.value = prevSub;
+    }
+  }
+  // 人材（企業選択時はその企業の人材だけに絞る + 担当フィルタも反映）
   const selectedCompany = compSel.value;
+  const selMain = mainSel?.value || 'all';
+  const selSub = subSel?.value || 'all';
   let workers = (allWorkers || []);
   if (selectedCompany && selectedCompany !== 'all') {
     workers = workers.filter(w => w.company_id === selectedCompany);
+  }
+  // 担当者フィルタ: その人材の企業のmain_staff/sub_staffに含まれているか
+  if (selMain !== 'all' || selSub !== 'all') {
+    workers = workers.filter(w => {
+      const c = (allCompanies||[]).find(x => x.id === w.company_id);
+      if (!c) return false;
+      if (selMain !== 'all') {
+        const arr = String(c.main_staff||'').split(/[,、，\s]+/).map(s=>s.trim()).filter(Boolean);
+        if (!arr.includes(selMain)) return false;
+      }
+      if (selSub !== 'all') {
+        const arr = String(c.sub_staff||'').split(/[,、，\s]+/).map(s=>s.trim()).filter(Boolean);
+        if (!arr.includes(selSub)) return false;
+      }
+      return true;
+    });
   }
   workers = workers.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'','ja'));
   wkSel.innerHTML = '<option value="all">👤 すべての人材</option>' +
@@ -7955,7 +8014,7 @@ function populateScheduleFilters() {
 }
 
 function clearScheduleFilters() {
-  ['scheduleCompanyFilter','scheduleWorkerFilter','scheduleTypeFilter','scheduleSearchInput'].forEach(id => {
+  ['scheduleCompanyFilter','scheduleWorkerFilter','scheduleTypeFilter','scheduleSearchInput','scheduleMainStaffFilter','scheduleSubStaffFilter'].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
     if (el.tagName === 'SELECT') el.value = 'all';
@@ -8000,6 +8059,8 @@ function onScheduleFilterChange() {
   _scheduleFilter.status = document.getElementById('scheduleStatusFilter')?.value || 'planned';
   _scheduleFilter.company = document.getElementById('scheduleCompanyFilter')?.value || 'all';
   _scheduleFilter.worker = document.getElementById('scheduleWorkerFilter')?.value || 'all';
+  _scheduleFilter.mainStaff = document.getElementById('scheduleMainStaffFilter')?.value || 'all';
+  _scheduleFilter.subStaff = document.getElementById('scheduleSubStaffFilter')?.value || 'all';
   _scheduleFilter.search = (document.getElementById('scheduleSearchInput')?.value || '').toLowerCase().trim();
   // 企業選択が変わったら人材リストを再構築
   populateScheduleFilters();
@@ -8092,6 +8153,22 @@ function renderScheduleCalendar() {
   }
   if (_scheduleFilter.worker !== 'all') {
     workersFiltered = workersFiltered.filter(w => w.id === _scheduleFilter.worker);
+  }
+  // メイン/サブ担当フィルタ
+  if (_scheduleFilter.mainStaff !== 'all' || _scheduleFilter.subStaff !== 'all') {
+    workersFiltered = workersFiltered.filter(w => {
+      const c = (allCompanies||[]).find(x => x.id === w.company_id);
+      if (!c) return false;
+      if (_scheduleFilter.mainStaff !== 'all') {
+        const arr = String(c.main_staff||'').split(/[,、，\s]+/).map(s=>s.trim()).filter(Boolean);
+        if (!arr.includes(_scheduleFilter.mainStaff)) return false;
+      }
+      if (_scheduleFilter.subStaff !== 'all') {
+        const arr = String(c.sub_staff||'').split(/[,、，\s]+/).map(s=>s.trim()).filter(Boolean);
+        if (!arr.includes(_scheduleFilter.subStaff)) return false;
+      }
+      return true;
+    });
   }
   if (_scheduleFilter.search) {
     const q = _scheduleFilter.search;
@@ -8232,6 +8309,20 @@ function renderScheduleTable() {
     if (_scheduleFilter.status === 'done' && s.status !== 'done') return false;
     if (_scheduleFilter.company !== 'all' && s.company_id !== _scheduleFilter.company) return false;
     if (_scheduleFilter.worker !== 'all' && s.worker_id !== _scheduleFilter.worker) return false;
+    // メイン/サブ担当フィルタ: その人材の企業のmain_staff/sub_staffに含まれているか
+    if (_scheduleFilter.mainStaff !== 'all' || _scheduleFilter.subStaff !== 'all') {
+      const cid = s.companies?.id || s.workers?.company_id || s.company_id;
+      const c = (allCompanies||[]).find(x => x.id === cid);
+      if (!c) return false;
+      if (_scheduleFilter.mainStaff !== 'all') {
+        const arr = String(c.main_staff||'').split(/[,、，\s]+/).map(x=>x.trim()).filter(Boolean);
+        if (!arr.includes(_scheduleFilter.mainStaff)) return false;
+      }
+      if (_scheduleFilter.subStaff !== 'all') {
+        const arr = String(c.sub_staff||'').split(/[,、，\s]+/).map(x=>x.trim()).filter(Boolean);
+        if (!arr.includes(_scheduleFilter.subStaff)) return false;
+      }
+    }
     if (_scheduleFilter.search) {
       const text = ((s.workers?.name||'') + ' ' + (s.companies?.name||'') + ' ' + (s.notes||'')).toLowerCase();
       if (!text.includes(_scheduleFilter.search)) return false;
@@ -9134,7 +9225,7 @@ function buildSendingModalBody(s){s=s||{}; return `<div class="form-grid">
   <div class="section-title">基本情報</div>
   <div class="form-group full"><label class="form-label">機関名 *</label><input class="form-input" id="sf_name" value="${esc(s.name||'')}"></div>
   <div class="form-group"><label class="form-label">国</label>
-    <select class="form-select" id="sf_country">${['','インドネシア','ベトナム','タイ','カンボジア','ミャンマー','中国','フィリピン','その他'].map(n=>`<option ${s.country===n?'selected':''}>${n}</option>`).join('')}</select></div>
+    <select class="form-select" id="sf_country">${['','インドネシア','ベトナム','タイ','カンボジア','ミャンマー','バングラデシュ','スリランカ','フィリピン','中国','その他'].map(n=>`<option ${s.country===n?'selected':''}>${n}</option>`).join('')}</select></div>
   <div class="form-group"><label class="form-label">担当者名</label><input class="form-input" id="sf_contact" value="${esc(s.contact_name||'')}"></div>
   <div class="form-group"><label class="form-label">メール</label><input class="form-input" id="sf_email" value="${esc(s.email||'')}"></div>
   <div class="form-group"><label class="form-label">電話</label><input class="form-input" id="sf_tel" value="${esc(s.tel||'')}"></div>
@@ -9337,7 +9428,7 @@ function buildResumeScreen() {
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
           <div class="form-group"><label class="form-label">国籍</label>
             <select class="form-select" id="rf_nationality" onchange="previewResume()">
-              ${['','インドネシア','ベトナム','タイ','カンボジア','ミャンマー','その他'].map(n=>`<option>${n}</option>`).join('')}
+              ${['','インドネシア','ベトナム','タイ','カンボジア','ミャンマー','バングラデシュ','スリランカ','フィリピン','中国','その他'].map(n=>`<option>${n}</option>`).join('')}
             </select></div>
           <div class="form-group"><label class="form-label">性別</label>
             <select class="form-select" id="rf_gender" onchange="previewResume()">
@@ -9940,7 +10031,7 @@ function buildIntroModalBody(i) {
       <select class="form-select" id="if_status">${['在職中','申請書類準備中','許可待ち','配属待ち','退職・転職','失踪'].map(s=>`<option ${i.status===s?'selected':''}>${s}</option>`).join('')}</select></div>
     <div class="form-group full"><label class="form-label">人材名</label><input class="form-input" id="if_worker_name" value="${esc(i.worker_name||'')}"></div>
     <div class="form-group"><label class="form-label">国籍</label>
-      <select class="form-select" id="if_nationality">${['','インドネシア','ベトナム','タイ','カンボジア','ミャンマー','その他'].map(n=>`<option ${i.nationality===n?'selected':''}>${n}</option>`).join('')}</select></div>
+      <select class="form-select" id="if_nationality">${['','インドネシア','ベトナム','タイ','カンボジア','ミャンマー','バングラデシュ','スリランカ','フィリピン','中国','その他'].map(n=>`<option ${i.nationality===n?'selected':''}>${n}</option>`).join('')}</select></div>
     <div class="form-group"><label class="form-label">国内/国外</label>
       <select class="form-select" id="if_domestic">${['','国内','国外'].map(s=>`<option ${i.domestic_or_overseas===s?'selected':''}>${s}</option>`).join('')}</select></div>
     <div class="form-group full"><label class="form-label">所属機関名</label>
