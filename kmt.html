@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260609.04 -->
+<!-- KMT_VERSION ver.20260609.05 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -219,7 +219,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260609.04</div>
+    <div class="logo-ver">ver.20260609.05</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -3708,6 +3708,9 @@ async function saveWorker(returnResult=false) {
     visa_expiry:      g('wf_visa_expiry'),
     first_tokutei_date: g('wf_first_tokutei_date'),
     residence_card_history: g('wf_residence_card_history'),
+    placement_report_date: g('wf_placement_report_date'),
+    retire_report_date:    g('wf_retire_report_date'),
+    tg2_change_report_date: g('wf_tg2_change_report_date'),
     residence_card:   g('wf_residence_card'),
     entry_date:       g('wf_entry_date'),
     request_date:     g('wf_request_date'),
@@ -7065,7 +7068,27 @@ function renderWorkerAlerts() {
   const missAlert = [];
   // 🟣 不足あり放置警告: 特例期間中 かつ 申請済み・不足あり
   const shortageAlert = [];
+  // 🏗️ 建設業就労管理システム報告アラート(3種類)
+  const kokkoPlacementAlert = []; // 配属報告未提出
+  const kokkoRetireAlert = [];    // 退職報告未提出
+  const kokkoTg2Alert = [];       // 2号変更報告未提出
+  const isConstruction = (w) => /建設/.test(w.applicant_field || '');
   (filteredWorkers.length ? filteredWorkers : allWorkers).forEach(w => {
+    // 建設業の報告アラート判定(在留期限の有無にかかわらず)
+    if (isConstruction(w)) {
+      // 配属報告: 在職中で配属報告未提出
+      if (w.status === '在職中' && !w.placement_report_date) {
+        kokkoPlacementAlert.push(w);
+      }
+      // 退職報告: 退職済(帰国/転職)で退職報告未提出
+      if (['退職済(帰国)','退職済(転職)'].includes(w.status) && !w.retire_report_date) {
+        kokkoRetireAlert.push(w);
+      }
+      // 2号変更報告: 希望在留資格=特定技能2号 かつ 申請ステータス=審査完了 で 2号変更報告未提出
+      if (w.desired_visa === '特定技能2号' && w.apply_status === '審査完了' && !w.tg2_change_report_date) {
+        kokkoTg2Alert.push(w);
+      }
+    }
     if (!w.visa_expiry) return;
     const exp = new Date(w.visa_expiry); exp.setHours(0,0,0,0);
     const days = Math.floor((exp-today)/86400000);
@@ -7090,7 +7113,8 @@ function renderWorkerAlerts() {
     else if (days <= 90) alerts[3].push({w, days});
   });
   const total = alerts[1].length + alerts[2].length + alerts[3].length;
-  if (!total && !missAlert.length && !shortageAlert.length) { banner.innerHTML=''; return; }
+  const kokkoTotal = kokkoPlacementAlert.length + kokkoRetireAlert.length + kokkoTg2Alert.length;
+  if (!total && !missAlert.length && !shortageAlert.length && !kokkoTotal) { banner.innerHTML=''; return; }
   // 残り日数で昇順ソート(期限切れも含めて期日が近い順)
   missAlert.sort((a,b) => a.days - b.days);
   shortageAlert.sort((a,b) => a.tokureiDays - b.tokureiDays);
@@ -7152,6 +7176,42 @@ function renderWorkerAlerts() {
     wrap.appendChild(sList);
   }
 
+  // 🏗️ 建設業就労管理システム報告アラート(オレンジ系の大きなバナー)
+  if (kokkoTotal) {
+    const kk = document.createElement('div');
+    kk.style.cssText = 'background:linear-gradient(135deg,#fff7ed 0%,#fed7aa 100%);border:2px solid #ea580c;border-radius:10px;padding:12px 16px;margin-bottom:10px;box-shadow:0 2px 8px rgba(234,88,12,0.12);';
+    const sub = (label, list, color) => list.length
+      ? `<button onclick="toggleKokkoAlertList('${label}', _kokkoAlertCache['${label}'])" style="background:${color};color:white;border:none;border-radius:8px;padding:5px 12px;font-size:11px;font-weight:800;cursor:pointer;margin-right:6px;">${label} ${list.length}名 ▼</button>`
+      : `<span style="background:#f3f4f6;color:#94a3b8;padding:5px 12px;border-radius:8px;font-size:11px;font-weight:700;margin-right:6px;">${label} 0名</span>`;
+    // バナー描画前にキャッシュへ保持(クリック時に参照)
+    window._kokkoAlertCache = window._kokkoAlertCache || {};
+    _kokkoAlertCache['配属報告'] = kokkoPlacementAlert;
+    _kokkoAlertCache['退職報告'] = kokkoRetireAlert;
+    _kokkoAlertCache['2号変更報告'] = kokkoTg2Alert;
+    kk.innerHTML =
+      '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">'+
+        '<div style="display:flex;align-items:center;gap:10px;">'+
+          '<div style="font-size:28px;">🏗️</div>'+
+          '<div>'+
+            '<div style="font-size:13px;font-weight:900;color:#9a3412;">建設業 就労管理システム報告 — 報告未提出</div>'+
+            '<div style="font-size:11px;color:#9a3412;margin-top:2px;">建設分野の人材で、配属/退職/2号変更の報告日が未入力のもの。報告したら人材詳細の「🏗️ 就労管理システム報告」タブに日付を入れてください</div>'+
+          '</div>'+
+        '</div>'+
+        '<div style="text-align:right;">'+
+          '<div style="font-size:24px;font-weight:900;color:#9a3412;line-height:1;">'+kokkoTotal+'<span style="font-size:12px;font-weight:600;">件</span></div>'+
+        '</div>'+
+      '</div>'+
+      '<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:4px;">'+
+        sub('配属報告', kokkoPlacementAlert, '#16a34a')+
+        sub('退職報告', kokkoRetireAlert, '#dc2626')+
+        sub('2号変更報告', kokkoTg2Alert, '#7c3aed')+
+      '</div>';
+    wrap.appendChild(kk);
+    const kkList = document.createElement('div');
+    kkList.id = 'workerKokkoAlertList';
+    wrap.appendChild(kkList);
+  }
+
   const alertDefs = [
     {list: alerts[1], label:'🔴 1ヶ月以内', color:'#dc2626', bg:'#fef2f2', border:'#fecaca', key:'a1'},
     {list: alerts[2], label:'🟠 2ヶ月以内', color:'#ea580c', bg:'#fff7ed', border:'#fed7aa', key:'a2'},
@@ -7183,6 +7243,34 @@ function renderWorkerAlerts() {
   wrap.appendChild(listArea);
   banner.innerHTML = '';
   banner.appendChild(wrap);
+}
+
+// 建設業就労管理報告アラートの開閉(配属/退職/2号変更別)
+let _kokkoAlertOpenKey = null;
+function toggleKokkoAlertList(label, list) {
+  const area = document.getElementById('workerKokkoAlertList');
+  if (!area) return;
+  if (_kokkoAlertOpenKey === label) {
+    area.innerHTML = '';
+    _kokkoAlertOpenKey = null;
+    return;
+  }
+  _kokkoAlertOpenKey = label;
+  const colorMap = { '配属報告':'#16a34a', '退職報告':'#dc2626', '2号変更報告':'#7c3aed' };
+  const color = colorMap[label] || '#ea580c';
+  const rows = (list||[]).map(w => {
+    return '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #fed7aa;cursor:pointer;background:white;" onclick="event.stopPropagation();openWorkerModal(\''+w.id+'\')">'+
+      '<div style="min-width:80px;font-size:11px;font-weight:600;color:#64748b;">'+esc(w.management_no||'-')+'</div>'+
+      '<div style="flex:1;font-size:12px;"><strong>'+esc(w.name)+'</strong> <span style="color:#94a3b8;font-size:11px;">('+esc(w.nationality||'-')+')</span></div>'+
+      '<div style="font-size:11px;color:#64748b;flex:1;">'+esc(w.companies?.name||'-')+'</div>'+
+      '<div style="font-size:11px;color:#9a3412;">'+esc(w.applicant_field||'-')+'</div>'+
+      '<div><span style="background:'+color+';color:white;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:800;">'+esc(w.status||'-')+'</span></div>'+
+    '</div>';
+  }).join('');
+  area.innerHTML = '<div style="margin-top:-2px;margin-bottom:10px;background:white;border:2px solid #ea580c;border-top:none;border-radius:0 0 10px 10px;overflow:hidden;">'+
+    '<div style="padding:8px 12px;font-size:11px;font-weight:800;color:'+color+';background:#fff7ed;">'+esc(label)+' 未提出: '+(list||[]).length+'名</div>'+
+    rows+
+  '</div>';
 }
 
 // 不足あり放置警告の人材リストを開閉
@@ -7331,7 +7419,7 @@ let editingWorkerId = null;
 let _savingWorkerNew = false;
 
 function switchWorkerTab(tab) {
-  const tabs = ['basic','note','tasks','schedules'];
+  const tabs = ['basic','note','tasks','schedules','kokko'];
   tabs.forEach(t => {
     const btn = document.getElementById('wtab_'+t);
     const panel = document.getElementById('wtab_'+t+'_panel');
@@ -7445,6 +7533,10 @@ function buildWorkerModalBody(w) {
     <button id="wtab_schedules" onclick="switchWorkerTab('schedules')"
       style="padding:8px 18px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--gray-400);border-bottom:2px solid transparent;">
       📅 支援スケジュール
+    </button>
+    <button id="wtab_kokko" onclick="switchWorkerTab('kokko')"
+      style="padding:8px 18px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--gray-400);border-bottom:2px solid transparent;">
+      🏗️ 就労管理システム報告
     </button>
   </div>
   <!-- 基本情報タブ -->
@@ -7633,6 +7725,30 @@ function buildWorkerModalBody(w) {
       <button class="btn btn-primary" style="font-size:11px;padding:5px 10px;" onclick="openScheduleModalForWorker(editingWorkerId)">＋ 予定を追加</button>
     </div>
     <div id="workerScheduleArea"><div style="text-align:center;padding:20px;color:var(--gray-400);font-size:13px;">読み込み中...</div></div>
+  </div>
+  <!-- 就労管理システム報告タブ(建設業) -->
+  <div id="wtab_kokko_panel" style="display:none;">
+    <div style="background:#fef3c7;border-left:4px solid #f59e0b;border-radius:0 8px 8px 0;padding:12px 16px;margin-bottom:16px;font-size:12px;color:#78350f;line-height:1.6;">
+      <strong>🏗️ 建設業就労管理システム報告</strong><br>
+      ${(/建設/.test(w.applicant_field||'')) ? '建設分野の人材です。配属・退職・2号変更のタイミングで、国交省「外国人就労管理システム」への報告が必要です。実施した日付を記録しておくと、外国人材ページ上部のアラートから外れます。' : 'この人材の分野は「'+esc(w.applicant_field||'未設定')+'」です。建設業以外の場合、本タブの記録は不要です。'}
+    </div>
+    <div class="form-grid">
+      <div class="section-title">📅 配属報告</div>
+      <div class="form-group full">
+        <label class="form-label">配属報告日 <span style="font-size:10px;color:var(--gray-400);font-weight:400;">— 在職ステータスが「配属前 → 在職中」に変わったタイミングで実施</span></label>
+        <input class="form-input" id="wf_placement_report_date" type="date" value="${w.placement_report_date||''}">
+      </div>
+      <div class="section-title">📤 退職報告</div>
+      <div class="form-group full">
+        <label class="form-label">退職報告日 <span style="font-size:10px;color:var(--gray-400);font-weight:400;">— 在職ステータスが「在職中 → 退職済」に変わったタイミングで実施</span></label>
+        <input class="form-input" id="wf_retire_report_date" type="date" value="${w.retire_report_date||''}">
+      </div>
+      <div class="section-title">🆙 2号変更報告</div>
+      <div class="form-group full">
+        <label class="form-label">2号変更報告日 <span style="font-size:10px;color:var(--gray-400);font-weight:400;">— 希望在留資格が「特定技能2号」かつ申請ステータスが「審査完了」になったタイミングで実施</span></label>
+        <input class="form-input" id="wf_tg2_change_report_date" type="date" value="${w.tg2_change_report_date||''}">
+      </div>
+    </div>
   </div>
   <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)">
     <button class="btn btn-outline" onclick="closeGenModal('workerModal')">閉じる</button>
