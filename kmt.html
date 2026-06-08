@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260609.06 -->
+<!-- KMT_VERSION ver.20260609.07 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -219,7 +219,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260609.06</div>
+    <div class="logo-ver">ver.20260609.07</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -245,6 +245,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="nav-item" onclick="showScreen('sales')">📊 売上管理</div>
   <div class="nav-item" onclick="showScreen('expenses')">💸 立替管理</div>
   <div class="nav-item" onclick="showScreen('users')">⚙️ ユーザー設定</div>
+  <div class="nav-item" onclick="showScreen('chat_teams')">💬 チャットグループ</div>
   <div class="nav-item" onclick="showScreen('audit_log')">📋 操作ログ</div>
   <div class="nav-item" onclick="showScreen('ai_knowledge')">🧠 AI記憶</div>
   <div class="sidebar-user">
@@ -3644,7 +3645,7 @@ async function loadChatScreen() {
       } catch(e) { _chatPinnedCompanyIds = new Set(); }
     }
     // chat_roomsテーブルから取得（人材チャット + 企業チャット）
-    const d = await sbFetch('chat_rooms?select=id,worker_id,company_id,group_id,status,completed_at,created_at,workers(id,name,nationality,staff,management_no,apply_type,desired_visa,apply_status,drive_url,drive_url_kmt,company_id,companies(id,name)),companies(id,name,drive_url,drive_url2)&order=created_at.desc');
+    const d = await sbFetch('chat_rooms?select=id,worker_id,company_id,group_id,status,completed_at,created_at,workers(id,name,nationality,staff,management_no,apply_type,desired_visa,apply_status,drive_url,drive_url_kmt,photo_url,company_id,companies(id,name)),companies(id,name,drive_url,drive_url2)&order=created_at.desc');
     chatRooms = (d||[]).map(r => {
       const isCompanyChat = !r.worker_id && !!r.company_id;
       const directCompany = r.companies || null; // ルーム直結の企業（企業チャット）
@@ -3660,6 +3661,7 @@ async function loadChatScreen() {
         staffStr: r.workers?.staff || '',
         // 人材の管理番号(人材チャット表示用)
         management_no: r.workers?.management_no || '',
+        photo_url: r.workers?.photo_url || '',
         // 申請種別グループ分け用
         apply_type: r.workers?.apply_type || '',
         desired_visa: r.workers?.desired_visa || '',
@@ -3743,6 +3745,7 @@ async function saveWorker(returnResult=false) {
     jp_address:       g('wf_jp_address'),
     drive_url:        g('wf_drive_url'),
     drive_url_kmt:    g('wf_drive_url_kmt'),
+    latest_contract_url: g('wf_latest_contract_url'),
     photo_url:        g('wf_photo_url'),
     workplace_name:   workplaceName,
     memo:             g('wf_memo'),
@@ -4753,9 +4756,12 @@ function buildChatRoomRow(r, companyId, isCompany) {
   row.onmouseover = () => { if (!active) row.style.background = isCompany?'#fde68a':'#f1f3f4'; };
   row.onmouseout = () => { row.style.background = active?(isCompany?'#fef3c7':'#e8f0fe'):(isCompany?'#fffbeb':''); };
   row.onclick = () => openChatRoom(r.id);
+  const photoSrc = !isCompany ? driveImageUrl(r.photo_url) : '';
   const icon = isCompany
     ? '<div style="width:36px;height:36px;border-radius:50%;background:#fde68a;color:#92400e;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">🏢</div>'
-    : '<div style="width:36px;height:36px;border-radius:50%;background:#c7d2fe;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">'+natFlag(r.nationality||'')+'</div>';
+    : (photoSrc
+      ? '<img src="'+esc(photoSrc)+'" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0;border:1px solid #e5e7eb;" onerror="this.outerHTML=\'<div style=&quot;width:36px;height:36px;border-radius:50%;background:#c7d2fe;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;&quot;>'+natFlag(r.nationality||'')+'</div>\'">'
+      : '<div style="width:36px;height:36px;border-radius:50%;background:#c7d2fe;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">'+natFlag(r.nationality||'')+'</div>');
   const mnBadge = (!isCompany && r.management_no)
     ? '<span style="font-size:9px;background:#e0e7ff;color:#3730a3;padding:1px 5px;border-radius:6px;margin-right:4px;font-weight:700;letter-spacing:.3px;white-space:nowrap;">'+esc(r.management_no)+'</span>'
     : '';
@@ -4955,6 +4961,10 @@ function _renderChatRoomsOld(filtered) {
     const lastText = last ? (_lc ? _lc.split('\n').join(' ').slice(0,22)+(_lc.length>22?'…':'') : '📎 '+(last.file_name||'ファイル')) : '';
     const lastSender = last ? last.sender_name : '';
     const flag = natFlag(r.nationality||'');
+    const _photo = driveImageUrl(r.photo_url);
+    const avatarHtml = _photo
+      ? '<img src="'+esc(_photo)+'" style="width:40px;height:40px;border-radius:50%;object-fit:cover;flex-shrink:0;border:1px solid #e5e7eb;" onerror="this.outerHTML=\'<div style=&quot;width:40px;height:40px;border-radius:50%;background:#c7d2fe;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;&quot;>'+flag+'</div>\'">'
+      : '<div style="width:40px;height:40px;border-radius:50%;background:#c7d2fe;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">'+flag+'</div>';
     const unreadBadge = r.unread > 0 ? '<span style="background:#1a73e8;color:white;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;flex-shrink:0;">'+r.unread+'</span>' : '';
     const doneBadge = '';
     const preview = lastSender ? '<b>'+esc(lastSender)+'</b>: '+esc(lastText) : esc(lastText);
@@ -4964,7 +4974,7 @@ function _renderChatRoomsOld(filtered) {
       'onmouseover="this.style.background=\''+hover+'\'"',
       'onmouseout="this.style.background=\''+bg+'\'"',
       '>',
-      '<div style="width:40px;height:40px;border-radius:50%;background:#c7d2fe;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">'+flag+'</div>',
+      avatarHtml,
       '<div style="flex:1;min-width:0;">',
         '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:4px;margin-bottom:2px;">',
           '<span style="font-size:13px;font-weight:'+(r.unread>0?'700':'500')+';color:#202124;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(r.name)+'</span>'+doneBadge+' ',
@@ -5552,18 +5562,34 @@ async function showMentionPopup(query) {
       allUsers = ud || [];
     } catch(e) {}
   }
+  // chat_teamsのキャッシュロード(1回限り)
+  if (!window._chatTeamsCache) {
+    try {
+      const teams = await sbFetch('chat_teams?select=id,name,icon,color');
+      const members = await sbFetch('chat_team_members?select=team_id,users(name)');
+      const byId = {};
+      (members||[]).forEach(m => { (byId[m.team_id] = byId[m.team_id] || []).push(m.users?.name || ''); });
+      window._chatTeamsCache = (teams||[]).map(t => ({ ...t, memberNames: byId[t.id] || [] }));
+    } catch(e) { window._chatTeamsCache = []; }
+  }
   // ユーザー候補
   const userCands = (allUsers || []).filter(u =>
     u.name && u.name !== currentUser?.name &&
     (!query || u.name.toLowerCase().includes(query))
   ).slice(0, 8);
 
-  // チーム候補（teamフィールドのユニーク値）
+  // チーム候補1: 旧 users.team (後方互換のため残す)
   const teamSet = new Set();
   (allUsers || []).forEach(u => { if (u.team && u.team.trim()) teamSet.add(u.team.trim()); });
+  // チーム候補2: chat_teams 新グループ
+  const chatTeamCands = (window._chatTeamsCache || []).filter(t =>
+    !query || t.name.toLowerCase().includes(query)
+  ).slice(0, 6);
+  // 旧teamCandsはchat_teamsに同名があれば除外(優先)
+  const chatTeamNames = new Set(chatTeamCands.map(t => t.name));
   const teamCands = Array.from(teamSet).filter(t =>
-    !query || t.toLowerCase().includes(query)
-  ).slice(0, 5).map(t => {
+    !chatTeamNames.has(t) && (!query || t.toLowerCase().includes(query))
+  ).slice(0, 3).map(t => {
     const members = (allUsers||[]).filter(u => u.team === t);
     return { type: 'team', name: t, count: members.length };
   });
@@ -5574,18 +5600,31 @@ async function showMentionPopup(query) {
     specialCands.push({ type: 'special', name: '全員', count: (allUsers||[]).length });
   }
 
-  if (!userCands.length && !teamCands.length && !specialCands.length) { closeMentionPopup(); return; }
+  if (!userCands.length && !teamCands.length && !chatTeamCands.length && !specialCands.length) { closeMentionPopup(); return; }
 
   let html = '';
   // 特殊
   specialCands.forEach((s, i) => {
-    html += '<div data-mention="' + esc(s.name) + '" data-mtype="special" class="mention-item' + (i===0 && userCands.length===0 && teamCands.length===0 ?' mention-active':'') + '" ' +
+    html += '<div data-mention="' + esc(s.name) + '" data-mtype="special" class="mention-item' + (i===0 && userCands.length===0 && teamCands.length===0 && chatTeamCands.length===0 ?' mention-active':'') + '" ' +
       'onclick="insertMention(\'' + esc(s.name).replace(/\'/g, "\\\\'") + '\')" ' +
       'style="padding:8px 12px;cursor:pointer;font-size:12px;font-weight:700;display:flex;align-items:center;gap:8px;background:#fef3c7;color:#92400e;" ' +
       'onmouseover="this.parentElement.querySelectorAll(\'.mention-active\').forEach(el=>el.classList.remove(\'mention-active\'));this.classList.add(\'mention-active\');">' +
       '📢 @全員 <span style="font-weight:400;color:#a16207;font-size:10px;">(' + s.count + '名)</span></div>';
   });
-  // チーム
+  // チャットグループ (chat_teams)
+  if (chatTeamCands.length) {
+    html += '<div style="padding:4px 12px;font-size:10px;color:#94a3b8;font-weight:700;letter-spacing:.5px;background:#f8fafc;border-top:1px solid #f1f5f9;">💬 チャットグループ</div>';
+    chatTeamCands.forEach((t, i) => {
+      const sample = (t.memberNames||[]).slice(0,3).join(', ');
+      const more = (t.memberNames||[]).length > 3 ? ' +' + ((t.memberNames||[]).length - 3) : '';
+      html += '<div data-mention="' + esc(t.name) + '" data-mtype="chatteam" class="mention-item' + (i===0 && !specialCands.length ?' mention-active':'') + '" ' +
+        'onclick="insertMention(\'' + esc(t.name).replace(/\'/g, "\\\\'") + '\')" ' +
+        'style="padding:8px 12px;cursor:pointer;font-size:12px;font-weight:700;display:flex;align-items:center;gap:8px;background:' + esc(t.color||'#7c3aed') + '15;color:' + esc(t.color||'#7c3aed') + ';" ' +
+        'onmouseover="this.parentElement.querySelectorAll(\'.mention-active\').forEach(el=>el.classList.remove(\'mention-active\'));this.classList.add(\'mention-active\');">' +
+        esc(t.icon||'👥') + ' @' + esc(t.name) + ' <span style="font-weight:400;color:' + esc(t.color||'#7c3aed') + '99;font-size:10px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">(' + (t.memberNames||[]).length + '名' + (sample ? ': ' + esc(sample) + more : '') + ')</span></div>';
+    });
+  }
+  // 旧チーム (users.team)
   if (teamCands.length) {
     html += '<div style="padding:4px 12px;font-size:10px;color:#94a3b8;font-weight:700;letter-spacing:.5px;background:#f8fafc;border-top:1px solid #f1f5f9;">👥 チーム</div>';
     teamCands.forEach((t, i) => {
@@ -5650,11 +5689,20 @@ function expandMentions(rawMentions) {
   const result = new Set();
   const teamSet = new Set();
   (allUsers || []).forEach(u => { if (u.team && u.team.trim()) teamSet.add(u.team.trim()); });
+  // chat_teamsからもメンバー名を取得
+  const chatTeamsMap = {};
+  (window._chatTeamsCache || []).forEach(t => { chatTeamsMap[t.name] = t.memberNames || []; });
 
   rawMentions.forEach(name => {
     if (name === '全員' || name === 'everyone' || name === 'all') {
       (allUsers || []).forEach(u => { if (u.name && u.name !== currentUser?.name) result.add(u.name); });
+    } else if (chatTeamsMap[name]) {
+      // chat_teamsグループ展開
+      chatTeamsMap[name].forEach(memberName => {
+        if (memberName && memberName !== currentUser?.name) result.add(memberName);
+      });
     } else if (teamSet.has(name)) {
+      // 旧 users.team グループ展開
       (allUsers || []).forEach(u => {
         if (u.team === name && u.name && u.name !== currentUser?.name) result.add(u.name);
       });
@@ -6618,6 +6666,7 @@ const SCREENS = {
   sales:     { title: '📊 売上管理', init: initSalesScreen },
   expenses:  { title: '💸 立替管理', init: loadExpenses },
   users:     { title: '⚙️ ユーザー設定', init: loadUsers },
+  chat_teams:{ title: '💬 チャットグループ', init: loadChatTeams },
   ofusa_view:{ title: '📊 案件進捗確認', init: loadOfusaView },
   decision_report:{ title: '📋 決定報告', init: loadDecisionReport },
   resume:    { title: '📝 履歴書作成', init: loadResumeScreen },
@@ -6698,6 +6747,7 @@ function renderScreenContent(name) {
     sales: buildSalesScreen(),
     expenses: buildExpensesScreen(),
     users: buildUsersScreen(),
+    chat_teams: buildChatTeamsScreen(),
     ofusa_view: buildOfusaViewScreen(),
     resume: buildResumeScreen(),
     // chat は専用処理で描画
@@ -7658,6 +7708,12 @@ function buildWorkerModalBody(w) {
       <div style="display:flex;gap:6px;align-items:center;">
         <input class="form-input" id="wf_drive_url_kmt" value="${esc(w.drive_url_kmt||'')}" placeholder="https://drive.google.com/..." style="flex:1;">
         <button type="button" class="btn btn-outline" title="リンク先を開く" style="font-size:16px;padding:4px 10px;flex-shrink:0;" onclick="openDriveLink('wf_drive_url_kmt')">📁</button>
+      </div>
+    </div>
+    <div class="form-group full"><label class="form-label">📄 最新雇用条件書ドライブURL <span style="font-size:10px;color:var(--gray-400);font-weight:400;">— 直近の雇用条件書PDFのドライブリンク</span></label>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <input class="form-input" id="wf_latest_contract_url" value="${esc(w.latest_contract_url||'')}" placeholder="https://drive.google.com/file/d/..." style="flex:1;">
+        <button type="button" class="btn btn-outline" title="リンク先を開く" style="font-size:16px;padding:4px 10px;flex-shrink:0;" onclick="openDriveLink('wf_latest_contract_url')">📁</button>
       </div>
     </div>
     <div class="section-title">📷 顔写真</div>
@@ -9802,6 +9858,194 @@ function buildJobsScreen() {
   </tr></thead>
   <tbody id="jobTbody"><tr><td colspan="10" style="text-align:center;padding:40px;color:var(--gray-400)">読み込み中...</td></tr></tbody>
   </table><div class="pagination-bar" id="jobPagination"></div></div>`;
+}
+
+// ==============================
+// 💬 チャットグループ管理
+// ==============================
+let _allChatTeams = [];        // [{id, name, icon, color, description, members:[{user_id, name, team}]}]
+let _editingChatTeamId = null;
+
+function buildChatTeamsScreen(){
+  return `
+  <div style="background:white;border:1px solid var(--gray-200);border-radius:10px;padding:16px;margin-bottom:16px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
+      <div>
+        <div style="font-size:14px;font-weight:800;color:var(--navy);">💬 チャットグループ</div>
+        <div style="font-size:11px;color:var(--gray-400);margin-top:2px;">グループを作成してメンバーを追加すると、チャット内で<code style="background:#f1f5f9;padding:1px 4px;border-radius:3px;">@グループ名</code>でまとめてメンションできます</div>
+      </div>
+      <button class="btn btn-primary" onclick="openChatTeamModal(null)" style="font-size:12px;padding:6px 14px;">＋ 新規グループ</button>
+    </div>
+  </div>
+  <div id="chatTeamsList"><div style="text-align:center;padding:40px;color:var(--gray-400);">読み込み中...</div></div>
+  `;
+}
+
+async function loadChatTeams() {
+  showLoading(true);
+  try {
+    // チームと、各チームのメンバーをまとめて取得
+    const teams = await sbFetch('chat_teams?select=*&order=name.asc');
+    const members = await sbFetch('chat_team_members?select=team_id,user_id,added_at,users(id,name,team,role)');
+    // 紐付け
+    const byTeam = {};
+    (members||[]).forEach(m => {
+      if (!byTeam[m.team_id]) byTeam[m.team_id] = [];
+      byTeam[m.team_id].push({ user_id: m.user_id, name: m.users?.name || '(削除済)', team: m.users?.team || '', role: m.users?.role || '' });
+    });
+    _allChatTeams = (teams||[]).map(t => ({ ...t, members: byTeam[t.id] || [] }));
+    renderChatTeams();
+  } catch(e) {
+    showToast('❌ ' + e.message, 'error');
+  }
+  showLoading(false);
+}
+
+function renderChatTeams() {
+  const list = document.getElementById('chatTeamsList');
+  if (!list) return;
+  if (!_allChatTeams.length) {
+    list.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray-400);font-size:13px;">まだチャットグループが作成されていません。「＋ 新規グループ」ボタンから作成してください。</div>';
+    return;
+  }
+  list.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px;">' +
+    _allChatTeams.map(t => {
+      const memberHtml = (t.members || []).slice(0, 8).map(m =>
+        '<span style="display:inline-flex;align-items:center;gap:3px;font-size:11px;background:#f1f5f9;padding:2px 8px;border-radius:10px;color:#475569;">👤 ' + esc(m.name) + '</span>'
+      ).join('');
+      const moreCount = (t.members || []).length - 8;
+      const moreHtml = moreCount > 0 ? '<span style="font-size:11px;color:#94a3b8;">+' + moreCount + '名</span>' : '';
+      return '<div style="background:white;border:1.5px solid ' + esc(t.color || '#7c3aed') + ';border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:8px;">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">' +
+          '<div style="display:flex;align-items:center;gap:8px;">' +
+            '<div style="width:36px;height:36px;border-radius:50%;background:' + esc(t.color || '#7c3aed') + ';color:white;display:flex;align-items:center;justify-content:center;font-size:18px;">' + esc(t.icon || '👥') + '</div>' +
+            '<div>' +
+              '<div style="font-size:14px;font-weight:800;color:var(--navy);">@' + esc(t.name) + '</div>' +
+              '<div style="font-size:10px;color:var(--gray-400);">' + (t.members||[]).length + '名のメンバー</div>' +
+            '</div>' +
+          '</div>' +
+          '<div style="display:flex;gap:4px;">' +
+            '<button class="btn btn-outline" style="font-size:11px;padding:3px 10px;" onclick="openChatTeamModal(\'' + t.id + '\')">編集</button>' +
+            '<button class="btn btn-outline" style="font-size:11px;padding:3px 10px;color:#dc2626;border-color:#fecaca;" onclick="deleteChatTeam(\'' + t.id + '\', \'' + esc(t.name).replace(/'/g, "\\'") + '\')">🗑</button>' +
+          '</div>' +
+        '</div>' +
+        (t.description ? '<div style="font-size:11px;color:#64748b;line-height:1.5;">' + esc(t.description) + '</div>' : '') +
+        '<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">' + memberHtml + moreHtml + '</div>' +
+      '</div>';
+    }).join('') +
+  '</div>';
+}
+
+function openChatTeamModal(id) {
+  _editingChatTeamId = id;
+  const t = id ? _allChatTeams.find(x => x.id === id) : null;
+  const memberIds = new Set((t?.members || []).map(m => m.user_id));
+  const sortedUsers = (allUsers || []).slice().sort((a,b) => (a.name||'').localeCompare(b.name||'', 'ja'));
+  const iconChoices = ['👥','🇻🇳','🇮🇩','🇹🇭','🇰🇭','🇲🇲','🇨🇳','🇵🇭','🇧🇩','🇱🇰','🏢','🛠️','📋','🎯','⭐','🌟','💼','🚀'];
+  const colorChoices = ['#7c3aed','#dc2626','#ea580c','#d97706','#16a34a','#0891b2','#0d9488','#2563eb','#db2777','#64748b'];
+  const body = `
+    <div class="form-grid">
+      <div class="form-group full">
+        <label class="form-label">グループ名 <span style="color:#dc2626;">*</span></label>
+        <input class="form-input" id="ct_name" value="${esc(t?.name||'')}" placeholder="例: ベトナム担当 / KMTサポート / 営業チーム">
+      </div>
+      <div class="form-group">
+        <label class="form-label">アイコン</label>
+        <div style="display:flex;flex-wrap:wrap;gap:4px;">
+          ${iconChoices.map(ic => `<button type="button" class="ct_icon_btn" data-icon="${ic}" onclick="document.getElementById('ct_icon').value='${ic}';document.querySelectorAll('.ct_icon_btn').forEach(b=>b.style.background=b.dataset.icon===this.dataset.icon?'#1a73e8':'white');this.style.background='#1a73e8';this.style.color='white';" style="font-size:18px;padding:6px 10px;border:1px solid var(--gray-200);border-radius:6px;background:${(t?.icon||'👥')===ic?'#1a73e8':'white'};color:${(t?.icon||'👥')===ic?'white':'inherit'};cursor:pointer;">${ic}</button>`).join('')}
+        </div>
+        <input type="hidden" id="ct_icon" value="${t?.icon||'👥'}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">色</label>
+        <div style="display:flex;flex-wrap:wrap;gap:4px;">
+          ${colorChoices.map(c => `<button type="button" class="ct_color_btn" data-color="${c}" onclick="document.getElementById('ct_color').value='${c}';document.querySelectorAll('.ct_color_btn').forEach(b=>b.style.outline=b.dataset.color===this.dataset.color?'3px solid var(--navy)':'none');this.style.outline='3px solid var(--navy)';" style="width:32px;height:32px;border-radius:50%;background:${c};border:1px solid var(--gray-200);cursor:pointer;outline:${(t?.color||'#7c3aed')===c?'3px solid var(--navy)':'none'};"></button>`).join('')}
+        </div>
+        <input type="hidden" id="ct_color" value="${t?.color||'#7c3aed'}">
+      </div>
+      <div class="form-group full">
+        <label class="form-label">説明 <span style="font-size:10px;color:var(--gray-400);font-weight:400;">(任意)</span></label>
+        <input class="form-input" id="ct_description" value="${esc(t?.description||'')}" placeholder="例: ベトナム人人材担当のチーム">
+      </div>
+      <div class="section-title">メンバー <span style="font-size:10px;color:var(--gray-400);font-weight:400;">— チェックを入れた人がメンバーになります</span></div>
+      <div class="form-group full">
+        <input class="form-input" id="ct_member_search" placeholder="🔍 名前・チームで絞り込み" oninput="filterTeamMembers()" style="margin-bottom:8px;">
+        <div id="ct_member_list" style="max-height:300px;overflow-y:auto;border:1px solid var(--gray-200);border-radius:8px;padding:6px;">
+          ${sortedUsers.map(u => `
+            <label class="ct_member_row" data-name="${esc((u.name||'')+' '+(u.team||'')+' '+(u.role||''))}" style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:13px;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
+              <input type="checkbox" name="ct_members" value="${u.id}" ${memberIds.has(u.id)?'checked':''} style="cursor:pointer;">
+              <span style="flex:1;">👤 ${esc(u.name||'')}${u.team?'<span style=\"font-size:10px;color:#7c3aed;margin-left:6px;\">('+esc(u.team)+')</span>':''}${u.role?'<span style=\"font-size:10px;color:#94a3b8;margin-left:6px;\">'+esc(u.role)+'</span>':''}</span>
+            </label>
+          `).join('')}
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200);">
+      <button class="btn btn-outline" onclick="closeGenModal('chatTeamModal')">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveChatTeam()">💾 保存</button>
+    </div>
+  `;
+  showGenModal('chatTeamModal', id ? '💬 グループを編集' : '💬 新規グループ作成', body);
+}
+
+function filterTeamMembers() {
+  const q = (document.getElementById('ct_member_search')?.value || '').toLowerCase().trim();
+  document.querySelectorAll('.ct_member_row').forEach(row => {
+    const txt = (row.dataset.name || '').toLowerCase();
+    row.style.display = !q || txt.includes(q) ? '' : 'none';
+  });
+}
+
+async function saveChatTeam() {
+  const name = document.getElementById('ct_name')?.value.trim();
+  if (!name) { showToast('❌ グループ名は必須です', 'error'); return; }
+  const icon = document.getElementById('ct_icon')?.value || '👥';
+  const color = document.getElementById('ct_color')?.value || '#7c3aed';
+  const description = document.getElementById('ct_description')?.value || '';
+  const memberIds = Array.from(document.querySelectorAll('input[name="ct_members"]:checked')).map(el => el.value);
+  showLoading(true);
+  try {
+    let teamId = _editingChatTeamId;
+    if (teamId) {
+      // 更新
+      await sbFetch('chat_teams?id=eq.' + teamId, { method: 'PATCH',
+        body: JSON.stringify({ name, icon, color, description: description || null, updated_at: new Date().toISOString() })
+      });
+      // 既存メンバーを全削除→再投入(シンプル)
+      await sbFetch('chat_team_members?team_id=eq.' + teamId, { method: 'DELETE' });
+    } else {
+      // 新規作成
+      const res = await sbFetch('chat_teams', { method: 'POST',
+        body: JSON.stringify({ name, icon, color, description: description || null, created_by: currentUser?.name || '' })
+      });
+      teamId = res?.[0]?.id;
+      if (!teamId) throw new Error('作成失敗(IDが取得できません)');
+    }
+    // メンバー追加
+    if (memberIds.length) {
+      const rows = memberIds.map(uid => ({ team_id: teamId, user_id: uid, added_by: currentUser?.name || '' }));
+      await sbFetch('chat_team_members', { method: 'POST', body: JSON.stringify(rows) });
+    }
+    showToast('✅ グループを保存しました', 'success');
+    closeGenModal('chatTeamModal');
+    await loadChatTeams();
+  } catch(e) {
+    showToast('❌ ' + e.message, 'error');
+  }
+  showLoading(false);
+}
+
+async function deleteChatTeam(id, name) {
+  if (!confirm('グループ「' + name + '」を削除しますか？\n(メッセージ内のメンションは残ります)')) return;
+  showLoading(true);
+  try {
+    await sbFetch('chat_teams?id=eq.' + id, { method: 'DELETE' });
+    showToast('🗑️ 削除しました', 'success');
+    await loadChatTeams();
+  } catch(e) {
+    showToast('❌ ' + e.message, 'error');
+  }
+  showLoading(false);
 }
 
 function buildUsersScreen(){
