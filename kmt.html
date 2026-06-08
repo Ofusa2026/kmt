@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260609.05 -->
+<!-- KMT_VERSION ver.20260609.06 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -219,7 +219,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260609.05</div>
+    <div class="logo-ver">ver.20260609.06</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -6855,7 +6855,7 @@ function buildWorkersScreen() {
 async function loadWorkers() {
   showLoading(true);
   try {
-    const data = await sbFetch('workers?select=*,companies(name,main_staff,sub_staff)&order=joined_date.desc.nullslast,name.asc');
+    const data = await sbFetch('workers?select=*,companies(name,main_staff,sub_staff,kokko_system_id,kokko_system_password,kokko_system_memo)&order=joined_date.desc.nullslast,name.asc');
     allWorkers = data || [];
     refreshWorkerStaffFilters();
     applyWorkerFilters();
@@ -7245,6 +7245,56 @@ function renderWorkerAlerts() {
   banner.appendChild(wrap);
 }
 
+// 就労管理システムログイン情報を所属企業に保存
+async function saveKokkoCredentials(companyId) {
+  if (!companyId) { showToast('❌ 所属企業が未設定です。先に基本情報で企業を設定してください', 'error'); return; }
+  const id = document.getElementById('wf_kokko_system_id')?.value || '';
+  const pw = document.getElementById('wf_kokko_system_password')?.value || '';
+  const memo = document.getElementById('wf_kokko_system_memo')?.value || '';
+  showLoading(true);
+  try {
+    await sbFetch('companies?id=eq.' + companyId, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        kokko_system_id: id || null,
+        kokko_system_password: pw || null,
+        kokko_system_memo: memo || null,
+      })
+    });
+    // allCompaniesのキャッシュも更新
+    const idx = (allCompanies||[]).findIndex(c => c.id === companyId);
+    if (idx >= 0) {
+      allCompanies[idx].kokko_system_id = id || null;
+      allCompanies[idx].kokko_system_password = pw || null;
+      allCompanies[idx].kokko_system_memo = memo || null;
+    }
+    // 開いている人材オブジェクトのcompaniesにも反映
+    const w = (allWorkers||[]).find(x => x.id === editingWorkerId);
+    if (w && w.companies) {
+      w.companies.kokko_system_id = id || null;
+      w.companies.kokko_system_password = pw || null;
+      w.companies.kokko_system_memo = memo || null;
+    }
+    showToast('✅ 就労管理システムログイン情報を企業に保存しました', 'success');
+  } catch(e) {
+    showToast('❌ 保存失敗: ' + e.message, 'error');
+  }
+  showLoading(false);
+}
+
+// パスワード表示/非表示切替
+function togglePwVisibility(inputId, btn) {
+  const inp = document.getElementById(inputId);
+  if (!inp) return;
+  if (inp.type === 'password') {
+    inp.type = 'text';
+    if (btn) btn.textContent = '🔒';
+  } else {
+    inp.type = 'password';
+    if (btn) btn.textContent = '👁';
+  }
+}
+
 // 建設業就労管理報告アラートの開閉(配属/退職/2号変更別)
 let _kokkoAlertOpenKey = null;
 function toggleKokkoAlertList(label, list) {
@@ -7384,7 +7434,7 @@ async function openWorkerModal(id) {
   // allWorkersに無ければDBから直接取得(企業詳細から開いた場合などへの対策)
   if (id && !w) {
     try {
-      const d = await sbFetch('workers?id=eq.' + encodeURIComponent(id) + '&select=*,companies(name,main_staff,sub_staff)&limit=1');
+      const d = await sbFetch('workers?id=eq.' + encodeURIComponent(id) + '&select=*,companies(name,main_staff,sub_staff,kokko_system_id,kokko_system_password,kokko_system_memo)&limit=1');
       if (d && d.length) {
         w = d[0];
         // allWorkersに混入させて次回以降のためにキャッシュ
@@ -7733,6 +7783,26 @@ function buildWorkerModalBody(w) {
       ${(/建設/.test(w.applicant_field||'')) ? '建設分野の人材です。配属・退職・2号変更のタイミングで、国交省「外国人就労管理システム」への報告が必要です。実施した日付を記録しておくと、外国人材ページ上部のアラートから外れます。' : 'この人材の分野は「'+esc(w.applicant_field||'未設定')+'」です。建設業以外の場合、本タブの記録は不要です。'}
     </div>
     <div class="form-grid">
+      <div class="section-title">🔐 外国人就労管理システム ログイン情報 <span style="font-size:10px;color:var(--gray-400);font-weight:400;">— 所属企業共通(${esc(w.companies?.name||'-')})</span></div>
+      <div class="form-group">
+        <label class="form-label">ログインID</label>
+        <input class="form-input" id="wf_kokko_system_id" value="${esc(w.companies?.kokko_system_id||'')}" placeholder="例: company123" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label class="form-label">パスワード</label>
+        <div style="display:flex;gap:6px;">
+          <input class="form-input" id="wf_kokko_system_password" type="password" value="${esc(w.companies?.kokko_system_password||'')}" placeholder="••••••••" autocomplete="new-password" style="flex:1;">
+          <button type="button" onclick="togglePwVisibility('wf_kokko_system_password', this)" style="padding:4px 10px;background:white;border:1px solid var(--gray-300);border-radius:6px;cursor:pointer;font-size:12px;">👁</button>
+        </div>
+      </div>
+      <div class="form-group full">
+        <label class="form-label">メモ <span style="font-size:10px;color:var(--gray-400);font-weight:400;">— 秘密の質問の答え、登録メールアドレス、その他補足など</span></label>
+        <textarea class="form-textarea" id="wf_kokko_system_memo" rows="2" placeholder="例: 登録メール kmt@example.com / 秘密の質問: 母校 → 〇〇高校">${esc(w.companies?.kokko_system_memo||'')}</textarea>
+      </div>
+      <div class="form-group full" style="text-align:right;">
+        <button type="button" class="btn btn-outline" style="font-size:11px;padding:4px 12px;color:#0d9488;border-color:#0d9488;" onclick="saveKokkoCredentials('${w.company_id||''}')">💾 企業情報として保存</button>
+        <span style="font-size:10px;color:var(--gray-400);margin-left:8px;">※同じ企業の他の人材を開いた時にも同じID/PWが表示されます</span>
+      </div>
       <div class="section-title">📅 配属報告</div>
       <div class="form-group full">
         <label class="form-label">配属報告日 <span style="font-size:10px;color:var(--gray-400);font-weight:400;">— 在職ステータスが「配属前 → 在職中」に変わったタイミングで実施</span></label>
