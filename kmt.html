@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260603.06 -->
+<!-- KMT_VERSION ver.20260609.01 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -211,7 +211,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260603.06</div>
+    <div class="logo-ver">ver.20260609.01</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -7188,7 +7188,16 @@ async function openWorkerModal(id) {
       allCandidates = d || [];
     } catch(e) {}
   }
-  showGenModal('workerModal', id ? '👤 外国人材詳細' : '👤 外国人材登録', buildWorkerModalBody(w));
+  // タイトルに氏名を併記(編集時のみ)
+  let title;
+  if (id && w) {
+    const mno = w.management_no ? `[${w.management_no}] ` : '';
+    const nat = w.nationality ? ` (${w.nationality})` : '';
+    title = `👤 ${mno}${w.name || '無名'}${nat}`;
+  } else {
+    title = '👤 外国人材登録';
+  }
+  showGenModal('workerModal', title, buildWorkerModalBody(w));
   setTimeout(() => { setupAutoSave(saveWorker); if (typeof updateWorkerPhotoPreview === 'function') updateWorkerPhotoPreview(); }, 100);
 }
 let editingWorkerId = null;
