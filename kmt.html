@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260609.10 -->
+<!-- KMT_VERSION ver.20260609.11 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -219,7 +219,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260609.10</div>
+    <div class="logo-ver">ver.20260609.11</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -4742,6 +4742,32 @@ function renderGroupRooms(companyId) {
     sep.textContent = '人材チャット';
     list.appendChild(sep);
   }
+
+  // ソート: 受信時間順なら最新メッセージ降順、フォルダ順なら管理番号
+  workerRooms.sort((a, b) => {
+    if (_chatSortMode === 'folder') {
+      const am = (a.management_no || '').toString();
+      const bm = (b.management_no || '').toString();
+      // 数値部分+枝番で比較(例: 142-007 vs 142-027)
+      const ma = am.match(/^(\d+)(?:-(\d+))?$/);
+      const mb = bm.match(/^(\d+)(?:-(\d+))?$/);
+      if (ma && mb) {
+        const aMain = parseInt(ma[1],10), bMain = parseInt(mb[1],10);
+        if (aMain !== bMain) return aMain - bMain;
+        const aSub = ma[2] ? parseInt(ma[2],10) : -1;
+        const bSub = mb[2] ? parseInt(mb[2],10) : -1;
+        return aSub - bSub;
+      }
+      return am.localeCompare(bm);
+    }
+    // recent: 最終メッセージ時刻の降順、メッセージ無しは末尾
+    const at = a.lastMsg?.created_at || '';
+    const bt = b.lastMsg?.created_at || '';
+    if (!at && !bt) return 0;
+    if (!at) return 1;
+    if (!bt) return -1;
+    return bt > at ? 1 : -1;
+  });
 
   workerRooms.forEach(r => {
     list.appendChild(buildChatRoomRow(r, companyId, false));
