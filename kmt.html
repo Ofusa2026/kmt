@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260609.11 -->
+<!-- KMT_VERSION ver.20260609.12 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -219,7 +219,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260609.11</div>
+    <div class="logo-ver">ver.20260609.12</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -898,6 +898,17 @@ async function loadCompanies() {
     buildFilterOptions();
     updateStats();
     applyFilters();
+    // allWorkersが空なら、在職中カウント表示のために裏で軽量取得(company_id, statusのみ)
+    if (!allWorkers || !allWorkers.length) {
+      (async () => {
+        try {
+          const w = await sbFetch('workers?select=id,name,status,company_id,nationality,management_no&order=name.asc');
+          allWorkers = w || [];
+          if (typeof updateStats === 'function' && document.getElementById('cntWorkers')) updateStats();
+          if (typeof renderTable === 'function' && document.getElementById('companyTbody')) renderTable();
+        } catch(e) {}
+      })();
+    }
   } catch(e) {
     showToast('❌ 読み込み失敗: ' + e.message, 'error');
   }
@@ -919,13 +930,27 @@ function buildFilterOptions() {
   staffSel.value = staffVal;
 }
 
+// 企業ごとの在職中人材数(キャッシュ)
+let _activeWorkerCounts = {};
+function _rebuildActiveCounts() {
+  _activeWorkerCounts = {};
+  (allWorkers||[]).forEach(w => {
+    if (['在職中','在職中(一時帰国中)'].includes(w.status) && w.company_id) {
+      _activeWorkerCounts[w.company_id] = (_activeWorkerCounts[w.company_id] || 0) + 1;
+    }
+  });
+}
+
 function updateStats() {
   const active = allCompanies.filter(c => c.status !== 'past').length;
   const past = allCompanies.filter(c => c.status === 'past').length;
+  // 在職中外国人(全体)
+  const totalActive = (allWorkers||[]).filter(w => ['在職中','在職中(一時帰国中)'].includes(w.status)).length;
   document.getElementById('cntAll').textContent = allCompanies.length;
   document.getElementById('cntActive').textContent = active;
   document.getElementById('cntPast').textContent = past;
-  document.getElementById('cntWorkers').textContent = '-'; // workers別途取得
+  document.getElementById('cntWorkers').textContent = totalActive > 0 ? totalActive : '-';
+  _rebuildActiveCounts();
 }
 
 function filterStat(type) {
@@ -986,13 +1011,17 @@ function renderTable() {
     const stBadge = c.status === 'past' ? '<span class="st-badge st-past">過去</span>' : '<span class="st-badge st-active">支援中</span>';
     const fee = c.fee_per_person ? Number(c.fee_per_person).toLocaleString() + '円' : '-';
     const cycle = c.billing_cycle || '-';
+    const activeCnt = _activeWorkerCounts[c.id] || 0;
+    const activeDisp = activeCnt > 0
+      ? `<span class="worker-count" style="background:#dcfce7;color:#15803d;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">${activeCnt}名</span>`
+      : `<span class="worker-count" style="color:#cbd5e1;">-</span>`;
     return `<tr onclick="openCompanyModal('${c.id}')">
       <td><span class="co-no">${esc(c.folder_no ?? '-')}</span></td>
       <td><div class="co-name">${esc(c.name)}</div><div class="co-industry">${esc(c.industry||'')}</div></td>
       <td class="co-industry">${esc(c.industry||'-')}</td>
       <td>${esc(c.pref||'-')}</td>
       <td>${esc(c.main_staff||'-')}</td>
-      <td><span class="worker-count">-</span></td>
+      <td>${activeDisp}</td>
       <td class="fee-text">${fee}</td>
       <td class="fee-text">${cycle}</td>
       <td>${c.payment_method ? `<span class="pay-badge ${payBadge}">${c.payment_method}</span>` : '-'}</td>
@@ -6947,6 +6976,11 @@ async function loadWorkers() {
     allWorkers = data || [];
     refreshWorkerStaffFilters();
     applyWorkerFilters();
+    // 企業一覧のヘッダ統計+在職中列を再計算(allWorkersが揃ったタイミング)
+    try {
+      if (typeof updateStats === 'function' && document.getElementById('cntWorkers')) updateStats();
+      if (typeof renderTable === 'function' && document.getElementById('companyTbody')) renderTable();
+    } catch(e) {}
   } catch(e) { showToast('❌ ' + e.message, 'error'); }
   showLoading(false);
 }
