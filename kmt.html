@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260609.12 -->
+<!-- KMT_VERSION ver.20260609.13 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -25,6 +25,37 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .logo-badge{background:#2563eb;color:white;font-size:11px;font-weight:800;padding:3px 8px;border-radius:4px;display:inline-block;margin-bottom:6px;letter-spacing:1px;}
 .logo-title{color:white;font-size:12px;font-weight:700;line-height:1.4;}
 .logo-ver{color:#CBD5E1;font-size:10px;margin-top:2px;}
+/* What's New: アップデートのお知らせ */
+.whats-new-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:10010;display:none;align-items:center;justify-content:center;padding:24px 12px;overflow-y:auto;}
+.whats-new-bg.open{display:flex;}
+.whats-new-modal{background:white;border-radius:16px;width:100%;max-width:520px;box-shadow:0 24px 80px rgba(0,0,0,.4);overflow:hidden;display:flex;flex-direction:column;}
+.whats-new-head{padding:16px 20px;background:linear-gradient(135deg,#7c3aed 0%,#5b21b6 100%);color:white;display:flex;align-items:center;justify-content:space-between;}
+.whats-new-title{font-size:16px;font-weight:800;letter-spacing:.5px;}
+.whats-new-close{background:none;border:none;color:white;font-size:20px;cursor:pointer;opacity:.75;line-height:1;padding:0 4px;}
+.whats-new-close:hover{opacity:1;}
+.whats-new-body{max-height:60vh;overflow-y:auto;padding:18px 20px;background:#fafafa;}
+.whats-new-version{font-size:11px;font-weight:700;color:#7c3aed;background:#f5f3ff;border:1.5px solid #ddd6fe;padding:3px 10px;border-radius:12px;display:inline-block;margin-bottom:8px;letter-spacing:.5px;}
+.whats-new-version .wn-date{color:#6b7280;font-weight:500;margin-left:6px;}
+.whats-new-section{background:white;border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px;margin-bottom:10px;}
+.whats-new-section ul{margin:0;padding-left:20px;}
+.whats-new-section ul li{font-size:13px;line-height:1.7;color:#1f2937;margin-bottom:4px;}
+.whats-new-section ul li:last-child{margin-bottom:0;}
+.whats-new-section ul li strong{color:#7c3aed;font-weight:700;}
+.whats-new-foot{padding:14px 20px;background:white;border-top:1px solid #e5e7eb;display:flex;justify-content:flex-end;}
+.whats-new-ok{background:#7c3aed;color:white;border:none;border-radius:8px;padding:9px 24px;font-size:13px;font-weight:700;cursor:pointer;transition:background .15s;}
+.whats-new-ok:hover{background:#6d28d9;}
+.whats-new-toast{position:fixed;top:70px;right:20px;background:#0f2040;border:1px solid #1e3a5f;border-left:4px solid #7c3aed;border-radius:10px;padding:14px 16px;box-shadow:0 12px 32px rgba(0,0,0,.35),0 4px 10px rgba(124,58,237,.25);z-index:10005;width:340px;max-width:calc(100vw - 40px);transform:translateX(420px);opacity:0;pointer-events:none;transition:transform .4s cubic-bezier(.4,0,.2,1),opacity .4s;}
+.whats-new-toast.show{transform:translateX(0);opacity:1;pointer-events:auto;}
+.whats-new-toast-head{display:flex;align-items:flex-start;gap:10px;margin-bottom:6px;}
+.whats-new-toast-icon{font-size:18px;flex-shrink:0;line-height:1.2;}
+.whats-new-toast-title{font-size:13px;font-weight:800;color:white;flex:1;line-height:1.3;letter-spacing:.3px;}
+.whats-new-toast-close{background:none;border:none;color:rgba(255,255,255,.6);font-size:16px;cursor:pointer;padding:0 2px;line-height:1;flex-shrink:0;transition:color .15s;}
+.whats-new-toast-close:hover{color:white;}
+.whats-new-toast-body{font-size:11px;color:rgba(255,255,255,.75);line-height:1.5;margin-bottom:10px;padding-left:28px;}
+.whats-new-toast-actions{display:flex;gap:8px;justify-content:flex-end;padding-left:28px;}
+.whats-new-toast-btn{background:#7c3aed;color:white;border:none;border-radius:6px;padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer;transition:background .15s,transform .1s;box-shadow:0 2px 6px rgba(124,58,237,.4);}
+.whats-new-toast-btn:hover{background:#8b5cf6;}
+.whats-new-toast-btn:active{transform:scale(.97);}
 .sidebar-section{padding:8px 12px 4px;font-size:10px;color:#94A3B8;font-weight:700;letter-spacing:1px;text-transform:uppercase;}
 .nav-item{display:flex;align-items:center;gap:10px;padding:9px 16px;color:#CBD5E1;font-size:13px;cursor:pointer;border-radius:6px;margin:1px 8px;}
 .nav-item:hover,.nav-item.active{background:rgba(255,255,255,0.1);color:white;}
@@ -180,6 +211,31 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
 </head>
 <body>
 
+<!-- What's New: アップデートのお知らせ -->
+<div id="whatsNewModalBg" class="whats-new-bg" onclick="if(event.target===this)closeWhatsNew()">
+  <div class="whats-new-modal">
+    <div class="whats-new-head">
+      <div class="whats-new-title">🎉 アップデートのお知らせ</div>
+      <button class="whats-new-close" onclick="closeWhatsNew()">✕</button>
+    </div>
+    <div id="whatsNewBody" class="whats-new-body"></div>
+    <div class="whats-new-foot">
+      <button class="whats-new-ok" onclick="closeWhatsNew()">確認しました</button>
+    </div>
+  </div>
+</div>
+<div id="whatsNewToast" class="whats-new-toast">
+  <div class="whats-new-toast-head">
+    <span class="whats-new-toast-icon">📢</span>
+    <div class="whats-new-toast-title">アップデートのお知らせ</div>
+    <button class="whats-new-toast-close" onclick="dismissWhatsNewToast()" title="閉じる">✕</button>
+  </div>
+  <div class="whats-new-toast-body" id="whatsNewToastBody">画面が更新されました。</div>
+  <div class="whats-new-toast-actions">
+    <button class="whats-new-toast-btn" onclick="openWhatsNewFromToast()">詳細を見る</button>
+  </div>
+</div>
+
 <!-- ===== ログイン画面 ===== -->
 <!-- ===== ログイン画面: ユーザー選択 ===== -->
 <div id="loginScreen" style="display:none;position:fixed;inset:0;background:linear-gradient(135deg,#0f2040,#1a56db);z-index:99999;align-items:center;justify-content:center;">
@@ -219,7 +275,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver">ver.20260609.12</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260609.13</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -3512,6 +3568,8 @@ function onLoginSuccess() {
   startPresenceHeartbeat();
   refreshSupportScheduleBadge();
   updateNotifButton();
+  // What's New: ログイン後1.2秒でチェック(新バージョンならトースト表示)
+  try { setTimeout(checkAndShowWhatsNew, 1200); } catch(e) {}
 }
 
 function logoutUser() {
@@ -11893,6 +11951,133 @@ function switchSaleTab(tab) {
 function updateWorkHistory(i, key, val) {
   _workHistory[i][key] = val;
   previewResume();
+}
+
+// ===== What's New: アップデートのお知らせ =====
+// 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
+// notify:false は履歴のみ表示(右上トースト通知を出さない)
+const WHATS_NEW = [
+  { version:'ver.20260609.13', date:'2026-06-09', notify:true, items:[
+    '🏢 企業一覧の「在職中」列に実数を表示するようにしました(各企業の在職中人材数を緑バッジで表示)。',
+    '📊 ヘッダーの「在職中外国人」スタッツも実数表示に修正しました。'
+  ]},
+  { version:'ver.20260609.11', date:'2026-06-09', notify:true, items:[
+    '💬 企業内の人材チャット一覧が「受信時間順」設定を無視していたバグを修正しました。最新メッセージのある人材が一番上に表示されます。'
+  ]},
+  { version:'ver.20260609.10', date:'2026-06-09', notify:true, items:[
+    '📅 シフト管理のセルをクリックして編集できなかったバグを修正しました(ログインユーザーの役職情報が画面に反映されていなかった問題)。'
+  ]},
+  { version:'ver.20260609.09', date:'2026-06-09', notify:true, items:[
+    '📅 シフト管理は役職(position)が「パート」のユーザーのみを表示するようにしました。',
+    '📋 操作ログの日時表示を明示的に日本時間(JST)で表示するようにしました。'
+  ]},
+  { version:'ver.20260609.08', date:'2026-06-09', notify:true, items:[
+    '📅 シフト管理機能を新設しました(週/月切替・希望/確定/欠勤の3区分・勤務日数集計・セルクリックで編集)。'
+  ]},
+  { version:'ver.20260609.07', date:'2026-06-09', notify:true, items:[
+    '📄 人材詳細に「最新雇用条件書ドライブURL」入力欄を追加しました。',
+    '💬 チャットアイコンを人材の顔写真優先で表示するようにしました(写真がなければ国旗にフォールバック)。',
+    '💬 チャットグループ機能を新設しました。@メンションでグループ宛のメンションが可能です。'
+  ]},
+  { version:'ver.20260609.06', date:'2026-06-09', notify:true, items:[
+    '🏗️ 建設業就労管理システムのID/パスワード/メモを企業情報として保存できるようにしました。'
+  ]},
+  { version:'ver.20260609.05', date:'2026-06-09', notify:true, items:[
+    '🏗️ 建設業の受入計画申請の報告管理機能を追加しました(配属/退職/2号変更報告日)。未提出案件を一覧アラートに表示します。'
+  ]},
+  { version:'ver.20260609.04', date:'2026-06-09', notify:true, items:[
+    '📅 支援スケジュールにメイン担当・サブ担当のフィルタを追加しました。',
+    '🌏 国籍に「バングラデシュ🇧🇩」「スリランカ🇱🇰」「フィリピン🇵🇭」「中国🇨🇳」を追加しました。',
+    '🔧 チャットの返信ボタンが一部効かなかった不具合を修正しました(改行・特殊文字対応)。'
+  ]},
+  { version:'ver.20260609.03', date:'2026-06-09', notify:true, items:[
+    '👤 人材一覧に在留期限の期間フィルター(From〜To)を追加しました。',
+    '🟣 申請ステータス「申請済み・不足あり」を追加しました。特例期間中で書類不足放置の案件は紫の警告バナーで通知します。',
+    '🔴 チャット選択画面に「未読のみ」フィルタを追加しました。',
+    '🤝 支援スケジュール種別に「企業面接」「その他対応」を追加しました。'
+  ]},
+  { version:'ver.20260609.02', date:'2026-06-09', notify:true, items:[
+    '💬 全企業の在職中人材(660名)に対してチャットルームを一括作成しました。',
+    '🔧 企業詳細から人材を開いた時に氏名が出ない不具合を修正しました。'
+  ]},
+  { version:'ver.20260609.01', date:'2026-06-09', notify:false, items:[
+    '👤 人材詳細モーダルのタイトルに管理番号・国籍を表示するようにしました。'
+  ]},
+  { version:'ver.20260603.06', date:'2026-06-03', notify:true, items:[
+    '💬 チャット選択画面(左パネル)を大型化し、視認性を向上しました。'
+  ]}
+];
+const WHATS_NEW_STORAGE_KEY = 'kmt_last_seen_version';
+const WHATS_NEW_INITIAL_LIMIT = 3;
+function _wnNotifyEntries(){ return (WHATS_NEW||[]).filter(e => e.notify !== false); }
+function _wnCurrentNotifyVersion(){ const f = _wnNotifyEntries(); return (f && f.length) ? f[0].version : ''; }
+function checkAndShowWhatsNew(){
+  try {
+    if (!WHATS_NEW || !WHATS_NEW.length) return;
+    const current = _wnCurrentNotifyVersion();
+    if (!current) return;
+    let lastSeen = '';
+    try { lastSeen = localStorage.getItem(WHATS_NEW_STORAGE_KEY) || ''; } catch(e) {}
+    if (current !== lastSeen) showWhatsNewToast();
+  } catch(e) { console.warn('[checkAndShowWhatsNew]', e); }
+}
+function showWhatsNewToast(){
+  const toast = document.getElementById('whatsNewToast');
+  const bodyEl = document.getElementById('whatsNewToastBody');
+  if (!toast || !bodyEl) return;
+  const f = _wnNotifyEntries(), latest = f[0];
+  if (latest && latest.items && latest.items.length){
+    let first = latest.items[0].replace(/<[^>]+>/g, '');
+    if (first.length > 70) first = first.substring(0, 67) + '...';
+    bodyEl.textContent = first;
+  } else {
+    bodyEl.textContent = '画面が更新されました。';
+  }
+  setTimeout(() => { toast.classList.add('show'); }, 600);
+}
+function dismissWhatsNewToast(){
+  const toast = document.getElementById('whatsNewToast');
+  if (toast) toast.classList.remove('show');
+  try { const c = _wnCurrentNotifyVersion(); if (c) localStorage.setItem(WHATS_NEW_STORAGE_KEY, c); } catch(e) {}
+}
+function openWhatsNewFromToast(){
+  const t = document.getElementById('whatsNewToast');
+  if (t) t.classList.remove('show');
+  openWhatsNew({autoOpened: true});
+}
+function openWhatsNew(opts){
+  opts = opts || {};
+  const bodyEl = document.getElementById('whatsNewBody');
+  if (!bodyEl) return;
+  let entries = (WHATS_NEW || []).slice();
+  if (opts.autoOpened){
+    let lastSeen = '';
+    try { lastSeen = localStorage.getItem(WHATS_NEW_STORAGE_KEY) || ''; } catch(e) {}
+    if (lastSeen){
+      const idx = entries.findIndex(e => e.version === lastSeen);
+      if (idx > 0) entries = entries.slice(0, idx);
+      else if (idx === -1) entries = entries.slice(0, WHATS_NEW_INITIAL_LIMIT);
+    } else {
+      entries = entries.slice(0, WHATS_NEW_INITIAL_LIMIT);
+    }
+  }
+  if (!entries.length){
+    bodyEl.innerHTML = '<div style="text-align:center;padding:30px;color:#9ca3af;font-size:13px;">最近のアップデートはありません</div>';
+  } else {
+    let h = '';
+    if (opts.autoOpened) h += '<div style="font-size:12px;color:#6b7280;margin-bottom:14px;">画面が更新されました。主な変更点は以下のとおりです。</div>';
+    entries.forEach(e => {
+      h += '<div class="whats-new-section"><div class="whats-new-version">' + esc(e.version) + '<span class="wn-date">' + esc(e.date||'') + '</span></div><ul>';
+      (e.items||[]).forEach(it => { h += '<li>' + it + '</li>'; });
+      h += '</ul></div>';
+    });
+    bodyEl.innerHTML = h;
+  }
+  document.getElementById('whatsNewModalBg').classList.add('open');
+}
+function closeWhatsNew(){
+  document.getElementById('whatsNewModalBg').classList.remove('open');
+  try { const c = _wnCurrentNotifyVersion(); if (c) localStorage.setItem(WHATS_NEW_STORAGE_KEY, c); } catch(e) {}
 }
 </script>
 </body>
