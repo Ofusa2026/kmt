@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260609.17 -->
+<!-- KMT_VERSION ver.20260609.18 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -308,7 +308,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260609.17</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260609.18</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -2045,6 +2045,18 @@ function buildDecisionReportScreen() {
       <div style="background:var(--blue-light);border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:var(--navy);">
         登録支援機関：<strong>株式会社KMT</strong> ／ スプレッドシートに転記されます
       </div>
+      <!-- 既存人材から自動入力 -->
+      <div style="background:#fef3c7;border:1.5px solid #fbbf24;border-radius:10px;padding:12px 14px;margin-bottom:14px;">
+        <div style="font-size:13px;font-weight:800;color:#92400e;margin-bottom:8px;">⚡ 既存人材から自動入力</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <input type="text" id="dr_worker_search" placeholder="🔍 管理番号・氏名・企業名で検索" oninput="filterDecisionWorkerOptions()" style="flex:1;min-width:240px;padding:8px 12px;border:1.5px solid #fcd34d;border-radius:8px;font-size:12px;background:white;">
+          <select id="dr_existing_worker" onchange="fillDecisionFromWorker()" style="flex:2;min-width:280px;padding:8px 12px;border:1.5px solid #fcd34d;border-radius:8px;font-size:12px;background:white;">
+            <option value="">読み込み中...</option>
+          </select>
+          <button type="button" onclick="clearDecisionForm()" style="padding:8px 14px;background:white;color:#92400e;border:1.5px solid #fcd34d;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;">✕ クリア</button>
+        </div>
+        <div style="font-size:10px;color:#78350f;margin-top:6px;line-height:1.4;">選択するとフォームの該当項目(氏名・国籍・在留資格・在留期限・企業名等)を自動入力します。検索ボックスで絞り込めます。</div>
+      </div>
       <div style="background:white;border-radius:12px;padding:20px;box-shadow:var(--shadow);border:1px solid var(--gray-200);">
         <div class="form-grid">
           <div class="section-title">基本情報</div>
@@ -2232,6 +2244,114 @@ async function loadDecisionReport() {
       if (cur) sel.value = cur;
     }
   } catch(e) {}
+  // 既存人材セレクトを構築(allWorkersが空なら軽量取得)
+  try {
+    if (!allWorkers || !allWorkers.length) {
+      const w = await sbFetch('workers?select=id,name,management_no,nationality,visa_status,visa_expiry,tokurei_date,return_home_date,desired_visa,apply_type,staff,status,company_id,first_tokutei_date,companies(name)&status=in.(配属前,在職中,在職中(一時帰国中))&order=management_no.asc.nullslast,name.asc');
+      allWorkers = w || [];
+    }
+    rebuildDecisionWorkerOptions();
+  } catch(e) {}
+}
+
+// 決定報告: 既存人材セレクトのオプション再構築(検索フィルタ反映)
+function rebuildDecisionWorkerOptions() {
+  const sel = document.getElementById('dr_existing_worker');
+  if (!sel) return;
+  const q = (document.getElementById('dr_worker_search')?.value || '').toLowerCase().trim();
+  // 在職中/配属前のみ対象、退職済みは除外
+  const active = (allWorkers || []).filter(w =>
+    w.status === '在職中' || w.status === '配属前' || w.status === '在職中(一時帰国中)'
+  );
+  const filtered = q ? active.filter(w =>
+    (w.management_no||'').toLowerCase().includes(q) ||
+    (w.name||'').toLowerCase().includes(q) ||
+    (w.companies?.name||'').toLowerCase().includes(q) ||
+    (w.nationality||'').toLowerCase().includes(q)
+  ) : active;
+  // 管理番号でソート(数値解析)
+  filtered.sort((a,b) => {
+    const am = (a.management_no||'').match(/^(\d+)(?:-(\d+))?/);
+    const bm = (b.management_no||'').match(/^(\d+)(?:-(\d+))?/);
+    if (am && bm) {
+      const x = parseInt(am[1],10) - parseInt(bm[1],10);
+      if (x !== 0) return x;
+      return (parseInt(am[2]||'0',10)) - (parseInt(bm[2]||'0',10));
+    }
+    return (a.name||'').localeCompare(b.name||'', 'ja');
+  });
+  const cur = sel.value;
+  const head = '<option value="">' + (filtered.length ? '選択... (' + filtered.length + '名)' : '該当なし') + '</option>';
+  sel.innerHTML = head + filtered.map(w => {
+    const mno = w.management_no || '---';
+    const co = w.companies?.name || '';
+    const nat = w.nationality || '';
+    return '<option value="' + w.id + '">' + esc(mno) + ' ' + esc(w.name||'') + (nat?' ('+esc(nat)+')':'') + (co?' - '+esc(co):'') + '</option>';
+  }).join('');
+  if (cur) sel.value = cur;
+}
+
+function filterDecisionWorkerOptions() {
+  rebuildDecisionWorkerOptions();
+}
+
+// 既存人材選択時にフォームを自動入力
+function fillDecisionFromWorker() {
+  const id = document.getElementById('dr_existing_worker')?.value;
+  if (!id) return;
+  const w = (allWorkers || []).find(x => x.id === id);
+  if (!w) { showToast('❌ 人材データが見つかりません', 'error'); return; }
+  const setVal = (eid, val) => { const el = document.getElementById(eid); if (el && val != null && val !== '') el.value = val; };
+  setVal('dr_person_name', w.name);
+  setVal('dr_expire_date', w.visa_expiry);
+  setVal('dr_tokurei', w.tokurei_date);
+  setVal('dr_temp_return', w.return_home_date);
+  setVal('dr_nationality', w.nationality);
+  setVal('dr_current_visa', w.visa_status);
+  if (w.desired_visa) setVal('dr_visa_type', w.desired_visa);
+  if (w.apply_type) setVal('dr_app_type', w.apply_type);
+  setVal('dr_support_staff', w.staff);
+  // 企業名のセレクト
+  const coSel = document.getElementById('dr_company_name');
+  if (coSel && w.companies?.name) {
+    const opts = Array.from(coSel.options);
+    const match = opts.find(o => o.value === w.companies.name);
+    if (match) coSel.value = w.companies.name;
+  }
+  // 特定技能通算期間を first_tokutei_date から自動計算(あれば)
+  if (w.first_tokutei_date) {
+    const start = new Date(w.first_tokutei_date);
+    const now = new Date();
+    if (!isNaN(start.getTime()) && start <= now) {
+      let months = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
+      if (now.getDate() < start.getDate()) months -= 1;
+      const years = Math.floor(months / 12);
+      const rmo = months % 12;
+      const txt = (years ? years + '年' : '') + (rmo ? rmo + 'ヶ月' : (years ? '' : '0ヶ月'));
+      setVal('dr_total_period', txt);
+    }
+  }
+  // 派生処理
+  try { autoFillSupportFee(); } catch(e) {}
+  try { updateDrCaseName(); } catch(e) {}
+  showToast('✅ 「' + (w.name||'?') + '」の情報を自動入力しました', 'success');
+}
+
+// 決定報告フォームをクリア
+function clearDecisionForm() {
+  if (!confirm('フォームの内容をすべてクリアしますか?')) return;
+  const ids = ['dr_existing_worker','dr_worker_search','dr_received_date','dr_visa_type','dr_app_type','dr_experience','dr_field','dr_case_name','dr_person_name','dr_company_name','dr_expire_date','dr_tokurei','dr_temp_return','dr_total_period','dr_nationality','dr_current_visa','dr_ginou_end','dr_support_staff','dr_target_date','dr_delivery','dr_initial_fee','dr_support_fee','dr_invoice_method','dr_invoice_staff','dr_join_date','dr_base_salary','dr_housing_fee','dr_utility_fee','dr_employment_note','dr_comment'];
+  ids.forEach(id => { const el = document.getElementById(id); if (el && el.type !== 'radio') { el.value = ''; if (el.dataset) delete el.dataset.autoFilled; } });
+  // 既定値復元
+  const mgEl = document.getElementById('dr_ohfusa_mg'); if (mgEl) mgEl.value = '書類部';
+  const invMethod = document.getElementById('dr_invoice_method'); if (invMethod) invMethod.value = 'メール';
+  const invStaff = document.getElementById('dr_invoice_staff'); if (invStaff) invStaff.value = '白井';
+  // ラジオも初期化
+  const joinTypeDefault = document.querySelector('input[name="dr_join_type"][value="許可おり次第"]');
+  if (joinTypeDefault) joinTypeDefault.checked = true;
+  const drJoinDate = document.getElementById('dr_join_date'); if (drJoinDate) drJoinDate.style.display = 'none';
+  rebuildDecisionWorkerOptions();
+  showToast('✅ フォームをクリアしました', 'success');
 }
 
 // 在留期限の2ヶ月後を特例期間に自動セット
@@ -12036,7 +12156,7 @@ function updateWorkHistory(i, key, val) {
 // 各クライアントが30秒ごとにポーリングし、対象なら10秒カウントダウンの上でログアウト/リロード。
 
 function _kmtAppVersion() {
-  // logo-verのテキストから現バージョンを取得 (例: "ver.20260609.17")
+  // logo-verのテキストから現バージョンを取得 (例: "ver.20260609.18")
   try {
     const t = document.querySelector('.logo-ver')?.textContent?.trim();
     if (t) return t;
@@ -12279,7 +12399,7 @@ async function _checkForceActions() {
     const minVer = map.min_app_version || '';
     if (minVer) {
       const myVer = _kmtAppVersion();
-      // 文字列比較で "ver.20260609.17" < "ver.20260609.17" 等を判定(辞書順だがフォーマットが揃っているため動く)
+      // 文字列比較で "ver.20260609.18" < "ver.20260609.18" 等を判定(辞書順だがフォーマットが揃っているため動く)
       if (myVer < minVer || myVer === 'ver.unknown') {
         let comment = '';
         if (map.force_reload_comment) {
@@ -12357,7 +12477,7 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
-  { version:'ver.20260609.17', date:'2026-06-09', notify:true, items:[
+  { version:'ver.20260609.18', date:'2026-06-09', notify:true, items:[
     '🏢 企業一覧の「在職中」列に実数を表示するようにしました(各企業の在職中人材数を緑バッジで表示)。',
     '📊 ヘッダーの「在職中外国人」スタッツも実数表示に修正しました。'
   ]},
