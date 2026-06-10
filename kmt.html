@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260609.16 -->
+<!-- KMT_VERSION ver.20260609.17 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -308,7 +308,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260609.16</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260609.17</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -334,6 +334,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="nav-item" onclick="showScreen('sales')">📊 売上管理</div>
   <div class="nav-item" onclick="showScreen('expenses')">💸 立替管理</div>
   <div class="nav-item" onclick="showScreen('users')">⚙️ ユーザー設定</div>
+  <div class="nav-item" id="navSysAdmin" onclick="showScreen('system_admin')" style="display:none;">🔒 システム管理</div>
   <div class="nav-item" onclick="showScreen('shift_kanri')">📅 シフト管理</div>
   <div class="nav-item" onclick="showScreen('chat_teams')">💬 チャットグループ</div>
   <div class="nav-item" onclick="showScreen('audit_log')">📋 操作ログ</div>
@@ -3578,6 +3579,8 @@ async function checkPin() {
     // 成功
     currentUser = { id: u.id, name: u.name, email: u.email, role: u.role, position: u.position };
     safeSetItem('kmt_current_user', JSON.stringify(currentUser));
+    // 強制ログアウト判定用のログイン時刻
+    try { localStorage.setItem('kmt_loginAt', new Date().toISOString()); } catch(e) {}
     document.getElementById('pinScreen').style.display = 'none';
     onLoginSuccess();
   } catch(e) {
@@ -3601,6 +3604,13 @@ function onLoginSuccess() {
   startPresenceHeartbeat();
   refreshSupportScheduleBadge();
   updateNotifButton();
+  // 大房さんだけ「🔒 システム管理」ナビ表示
+  _refreshSysAdminNav();
+  // 強制ログアウト/リロードの定期チェック(30秒ごと、初回は5秒後)
+  setTimeout(_checkForceActions, 5000);
+  if (!window._forceCheckTimer) {
+    window._forceCheckTimer = setInterval(_checkForceActions, 30000);
+  }
   // What's New: ログイン後1.2秒でチェック(新バージョンならトースト表示)
   try { setTimeout(checkAndShowWhatsNew, 1200); } catch(e) {}
 }
@@ -6822,6 +6832,7 @@ const SCREENS = {
   sales:     { title: '📊 売上管理', init: initSalesScreen },
   expenses:  { title: '💸 立替管理', init: loadExpenses },
   users:     { title: '⚙️ ユーザー設定', init: loadUsers },
+  system_admin:{ title: '🔒 システム管理', init: loadSystemAdmin },
   shift_kanri:{ title: '📅 シフト管理', init: loadShiftKanri },
   chat_teams:{ title: '💬 チャットグループ', init: loadChatTeams },
   ofusa_view:{ title: '📊 案件進捗確認', init: loadOfusaView },
@@ -6904,6 +6915,7 @@ function renderScreenContent(name) {
     sales: buildSalesScreen(),
     expenses: buildExpensesScreen(),
     users: buildUsersScreen(),
+    system_admin: buildSystemAdminScreen(),
     shift_kanri: buildShiftKanriScreen(),
     chat_teams: buildChatTeamsScreen(),
     ofusa_view: buildOfusaViewScreen(),
@@ -10112,7 +10124,7 @@ async function loadShiftKanri() {
   // currentUserにpositionが無ければ補完(旧セッションのために)
   if (currentUser && !('position' in currentUser) && currentUser.id) {
     const me = (allUsers||[]).find(u => u.id === currentUser.id);
-    if (me) { currentUser.position = me.position; try { safeSetItem('kmt_current_user', JSON.stringify(currentUser)); } catch(e) {} }
+    if (me) { currentUser.position = me.position; try { safeSetItem('kmt_current_user', JSON.stringify(currentUser)); } catch(e) {} try { _refreshSysAdminNav(); } catch(e) {} }
   }
   await loadShiftData();
 }
@@ -12018,11 +12030,334 @@ function updateWorkHistory(i, key, val) {
   previewResume();
 }
 
+// ===== 🔒 システム管理: 強制ログアウト/強制リロード(大房のみ) =====
+// 案件管理システム(anken/index.html)流の実装。
+// app_settings テーブルに force_logout_at / force_logout_all_comment / min_app_version / force_reload_comment を保存。
+// 各クライアントが30秒ごとにポーリングし、対象なら10秒カウントダウンの上でログアウト/リロード。
+
+function _kmtAppVersion() {
+  // logo-verのテキストから現バージョンを取得 (例: "ver.20260609.17")
+  try {
+    const t = document.querySelector('.logo-ver')?.textContent?.trim();
+    if (t) return t;
+  } catch(e) {}
+  return 'ver.unknown';
+}
+
+// 大房(管理者role+管理者position、または明良)判定
+function _isSysAdmin() {
+  if (!currentUser) return false;
+  if (currentUser.role === '管理者' && currentUser.position === '管理者') return true;
+  if ((currentUser.name||'').replace(/\s+/g,'') === '大房明良') return true;
+  return false;
+}
+
+// ナビ「🔒 システム管理」の表示制御(ログイン後・position補完後に呼ぶ)
+function _refreshSysAdminNav() {
+  const el = document.getElementById('navSysAdmin');
+  if (!el) return;
+  el.style.display = _isSysAdmin() ? '' : 'none';
+}
+
+// システム管理画面
+function buildSystemAdminScreen() {
+  return `<div style="max-width:780px;">
+    <div style="background:linear-gradient(135deg,#7c2d12,#dc2626);color:white;padding:14px 18px;border-radius:10px;margin-bottom:14px;">
+      <div style="font-size:15px;font-weight:800;margin-bottom:4px;">🔒 システム管理(大房 専用)</div>
+      <div style="font-size:11px;opacity:.9;line-height:1.6;">現在のアプリバージョン: <strong id="sysadm_current_ver">-</strong>　/　あなたのログイン時刻: <strong id="sysadm_my_login">-</strong></div>
+    </div>
+    <!-- 🚪 強制ログアウト -->
+    <div style="background:white;border:1px solid #fecaca;border-radius:10px;padding:16px;margin-bottom:14px;box-shadow:0 2px 6px rgba(0,0,0,.05);">
+      <div style="font-size:14px;font-weight:800;color:#7f1d1d;margin-bottom:6px;">🚪 強制ログアウト(全員対象)</div>
+      <div style="font-size:11px;color:#b91c1c;line-height:1.6;margin-bottom:10px;">
+        ⚠️ 実行後30秒以内に、現在ログイン中の全ユーザーに10秒カウントダウンバナーが表示され、その後自動ログアウトします。<br>
+        (実行時刻より前にログインしているセッションが対象。それ以降にログインしたセッションは影響を受けません)
+      </div>
+      <div style="margin-bottom:10px;">
+        <label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:4px;">ユーザーへのメッセージ(任意)</label>
+        <textarea id="sysadm_logout_comment" rows="2" placeholder="例: メンテナンスのため一時的にログアウトします" style="width:100%;padding:8px 10px;border:1.5px solid #fecaca;border-radius:6px;font-size:12px;resize:vertical;font-family:inherit;"></textarea>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button onclick="doForceLogoutAll()" style="padding:9px 18px;background:#dc2626;color:white;border:none;border-radius:8px;font-size:13px;font-weight:800;cursor:pointer;box-shadow:0 2px 6px rgba(220,38,38,.3);">🚪 今すぐ全員ログアウト</button>
+        <button onclick="clearForceLogout()" style="padding:9px 14px;background:white;color:#64748b;border:1.5px solid #e5e7eb;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">予約を解除</button>
+        <div id="sysadm_logout_status" style="font-size:11px;color:#94a3b8;margin-left:auto;"></div>
+      </div>
+    </div>
+    <!-- 🔄 強制リロード -->
+    <div style="background:white;border:1px solid #bfdbfe;border-radius:10px;padding:16px;margin-bottom:14px;box-shadow:0 2px 6px rgba(0,0,0,.05);">
+      <div style="font-size:14px;font-weight:800;color:#1e40af;margin-bottom:6px;">🔄 強制リロード(最新版に統一)</div>
+      <div style="font-size:11px;color:#1e40af;line-height:1.6;margin-bottom:10px;">
+        🔁 全ユーザーのブラウザを最新版のアプリでリロードさせます。バージョンが古いセッションが対象。<br>
+        現在のバージョン以下を全てリロード対象にします(min_app_version=現バージョン)。
+      </div>
+      <div style="margin-bottom:10px;">
+        <label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:4px;">ユーザーへのメッセージ(任意)</label>
+        <textarea id="sysadm_reload_comment" rows="2" placeholder="例: アップデートが入りました。最新版に切り替わります" style="width:100%;padding:8px 10px;border:1.5px solid #bfdbfe;border-radius:6px;font-size:12px;resize:vertical;font-family:inherit;"></textarea>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button onclick="doForceReloadAll()" style="padding:9px 18px;background:#1d4ed8;color:white;border:none;border-radius:8px;font-size:13px;font-weight:800;cursor:pointer;box-shadow:0 2px 6px rgba(29,78,216,.3);">🔄 今すぐ全員リロード</button>
+        <button onclick="clearForceReload()" style="padding:9px 14px;background:white;color:#64748b;border:1.5px solid #e5e7eb;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">予約を解除</button>
+        <div id="sysadm_reload_status" style="font-size:11px;color:#94a3b8;margin-left:auto;"></div>
+      </div>
+    </div>
+    <!-- 現在の予約状況 -->
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px;">
+      <div style="font-size:12px;font-weight:800;color:var(--navy);margin-bottom:8px;">📋 現在の予約状況</div>
+      <div id="sysadm_settings_view" style="font-size:11px;color:#64748b;font-family:ui-monospace,monospace;white-space:pre-wrap;">読み込み中...</div>
+    </div>
+  </div>`;
+}
+
+async function loadSystemAdmin() {
+  if (!_isSysAdmin()) {
+    const cw = document.getElementById('contentWrap');
+    if (cw) cw.innerHTML = '<div style="padding:40px;text-align:center;color:#dc2626;font-size:14px;font-weight:700;">🔒 この画面は大房さん専用です</div>';
+    return;
+  }
+  document.getElementById('sysadm_current_ver').textContent = _kmtAppVersion();
+  const loginAt = localStorage.getItem('kmt_loginAt') || '(未記録)';
+  document.getElementById('sysadm_my_login').textContent = loginAt;
+  await refreshSysAdmStatus();
+}
+
+async function refreshSysAdmStatus() {
+  try {
+    const rows = await sbFetch("app_settings?key=in.(force_logout_at,force_logout_all_comment,min_app_version,force_reload_comment)&select=key,value,updated_at,updated_by");
+    const map = {};
+    (rows||[]).forEach(r => { map[r.key] = r; });
+    // 表示テキスト
+    let txt = '';
+    if (map.force_logout_at) {
+      const r = map.force_logout_at;
+      txt += '🚪 force_logout_at = ' + r.value + '\n   (' + (r.updated_by||'?') + ' / ' + new Date(r.updated_at).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'}) + ')\n';
+    } else {
+      txt += '🚪 force_logout_at = (未設定)\n';
+    }
+    if (map.force_logout_all_comment) {
+      try {
+        const c = JSON.parse(map.force_logout_all_comment.value);
+        if (c?.comment) txt += '   💬 ' + c.comment + '\n';
+      } catch(e) {}
+    }
+    txt += '\n';
+    if (map.min_app_version) {
+      const r = map.min_app_version;
+      txt += '🔄 min_app_version = ' + r.value + '\n   (' + (r.updated_by||'?') + ' / ' + new Date(r.updated_at).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'}) + ')\n';
+    } else {
+      txt += '🔄 min_app_version = (未設定)\n';
+    }
+    if (map.force_reload_comment) {
+      try {
+        const c = JSON.parse(map.force_reload_comment.value);
+        if (c?.comment) txt += '   💬 ' + c.comment + '\n';
+      } catch(e) {}
+    }
+    const v = document.getElementById('sysadm_settings_view');
+    if (v) v.textContent = txt;
+    // ステータス
+    const sLO = document.getElementById('sysadm_logout_status');
+    if (sLO) sLO.textContent = map.force_logout_at ? '予約中: ' + map.force_logout_at.value : '';
+    const sRL = document.getElementById('sysadm_reload_status');
+    if (sRL) sRL.textContent = map.min_app_version ? '予約中: ' + map.min_app_version.value : '';
+  } catch(e) { console.warn('refreshSysAdmStatus err', e); }
+}
+
+async function doForceLogoutAll() {
+  if (!_isSysAdmin()) return;
+  if (!confirm('⚠️ 全員強制ログアウトを実行しますか?\n\n現在ログイン中の全ユーザーが10秒カウントダウン後にログアウトされます。')) return;
+  const comment = (document.getElementById('sysadm_logout_comment')?.value || '').trim();
+  const now = new Date().toISOString();
+  showLoading(true);
+  try {
+    // upsert: force_logout_at
+    await sbFetch('app_settings?on_conflict=key', {
+      method:'POST',
+      headers:{ 'Prefer':'resolution=merge-duplicates' },
+      body: JSON.stringify({ key:'force_logout_at', value:now, updated_at:now, updated_by: currentUser?.name||'admin' })
+    });
+    // upsert: コメント(あれば保存、無ければ削除)
+    if (comment) {
+      await sbFetch('app_settings?on_conflict=key', {
+        method:'POST',
+        headers:{ 'Prefer':'resolution=merge-duplicates' },
+        body: JSON.stringify({ key:'force_logout_all_comment', value: JSON.stringify({at:now, comment}), updated_at:now, updated_by: currentUser?.name||'admin' })
+      });
+    } else {
+      await sbFetch('app_settings?key=eq.force_logout_all_comment', { method:'DELETE' });
+    }
+    showToast('✅ 全員強制ログアウトを予約しました(30秒以内に反映)', 'success');
+    await refreshSysAdmStatus();
+  } catch(e) {
+    showToast('❌ ' + e.message, 'error');
+  }
+  showLoading(false);
+}
+
+async function clearForceLogout() {
+  if (!_isSysAdmin()) return;
+  if (!confirm('強制ログアウトの予約を解除しますか?')) return;
+  showLoading(true);
+  try {
+    await sbFetch('app_settings?key=eq.force_logout_at', { method:'DELETE' });
+    await sbFetch('app_settings?key=eq.force_logout_all_comment', { method:'DELETE' });
+    showToast('✅ 予約を解除しました', 'success');
+    await refreshSysAdmStatus();
+  } catch(e) { showToast('❌ ' + e.message, 'error'); }
+  showLoading(false);
+}
+
+async function doForceReloadAll() {
+  if (!_isSysAdmin()) return;
+  if (!confirm('🔄 全員強制リロードを実行しますか?\n\n現在ログイン中の全ユーザー(現バージョン以下)が10秒カウントダウン後にブラウザリロードされます。')) return;
+  const comment = (document.getElementById('sysadm_reload_comment')?.value || '').trim();
+  const ver = _kmtAppVersion();
+  const now = new Date().toISOString();
+  showLoading(true);
+  try {
+    await sbFetch('app_settings?on_conflict=key', {
+      method:'POST',
+      headers:{ 'Prefer':'resolution=merge-duplicates' },
+      body: JSON.stringify({ key:'min_app_version', value: ver, updated_at:now, updated_by: currentUser?.name||'admin' })
+    });
+    if (comment) {
+      await sbFetch('app_settings?on_conflict=key', {
+        method:'POST',
+        headers:{ 'Prefer':'resolution=merge-duplicates' },
+        body: JSON.stringify({ key:'force_reload_comment', value: JSON.stringify({at:now, comment}), updated_at:now, updated_by: currentUser?.name||'admin' })
+      });
+    } else {
+      await sbFetch('app_settings?key=eq.force_reload_comment', { method:'DELETE' });
+    }
+    showToast('✅ 全員強制リロードを予約しました(min_app_version=' + ver + ')', 'success');
+    await refreshSysAdmStatus();
+  } catch(e) { showToast('❌ ' + e.message, 'error'); }
+  showLoading(false);
+}
+
+async function clearForceReload() {
+  if (!_isSysAdmin()) return;
+  if (!confirm('強制リロードの予約を解除しますか?')) return;
+  showLoading(true);
+  try {
+    await sbFetch('app_settings?key=eq.min_app_version', { method:'DELETE' });
+    await sbFetch('app_settings?key=eq.force_reload_comment', { method:'DELETE' });
+    showToast('✅ 予約を解除しました', 'success');
+    await refreshSysAdmStatus();
+  } catch(e) { showToast('❌ ' + e.message, 'error'); }
+  showLoading(false);
+}
+
+// ===== クライアント側ポーリング =====
+let _forceCheckShown = false;
+
+async function _checkForceActions() {
+  if (!currentUser) return;
+  // ログイン直後3秒間はスキップ
+  const myLoginAt = localStorage.getItem('kmt_loginAt');
+  if (myLoginAt) {
+    const ageSec = (Date.now() - new Date(myLoginAt).getTime()) / 1000;
+    if (ageSec < 3) return;
+  }
+  if (_forceCheckShown) return;
+  try {
+    const rows = await sbFetch("app_settings?key=in.(force_logout_at,force_logout_all_comment,min_app_version,force_reload_comment)&select=key,value");
+    if (!rows) return;
+    const map = {};
+    rows.forEach(r => { map[r.key] = r.value; });
+    // 1) 強制ログアウト判定
+    const forceAt = map.force_logout_at || '';
+    if (forceAt && (!myLoginAt || myLoginAt < forceAt)) {
+      let comment = '';
+      if (map.force_logout_all_comment) {
+        try { const c = JSON.parse(map.force_logout_all_comment); if (c?.comment) comment = c.comment; } catch(e) {}
+      }
+      _forceCheckShown = true;
+      _showForceLogoutCountdown(comment);
+      return;
+    }
+    // 2) 強制リロード判定(現バージョン < min_app_version)
+    const minVer = map.min_app_version || '';
+    if (minVer) {
+      const myVer = _kmtAppVersion();
+      // 文字列比較で "ver.20260609.17" < "ver.20260609.17" 等を判定(辞書順だがフォーマットが揃っているため動く)
+      if (myVer < minVer || myVer === 'ver.unknown') {
+        let comment = '';
+        if (map.force_reload_comment) {
+          try { const c = JSON.parse(map.force_reload_comment); if (c?.comment) comment = c.comment; } catch(e) {}
+        }
+        _forceCheckShown = true;
+        _showForceReloadCountdown(myVer, minVer, comment);
+        return;
+      }
+    }
+  } catch(e) { console.warn('forceCheck err', e); }
+}
+
+function _showForceLogoutCountdown(comment) {
+  const ex = document.getElementById('_forceBanner'); if (ex) ex.remove();
+  const banner = document.createElement('div');
+  banner.id = '_forceBanner';
+  banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:999999;background:linear-gradient(135deg,#dc2626,#ef4444);color:white;padding:14px 20px;box-shadow:0 4px 20px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;gap:20px;flex-wrap:wrap;font-family:inherit;';
+  const safeComment = comment ? '<div style="font-size:12px;background:rgba(255,255,255,.2);padding:4px 10px;border-radius:6px;max-width:400px;line-height:1.4;white-space:pre-wrap;">💬 ' + esc(comment) + '</div>' : '';
+  banner.innerHTML =
+    '<div style="font-size:16px;font-weight:800;">🚪 まもなくログアウトされます</div>' +
+    '<div style="font-size:13px;opacity:.9;">⚠️ 管理者によるログアウト</div>' +
+    safeComment +
+    '<div style="font-size:14px;font-weight:700;">あと <span id="_forceCountdown" style="font-size:18px;font-weight:900;background:rgba(255,255,255,.25);padding:2px 10px;border-radius:6px;">10</span> 秒</div>' +
+    '<button onclick="_doForceLogoutNow()" style="padding:7px 18px;background:white;color:#dc2626;border:none;border-radius:8px;font-size:13px;font-weight:800;cursor:pointer;">今すぐログアウト</button>';
+  document.body.appendChild(banner);
+  let c = 10;
+  const t = setInterval(() => {
+    c--; const el = document.getElementById('_forceCountdown'); if (el) el.textContent = c;
+    if (c <= 0) { clearInterval(t); _doForceLogoutNow(); }
+  }, 1000);
+}
+
+function _doForceLogoutNow() {
+  try { console.warn('🚪 強制ログアウト実行'); } catch(e){}
+  try { localStorage.removeItem('kmt_current_user'); localStorage.removeItem('kmt_loginAt'); } catch(e){}
+  // pinScreen に戻す
+  try {
+    document.getElementById('mainWrap').style.display = 'none';
+    document.getElementById('loginScreen').style.display = 'flex';
+  } catch(e) { location.reload(); }
+}
+
+function _showForceReloadCountdown(myVer, minVer, comment) {
+  const ex = document.getElementById('_forceBanner'); if (ex) ex.remove();
+  const banner = document.createElement('div');
+  banner.id = '_forceBanner';
+  banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:999999;background:linear-gradient(135deg,#1d4ed8,#3b82f6);color:white;padding:14px 20px;box-shadow:0 4px 20px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;gap:20px;flex-wrap:wrap;font-family:inherit;';
+  const safeComment = comment ? '<div style="font-size:12px;background:rgba(255,255,255,.2);padding:4px 10px;border-radius:6px;max-width:400px;line-height:1.4;white-space:pre-wrap;">💬 ' + esc(comment) + '</div>' : '';
+  banner.innerHTML =
+    '<div style="font-size:16px;font-weight:800;">🔄 まもなく最新版に更新されます</div>' +
+    '<div style="font-size:12px;opacity:.9;">現バージョン: ' + esc(myVer) + ' → ' + esc(minVer) + '</div>' +
+    safeComment +
+    '<div style="font-size:14px;font-weight:700;">あと <span id="_forceCountdown" style="font-size:18px;font-weight:900;background:rgba(255,255,255,.25);padding:2px 10px;border-radius:6px;">10</span> 秒</div>' +
+    '<button onclick="_doForceReloadNow()" style="padding:7px 18px;background:white;color:#1d4ed8;border:none;border-radius:8px;font-size:13px;font-weight:800;cursor:pointer;">今すぐ更新</button>';
+  document.body.appendChild(banner);
+  let c = 10;
+  const t = setInterval(() => {
+    c--; const el = document.getElementById('_forceCountdown'); if (el) el.textContent = c;
+    if (c <= 0) { clearInterval(t); _doForceReloadNow(); }
+  }, 1000);
+}
+
+function _doForceReloadNow() {
+  try { console.warn('🔄 強制リロード実行'); } catch(e){}
+  // キャッシュバスター付きでリロード
+  try {
+    const url = new URL(location.href);
+    url.searchParams.set('_v', Date.now());
+    location.href = url.toString();
+  } catch(e) { location.reload(true); }
+}
+
 // ===== What's New: アップデートのお知らせ =====
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
-  { version:'ver.20260609.16', date:'2026-06-09', notify:true, items:[
+  { version:'ver.20260609.17', date:'2026-06-09', notify:true, items:[
     '🏢 企業一覧の「在職中」列に実数を表示するようにしました(各企業の在職中人材数を緑バッジで表示)。',
     '📊 ヘッダーの「在職中外国人」スタッツも実数表示に修正しました。'
   ]},
