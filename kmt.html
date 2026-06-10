@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260609.18 -->
+<!-- KMT_VERSION ver.20260609.19 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -308,7 +308,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260609.18</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260609.19</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -2244,9 +2244,11 @@ async function loadDecisionReport() {
       if (cur) sel.value = cur;
     }
   } catch(e) {}
-  // 既存人材セレクトを構築(allWorkersが空なら軽量取得)
+  // 既存人材セレクトを構築(allWorkersが空 or 軽量データなら詳細取得)
   try {
-    if (!allWorkers || !allWorkers.length) {
+    const sample = (allWorkers && allWorkers.length) ? allWorkers[0] : null;
+    const needsFetch = !sample || !('visa_status' in sample) || !('visa_expiry' in sample) || !('tokurei_date' in sample);
+    if (needsFetch) {
       const w = await sbFetch('workers?select=id,name,management_no,nationality,visa_status,visa_expiry,tokurei_date,return_home_date,desired_visa,apply_type,staff,status,company_id,first_tokutei_date,companies(name)&status=in.(配属前,在職中,在職中(一時帰国中))&order=management_no.asc.nullslast,name.asc');
       allWorkers = w || [];
     }
@@ -2295,12 +2297,32 @@ function filterDecisionWorkerOptions() {
   rebuildDecisionWorkerOptions();
 }
 
-// 既存人材選択時にフォームを自動入力
-function fillDecisionFromWorker() {
+// 既存人材選択時にフォームを自動入力(選択時にDBから完全データを取得)
+async function fillDecisionFromWorker() {
   const id = document.getElementById('dr_existing_worker')?.value;
   if (!id) return;
-  const w = (allWorkers || []).find(x => x.id === id);
-  if (!w) { showToast('❌ 人材データが見つかりません', 'error'); return; }
+  showLoading(true);
+  let w = null;
+  try {
+    // allWorkersの該当エントリが必要フィールドを持っているか確認
+    const cached = (allWorkers || []).find(x => x.id === id);
+    const hasFull = cached && ('visa_status' in cached) && ('visa_expiry' in cached) && ('tokurei_date' in cached);
+    if (hasFull) {
+      w = cached;
+    } else {
+      // 必要なフィールドが欠落しているので個別にDBから取得
+      const d = await sbFetch('workers?id=eq.' + encodeURIComponent(id) + '&select=*,companies(name)&limit=1');
+      if (d && d.length) {
+        w = d[0];
+        // キャッシュも更新(allWorkersの該当エントリを置換)
+        const idx = (allWorkers||[]).findIndex(x => x.id === id);
+        if (idx >= 0) allWorkers[idx] = w;
+        else if (allWorkers) allWorkers.push(w);
+      }
+    }
+  } catch(e) { console.warn('fillDecisionFromWorker fetch err:', e); }
+  showLoading(false);
+  if (!w) { showToast('❌ 人材データが取得できませんでした', 'error'); return; }
   const setVal = (eid, val) => { const el = document.getElementById(eid); if (el && val != null && val !== '') el.value = val; };
   setVal('dr_person_name', w.name);
   setVal('dr_expire_date', w.visa_expiry);
@@ -2334,7 +2356,17 @@ function fillDecisionFromWorker() {
   // 派生処理
   try { autoFillSupportFee(); } catch(e) {}
   try { updateDrCaseName(); } catch(e) {}
-  showToast('✅ 「' + (w.name||'?') + '」の情報を自動入力しました', 'success');
+  // 何項目入ったかフィードバック
+  const filled = [
+    w.name && '氏名',
+    w.visa_expiry && '在留期限',
+    w.tokurei_date && '特例期間',
+    w.nationality && '国籍',
+    w.visa_status && '現在の在留資格',
+    w.companies?.name && '企業名',
+    w.staff && '担当者',
+  ].filter(Boolean);
+  showToast('✅ 「' + (w.name||'?') + '」: ' + filled.length + '項目を自動入力 (' + filled.join('/') + ')', 'success');
 }
 
 // 決定報告フォームをクリア
@@ -12156,7 +12188,7 @@ function updateWorkHistory(i, key, val) {
 // 各クライアントが30秒ごとにポーリングし、対象なら10秒カウントダウンの上でログアウト/リロード。
 
 function _kmtAppVersion() {
-  // logo-verのテキストから現バージョンを取得 (例: "ver.20260609.18")
+  // logo-verのテキストから現バージョンを取得 (例: "ver.20260609.19")
   try {
     const t = document.querySelector('.logo-ver')?.textContent?.trim();
     if (t) return t;
@@ -12399,7 +12431,7 @@ async function _checkForceActions() {
     const minVer = map.min_app_version || '';
     if (minVer) {
       const myVer = _kmtAppVersion();
-      // 文字列比較で "ver.20260609.18" < "ver.20260609.18" 等を判定(辞書順だがフォーマットが揃っているため動く)
+      // 文字列比較で "ver.20260609.19" < "ver.20260609.19" 等を判定(辞書順だがフォーマットが揃っているため動く)
       if (myVer < minVer || myVer === 'ver.unknown') {
         let comment = '';
         if (map.force_reload_comment) {
@@ -12477,7 +12509,7 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
-  { version:'ver.20260609.18', date:'2026-06-09', notify:true, items:[
+  { version:'ver.20260609.19', date:'2026-06-09', notify:true, items:[
     '🏢 企業一覧の「在職中」列に実数を表示するようにしました(各企業の在職中人材数を緑バッジで表示)。',
     '📊 ヘッダーの「在職中外国人」スタッツも実数表示に修正しました。'
   ]},
