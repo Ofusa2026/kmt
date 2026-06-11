@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260609.23 -->
+<!-- KMT_VERSION ver.20260609.24 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -308,7 +308,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260609.23</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260609.24</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -2123,9 +2123,12 @@ function buildDecisionReportScreen() {
             </div>
           </div>
         </div>
-        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid var(--gray-200);">
-          <button class="btn btn-outline" onclick="copyKmtReport()">📋 テキストコピー</button>
-          <button class="btn btn-primary" onclick="submitDecisionReport()">📤 スプレッドシートに送信</button>
+        <div style="display:flex;gap:10px;justify-content:space-between;align-items:center;margin-top:20px;padding-top:16px;border-top:1px solid var(--gray-200);flex-wrap:wrap;">
+          <button class="btn" onclick="gotoDecisionWorkerChat()" style="background:#7c3aed;color:white;border:none;font-weight:700;">💬 この人材のチャットへ移動</button>
+          <div style="display:flex;gap:10px;">
+            <button class="btn btn-outline" onclick="copyKmtReport()">📋 テキストコピー</button>
+            <button class="btn btn-primary" onclick="submitDecisionReport()">📤 スプレッドシートに送信</button>
+          </div>
         </div>
       </div>
     </div>
@@ -2574,6 +2577,28 @@ function getDecisionData() {
 }
 
 // KMT案件：テキストコピー
+// 決定報告画面から、選択中の人材のチャットに遷移
+async function gotoDecisionWorkerChat() {
+  const workerId = document.getElementById('dr_existing_worker')?.value;
+  if (!workerId) {
+    showToast('⚠️ 先に「⚡既存人材から自動入力」で人材を選択してください', 'error');
+    return;
+  }
+  const w = (allWorkers || []).find(x => x.id === workerId);
+  if (!w) {
+    showToast('❌ 人材データが見つかりません', 'error');
+    return;
+  }
+  // チャット画面に遷移してから、その人材のチャットを開く
+  try {
+    showScreen('chat');
+    // 少し遅延を入れてチャット画面の初期化を待つ
+    setTimeout(() => { openWorkerChatFromCompany(workerId); }, 250);
+  } catch(e) {
+    showToast('❌ ' + e.message, 'error');
+  }
+}
+
 function copyKmtReport() {
   const d = getDecisionData();
   const g = id => document.getElementById(id)?.value || '';
@@ -12252,7 +12277,7 @@ function updateWorkHistory(i, key, val) {
 // 各クライアントが30秒ごとにポーリングし、対象なら10秒カウントダウンの上でログアウト/リロード。
 
 function _kmtAppVersion() {
-  // logo-verのテキストから現バージョンを取得 (例: "ver.20260609.23")
+  // logo-verのテキストから現バージョンを取得 (例: "ver.20260609.24")
   try {
     const t = document.querySelector('.logo-ver')?.textContent?.trim();
     if (t) return t;
@@ -12495,7 +12520,7 @@ async function _checkForceActions() {
     const minVer = map.min_app_version || '';
     if (minVer) {
       const myVer = _kmtAppVersion();
-      // 文字列比較で "ver.20260609.23" < "ver.20260609.23" 等を判定(辞書順だがフォーマットが揃っているため動く)
+      // 文字列比較で "ver.20260609.24" < "ver.20260609.24" 等を判定(辞書順だがフォーマットが揃っているため動く)
       if (myVer < minVer || myVer === 'ver.unknown') {
         let comment = '';
         if (map.force_reload_comment) {
@@ -12573,7 +12598,7 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
-  { version:'ver.20260609.23', date:'2026-06-09', notify:true, items:[
+  { version:'ver.20260609.24', date:'2026-06-09', notify:true, items:[
     '🏢 企業一覧の「在職中」列に実数を表示するようにしました(各企業の在職中人材数を緑バッジで表示)。',
     '📊 ヘッダーの「在職中外国人」スタッツも実数表示に修正しました。'
   ]},
