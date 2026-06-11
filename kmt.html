@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260609.20 -->
+<!-- KMT_VERSION ver.20260609.21 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -308,7 +308,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260609.20</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260609.21</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -7515,7 +7515,7 @@ function renderWorkerAlerts() {
         kokkoRetireAlert.push(w);
       }
       // 2号変更報告: 希望在留資格=特定技能2号 かつ 申請ステータス=審査完了 で 2号変更報告未提出
-      if (w.desired_visa === '特定技能2号' && w.apply_status === '審査完了' && !w.tg2_change_report_date) {
+      if (w.desired_visa === '特定技能2号' && w.apply_status === '審査完了' && !w.tg2_change_report_date && w.status !== '退職予定(更新なし決定)') {
         kokkoTg2Alert.push(w);
       }
     }
@@ -7523,7 +7523,7 @@ function renderWorkerAlerts() {
     const exp = new Date(w.visa_expiry); exp.setHours(0,0,0,0);
     const days = Math.floor((exp-today)/86400000);
     // 退職者は除外
-    if (['退職済(帰国)','退職済(転職)'].includes(w.status)) return;
+    if (['退職済(帰国)','退職済(転職)','退職予定(更新なし決定)'].includes(w.status)) return;
     // 申請忘れ判定(90日以内・期限切れ含む・申請予定なしor未設定)
     const applyStatus = w.apply_status || '申請予定なし';
     if (days <= 90 && applyStatus === '申請予定なし') {
@@ -12233,7 +12233,7 @@ function updateWorkHistory(i, key, val) {
 // 各クライアントが30秒ごとにポーリングし、対象なら10秒カウントダウンの上でログアウト/リロード。
 
 function _kmtAppVersion() {
-  // logo-verのテキストから現バージョンを取得 (例: "ver.20260609.20")
+  // logo-verのテキストから現バージョンを取得 (例: "ver.20260609.21")
   try {
     const t = document.querySelector('.logo-ver')?.textContent?.trim();
     if (t) return t;
@@ -12476,7 +12476,7 @@ async function _checkForceActions() {
     const minVer = map.min_app_version || '';
     if (minVer) {
       const myVer = _kmtAppVersion();
-      // 文字列比較で "ver.20260609.20" < "ver.20260609.20" 等を判定(辞書順だがフォーマットが揃っているため動く)
+      // 文字列比較で "ver.20260609.21" < "ver.20260609.21" 等を判定(辞書順だがフォーマットが揃っているため動く)
       if (myVer < minVer || myVer === 'ver.unknown') {
         let comment = '';
         if (map.force_reload_comment) {
@@ -12554,7 +12554,7 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
-  { version:'ver.20260609.20', date:'2026-06-09', notify:true, items:[
+  { version:'ver.20260609.21', date:'2026-06-09', notify:true, items:[
     '🏢 企業一覧の「在職中」列に実数を表示するようにしました(各企業の在職中人材数を緑バッジで表示)。',
     '📊 ヘッダーの「在職中外国人」スタッツも実数表示に修正しました。'
   ]},
