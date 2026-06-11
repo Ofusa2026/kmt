@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260609.22 -->
+<!-- KMT_VERSION ver.20260609.23 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -308,7 +308,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260609.22</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260609.23</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -2109,6 +2109,19 @@ function buildDecisionReportScreen() {
           <div class="form-group full"><label class="form-label">その他雇用条件・備考</label><textarea class="form-textarea" id="dr_employment_note" rows="2" placeholder="例: 直近で決定したXXさんと同じ条件"></textarea></div>
           <div class="section-title">💬 コメント</div>
           <div class="form-group full"><label class="form-label">26. コメント・特記事項</label><textarea class="form-textarea" id="dr_comment" rows="3" placeholder="特記事項など"></textarea></div>
+          <div class="section-title">📞 企業連絡担当</div>
+          <div class="form-group full"><label class="form-label">27. 企業への連絡はどちらが担当しますか?</label>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <label style="flex:1;min-width:160px;display:flex;align-items:center;gap:8px;padding:10px 14px;border:1.5px solid var(--gray-200);border-radius:8px;cursor:pointer;background:white;transition:.15s;" onmouseover="this.style.borderColor='#1d4ed8'" onmouseout="this.style.borderColor='var(--gray-200)'">
+                <input type="radio" name="dr_contact_party" value="大房側" style="margin:0;cursor:pointer;">
+                <span style="font-size:13px;font-weight:700;color:var(--navy);">🏢 大房側</span>
+              </label>
+              <label style="flex:1;min-width:160px;display:flex;align-items:center;gap:8px;padding:10px 14px;border:1.5px solid var(--gray-200);border-radius:8px;cursor:pointer;background:white;transition:.15s;" onmouseover="this.style.borderColor='#1d4ed8'" onmouseout="this.style.borderColor='var(--gray-200)'">
+                <input type="radio" name="dr_contact_party" value="KMT側" style="margin:0;cursor:pointer;">
+                <span style="font-size:13px;font-weight:700;color:var(--navy);">🏪 KMT側</span>
+              </label>
+            </div>
+          </div>
         </div>
         <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid var(--gray-200);">
           <button class="btn btn-outline" onclick="copyKmtReport()">📋 テキストコピー</button>
@@ -2426,6 +2439,7 @@ function clearDecisionForm() {
   // ラジオも初期化
   const joinTypeDefault = document.querySelector('input[name="dr_join_type"][value="許可おり次第"]');
   if (joinTypeDefault) joinTypeDefault.checked = true;
+  document.querySelectorAll('input[name="dr_contact_party"]').forEach(r => r.checked = false);
   const drJoinDate = document.getElementById('dr_join_date'); if (drJoinDate) drJoinDate.style.display = 'none';
   rebuildDecisionWorkerOptions();
   showToast('✅ フォームをクリアしました', 'success');
@@ -2518,6 +2532,7 @@ function getDecisionJoinDate() {
 // KMT案件：スプレッドシート送信用データ取得
 function getDecisionData() {
   const g = id => document.getElementById(id)?.value || '';
+  const contactParty = document.querySelector('input[name="dr_contact_party"]:checked')?.value || '';
   return {
     paku: '',
     received_date: g('dr_received_date'),
@@ -2543,7 +2558,9 @@ function getDecisionData() {
     referral_fee: '',
     target_date: g('dr_target_date'),
     delivery: g('dr_delivery'),
+    contact_party: contactParty,
     comment: [
+      contactParty ? '企業連絡担当: ' + contactParty : '',
       g('dr_comment'),
       g('dr_initial_fee') ? '初期費用: ' + g('dr_initial_fee') : '',
       '請求書: ' + g('dr_invoice_method') + '/' + g('dr_invoice_staff'),
@@ -12235,7 +12252,7 @@ function updateWorkHistory(i, key, val) {
 // 各クライアントが30秒ごとにポーリングし、対象なら10秒カウントダウンの上でログアウト/リロード。
 
 function _kmtAppVersion() {
-  // logo-verのテキストから現バージョンを取得 (例: "ver.20260609.22")
+  // logo-verのテキストから現バージョンを取得 (例: "ver.20260609.23")
   try {
     const t = document.querySelector('.logo-ver')?.textContent?.trim();
     if (t) return t;
@@ -12478,7 +12495,7 @@ async function _checkForceActions() {
     const minVer = map.min_app_version || '';
     if (minVer) {
       const myVer = _kmtAppVersion();
-      // 文字列比較で "ver.20260609.22" < "ver.20260609.22" 等を判定(辞書順だがフォーマットが揃っているため動く)
+      // 文字列比較で "ver.20260609.23" < "ver.20260609.23" 等を判定(辞書順だがフォーマットが揃っているため動く)
       if (myVer < minVer || myVer === 'ver.unknown') {
         let comment = '';
         if (map.force_reload_comment) {
@@ -12556,7 +12573,7 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
-  { version:'ver.20260609.22', date:'2026-06-09', notify:true, items:[
+  { version:'ver.20260609.23', date:'2026-06-09', notify:true, items:[
     '🏢 企業一覧の「在職中」列に実数を表示するようにしました(各企業の在職中人材数を緑バッジで表示)。',
     '📊 ヘッダーの「在職中外国人」スタッツも実数表示に修正しました。'
   ]},
