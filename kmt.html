@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260609.24 -->
+<!-- KMT_VERSION ver.20260612.01 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -308,7 +308,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260609.24</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260612.01</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -4092,6 +4092,10 @@ async function saveWorker(returnResult=false) {
     placement_report_date: g('wf_placement_report_date'),
     retire_report_date:    g('wf_retire_report_date'),
     tg2_change_report_date: g('wf_tg2_change_report_date'),
+    renewal_status:       g('wf_renewal_status'),
+    renewal_stage:        g('wf_renewal_stage'),
+    renewal_memo:         g('wf_renewal_memo'),
+    employment_condition: g('wf_employment_condition'),
     residence_card:   g('wf_residence_card'),
     entry_date:       g('wf_entry_date'),
     request_date:     g('wf_request_date'),
@@ -7963,7 +7967,7 @@ let editingWorkerId = null;
 let _savingWorkerNew = false;
 
 function switchWorkerTab(tab) {
-  const tabs = ['basic','note','tasks','schedules','kokko'];
+  const tabs = ['basic','note','tasks','schedules','kokko','renewal'];
   tabs.forEach(t => {
     const btn = document.getElementById('wtab_'+t);
     const panel = document.getElementById('wtab_'+t+'_panel');
@@ -8081,6 +8085,10 @@ function buildWorkerModalBody(w) {
     <button id="wtab_kokko" onclick="switchWorkerTab('kokko')"
       style="padding:8px 18px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--gray-400);border-bottom:2px solid transparent;">
       🏗️ 就労管理システム報告
+    </button>
+    <button id="wtab_renewal" onclick="switchWorkerTab('renewal')"
+      style="padding:8px 18px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--gray-400);border-bottom:2px solid transparent;">
+      📅 更新状況
     </button>
   </div>
   <!-- 基本情報タブ -->
@@ -8321,6 +8329,44 @@ function buildWorkerModalBody(w) {
       <div class="form-group full">
         <label class="form-label">2号変更報告日 <span style="font-size:10px;color:var(--gray-400);font-weight:400;">— 希望在留資格が「特定技能2号」かつ申請ステータスが「審査完了」になったタイミングで実施</span></label>
         <input class="form-input" id="wf_tg2_change_report_date" type="date" value="${w.tg2_change_report_date||''}">
+      </div>
+    </div>
+  </div>
+  <!-- 更新状況タブ -->
+  <div id="wtab_renewal_panel" style="display:none;">
+    <div style="background:#ede9fe;border-left:4px solid #7c3aed;border-radius:0 8px 8px 0;padding:12px 16px;margin-bottom:16px;font-size:12px;color:#5b21b6;line-height:1.6;">
+      <strong>📅 更新状況</strong><br>
+      在留期限の更新申請に関する進捗状況・申請メモ・確定雇用条件を記録します。「KMT側 申請状況管理スプレッドシート」の更新状況シートから取り込み済み。
+    </div>
+    <div class="form-grid">
+      <div class="section-title">ステータス・進捗</div>
+      <div class="form-group">
+        <label class="form-label">更新状況ステータス</label>
+        <select class="form-select" id="wf_renewal_status">
+          ${['','更新なし','更新済(有)','更新済(無)','要確認','優先度高め','許可済み'].map(s=>`<option value="${s}" ${(w.renewal_status||'')===s?'selected':''}>${s||'─ 選択 ─'}</option>`).join('')}
+        </select>
+        <div style="font-size:10px;color:var(--gray-400);margin-top:3px;line-height:1.5;">
+          <strong>更新なし</strong>: 本帰国・転職等で更新申請しない / 
+          <strong>更新済(有)</strong>: 雇用条件変更ありで申請済 / 
+          <strong>更新済(無)</strong>: 雇用条件変更なしで申請済 / 
+          <strong>要確認</strong>: 状況確認中 / 
+          <strong>優先度高め</strong>: 急ぎ対応 / 
+          <strong>許可済み</strong>: 更新許可済み
+        </div>
+      </div>
+      <div class="form-group full">
+        <label class="form-label">現在の段階</label>
+        <textarea class="form-textarea" id="wf_renewal_stage" rows="3" placeholder="例: 11/17 申請済み(不足無し) / 1-6押印サイン待ち / 雇用条件変更あり…">${esc(w.renewal_stage||'')}</textarea>
+      </div>
+      <div class="section-title">メモ</div>
+      <div class="form-group full">
+        <label class="form-label">申請メモ</label>
+        <textarea class="form-textarea" id="wf_renewal_memo" rows="4" placeholder="例: 課税・納税・源泉➡ストックにあり / 一時帰国中受け取り待ち …">${esc(w.renewal_memo||'')}</textarea>
+      </div>
+      <div class="section-title">確定雇用条件</div>
+      <div class="form-group full">
+        <label class="form-label">確定雇用条件</label>
+        <textarea class="form-textarea" id="wf_employment_condition" rows="5" placeholder="例: 月給220,000円　2026年4月1日適用　他は現行通り …">${esc(w.employment_condition||'')}</textarea>
       </div>
     </div>
   </div>
@@ -12277,7 +12323,7 @@ function updateWorkHistory(i, key, val) {
 // 各クライアントが30秒ごとにポーリングし、対象なら10秒カウントダウンの上でログアウト/リロード。
 
 function _kmtAppVersion() {
-  // logo-verのテキストから現バージョンを取得 (例: "ver.20260609.24")
+  // logo-verのテキストから現バージョンを取得 (例: "ver.20260612.01")
   try {
     const t = document.querySelector('.logo-ver')?.textContent?.trim();
     if (t) return t;
@@ -12520,7 +12566,7 @@ async function _checkForceActions() {
     const minVer = map.min_app_version || '';
     if (minVer) {
       const myVer = _kmtAppVersion();
-      // 文字列比較で "ver.20260609.24" < "ver.20260609.24" 等を判定(辞書順だがフォーマットが揃っているため動く)
+      // 文字列比較で "ver.20260612.01" < "ver.20260612.01" 等を判定(辞書順だがフォーマットが揃っているため動く)
       if (myVer < minVer || myVer === 'ver.unknown') {
         let comment = '';
         if (map.force_reload_comment) {
@@ -12598,7 +12644,7 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
-  { version:'ver.20260609.24', date:'2026-06-09', notify:true, items:[
+  { version:'ver.20260612.01', date:'2026-06-09', notify:true, items:[
     '🏢 企業一覧の「在職中」列に実数を表示するようにしました(各企業の在職中人材数を緑バッジで表示)。',
     '📊 ヘッダーの「在職中外国人」スタッツも実数表示に修正しました。'
   ]},
