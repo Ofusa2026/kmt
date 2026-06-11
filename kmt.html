@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260609.19 -->
+<!-- KMT_VERSION ver.20260609.20 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -308,7 +308,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260609.19</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260609.20</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -2060,7 +2060,7 @@ function buildDecisionReportScreen() {
       <div style="background:white;border-radius:12px;padding:20px;box-shadow:var(--shadow);border:1px solid var(--gray-200);">
         <div class="form-grid">
           <div class="section-title">基本情報</div>
-          <div class="form-group"><label class="form-label">2. 依頼受領日</label><input class="form-input" id="dr_received_date" type="date"></div>
+          <div class="form-group"><label class="form-label">2. 依頼受領日</label><input class="form-input" id="dr_received_date" type="date" onchange="updateDrTargetDate()"></div>
           <div class="form-group"><label class="form-label">3. 大房行政書士法人 担当MG</label><input class="form-input" id="dr_ohfusa_mg" value="書類部"></div>
           <div class="section-title">区分情報</div>
           <div class="form-group"><label class="form-label">5. 【A区分】希望在留資格</label>
@@ -2230,6 +2230,22 @@ function buildDecisionReportScreen() {
 async function loadDecisionReport() {
   decisionReportType = 'kmt';
   switchDecisionType('kmt');
+  // 初期値: 依頼日=今日 / 申請・対応目標日=依頼日+1ヶ月 / 交付方法=郵送
+  try {
+    const today = new Date();
+    const todayStr = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
+    const recv = document.getElementById('dr_received_date');
+    if (recv && !recv.value) recv.value = todayStr;
+    // 目標日 = 依頼日+1ヶ月(まだ空欄なら)
+    const tgt = document.getElementById('dr_target_date');
+    if (tgt && !tgt.value) {
+      const base = recv?.value || todayStr;
+      tgt.value = _addOneMonth(base);
+    }
+    // 交付方法 = 郵送(まだ空欄なら)
+    const dlv = document.getElementById('dr_delivery');
+    if (dlv && !dlv.value) dlv.value = '郵送';
+  } catch(e) {}
   // 支援担当者セレクトをユーザー一覧から生成
   try {
     if (!allUsers.length) {
@@ -2254,6 +2270,35 @@ async function loadDecisionReport() {
     }
     rebuildDecisionWorkerOptions();
   } catch(e) {}
+}
+
+// 日付文字列 YYYY-MM-DD の1ヶ月後を返す。月末はその月の末日に丸める。
+function _addOneMonth(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '';
+  const origDay = d.getDate();
+  d.setDate(1);
+  d.setMonth(d.getMonth() + 1);
+  // 翌月の末日を確認、origDayが翌月の日数を超えていれば末日に丸める
+  const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  d.setDate(Math.min(origDay, lastDay));
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+// 決定報告: 依頼日が変更されたら、申請・対応目標日を1ヶ月後に自動更新
+// (前回自動入力した値、または空欄の場合のみ上書き。手動編集は保護)
+function updateDrTargetDate() {
+  const recv = document.getElementById('dr_received_date');
+  const tgt = document.getElementById('dr_target_date');
+  if (!recv || !tgt) return;
+  if (!recv.value) return;
+  const next = _addOneMonth(recv.value);
+  if (!next) return;
+  const current = (tgt.value || '').trim();
+  if (current && current !== tgt.dataset.autoFilled) return; // 手動編集は保護
+  tgt.value = next;
+  tgt.dataset.autoFilled = next;
 }
 
 // 決定報告: 既存人材セレクトのオプション再構築(検索フィルタ反映)
@@ -12188,7 +12233,7 @@ function updateWorkHistory(i, key, val) {
 // 各クライアントが30秒ごとにポーリングし、対象なら10秒カウントダウンの上でログアウト/リロード。
 
 function _kmtAppVersion() {
-  // logo-verのテキストから現バージョンを取得 (例: "ver.20260609.19")
+  // logo-verのテキストから現バージョンを取得 (例: "ver.20260609.20")
   try {
     const t = document.querySelector('.logo-ver')?.textContent?.trim();
     if (t) return t;
@@ -12431,7 +12476,7 @@ async function _checkForceActions() {
     const minVer = map.min_app_version || '';
     if (minVer) {
       const myVer = _kmtAppVersion();
-      // 文字列比較で "ver.20260609.19" < "ver.20260609.19" 等を判定(辞書順だがフォーマットが揃っているため動く)
+      // 文字列比較で "ver.20260609.20" < "ver.20260609.20" 等を判定(辞書順だがフォーマットが揃っているため動く)
       if (myVer < minVer || myVer === 'ver.unknown') {
         let comment = '';
         if (map.force_reload_comment) {
@@ -12509,7 +12554,7 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
-  { version:'ver.20260609.19', date:'2026-06-09', notify:true, items:[
+  { version:'ver.20260609.20', date:'2026-06-09', notify:true, items:[
     '🏢 企業一覧の「在職中」列に実数を表示するようにしました(各企業の在職中人材数を緑バッジで表示)。',
     '📊 ヘッダーの「在職中外国人」スタッツも実数表示に修正しました。'
   ]},
