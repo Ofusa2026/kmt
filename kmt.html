@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260612.05 -->
+<!-- KMT_VERSION ver.20260612.06 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -308,7 +308,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260612.05</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260612.06</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -4123,6 +4123,11 @@ async function saveWorker(returnResult=false) {
     return_jp_date:   g('wf_return_jp_date'),
     tg2_expiry:       g('wf_tg2_expiry'),
     tg2_status:       g('wf_tg2_status'),
+    lump_sum_plan:     g('wf_lump_sum_plan'),
+    transfer_out_date: g('wf_transfer_out_date'),
+    transfer_out_done: document.getElementById('wf_transfer_out_done')?.checked || false,
+    transfer_in_date:  g('wf_transfer_in_date'),
+    transfer_in_done:  document.getElementById('wf_transfer_in_done')?.checked || false,
     phone:            g('wf_phone'),
     email:            g('wf_email'),
     jp_address:       g('wf_jp_address'),
@@ -7708,6 +7713,12 @@ function renderWorkerTable() {
   renderWorkerAlerts();
 }
 
+function toggleLumpSumFields() {
+  const v = document.getElementById('wf_lump_sum_plan')?.value || '';
+  const d = document.getElementById('wf_lump_sum_detail');
+  if (d) d.style.display = (v === 'あり') ? '' : 'none';
+}
+
 function renderWorkerAlerts() {
   const banner = document.getElementById('workerAlertBanner');
   if (!banner) return;
@@ -7721,6 +7732,7 @@ function renderWorkerAlerts() {
   const kokkoPlacementAlert = []; // 配属報告未提出
   const kokkoRetireAlert = [];    // 退職報告未提出
   const kokkoTg2Alert = [];       // 2号変更報告未提出
+  const lumpSumAlert = [];        // 脱退一時金あり & 転出/転入手続き未完了
   const isConstruction = (w) => /建設/.test(w.applicant_field || '');
   (filteredWorkers.length ? filteredWorkers : allWorkers).forEach(w => {
     // KMT支援外は全アラートから除外(支援対象外なので)
@@ -7739,6 +7751,13 @@ function renderWorkerAlerts() {
       if (w.desired_visa === '特定技能2号' && w.apply_status === '審査完了' && !w.tg2_change_report_date && w.status !== '退職予定(更新なし決定)') {
         kokkoTg2Alert.push(w);
       }
+    }
+    // 💴 脱退一時金あり & 転出/転入手続き未完了(在留期限の有無に関係なく判定)
+    if (w.lump_sum_plan === 'あり' && !(w.transfer_out_done && w.transfer_in_done)) {
+      const od = w.transfer_out_date ? Math.floor((today - new Date(w.transfer_out_date))/86400000) : null;
+      const idd = w.transfer_in_date ? Math.floor((today - new Date(w.transfer_in_date))/86400000) : null;
+      const overdue = (!w.transfer_out_done && od !== null && od > 0) || (!w.transfer_in_done && idd !== null && idd > 0);
+      lumpSumAlert.push({ w, overdue });
     }
     if (!w.visa_expiry) return;
     const exp = new Date(w.visa_expiry); exp.setHours(0,0,0,0);
@@ -7767,7 +7786,7 @@ function renderWorkerAlerts() {
   });
   const total = alerts[1].length + alerts[2].length + alerts[3].length;
   const kokkoTotal = kokkoPlacementAlert.length + kokkoRetireAlert.length + kokkoTg2Alert.length;
-  if (!total && !missAlert.length && !shortageAlert.length && !kokkoTotal) { banner.innerHTML=''; return; }
+  if (!total && !missAlert.length && !shortageAlert.length && !kokkoTotal && !lumpSumAlert.length) { banner.innerHTML=''; return; }
   // 残り日数で昇順ソート(期限切れも含めて期日が近い順)
   missAlert.sort((a,b) => a.days - b.days);
   shortageAlert.sort((a,b) => a.tokureiDays - b.tokureiDays);
@@ -7800,6 +7819,34 @@ function renderWorkerAlerts() {
     const missList = document.createElement('div');
     missList.id = 'workerMissAlertList';
     wrap.appendChild(missList);
+  }
+
+  // 💴 脱退一時金 転出/転入手続きアラート(独立バナー)
+  if (lumpSumAlert.length) {
+    const overdueCount = lumpSumAlert.filter(x => x.overdue).length;
+    const ls = document.createElement('div');
+    ls.style.cssText = 'background:linear-gradient(135deg,#fffbeb 0%,#fef3c7 100%);border:2px solid #d97706;border-radius:10px;padding:12px 16px;margin-bottom:10px;cursor:pointer;transition:.15s;box-shadow:0 2px 8px rgba(217,119,6,0.12);';
+    ls.onmouseover = () => ls.style.opacity = '0.92';
+    ls.onmouseout = () => ls.style.opacity = '1';
+    ls.innerHTML =
+      '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">'+
+        '<div style="display:flex;align-items:center;gap:10px;">'+
+          '<div style="font-size:28px;">💴</div>'+
+          '<div>'+
+            '<div style="font-size:13px;font-weight:900;color:#b45309;">脱退一時金 転出/転入手続き — 未完了</div>'+
+            '<div style="font-size:11px;color:#92400e;margin-top:2px;">脱退一時金「あり」で転出・転入手続きが未完了の人材です。'+(overdueCount?'<strong style="color:#dc2626;">うち '+overdueCount+'名 は手続き日付を過ぎても「済み」未チェック</strong>。':'')+'</div>'+
+          '</div>'+
+        '</div>'+
+        '<div style="text-align:right;">'+
+          '<div style="font-size:26px;font-weight:900;color:#b45309;line-height:1;">'+lumpSumAlert.length+'<span style="font-size:13px;font-weight:600;">名</span></div>'+
+          '<div style="font-size:10px;color:#b45309;margin-top:2px;">クリックで一覧表示 ▼</div>'+
+        '</div>'+
+      '</div>';
+    ls.onclick = () => toggleLumpSumAlertList(lumpSumAlert);
+    wrap.appendChild(ls);
+    const lsList = document.createElement('div');
+    lsList.id = 'workerLumpSumAlertList';
+    wrap.appendChild(lsList);
   }
 
   // 🟣 不足あり放置警告(独立した大きなバナー)
@@ -8044,6 +8091,36 @@ function toggleMissAlertList(list) {
   area.dataset.open = '1';
 }
 
+// 脱退一時金 転出/転入手続きアラートの人材リストを開閉
+function toggleLumpSumAlertList(list) {
+  const area = document.getElementById('workerLumpSumAlertList');
+  if (!area) return;
+  if (area.dataset.open === '1') {
+    area.innerHTML = '';
+    area.dataset.open = '';
+    return;
+  }
+  const fmt = (d, done) => {
+    if (done) return '<span style="background:#047857;color:white;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:800;">済</span>';
+    if (!d) return '<span style="background:#94a3b8;color:white;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;">未</span>';
+    const today = new Date(); today.setHours(0,0,0,0);
+    const days = Math.floor((today - new Date(d))/86400000);
+    if (days > 0) return '<span style="background:#dc2626;color:white;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:800;">超過'+days+'日</span>';
+    return '<span style="background:#ea580c;color:white;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;">'+formatDate(d)+'</span>';
+  };
+  const rows = list.map(({w}) => {
+    return '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #fde68a;cursor:pointer;background:white;flex-wrap:wrap;" onclick="event.stopPropagation();openWorkerModal(\''+w.id+'\')">'+
+      '<div style="min-width:80px;font-size:11px;font-weight:600;color:#64748b;">'+esc(w.management_no||'-')+'</div>'+
+      '<div style="flex:1;min-width:160px;font-size:12px;"><strong>'+esc(w.name)+'</strong> <span style="color:#94a3b8;font-size:11px;">('+esc(w.nationality||'-')+')</span></div>'+
+      '<div style="font-size:11px;color:#64748b;flex:1;min-width:120px;">'+esc(w.companies?.name||'-')+'</div>'+
+      '<div style="font-size:11px;color:#92400e;">転出 '+fmt(w.transfer_out_date, w.transfer_out_done)+'</div>'+
+      '<div style="font-size:11px;color:#92400e;">転入 '+fmt(w.transfer_in_date, w.transfer_in_done)+'</div>'+
+    '</div>';
+  }).join('');
+  area.innerHTML = '<div style="margin-top:-2px;margin-bottom:10px;background:white;border:2px solid #d97706;border-top:none;border-radius:0 0 10px 10px;overflow:hidden;">'+rows+'</div>';
+  area.dataset.open = '1';
+}
+
 function toggleAlertList(key, alertDef, grid) {
   const listArea = document.getElementById('workerAlertList');
   if (!listArea) return;
@@ -8259,7 +8336,7 @@ function buildWorkerModalBody(w) {
     </button>
     <button id="wtab_kokko" onclick="switchWorkerTab('kokko')"
       style="padding:8px 18px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--gray-400);border-bottom:2px solid transparent;">
-      🏗️ 就労管理システム報告
+      🏗️ 就労管理システムの報告【建設業のみ】
     </button>
     <button id="wtab_renewal" onclick="switchWorkerTab('renewal')"
       style="padding:8px 18px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--gray-400);border-bottom:2px solid transparent;">
@@ -8434,6 +8511,34 @@ function buildWorkerModalBody(w) {
     <div class="section-title">一時帰国 / 5年満了</div>
     <div class="form-group"><label class="form-label">一時帰国日</label><input class="form-input" id="wf_return_home_date" type="date" value="${w.return_home_date||''}"></div>
     <div class="form-group"><label class="form-label">再入国日</label><input class="form-input" id="wf_return_jp_date" type="date" value="${w.return_jp_date||''}"></div>
+    <div class="form-group"><label class="form-label">脱退一時金の予定</label>
+      <select class="form-select" id="wf_lump_sum_plan" onchange="toggleLumpSumFields()">
+        <option value="" ${!w.lump_sum_plan?'selected':''}>─ 選択 ─</option>
+        <option ${w.lump_sum_plan==='あり'?'selected':''}>あり</option>
+        <option ${w.lump_sum_plan==='なし'?'selected':''}>なし</option>
+      </select>
+    </div>
+    <div class="form-group full" id="wf_lump_sum_detail" style="display:${w.lump_sum_plan==='あり'?'':'none'};">
+      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:12px;">
+        <div style="font-size:11px;color:#92400e;margin-bottom:8px;font-weight:700;">転出・転入手続き（脱退一時金あり）— 日付が過ぎても「済み」が未チェックだとアラートが出ます</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div>
+            <label class="form-label" style="font-size:11px;">転出手続き日付</label>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input class="form-input" id="wf_transfer_out_date" type="date" value="${w.transfer_out_date||''}" style="flex:1;">
+              <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:#047857;white-space:nowrap;cursor:pointer;padding:5px 9px;background:white;border:1px solid var(--gray-200);border-radius:6px;"><input type="checkbox" id="wf_transfer_out_done" ${w.transfer_out_done?'checked':''}>済み</label>
+            </div>
+          </div>
+          <div>
+            <label class="form-label" style="font-size:11px;">転入手続き日付</label>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input class="form-input" id="wf_transfer_in_date" type="date" value="${w.transfer_in_date||''}" style="flex:1;">
+              <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:#047857;white-space:nowrap;cursor:pointer;padding:5px 9px;background:white;border:1px solid var(--gray-200);border-radius:6px;"><input type="checkbox" id="wf_transfer_in_done" ${w.transfer_in_done?'checked':''}>済み</label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
     <div class="form-group"><label class="form-label">5年満了日</label><input class="form-input" id="wf_tg2_expiry" type="date" value="${w.tg2_expiry||''}"></div>
     <div class="form-group"><label class="form-label">5年満了状況</label><input class="form-input" id="wf_tg2_status" value="${esc(w.tg2_status||'')}"></div>
     <div class="section-title">連絡先</div>
@@ -8466,7 +8571,7 @@ function buildWorkerModalBody(w) {
   <!-- 就労管理システム報告タブ(建設業) -->
   <div id="wtab_kokko_panel" style="display:none;">
     <div style="background:#fef3c7;border-left:4px solid #f59e0b;border-radius:0 8px 8px 0;padding:12px 16px;margin-bottom:16px;font-size:12px;color:#78350f;line-height:1.6;">
-      <strong>🏗️ 建設業就労管理システム報告</strong><br>
+      <strong>🏗️ 【建設業のみ】就労管理システムの報告</strong><br>
       ${(/建設/.test(w.applicant_field||'')) ? '建設分野の人材です。配属・退職・2号変更のタイミングで、国交省「外国人就労管理システム」への報告が必要です。実施した日付を記録しておくと、外国人材ページ上部のアラートから外れます。' : 'この人材の分野は「'+esc(w.applicant_field||'未設定')+'」です。建設業以外の場合、本タブの記録は不要です。'}
     </div>
     <div class="form-grid">
@@ -8490,12 +8595,20 @@ function buildWorkerModalBody(w) {
         <button type="button" class="btn btn-outline" style="font-size:11px;padding:4px 12px;color:#0d9488;border-color:#0d9488;" onclick="saveKokkoCredentials('${w.company_id||''}')">💾 企業情報として保存</button>
         <span style="font-size:10px;color:var(--gray-400);margin-left:8px;">※同じ企業の他の人材を開いた時にも同じID/PWが表示されます</span>
       </div>
-      <div class="section-title">📅 配属報告</div>
+      <div class="section-title">📅 受け入れ報告</div>
       <div class="form-group full">
-        <label class="form-label">配属報告日 <span style="font-size:10px;color:var(--gray-400);font-weight:400;">— 在職ステータスが「配属前 → 在職中」に変わったタイミングで実施</span></label>
+        <label class="form-label">配属日 <span style="font-size:10px;color:var(--gray-400);font-weight:400;">— 人材情報（基本情報タブの配属日）から自動反映</span></label>
+        <input class="form-input" type="date" value="${w.joined_date||''}" disabled style="background:#f1f5f9;color:#475569;">
+      </div>
+      <div class="form-group full">
+        <label class="form-label">受け入れ報告日 <span style="font-size:10px;color:var(--gray-400);font-weight:400;">— 在職ステータスが「配属前 → 在職中」に変わったタイミングで実施</span></label>
         <input class="form-input" id="wf_placement_report_date" type="date" value="${w.placement_report_date||''}">
       </div>
       <div class="section-title">📤 退職報告</div>
+      <div class="form-group full">
+        <label class="form-label">退職日 <span style="font-size:10px;color:var(--gray-400);font-weight:400;">— 人材情報（基本情報タブの退職日）から自動反映</span></label>
+        <input class="form-input" type="date" value="${w.left_date||''}" disabled style="background:#f1f5f9;color:#475569;">
+      </div>
       <div class="form-group full">
         <label class="form-label">退職報告日 <span style="font-size:10px;color:var(--gray-400);font-weight:400;">— 在職ステータスが「在職中 → 退職済」に変わったタイミングで実施</span></label>
         <input class="form-input" id="wf_retire_report_date" type="date" value="${w.retire_report_date||''}">
@@ -12819,6 +12932,12 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260612.06', date:'2026-06-12', notify:true, items:[
+    '人材基本情報「一時帰国」に脱退一時金の項目を追加: 「脱退一時金の予定(あり/なし)」を選択し、ありの場合は転出・転入手続きの日付＋「済み」チェックを入力',
+    '脱退一時金アラート: 「あり」で転出/転入が未完了の人材を上部に通知。日付を過ぎても「済み」未チェックは「超過」表示',
+    '就労管理システム報告タブを「就労管理システムの報告【建設業のみ】」に改名',
+    '建設業報告: 「配属報告」→「受け入れ報告」に改名し、配属日・退職日を人材情報から自動反映表示',
+  ]},
   { version:'ver.20260612.05', date:'2026-06-12', notify:true, items:[
     '申請忘れ(申請なし)アラートの対象を調整: ステータス「退職予定(更新なし決定)」と支援区分「2号企業単独」を申請なしアラートから除外',
     '在留期限アラート(90日/60日/30日以内など)は従来どおり表示。「2号支援継続」「2号支援終了・書類サポート」は引き続き申請なしアラートに表示',
