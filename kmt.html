@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260612.04 -->
+<!-- KMT_VERSION ver.20260612.05 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -308,7 +308,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260612.04</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260612.05</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -7743,15 +7743,17 @@ function renderWorkerAlerts() {
     if (!w.visa_expiry) return;
     const exp = new Date(w.visa_expiry); exp.setHours(0,0,0,0);
     const days = Math.floor((exp-today)/86400000);
-    // 退職者は除外
-    if (['退職済(帰国)','退職済(転職)','退職予定(更新なし決定)'].includes(w.status)) return;
+    // 退職済は全アラート対象外(退職予定(更新なし決定)は期限アラートには残す)
+    if (['退職済(帰国)','退職済(転職)'].includes(w.status)) return;
     // 申請忘れ判定(90日以内・期限切れ含む・申請予定なしor未設定)
+    // ただし 退職予定(更新なし決定) と 2号企業単独 は「申請なし」アラートから除外(期限アラートはそのまま)
     const applyStatus = w.apply_status || '申請予定なし';
-    if (days <= 90 && applyStatus === '申請予定なし') {
+    const skipMissAlert = w.status === '退職予定(更新なし決定)' || w.support_type_2go === '2号企業単独';
+    if (days <= 90 && applyStatus === '申請予定なし' && !skipMissAlert) {
       missAlert.push({w, days});
     }
-    // 特例期間中 + 申請済み・不足あり の組み合わせ警告
-    if (applyStatus === '申請済み・不足あり' && days < 0) {
+    // 特例期間中 + 申請済み・不足あり の組み合わせ警告(退職予定は従来通り除外)
+    if (applyStatus === '申請済み・不足あり' && days < 0 && w.status !== '退職予定(更新なし決定)') {
       const td = w.tokurei_date ? Math.floor((new Date(w.tokurei_date)-today)/86400000) : null;
       if (td !== null && td >= 0) {
         shortageAlert.push({w, days, tokureiDays: td});
@@ -12817,6 +12819,10 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260612.05', date:'2026-06-12', notify:true, items:[
+    '申請忘れ(申請なし)アラートの対象を調整: ステータス「退職予定(更新なし決定)」と支援区分「2号企業単独」を申請なしアラートから除外',
+    '在留期限アラート(90日/60日/30日以内など)は従来どおり表示。「2号支援継続」「2号支援終了・書類サポート」は引き続き申請なしアラートに表示',
+  ]},
   { version:'ver.20260612.04', date:'2026-06-12', notify:false, items:[
     '更新状況タブ: 「詳細」ボタンを廃止(行クリックで人材詳細を開けます)、代わりに顔写真列を追加',
   ]},
