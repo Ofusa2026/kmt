@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260612.06 -->
+<!-- KMT_VERSION ver.20260612.07 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -308,7 +308,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260612.06</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260612.07</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -4093,6 +4093,7 @@ async function saveWorker(returnResult=false) {
     retire_report_date:    g('wf_retire_report_date'),
     tg2_change_report_date: g('wf_tg2_change_report_date'),
     renewal_status:       g('wf_renewal_status'),
+    renewal_check_staff:  g('wf_renewal_check_staff'),
     renewal_stage:        g('wf_renewal_stage'),
     renewal_memo:         g('wf_renewal_memo'),
     employment_condition: g('wf_employment_condition'),
@@ -7467,9 +7468,9 @@ function renderRenewalList() {
   const cnt = document.getElementById('renResultCount');
   if (cnt) cnt.textContent = '該当 ' + list.length + ' 名';
 
-  const gridCols = '44px 44px minmax(120px,1fr) minmax(120px,1.1fr) 74px 92px 92px minmax(150px,1.4fr) minmax(150px,1.4fr) minmax(150px,1.4fr)';
+  const gridCols = '44px 44px minmax(120px,1fr) minmax(120px,1.1fr) 74px 92px 92px 90px minmax(150px,1.4fr) minmax(150px,1.4fr) minmax(150px,1.4fr)';
   const head = '<div style="display:grid;grid-template-columns:'+gridCols+';gap:6px;padding:8px 12px;background:#f8fafc;border-bottom:1px solid var(--gray-200);font-size:11px;font-weight:700;color:var(--navy);">'+
-    '<div>管理番号</div><div>写真</div><div>氏名</div><div>企業</div><div>在留資格</div><div>在留期限</div><div>ステータス</div><div>現在の段階</div><div>申請メモ</div><div>確定雇用条件</div></div>';
+    '<div>管理番号</div><div>写真</div><div>氏名</div><div>企業</div><div>在留資格</div><div>在留期限</div><div>ステータス</div><div>確認担当</div><div>現在の段階</div><div>申請メモ</div><div>確定雇用条件</div></div>';
 
   const rows = list.map(w => {
     const stg = w.renewal_stage || '';
@@ -7484,6 +7485,7 @@ function renderRenewalList() {
       '<div style="color:var(--gray-600);">'+esc(w.visa_status||'-')+'</div>'+
       '<div style="color:var(--gray-600);">'+esc(w.visa_expiry||'-')+'</div>'+
       '<div>'+_renewalStatusBadge(w.renewal_status)+'</div>'+
+      '<div style="color:var(--gray-600);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;" title="'+esc(w.renewal_check_staff||'')+'">'+esc(w.renewal_check_staff||'-')+'</div>'+
       '<div style="color:var(--gray-700);white-space:pre-line;line-height:1.4;min-width:0;" title="'+esc(stg)+'">'+esc(_shortText(stg, 80))+'</div>'+
       '<div style="color:var(--gray-700);white-space:pre-line;line-height:1.4;min-width:0;" title="'+esc(mem)+'">'+esc(_shortText(mem, 80))+'</div>'+
       '<div style="color:var(--gray-700);white-space:pre-line;line-height:1.4;min-width:0;" title="'+esc(cnd)+'">'+esc(_shortText(cnd, 80))+'</div>'+
@@ -7737,10 +7739,10 @@ function renderWorkerAlerts() {
   (filteredWorkers.length ? filteredWorkers : allWorkers).forEach(w => {
     // KMT支援外は全アラートから除外(支援対象外なので)
     if (w.kmt_support === 'KMT支援外') return;
-    // 建設業の報告アラート判定(在留期限の有無にかかわらず)
-    if (isConstruction(w)) {
-      // 配属報告: 在職中で配属報告未提出
-      if (w.status === '在職中' && !w.placement_report_date) {
+    // 建設業の報告アラート判定(在留期限の有無にかかわらず)。特定活動は通知除外。
+    if (isConstruction(w) && w.visa_status !== '特定活動') {
+      // 受け入れ報告: 在職中 かつ 特定技能1号(特定活動→特定技能1号に変わった)で 受け入れ報告未提出
+      if (w.status === '在職中' && w.visa_status === '特定技能1号' && !w.placement_report_date) {
         kokkoPlacementAlert.push(w);
       }
       // 退職報告: 退職済(帰国/転職)で退職報告未提出
@@ -8050,16 +8052,23 @@ function toggleShortageAlertList(list) {
 }
 
 // アラート用 共通情報バッジ(申請ステータス・KMT支援区分・在留資格・5年満了状況)
+const APPLY_STATUS_STYLE = {
+  '申請予定なし':      { bg:'#94a3b8', fg:'white' },   // グレー
+  '申請準備中':        { bg:'#facc15', fg:'#1f2937' },  // 黄色
+  '審査中':            { bg:'#84cc16', fg:'#1f2937' },  // 黄緑
+  '申請済み・不足あり': { bg:'#ea580c', fg:'white' },    // オレンジ
+  '審査完了':          { bg:'#2563eb', fg:'white' },    // 青
+};
 function _alertInfoBadges(w){
   const items = [];
-  if (w.apply_status) items.push({label:'申請', val:w.apply_status, bg:'#1e3a8a'});
-  if (w.kmt_support) items.push({label:'KMT', val:w.kmt_support, bg:'#0891b2'});
-  if (w.visa_status) items.push({label:'資格', val:w.visa_status, bg:'#4338ca'});
-  if (w.tg2_status) items.push({label:'5年', val:w.tg2_status, bg:'#7c2d12'});
+  if (w.apply_status) { const s = APPLY_STATUS_STYLE[w.apply_status] || {bg:'#1e3a8a',fg:'white'}; items.push({label:'申請', val:w.apply_status, bg:s.bg, fg:s.fg}); }
+  if (w.kmt_support) items.push({label:'KMT', val:w.kmt_support, bg:'#0891b2', fg:'white'});
+  if (w.visa_status) items.push({label:'資格', val:w.visa_status, bg:'#4338ca', fg:'white'});
+  if (w.tg2_status) items.push({label:'5年', val:w.tg2_status, bg:'#7c2d12', fg:'white'});
   if (!items.length) return '<div style="min-width:0;"></div>';
   return '<div style="display:flex;flex-wrap:wrap;gap:3px;align-items:center;font-size:10px;">' +
     items.map(i =>
-      '<span style="background:'+i.bg+';color:white;padding:1px 6px;border-radius:6px;font-weight:600;white-space:nowrap;"><span style="opacity:.7;font-size:9px;">'+i.label+':</span> '+esc(i.val)+'</span>'
+      '<span style="background:'+i.bg+';color:'+(i.fg||'white')+';padding:1px 6px;border-radius:6px;font-weight:600;white-space:nowrap;"><span style="opacity:.7;font-size:9px;">'+i.label+':</span> '+esc(i.val)+'</span>'
     ).join('') + '</div>';
 }
 
@@ -8206,7 +8215,9 @@ async function openWorkerModal(id) {
   if (id && w) {
     const mno = w.management_no ? `[${w.management_no}] ` : '';
     const nat = w.nationality ? ` (${w.nationality})` : '';
-    title = `👤 ${mno}${w.name || '無名'}${nat}`;
+    const stat = w.status ? `　【${w.status}】` : '';
+    const exp = w.visa_expiry ? `　在留期限:${formatDate(w.visa_expiry)}` : '';
+    title = `👤 ${mno}${w.name || '無名'}${nat}${stat}${exp}`;
   } else if (id && !w) {
     title = '👤 外国人材詳細 (読込中…)';
   } else {
@@ -8641,6 +8652,19 @@ function buildWorkerModalBody(w) {
           <strong>優先度高め</strong>: 急ぎ対応 / 
           <strong>許可済み</strong>: 更新許可済み
         </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">企業確認担当KMTスタッフ</label>
+        <select class="form-select" id="wf_renewal_check_staff">
+          ${(() => {
+            const fixed = ['神出','新宅','高橋','柿沼'];
+            const others = [...new Set((allUsers||[]).map(u=>u.name).filter(Boolean))].filter(n=>!fixed.includes(n)).sort((a,b)=>a.localeCompare(b,'ja'));
+            const cur = w.renewal_check_staff || '';
+            const all = [...fixed, ...others];
+            if (cur && !all.includes(cur)) all.push(cur);
+            return '<option value="">─ 選択 ─</option>' + all.map(n=>`<option ${cur===n?'selected':''}>${esc(n)}</option>`).join('');
+          })()}
+        </select>
       </div>
       <div class="form-group full">
         <label class="form-label">現在の段階</label>
@@ -12932,6 +12956,12 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260612.07', date:'2026-06-12', notify:true, items:[
+    '更新状況に「企業確認担当KMTスタッフ」を追加(選択式: 神出/新宅/高橋/柿沼→他担当)。更新状況リストにも「確認担当」列を表示',
+    '人材詳細のタイトルに【在籍ステータス】と【在留期限】を追加表示(採番＋氏名＋国籍に加えて)',
+    '建設業就労管理: 在留資格「特定活動」は通知除外。特定技能1号で受け入れ報告が未提出の人材を通知',
+    'アラートの申請ステータスを色分け: 申請予定なし=グレー / 申請準備中=黄 / 審査中=黄緑 / 申請済み・不足あり=オレンジ / 審査完了=青',
+  ]},
   { version:'ver.20260612.06', date:'2026-06-12', notify:true, items:[
     '人材基本情報「一時帰国」に脱退一時金の項目を追加: 「脱退一時金の予定(あり/なし)」を選択し、ありの場合は転出・転入手続きの日付＋「済み」チェックを入力',
     '脱退一時金アラート: 「あり」で転出/転入が未完了の人材を上部に通知。日付を過ぎても「済み」未チェックは「超過」表示',
