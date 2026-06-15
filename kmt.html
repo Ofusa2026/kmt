@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260612.07 -->
+<!-- KMT_VERSION ver.20260612.08 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -308,7 +308,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260612.07</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260612.08</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -592,17 +592,22 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
           </div>
           <div class="form-group full">
             <label class="form-label">担当者メール</label>
-            <input class="form-input" id="co_contact_email" placeholder="tantosha@example.com">
+            <div id="co_contact_email_rows"></div>
+            <button type="button" class="btn btn-outline" style="font-size:11px;padding:3px 10px;margin-top:4px;" onclick="addContactEmailRow()">＋ メール行を追加</button>
           </div>
 
           <div class="section-title">🏢 KMT担当</div>
           <div class="form-group">
             <label class="form-label">KMTメイン担当</label>
-            <input class="form-input" id="co_main_staff" placeholder="例: ニサ">
+            <select class="form-select" id="co_main_staff"><option value="">─ 選択 ─</option></select>
           </div>
           <div class="form-group">
             <label class="form-label">KMTサブ担当</label>
-            <input class="form-input" id="co_sub_staff" placeholder="例: ウスマン">
+            <select class="form-select" id="co_sub_staff"><option value="">─ 選択 ─</option></select>
+          </div>
+          <div class="form-group full">
+            <label class="form-label">社内メモ <span style="font-size:10px;color:var(--gray-400);font-weight:400;">— KMT側共有用</span></label>
+            <textarea class="form-textarea" id="co_memo" rows="4" placeholder="社内共有メモを入力..."></textarea>
           </div>
         </div>
       </div>
@@ -702,14 +707,19 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
       <!-- メモ -->
       <div class="tab-panel" id="tab-memo">
         <div class="form-grid">
-          <div class="section-title">📝 メモ・備考</div>
+          <div class="section-title">📝 企業メモ</div>
           <div class="form-group full">
-            <label class="form-label">社内メモ</label>
-            <textarea class="form-textarea" id="co_memo" rows="5" placeholder="社内共有メモを入力..."></textarea>
+            <label class="form-label">企業メモ <span style="font-size:10px;color:var(--gray-400);font-weight:400;">— 相談内容・やり取りなどを自由記述</span></label>
+            <textarea class="form-textarea" id="co_company_note" rows="5" placeholder="企業との相談内容・やり取り・特記事項..."></textarea>
           </div>
+          <div class="section-title">🗒️ 企業ノート（時系列）</div>
           <div class="form-group full">
-            <label class="form-label">企業ノート</label>
-            <textarea class="form-textarea" id="co_company_note" rows="5" placeholder="企業に関する特記事項..."></textarea>
+            <div style="display:flex;gap:6px;align-items:flex-start;flex-wrap:wrap;">
+              <input class="form-input" id="co_note_category" placeholder="項目(任意) 例: 請求/面談/トラブル" style="max-width:200px;min-width:140px;">
+              <textarea class="form-textarea" id="co_note_text" rows="2" placeholder="ノート内容を入力..." style="flex:1;min-width:200px;"></textarea>
+              <button type="button" class="btn btn-primary" style="white-space:nowrap;align-self:stretch;" onclick="addCompanyNoteEntry()">＋ 追加</button>
+            </div>
+            <div id="co_notes_list" style="margin-top:10px;"></div>
           </div>
           <div class="form-group full">
             <label class="form-label">最終訪問日</label>
@@ -1146,6 +1156,8 @@ function openCompanyModal(id) {
   editingCoId = id;
   _savingCompanyNew = false;
   clearCoForm();
+  const _coForStaff = id ? allCompanies.find(c => c.id === id) : null;
+  populateCompanyStaffSelects(_coForStaff);
   if (id) {
     const co = allCompanies.find(c => c.id === id);
     if (co) fillCoForm(co);
@@ -1503,7 +1515,7 @@ const CO_FIELDS = [
   'memo','company_note','last_visit'
 ];
 
-function clearCoForm() { CO_FIELDS.forEach(f => { const el = document.getElementById('co_'+f); if(el) el.value=''; }); }
+function clearCoForm() { CO_FIELDS.forEach(f => { const el = document.getElementById('co_'+f); if(el) el.value=''; }); renderContactEmailRows(''); _coNotes = []; renderCompanyNotes(); }
 
 function fillCoForm(co) {
   const map = {
@@ -1513,7 +1525,7 @@ function fillCoForm(co) {
     workplace_name:'workplace_name', workplace_zip:'workplace_zip',
     workplace_pref:'workplace_pref', workplace_city:'workplace_city',
     workplace_address:'workplace_address', workplace_tel:'workplace_tel',
-    contact_name:'contact_name', contact_tel:'contact_tel', contact_email:'contact_email',
+    contact_name:'contact_name', contact_tel:'contact_tel',
     drive_url:'drive_url', drive_url_kmt:'drive_url2', fee_per_person:'fee_per_person', billing_cycle:'billing_cycle', billing_timing:'billing_timing', billing_start_month:'billing_start_month',
     payment_method:'payment_method', invoice_method:'invoice_method', invoice_to:'invoice_to',
     kmt_corp_type:'kmt_corp_type', direct_debit_applied:'direct_debit_applied',
@@ -1529,6 +1541,9 @@ function fillCoForm(co) {
     const el = document.getElementById('co_' + key);
     if (el && co[col] != null) el.value = co[col];
   });
+  renderContactEmailRows(co.contact_email);
+  _coNotes = Array.isArray(co.company_notes) ? co.company_notes.slice() : [];
+  renderCompanyNotes();
 }
 
 function getCoFormData() {
@@ -1554,7 +1569,7 @@ function getCoFormData() {
     rep_title: document.getElementById('co_rep_title').value || null,
     contact_name: document.getElementById('co_contact_name').value || null,
     contact_tel: document.getElementById('co_contact_tel').value || null,
-    contact_email: document.getElementById('co_contact_email').value || null,
+    contact_email: getContactEmails(),
     main_staff: document.getElementById('co_main_staff').value || null,
     sub_staff: document.getElementById('co_sub_staff').value || null,
     drive_url: document.getElementById('co_drive_url').value || null,
@@ -1586,9 +1601,93 @@ function getCoFormData() {
     foreign_employees: document.getElementById('co_foreign_employees').value || null,
     memo: document.getElementById('co_memo').value || null,
     company_note: document.getElementById('co_company_note').value || null,
+    company_notes: _coNotes,
     last_visit: document.getElementById('co_last_visit').value || null,
     updated_at: new Date().toISOString()
   };
+}
+
+function populateCompanyStaffSelects(co) {
+  const build = () => {
+    const staff = [...new Set((allUsers||[]).map(u=>u.name).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ja'));
+    [['co_main_staff','main_staff'],['co_sub_staff','sub_staff']].forEach(([elId, key]) => {
+      const sel = document.getElementById(elId);
+      if (!sel) return;
+      const cur = co ? (co[key]||'') : '';
+      const list = [...staff];
+      if (cur && !list.includes(cur)) list.unshift(cur);
+      sel.innerHTML = '<option value="">─ 選択 ─</option>' + list.map(n=>'<option>'+esc(n)+'</option>').join('');
+      sel.value = cur;
+    });
+  };
+  build();
+  if (!(allUsers && allUsers.length)) {
+    sbFetch('users?select=name&order=name.asc').then(d => { if (d && d.length) { allUsers = d; build(); } }).catch(()=>{});
+  }
+}
+
+function _emailRowHtml(val) {
+  return '<div class="co-email-row" style="display:flex;gap:6px;margin-bottom:4px;">'+
+    '<input class="form-input co-email-input" value="'+esc(val||'')+'" placeholder="tantosha@example.com" style="flex:1;">'+
+    '<button type="button" class="btn btn-outline" style="font-size:14px;padding:2px 10px;color:var(--red);flex-shrink:0;" onclick="this.closest(\'.co-email-row\').remove()">✕</button>'+
+  '</div>';
+}
+function renderContactEmailRows(emailStr) {
+  const box = document.getElementById('co_contact_email_rows');
+  if (!box) return;
+  const emails = (emailStr||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+  if (!emails.length) emails.push('');
+  box.innerHTML = emails.map(e=>_emailRowHtml(e)).join('');
+}
+function addContactEmailRow() {
+  const box = document.getElementById('co_contact_email_rows');
+  if (box) box.insertAdjacentHTML('beforeend', _emailRowHtml(''));
+}
+function getContactEmails() {
+  const box = document.getElementById('co_contact_email_rows');
+  if (!box) return null;
+  const vals = [...box.querySelectorAll('.co-email-input')].map(i=>i.value.trim()).filter(Boolean);
+  return vals.length ? vals.join('\n') : null;
+}
+
+let _coNotes = [];
+function renderCompanyNotes() {
+  const box = document.getElementById('co_notes_list');
+  if (!box) return;
+  if (!_coNotes.length) { box.innerHTML = '<div style="font-size:11px;color:var(--gray-400);padding:6px 0;">まだ企業ノートはありません</div>'; return; }
+  const sorted = _coNotes.map((n,i)=>({n,i})).sort((a,b)=> new Date(b.n.ts||0) - new Date(a.n.ts||0));
+  box.innerHTML = sorted.map(({n,i}) => {
+    const d = n.ts ? new Date(n.ts) : null;
+    const ds = d ? (d.toLocaleDateString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit'}) + ' ' + d.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})) : '';
+    return '<div style="border:1px solid var(--gray-200);border-radius:8px;padding:8px 12px;margin-bottom:6px;background:white;">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px;">'+
+        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'+
+          (n.category?'<span style="font-size:10px;background:#ede9fe;color:#5b21b6;padding:1px 8px;border-radius:10px;font-weight:700;">'+esc(n.category)+'</span>':'')+
+          '<span style="font-size:11px;color:var(--gray-500);">'+esc(ds)+'</span>'+
+          (n.author?'<span style="font-size:11px;color:var(--gray-500);">'+esc(n.author)+'</span>':'')+
+        '</div>'+
+        '<button type="button" class="btn btn-outline" style="font-size:10px;padding:2px 8px;color:var(--red);" onclick="deleteCompanyNoteEntry('+i+')">削除</button>'+
+      '</div>'+
+      '<div style="font-size:12px;color:var(--gray-700);line-height:1.6;white-space:pre-wrap;">'+esc(n.text||'')+'</div>'+
+    '</div>';
+  }).join('');
+}
+function addCompanyNoteEntry() {
+  const catEl = document.getElementById('co_note_category');
+  const txtEl = document.getElementById('co_note_text');
+  const text = (txtEl?.value||'').trim();
+  if (!text) { showToast('⚠️ ノート内容を入力してください','error'); return; }
+  _coNotes.push({ ts: new Date().toISOString(), author: (typeof currentUser!=='undefined' && currentUser?.name) || '', category: (catEl?.value||'').trim(), text });
+  if (catEl) catEl.value='';
+  if (txtEl) txtEl.value='';
+  renderCompanyNotes();
+  if (editingCompanyId) saveCompany(true);
+}
+function deleteCompanyNoteEntry(idx) {
+  if (idx<0 || idx>=_coNotes.length) return;
+  _coNotes.splice(idx,1);
+  renderCompanyNotes();
+  if (editingCompanyId) saveCompany(true);
 }
 
 function copyMainAddressToWorkplace() {
@@ -4103,6 +4202,7 @@ async function saveWorker(returnResult=false) {
     apply_date:       g('wf_apply_date'),
     apply_number:     g('wf_apply_number'),
     status:           g('wf_status'),
+    expected_leave_date: g('wf_expected_leave_date'),
     apply_status:     g('wf_apply_status'),
     apply_type:       g('wf_apply_type'),
     desired_visa:     g('wf_desired_visa'),
@@ -7715,6 +7815,12 @@ function renderWorkerTable() {
   renderWorkerAlerts();
 }
 
+function toggleExpectedLeaveField() {
+  const v = document.getElementById('wf_status')?.value || '';
+  const wrap = document.getElementById('wf_expected_leave_wrap');
+  if (wrap) wrap.style.display = (v === '退職予定(更新なし決定)') ? '' : 'none';
+}
+
 function toggleLumpSumFields() {
   const v = document.getElementById('wf_lump_sum_plan')?.value || '';
   const d = document.getElementById('wf_lump_sum_detail');
@@ -7735,6 +7841,7 @@ function renderWorkerAlerts() {
   const kokkoRetireAlert = [];    // 退職報告未提出
   const kokkoTg2Alert = [];       // 2号変更報告未提出
   const lumpSumAlert = [];        // 脱退一時金あり & 転出/転入手続き未完了
+  const leaveOverdueAlert = [];   // 退職予定日超過 & ステータス未変更 & 退職日未記入
   const isConstruction = (w) => /建設/.test(w.applicant_field || '');
   (filteredWorkers.length ? filteredWorkers : allWorkers).forEach(w => {
     // KMT支援外は全アラートから除外(支援対象外なので)
@@ -7760,6 +7867,11 @@ function renderWorkerAlerts() {
       const idd = w.transfer_in_date ? Math.floor((today - new Date(w.transfer_in_date))/86400000) : null;
       const overdue = (!w.transfer_out_done && od !== null && od > 0) || (!w.transfer_in_done && idd !== null && idd > 0);
       lumpSumAlert.push({ w, overdue });
+    }
+    // 📅 退職予定日を過ぎてもステータスが退職予定のまま & 退職日未記入
+    if (w.status === '退職予定(更新なし決定)' && w.expected_leave_date && !w.left_date) {
+      const ld = Math.floor((today - new Date(w.expected_leave_date))/86400000);
+      if (ld > 0) leaveOverdueAlert.push({ w, days: ld });
     }
     if (!w.visa_expiry) return;
     const exp = new Date(w.visa_expiry); exp.setHours(0,0,0,0);
@@ -7788,7 +7900,7 @@ function renderWorkerAlerts() {
   });
   const total = alerts[1].length + alerts[2].length + alerts[3].length;
   const kokkoTotal = kokkoPlacementAlert.length + kokkoRetireAlert.length + kokkoTg2Alert.length;
-  if (!total && !missAlert.length && !shortageAlert.length && !kokkoTotal && !lumpSumAlert.length) { banner.innerHTML=''; return; }
+  if (!total && !missAlert.length && !shortageAlert.length && !kokkoTotal && !lumpSumAlert.length && !leaveOverdueAlert.length) { banner.innerHTML=''; return; }
   // 残り日数で昇順ソート(期限切れも含めて期日が近い順)
   missAlert.sort((a,b) => a.days - b.days);
   shortageAlert.sort((a,b) => a.tokureiDays - b.tokureiDays);
@@ -7849,6 +7961,34 @@ function renderWorkerAlerts() {
     const lsList = document.createElement('div');
     lsList.id = 'workerLumpSumAlertList';
     wrap.appendChild(lsList);
+  }
+
+  // 📅 退職予定日超過アラート(ステータス未変更&退職日未記入)
+  if (leaveOverdueAlert.length) {
+    leaveOverdueAlert.sort((a,b) => b.days - a.days);
+    const lo = document.createElement('div');
+    lo.style.cssText = 'background:linear-gradient(135deg,#fef2f2 0%,#fde8e8 100%);border:2px solid #b91c1c;border-radius:10px;padding:12px 16px;margin-bottom:10px;cursor:pointer;transition:.15s;box-shadow:0 2px 8px rgba(185,28,28,0.12);';
+    lo.onmouseover = () => lo.style.opacity = '0.92';
+    lo.onmouseout = () => lo.style.opacity = '1';
+    lo.innerHTML =
+      '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">'+
+        '<div style="display:flex;align-items:center;gap:10px;">'+
+          '<div style="font-size:28px;">📅</div>'+
+          '<div>'+
+            '<div style="font-size:13px;font-weight:900;color:#991b1b;">退職予定日 超過 — 在籍ステータス変更・退職日の記入が必要</div>'+
+            '<div style="font-size:11px;color:#7f1d1d;margin-top:2px;">「退職予定(更新なし決定)」のまま退職予定日を過ぎ、退職日が未記入です。在籍ステータス変更と退職日を記入してください。</div>'+
+          '</div>'+
+        '</div>'+
+        '<div style="text-align:right;">'+
+          '<div style="font-size:26px;font-weight:900;color:#991b1b;line-height:1;">'+leaveOverdueAlert.length+'<span style="font-size:13px;font-weight:600;">名</span></div>'+
+          '<div style="font-size:10px;color:#991b1b;margin-top:2px;">クリックで一覧表示 ▼</div>'+
+        '</div>'+
+      '</div>';
+    lo.onclick = () => toggleLeaveOverdueAlertList(leaveOverdueAlert);
+    wrap.appendChild(lo);
+    const loList = document.createElement('div');
+    loList.id = 'workerLeaveOverdueAlertList';
+    wrap.appendChild(loList);
   }
 
   // 🟣 不足あり放置警告(独立した大きなバナー)
@@ -8130,6 +8270,29 @@ function toggleLumpSumAlertList(list) {
   area.dataset.open = '1';
 }
 
+// 退職予定日超過アラートの人材リストを開閉
+function toggleLeaveOverdueAlertList(list) {
+  const area = document.getElementById('workerLeaveOverdueAlertList');
+  if (!area) return;
+  if (area.dataset.open === '1') {
+    area.innerHTML = '';
+    area.dataset.open = '';
+    return;
+  }
+  const rows = list.map(({w, days}) => {
+    return '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #fecaca;cursor:pointer;background:white;flex-wrap:wrap;" onclick="event.stopPropagation();openWorkerModal(\''+w.id+'\')">'+
+      '<div style="min-width:80px;font-size:11px;font-weight:600;color:#64748b;">'+esc(w.management_no||'-')+'</div>'+
+      '<div style="flex:1;min-width:160px;font-size:12px;"><strong>'+esc(w.name)+'</strong> <span style="color:#94a3b8;font-size:11px;">('+esc(w.nationality||'-')+')</span></div>'+
+      '<div style="font-size:11px;color:#64748b;flex:1;min-width:120px;">'+esc(w.companies?.name||'-')+'</div>'+
+      '<div style="font-size:11px;color:#991b1b;font-weight:700;">予定日 '+formatDate(w.expected_leave_date)+'</div>'+
+      '<div><span style="background:#991b1b;color:white;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:800;">超過'+days+'日</span></div>'+
+      '<div style="font-size:11px;color:#64748b;">'+esc(w.staff||'担当未設定')+'</div>'+
+    '</div>';
+  }).join('');
+  area.innerHTML = '<div style="margin-top:-2px;margin-bottom:10px;background:white;border:2px solid #b91c1c;border-top:none;border-radius:0 0 10px 10px;overflow:hidden;">'+rows+'</div>';
+  area.dataset.open = '1';
+}
+
 function toggleAlertList(key, alertDef, grid) {
   const listArea = document.getElementById('workerAlertList');
   if (!listArea) return;
@@ -8359,9 +8522,13 @@ function buildWorkerModalBody(w) {
   <div class="form-grid">
     <div class="section-title">ステータス</div>
     <div class="form-group"><label class="form-label">在職ステータス</label>
-      <select class="form-select" id="wf_status">
+      <select class="form-select" id="wf_status" onchange="toggleExpectedLeaveField()">
         ${['配属前','在職中','在職中(一時帰国中)','退職予定(更新なし決定)','退職済(帰国)','退職済(転職)'].map(s=>`<option ${w.status===s?'selected':''}>${s}</option>`).join('')}
       </select></div>
+    <div class="form-group" id="wf_expected_leave_wrap" style="display:${w.status==='退職予定(更新なし決定)'?'':'none'};">
+      <label class="form-label">退職予定日 <span style="font-size:10px;color:var(--gray-400);font-weight:400;">— 予定日を過ぎてもステータス未変更・退職日未記入だとアラート</span></label>
+      <input class="form-input" id="wf_expected_leave_date" type="date" value="${w.expected_leave_date||''}">
+    </div>
     <div class="form-group"><label class="form-label">申請ステータス</label>
       <select class="form-select" id="wf_apply_status">
         ${['申請予定なし','申請準備中','審査中','申請済み・不足あり','審査完了'].map(s=>`<option ${(w.apply_status||'申請予定なし')===s?'selected':''}>${s}</option>`).join('')}
@@ -12956,6 +13123,12 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260612.08', date:'2026-06-12', notify:true, items:[
+    '在職ステータス「退職予定(更新なし決定)」で退職予定日の入力欄を表示。予定日を過ぎてもステータス未変更・退職日未記入の人材を上部にアラート通知',
+    '新規所属機関登録: KMTメイン/サブ担当を選択式(記入式→プルダウン)に変更',
+    '所属機関詳細: 担当者メールを複数行(行の追加・削除)に対応',
+    '企業メモ整理: 「社内メモ(KMT共有用)」を基本情報タブへ移動。「企業メモ」は相談内容・やり取り用に維持。さらに時系列で残せる「企業ノート(追加)」機能を新設',
+  ]},
   { version:'ver.20260612.07', date:'2026-06-12', notify:true, items:[
     '更新状況に「企業確認担当KMTスタッフ」を追加(選択式: 神出/新宅/高橋/柿沼→他担当)。更新状況リストにも「確認担当」列を表示',
     '人材詳細のタイトルに【在籍ステータス】と【在留期限】を追加表示(採番＋氏名＋国籍に加えて)',
