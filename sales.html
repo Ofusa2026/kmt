@@ -174,11 +174,12 @@
     <nav class="nav" id="nav">
       <button data-pg="dash" class="on"><span class="ic">◧</span><span>ダッシュボード</span></button>
       <button data-pg="sales"><span class="ic">¥</span><span>売上明細</span></button>
+      <button data-pg="init"><span class="ic">↧</span><span>初期費用 取込</span></button>
       <button data-pg="gen"><span class="ic">⟳</span><span>月次委託費 生成</span></button>
       <button data-pg="fc"><span class="ic">◔</span><span>売上見込み</span></button>
       <button data-pg="comp"><span class="ic">▤</span><span>企業マスタ</span></button>
     </nav>
-    <div class="foot"><span class="dot"></span>KMT案件管理DB 接続中<br><span style="font-size:9px;color:#6b6e65">ver.20260529.01</span></div>
+    <div class="foot"><span class="dot"></span>KMT案件管理DB 接続中<br><span style="font-size:9px;color:#6b6e65">ver.20260529.02</span></div>
   </aside>
 
   <main class="main">
@@ -247,6 +248,35 @@
             <tbody id="salesBody"></tbody>
           </table>
           <div class="tfoot" id="salesFoot"></div>
+        </div>
+      </section>
+
+      <!-- INIT FEE intake (試運転) -->
+      <section class="page" id="pg-init">
+        <div class="card" style="margin-bottom:16px;border-left:3px solid var(--amber)">
+          <h3>🧪 決定報告 初期費用の取込（試運転）</h3>
+          <div class="csub" style="margin-bottom:0">ここで登録した初期費用は <b>support_fees</b> に「初期費用」行（未請求）として保存され、そのまま売上明細に出ます。金額パース・請求月・請求法人のルールを確認するための試運転で、固まったら kmt.html の決定報告保存に移植します。</div>
+        </div>
+        <div class="card" style="margin-bottom:16px">
+          <div class="fgrid">
+            <div class="f full"><label>企業</label><select id="i_company"></select></div>
+            <div class="f"><label>初期費用（税抜・「50,000円」「5万」可）</label><input type="text" id="i_fee" placeholder="例: 50,000円 / 5万"></div>
+            <div class="f"><label>請求月</label><input type="month" id="i_month"></div>
+            <div class="f"><label>請求法人</label><select id="i_entity"><option>株式会社KMT</option><option>一般社団法人KMT</option></select></div>
+            <div class="f"><label>ステータス</label><select id="i_status"><option>未請求</option><option>請求済</option><option>入金済</option></select></div>
+            <div class="calcline"><span class="l">パース結果（税抜→税込10%）</span><span class="v"><span id="i_excl" class="num">¥0</span> → <span id="i_incl" class="num">¥0</span></span></div>
+            <div class="f full"><label>人材名 / メモ</label><input type="text" id="i_notes" placeholder="例: 〇〇さん 決定報告より"></div>
+          </div>
+          <div style="display:flex;justify-content:flex-end;margin-top:14px">
+            <button class="btn primary" id="iSave">support_fees に登録</button>
+          </div>
+        </div>
+        <div class="tablecard">
+          <table>
+            <thead><tr><th>請求月</th><th>企業</th><th class="r">税抜</th><th class="r">税込</th><th>ステータス</th><th>メモ</th><th></th></tr></thead>
+            <tbody id="initBody"></tbody>
+          </table>
+          <div class="tfoot" id="initFoot"></div>
         </div>
       </section>
 
@@ -434,10 +464,11 @@ function fillSelects(){
   $("fType").innerHTML='<option value="">全種別</option>'+opt(types);
   const comps=COMP.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join("");
   $("fCompany").innerHTML='<option value="">全企業</option>'+comps;
-  ["s_company","c_company"].forEach(id=>$(id).innerHTML=comps);
+  ["s_company","c_company","i_company"].forEach(id=>$(id).innerHTML=comps);
+  if(!$("i_month").value)$("i_month").value=CUR_MONTH;
 }
 
-function renderAll(){renderDash();renderSales();renderFc();renderComp();}
+function renderAll(){renderDash();renderSales();renderInit();renderFc();renderComp();}
 
 /* ---------- DASHBOARD ---------- */
 function monthFees(m){return FEES.filter(f=>f.billing_month===m);}
@@ -691,8 +722,42 @@ $("compSave").onclick=async()=>{const payload={fee_per_person:+$("m_fee").value|
   try{await api("companies?id=eq."+compEditId,{method:"PATCH",headers:{...H,Prefer:"return=minimal"},body:JSON.stringify(payload)});
     $("compOv").classList.remove("on");toast("更新しました");await loadAll();}catch(e){toast("保存失敗: "+e.message);}};
 
+/* ---------- INIT FEE intake (試運転) ---------- */
+function parseYen(raw){
+  if(raw==null)return 0;
+  let s=String(raw).replace(/[,，\s円¥]/g,"");
+  if(s.includes("万")){const p=s.split("万");return Math.round((parseFloat(p[0])||0)*10000+(parseFloat(p[1])||0));}
+  const n=parseFloat(s.replace(/[^\d.]/g,""));return isNaN(n)?0:Math.round(n);
+}
+function calcInit(){const ex=parseYen($("i_fee").value);$("i_excl").textContent=yen(ex);$("i_incl").textContent=yen(incl(ex));}
+$("i_fee").addEventListener("input",calcInit);
+function renderInit(){
+  const rows=FEES.filter(f=>f.fee_type==="初期費用");
+  const body=$("initBody");
+  body.innerHTML=rows.length?rows.map(f=>{const ex=f.amount_excl||0;return `<tr>
+    <td class="num">${esc(f.billing_month||"")}</td><td class="tname">${esc(cname(f))}</td>
+    <td class="r num">${yen(ex)}</td><td class="r num" style="font-weight:700">${yen(f.amount_incl||incl(ex))}</td>
+    <td>${badgeStat(f.status)}</td><td class="tsub">${esc(f.notes||"")}</td>
+    <td><div class="rowact"><button class="iconbtn" onclick="editSale('${f.id}')">✎</button><button class="iconbtn" onclick="delSale('${f.id}')">🗑</button></div></td></tr>`;}).join(""):'<tr><td colspan="7" class="empty">初期費用の行はまだありません</td></tr>';
+  const ti=rows.reduce((s,f)=>s+(f.amount_incl||incl(f.amount_excl)),0);
+  $("initFoot").innerHTML=`<span>${rows.length}件（fee_type=初期費用）</span><span>税込合計 <b class="num">${yen(ti)}</b></span>`;
+}
+$("iSave").onclick=async()=>{
+  const ex=parseYen($("i_fee").value);
+  if(!$("i_company").value){toast("企業を選んでください");return;}
+  if(!ex){toast("初期費用の金額を確認してください");return;}
+  if(!$("i_month").value){toast("請求月を入れてください");return;}
+  const memo=[$("i_notes").value,"請求法人:"+$("i_entity").value,"(決定報告 試運転)"].filter(Boolean).join(" / ");
+  const payload={company_id:$("i_company").value,billing_month:$("i_month").value,fee_type:"初期費用",
+    worker_count:1,unit_price:ex,amount_excl:ex,amount_incl:incl(ex),status:$("i_status").value,notes:memo};
+  try{await api("support_fees",{method:"POST",headers:{...H,Prefer:"return=minimal"},body:JSON.stringify(payload)});
+    toast("初期費用を登録しました（売上明細に出ます）");$("i_fee").value="";$("i_notes").value="";calcInit();await loadAll();}
+  catch(e){toast("登録失敗: "+e.message);}
+};
+
 /* ---------- nav / chrome ---------- */
 const TITLES={dash:["ダッシュボード","支援委託費・一時金・初期費用の売上集計"],sales:["売上明細","support_fees（委託費・一時金・初期費用）の登録・管理"],
+  init:["初期費用 取込","決定報告の初期費用を support_fees に取り込む試運転（kmt.html移植前）"],
   gen:["月次委託費 生成","在職者数 × 単価 から当月の委託費をまとめて作成"],fc:["売上見込み","sales_forecast（確度別の売上予測）"],comp:["企業マスタ","受入企業の請求設定"]};
 document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{
   document.querySelectorAll("#nav button").forEach(x=>x.classList.remove("on"));b.classList.add("on");
