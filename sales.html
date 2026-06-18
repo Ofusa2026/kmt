@@ -122,6 +122,16 @@
     cursor:pointer;font-size:13px;color:var(--ink-2);transition:.15s}
   .iconbtn:hover{border-color:var(--accent);color:var(--accent)}
   .empty{padding:50px;text-align:center;color:var(--ink-3);font-size:13px}
+  .combo{position:relative}
+  .combo-in{width:100%}
+  .combo-pop{position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--surface);border:1px solid var(--line);
+    border-radius:10px;box-shadow:0 14px 34px -10px rgba(27,29,26,.28);max-height:248px;overflow:auto;z-index:55;display:none;padding:4px}
+  .combo-pop.on{display:block}
+  .combo-item{padding:8px 11px;border-radius:7px;cursor:pointer;font-size:13px;display:flex;align-items:baseline;gap:8px;white-space:nowrap}
+  .combo-item small{color:var(--ink-3);font-size:11px}
+  .combo-item:hover,.combo-item.act{background:var(--accent-soft);color:var(--accent-ink)}
+  .combo-empty{padding:10px 11px;color:var(--ink-3);font-size:12px}
+  .chipbtn.on{background:var(--accent);border-color:var(--accent);color:#fff}
   .tfoot{padding:12px 14px;background:var(--surface-2);border-top:1px solid var(--line);font-size:12px;color:var(--ink-2);display:flex;justify-content:space-between;align-items:center}
 
   /* modal */
@@ -179,7 +189,7 @@
       <button data-pg="fc"><span class="ic">◔</span><span>売上見込み</span></button>
       <button data-pg="comp"><span class="ic">▤</span><span>企業マスタ</span></button>
     </nav>
-    <div class="foot"><span class="dot"></span>KMT案件管理DB 接続中<br><span style="font-size:9px;color:#6b6e65">ver.20260529.02</span></div>
+    <div class="foot"><span class="dot"></span>KMT案件管理DB 接続中<br><span style="font-size:9px;color:#6b6e65">ver.20260529.04</span></div>
   </aside>
 
   <main class="main">
@@ -230,7 +240,7 @@
       <section class="page" id="pg-sales">
         <div class="toolbar">
           <select id="fMonth"><option value="">全期間</option></select>
-          <select id="fCompany"><option value="">全企業</option></select>
+          <div class="combo" style="min-width:170px"><input type="text" id="fCompany_t" class="combo-in" placeholder="全企業（企業名で絞込）" autocomplete="off"><input type="hidden" id="fCompany"><div class="combo-pop" id="fCompany_p"></div></div>
           <select id="fType"><option value="">全種別</option></select>
           <select id="fStatus">
             <option value="">全ステータス</option>
@@ -259,9 +269,10 @@
         </div>
         <div class="card" style="margin-bottom:16px">
           <div class="fgrid">
-            <div class="f full"><label>企業</label><select id="i_company"></select></div>
+            <div class="f full"><label>企業</label><div class="combo"><input type="text" id="i_company_t" class="combo-in" placeholder="企業名を入力して候補から選択…" autocomplete="off"><input type="hidden" id="i_company"><div class="combo-pop" id="i_company_p"></div></div></div>
             <div class="f"><label>初期費用（税抜・「50,000円」「5万」可）</label><input type="text" id="i_fee" placeholder="例: 50,000円 / 5万"></div>
-            <div class="f"><label>請求月</label><input type="month" id="i_month"></div>
+            <div class="f"><label>請求区分</label><select id="i_timing"><option value="">請求月を指定</option><option value="配属後請求">配属後請求</option></select></div>
+            <div class="f"><label id="i_month_lab">請求月</label><input type="month" id="i_month"><span id="i_month_hint" class="tsub" style="display:none;margin-top:2px">配属後に請求。見込み月で計上されます</span></div>
             <div class="f"><label>請求法人</label><select id="i_entity"><option>株式会社KMT</option><option>一般社団法人KMT</option></select></div>
             <div class="f"><label>ステータス</label><select id="i_status"><option>未請求</option><option>請求済</option><option>入金済</option></select></div>
             <div class="calcline"><span class="l">パース結果（税抜→税込10%）</span><span class="v"><span id="i_excl" class="num">¥0</span> → <span id="i_incl" class="num">¥0</span></span></div>
@@ -271,9 +282,17 @@
             <button class="btn primary" id="iSave">support_fees に登録</button>
           </div>
         </div>
+        <div class="toolbar" style="margin-bottom:12px">
+          <span class="tsub" style="margin-right:2px">表示:</span>
+          <button class="btn sm chipbtn on" data-if="all">すべて</button>
+          <button class="btn sm chipbtn" data-if="month">月指定</button>
+          <button class="btn sm chipbtn" data-if="post">配属後請求</button>
+          <div class="grow"></div>
+          <span id="initSummary" class="tsub"></span>
+        </div>
         <div class="tablecard">
           <table>
-            <thead><tr><th>請求月</th><th>企業</th><th class="r">税抜</th><th class="r">税込</th><th>ステータス</th><th>メモ</th><th></th></tr></thead>
+            <thead><tr><th>請求月/見込</th><th>企業</th><th>請求区分</th><th class="r">税抜</th><th class="r">税込</th><th>ステータス</th><th>メモ</th><th></th></tr></thead>
             <tbody id="initBody"></tbody>
           </table>
           <div class="tfoot" id="initFoot"></div>
@@ -359,7 +378,7 @@
 <div class="ov" id="saleOv"><div class="modal">
   <div class="mh"><h3 id="saleMTitle">売上を追加</h3><button class="x" data-close>×</button></div>
   <div class="mb"><div class="fgrid">
-    <div class="f full"><label>企業</label><select id="s_company"></select></div>
+    <div class="f full"><label>企業</label><div class="combo"><input type="text" id="s_company_t" class="combo-in" placeholder="企業名を入力して候補から選択…" autocomplete="off"><input type="hidden" id="s_company"><div class="combo-pop" id="s_company_p"></div></div></div>
     <div class="f"><label>請求月</label><input type="month" id="s_month"></div>
     <div class="f"><label>種別</label><select id="s_type">
       <option>通常委託費</option><option>新規委託費</option><option>初期費用</option><option>一時金</option><option>紹介費</option><option>その他</option>
@@ -381,7 +400,7 @@
 <div class="ov" id="fcOv"><div class="modal">
   <div class="mh"><h3 id="fcMTitle">見込みを追加</h3><button class="x" data-close>×</button></div>
   <div class="mb"><div class="fgrid">
-    <div class="f full"><label>企業</label><select id="c_company"></select></div>
+    <div class="f full"><label>企業</label><div class="combo"><input type="text" id="c_company_t" class="combo-in" placeholder="企業名を入力して候補から選択…" autocomplete="off"><input type="hidden" id="c_company"><div class="combo-pop" id="c_company_p"></div></div></div>
     <div class="f"><label>見込月</label><input type="month" id="c_month"></div>
     <div class="f"><label>カテゴリ</label><select id="c_category">
       <option>委託費</option><option>初期費用</option><option>紹介費</option><option>その他</option>
@@ -427,6 +446,7 @@ const toast=(m)=>{const t=$("toast");t.textContent=m;t.classList.add("on");setTi
 
 // data stores
 let FEES=[],FC=[],COMP=[],WORKERS=[];
+let combos={};
 let compMap={};
 let CUR_MONTH=ym(new Date());
 let charts={};
@@ -462,10 +482,41 @@ function fillSelects(){
   $("fMonth").innerHTML='<option value="">全期間</option>'+opt(months);
   $("fcMonth").innerHTML='<option value="">全期間</option>'+opt(fcMonths);
   $("fType").innerHTML='<option value="">全種別</option>'+opt(types);
-  const comps=COMP.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join("");
-  $("fCompany").innerHTML='<option value="">全企業</option>'+comps;
-  ["s_company","c_company","i_company"].forEach(id=>$(id).innerHTML=comps);
+  if(!window.__combosInit){
+    combos.fCompany=initCombo("fCompany",{onChange:renderSales});
+    combos.i_company=initCombo("i_company");
+    combos.s_company=initCombo("s_company");
+    combos.c_company=initCombo("c_company");
+    window.__combosInit=true;
+  }
   if(!$("i_month").value)$("i_month").value=CUR_MONTH;
+}
+
+/* ---------- combobox (入力→候補選択) ---------- */
+function initCombo(id,opt={}){
+  const t=$(id+"_t"),h=$(id),p=$(id+"_p");
+  let items=[],active=-1;
+  const draw=()=>{
+    const q=(t.value||"").trim();
+    items=COMP.filter(c=>!q||(c.name||"").includes(q)||(c.name_kana||"").includes(q));
+    p.innerHTML=items.length?items.map((c,i)=>`<div class="combo-item${i===active?" act":""}" data-i="${i}">${esc(c.name)}${c.name_kana?`<small>${esc(c.name_kana)}</small>`:""}</div>`).join(""):'<div class="combo-empty">該当なし</div>';
+    [...p.querySelectorAll(".combo-item")].forEach(el=>{el.onmousedown=e=>{e.preventDefault();pick(items[+el.dataset.i]);};});
+  };
+  const pick=c=>{if(!c)return;h.value=c.id;t.value=c.name;p.classList.remove("on");active=-1;opt.onChange&&opt.onChange(c.id);};
+  t.addEventListener("focus",()=>{active=-1;draw();p.classList.add("on");});
+  t.addEventListener("input",()=>{h.value="";active=-1;draw();p.classList.add("on");opt.onChange&&opt.onChange("");});
+  t.addEventListener("blur",()=>setTimeout(()=>p.classList.remove("on"),160));
+  t.addEventListener("keydown",e=>{
+    if(!p.classList.contains("on"))return;
+    if(e.key==="ArrowDown"){active=Math.min(active+1,items.length-1);draw();e.preventDefault();}
+    else if(e.key==="ArrowUp"){active=Math.max(active-1,0);draw();e.preventDefault();}
+    else if(e.key==="Enter"){if(active>=0&&items[active]){pick(items[active]);e.preventDefault();}}
+    else if(e.key==="Escape"){p.classList.remove("on");}
+  });
+  return {
+    set:cid=>{const c=compMap[cid];h.value=c?c.id:"";t.value=c?c.name:"";},
+    clear:()=>{h.value="";t.value="";}
+  };
 }
 
 function renderAll(){renderDash();renderSales();renderInit();renderFc();renderComp();}
@@ -575,13 +626,14 @@ function openSale(){$("saleOv").classList.add("on");}
 function calcSale(){const ex=(+$("s_price").value||0)*(+$("s_qty").value||0);$("s_excl").textContent=yen(ex);$("s_incl").textContent=yen(incl(ex));}
 ["s_price","s_qty"].forEach(id=>$(id).addEventListener("input",calcSale));
 $("addSale").onclick=()=>{editId=null;$("saleMTitle").textContent="売上を追加";
-  $("s_company").value=COMP[0]?.id||"";$("s_month").value=CUR_MONTH;$("s_type").value="通常委託費";
+  combos.s_company.clear();$("s_month").value=CUR_MONTH;$("s_type").value="通常委託費";
   $("s_price").value="";$("s_qty").value=1;$("s_status").value="未請求";$("s_billed").value="";$("s_paid").value="";$("s_notes").value="";calcSale();openSale();};
 window.editSale=(id)=>{const f=FEES.find(x=>x.id===id);if(!f)return;editId=id;$("saleMTitle").textContent="売上を編集";
-  $("s_company").value=f.company_id||"";$("s_month").value=f.billing_month||"";$("s_type").value=f.fee_type||"通常委託費";
+  combos.s_company.set(f.company_id);$("s_month").value=f.billing_month||"";$("s_type").value=f.fee_type||"通常委託費";
   $("s_price").value=f.unit_price||(f.worker_count?Math.round(f.amount_excl/f.worker_count):f.amount_excl)||"";
   $("s_qty").value=f.worker_count||1;$("s_status").value=f.status||"未請求";$("s_billed").value=f.billed_date||"";$("s_paid").value=f.paid_date||"";$("s_notes").value=f.notes||"";calcSale();openSale();};
 $("saleSave").onclick=async()=>{
+  if(!$("s_company").value){toast("企業を候補から選んでください");return;}
   const price=+$("s_price").value||0,qty=+$("s_qty").value||0,ex=price*qty;
   const payload={company_id:$("s_company").value,billing_month:$("s_month").value,fee_type:$("s_type").value,
     worker_count:qty,unit_price:price,amount_excl:ex,amount_incl:incl(ex),status:$("s_status").value,
@@ -677,13 +729,14 @@ let fcEditId=null;
 function calcFc(){const ex=(+$("c_price").value||0)*(+$("c_qty").value||0);$("c_excl").textContent=yen(ex);$("c_incl").textContent=yen(incl(ex));}
 ["c_price","c_qty"].forEach(id=>$(id).addEventListener("input",calcFc));
 $("addFc").onclick=()=>{fcEditId=null;$("fcMTitle").textContent="見込みを追加";
-  $("c_company").value=COMP[0]?.id||"";$("c_month").value=CUR_MONTH;$("c_category").value="委託費";$("c_item").value="";
+  combos.c_company.clear();$("c_month").value=CUR_MONTH;$("c_category").value="委託費";$("c_item").value="";
   $("c_entity").value="株式会社KMT";$("c_price").value="";$("c_qty").value=1;$("c_cert").value="確定";$("c_notes").value="";calcFc();$("fcOv").classList.add("on");};
 window.editFc=id=>{const f=FC.find(x=>x.id===id);if(!f)return;fcEditId=id;$("fcMTitle").textContent="見込みを編集";
-  $("c_company").value=f.company_id||"";$("c_month").value=f.billing_month||"";$("c_category").value=f.category||"委託費";
+  combos.c_company.set(f.company_id);$("c_month").value=f.billing_month||"";$("c_category").value=f.category||"委託費";
   $("c_item").value=f.item_name||"";$("c_entity").value=f.kmt_entity||"株式会社KMT";$("c_price").value=f.unit_price||"";
   $("c_qty").value=f.quantity||1;$("c_cert").value=f.certainty||"確定";$("c_notes").value=f.notes||"";calcFc();$("fcOv").classList.add("on");};
-$("fcSave").onclick=async()=>{const price=+$("c_price").value||0,qty=+$("c_qty").value||0,ex=price*qty;
+$("fcSave").onclick=async()=>{if(!$("c_company").value){toast("企業を候補から選んでください");return;}
+  const price=+$("c_price").value||0,qty=+$("c_qty").value||0,ex=price*qty;
   const payload={company_id:$("c_company").value,billing_month:$("c_month").value,category:$("c_category").value,
     item_name:$("c_item").value||null,kmt_entity:$("c_entity").value,unit_price:price,quantity:qty,
     amount_excl:ex,amount_incl:incl(ex),certainty:$("c_cert").value,notes:$("c_notes").value||null};
@@ -731,27 +784,43 @@ function parseYen(raw){
 }
 function calcInit(){const ex=parseYen($("i_fee").value);$("i_excl").textContent=yen(ex);$("i_incl").textContent=yen(incl(ex));}
 $("i_fee").addEventListener("input",calcInit);
+let initFilter="all";
+$("i_timing").addEventListener("change",()=>{const post=$("i_timing").value==="配属後請求";
+  $("i_month_lab").textContent=post?"見込み月":"請求月";$("i_month_hint").style.display=post?"":"none";});
+document.querySelectorAll(".chipbtn").forEach(b=>b.onclick=()=>{initFilter=b.dataset.if;
+  document.querySelectorAll(".chipbtn").forEach(x=>x.classList.toggle("on",x===b));renderInit();});
 function renderInit(){
-  const rows=FEES.filter(f=>f.fee_type==="初期費用");
+  const all=FEES.filter(f=>f.fee_type==="初期費用");
+  const isPost=f=>f.billing_timing==="配属後請求";
+  let rows=all;
+  if(initFilter==="post")rows=all.filter(isPost);
+  else if(initFilter==="month")rows=all.filter(f=>!isPost(f));
   const body=$("initBody");
-  body.innerHTML=rows.length?rows.map(f=>{const ex=f.amount_excl||0;return `<tr>
-    <td class="num">${esc(f.billing_month||"")}</td><td class="tname">${esc(cname(f))}</td>
+  body.innerHTML=rows.length?rows.map(f=>{const ex=f.amount_excl||0,post=isPost(f);return `<tr>
+    <td class="num">${post?'<span class="tsub">見込 </span>':''}${esc(f.billing_month||"")}</td>
+    <td class="tname">${esc(cname(f))}</td>
+    <td>${post?'<span class="badge b-amber">配属後請求</span>':'<span class="badge b-gray">月指定</span>'}</td>
     <td class="r num">${yen(ex)}</td><td class="r num" style="font-weight:700">${yen(f.amount_incl||incl(ex))}</td>
     <td>${badgeStat(f.status)}</td><td class="tsub">${esc(f.notes||"")}</td>
-    <td><div class="rowact"><button class="iconbtn" onclick="editSale('${f.id}')">✎</button><button class="iconbtn" onclick="delSale('${f.id}')">🗑</button></div></td></tr>`;}).join(""):'<tr><td colspan="7" class="empty">初期費用の行はまだありません</td></tr>';
+    <td><div class="rowact"><button class="iconbtn" onclick="editSale('${f.id}')">✎</button><button class="iconbtn" onclick="delSale('${f.id}')">🗑</button></div></td></tr>`;}).join(""):'<tr><td colspan="8" class="empty">該当する初期費用はありません</td></tr>';
   const ti=rows.reduce((s,f)=>s+(f.amount_incl||incl(f.amount_excl)),0);
-  $("initFoot").innerHTML=`<span>${rows.length}件（fee_type=初期費用）</span><span>税込合計 <b class="num">${yen(ti)}</b></span>`;
+  $("initFoot").innerHTML=`<span>${rows.length}件</span><span>税込合計 <b class="num">${yen(ti)}</b></span>`;
+  const post=all.filter(isPost),pti=post.reduce((s,f)=>s+(f.amount_incl||incl(f.amount_excl)),0);
+  $("initSummary").innerHTML=`配属後請求 <b>${post.length}</b>件 ・ 見込税込 <b class="num">${yen(pti)}</b>`;
 }
 $("iSave").onclick=async()=>{
   const ex=parseYen($("i_fee").value);
-  if(!$("i_company").value){toast("企業を選んでください");return;}
+  const post=$("i_timing").value==="配属後請求";
+  if(!$("i_company").value){toast("企業を候補から選んでください");return;}
   if(!ex){toast("初期費用の金額を確認してください");return;}
-  if(!$("i_month").value){toast("請求月を入れてください");return;}
+  if(!$("i_month").value){toast(post?"見込み月を入れてください":"請求月を入れてください");return;}
   const memo=[$("i_notes").value,"請求法人:"+$("i_entity").value,"(決定報告 試運転)"].filter(Boolean).join(" / ");
   const payload={company_id:$("i_company").value,billing_month:$("i_month").value,fee_type:"初期費用",
-    worker_count:1,unit_price:ex,amount_excl:ex,amount_incl:incl(ex),status:$("i_status").value,notes:memo};
+    billing_timing:post?"配属後請求":null,worker_count:1,unit_price:ex,amount_excl:ex,amount_incl:incl(ex),
+    status:$("i_status").value,notes:memo};
   try{await api("support_fees",{method:"POST",headers:{...H,Prefer:"return=minimal"},body:JSON.stringify(payload)});
-    toast("初期費用を登録しました（売上明細に出ます）");$("i_fee").value="";$("i_notes").value="";calcInit();await loadAll();}
+    toast(post?"配属後請求の初期費用を登録しました":"初期費用を登録しました（売上明細に出ます）");
+    $("i_fee").value="";$("i_notes").value="";$("i_timing").value="";$("i_month_lab").textContent="請求月";$("i_month_hint").style.display="none";calcInit();await loadAll();}
   catch(e){toast("登録失敗: "+e.message);}
 };
 
