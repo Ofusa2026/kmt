@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260612.11 -->
+<!-- KMT_VERSION ver.20260612.12 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -308,7 +308,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260612.11</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260612.12</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -729,6 +729,67 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
           <div class="form-group full">
             <label class="form-label">最終訪問日</label>
             <input class="form-input" id="co_last_visit" type="date">
+          </div>
+
+          <div class="section-title">📋 受け入れ状況（協力確認書）</div>
+          <div class="form-group">
+            <label class="form-label">外国人の就労（特定技能以外）</label>
+            <select class="form-select" id="co_other_foreign_employment" onchange="toggleOtherForeignTypes()">
+              <option value="">─ 選択 ─</option><option>あり</option><option>なし</option>
+            </select>
+          </div>
+          <div class="form-group full" id="co_other_foreign_types_box" style="display:none;">
+            <label class="form-label" style="font-size:11px;">就労の種類（複数選択可）</label>
+            <div style="display:flex;flex-wrap:wrap;gap:16px;font-size:12px;">
+              <label style="display:flex;gap:4px;align-items:center;cursor:pointer;"><input type="checkbox" class="co-offt" value="技能実習">技能実習</label>
+              <label style="display:flex;gap:4px;align-items:center;cursor:pointer;"><input type="checkbox" class="co-offt" value="技人国">技人国</label>
+              <label style="display:flex;gap:4px;align-items:center;cursor:pointer;"><input type="checkbox" class="co-offt" value="永住者・定住者">永住者・定住者</label>
+              <label style="display:flex;gap:4px;align-items:center;cursor:pointer;"><input type="checkbox" class="co-offt" value="その他">その他</label>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">他登録支援機関の利用</label>
+            <select class="form-select" id="co_other_support_org_used" onchange="toggleOtherSupportOrg()">
+              <option value="">─ 選択 ─</option><option>あり</option><option>なし</option>
+            </select>
+          </div>
+          <div class="form-group full" id="co_other_support_org_box" style="display:none;">
+            <label class="form-label" style="font-size:11px;">他登録支援機関の詳細 <span style="font-size:10px;color:var(--gray-400);font-weight:400;">（任意）</span></label>
+            <textarea class="form-textarea" id="co_other_support_org_detail" rows="2" placeholder="支援機関名・利用内容など"></textarea>
+          </div>
+
+          <div class="section-title">🛡️ 任意保険の加入状況</div>
+          <div class="form-group">
+            <label class="form-label">保険案内指導 日程</label>
+            <input class="form-input" id="co_insurance_guidance_date" type="date">
+          </div>
+          <div class="form-group">
+            <label class="form-label">保険案内指導 担当名</label>
+            <input class="form-input" id="co_insurance_guidance_staff" placeholder="担当者名">
+          </div>
+          <div class="form-group">
+            <label class="form-label">保険名</label>
+            <input class="form-input" id="co_insurance_name" placeholder="○○保険">
+          </div>
+          <div class="form-group">
+            <label class="form-label">加入手続き</label>
+            <select class="form-select" id="co_insurance_procedure_by"><option value="">─ 選択 ─</option><option>企業</option><option>本人</option><option>KMT</option><option>他支援機関</option></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">加入日</label>
+            <input class="form-input" id="co_insurance_start_date" type="date">
+          </div>
+          <div class="form-group">
+            <label class="form-label">終了日</label>
+            <input class="form-input" id="co_insurance_end_date" type="date">
+          </div>
+          <div class="form-group">
+            <label class="form-label">保険料負担</label>
+            <select class="form-select" id="co_insurance_premium_by"><option value="">─ 選択 ─</option><option>企業</option><option>本人</option></select>
+          </div>
+          <div class="form-group full">
+            <label class="form-label">その他 保険に関する共有事項</label>
+            <textarea class="form-textarea" id="co_insurance_note" rows="2" placeholder="追加の共有事項"></textarea>
           </div>
         </div>
       </div>
@@ -1517,10 +1578,12 @@ const CO_FIELDS = [
   'sales_y1','sales_y2','sales_y3','ordinary_pl_y1','ordinary_pl_y2','ordinary_pl_y3',
   'net_pl_y1','net_pl_y2','net_pl_y3','net_assets_y1','net_assets_y2','net_assets_y3',
   'capital','employees','foreign_employees',
-  'memo','company_note','last_visit'
+  'memo','company_note','last_visit',
+  'other_foreign_employment','other_support_org_used','other_support_org_detail',
+  'insurance_guidance_date','insurance_guidance_staff','insurance_name','insurance_start_date','insurance_end_date','insurance_procedure_by','insurance_premium_by','insurance_note'
 ];
 
-function clearCoForm() { CO_FIELDS.forEach(f => { const el = document.getElementById('co_'+f); if(el) el.value=''; }); renderContactEmailRows(''); renderExtraWorkplaces([]); _coNotes = []; renderCompanyNotes(); }
+function clearCoForm() { CO_FIELDS.forEach(f => { const el = document.getElementById('co_'+f); if(el) el.value=''; }); renderContactEmailRows(''); renderExtraWorkplaces([]); document.querySelectorAll('.co-offt').forEach(cb=>cb.checked=false); if(typeof toggleOtherForeignTypes==='function')toggleOtherForeignTypes(); if(typeof toggleOtherSupportOrg==='function')toggleOtherSupportOrg(); _coNotes = []; renderCompanyNotes(); }
 
 function fillCoForm(co) {
   const map = {
@@ -1540,7 +1603,11 @@ function fillCoForm(co) {
     net_pl_y1:'net_pl_y1', net_pl_y2:'net_pl_y2', net_pl_y3:'net_pl_y3',
     net_assets_y1:'net_assets_y1', net_assets_y2:'net_assets_y2', net_assets_y3:'net_assets_y3',
     capital:'capital', employees:'employees', foreign_employees:'foreign_employees',
-    memo:'memo', company_note:'company_note', last_visit:'last_visit'
+    memo:'memo', company_note:'company_note', last_visit:'last_visit',
+    other_foreign_employment:'other_foreign_employment', other_support_org_used:'other_support_org_used', other_support_org_detail:'other_support_org_detail',
+    insurance_guidance_date:'insurance_guidance_date', insurance_guidance_staff:'insurance_guidance_staff', insurance_name:'insurance_name',
+    insurance_start_date:'insurance_start_date', insurance_end_date:'insurance_end_date', insurance_procedure_by:'insurance_procedure_by',
+    insurance_premium_by:'insurance_premium_by', insurance_note:'insurance_note'
   };
   Object.entries(map).forEach(([key, col]) => {
     const el = document.getElementById('co_' + key);
@@ -1548,6 +1615,11 @@ function fillCoForm(co) {
   });
   renderContactEmailRows(co.contact_email);
   renderExtraWorkplaces(co.workplaces_extra);
+  // 協力確認書: 就労種類チェックボックス + あり/なしトグル
+  const offt = Array.isArray(co.other_foreign_employment_types) ? co.other_foreign_employment_types : [];
+  document.querySelectorAll('.co-offt').forEach(cb => { cb.checked = offt.includes(cb.value); });
+  if (typeof toggleOtherForeignTypes === 'function') toggleOtherForeignTypes();
+  if (typeof toggleOtherSupportOrg === 'function') toggleOtherSupportOrg();
   _coNotes = Array.isArray(co.company_notes) ? co.company_notes.slice() : [];
   renderCompanyNotes();
 }
@@ -1609,6 +1681,18 @@ function getCoFormData() {
     company_note: document.getElementById('co_company_note').value || null,
     company_notes: _coNotes,
     workplaces_extra: getExtraWorkplaces(),
+    other_foreign_employment: document.getElementById('co_other_foreign_employment')?.value || null,
+    other_foreign_employment_types: [...document.querySelectorAll('.co-offt')].filter(cb=>cb.checked).map(cb=>cb.value),
+    other_support_org_used: document.getElementById('co_other_support_org_used')?.value || null,
+    other_support_org_detail: document.getElementById('co_other_support_org_detail')?.value || null,
+    insurance_guidance_date: document.getElementById('co_insurance_guidance_date')?.value || null,
+    insurance_guidance_staff: document.getElementById('co_insurance_guidance_staff')?.value || null,
+    insurance_name: document.getElementById('co_insurance_name')?.value || null,
+    insurance_start_date: document.getElementById('co_insurance_start_date')?.value || null,
+    insurance_end_date: document.getElementById('co_insurance_end_date')?.value || null,
+    insurance_procedure_by: document.getElementById('co_insurance_procedure_by')?.value || null,
+    insurance_premium_by: document.getElementById('co_insurance_premium_by')?.value || null,
+    insurance_note: document.getElementById('co_insurance_note')?.value || null,
     last_visit: document.getElementById('co_last_visit').value || null,
     updated_at: new Date().toISOString()
   };
@@ -1694,6 +1778,16 @@ function getExtraWorkplaces(){
     address: row.querySelector('.co-wp-address')?.value.trim()||'',
     tel: row.querySelector('.co-wp-tel')?.value.trim()||'',
   })).filter(wp => wp.name||wp.zip||wp.pref||wp.city||wp.address||wp.tel);
+}
+function toggleOtherForeignTypes(){
+  const v = document.getElementById('co_other_foreign_employment')?.value || '';
+  const box = document.getElementById('co_other_foreign_types_box');
+  if (box) box.style.display = (v==='あり') ? '' : 'none';
+}
+function toggleOtherSupportOrg(){
+  const v = document.getElementById('co_other_support_org_used')?.value || '';
+  const box = document.getElementById('co_other_support_org_box');
+  if (box) box.style.display = (v==='あり') ? '' : 'none';
 }
 
 function renderCompanyNotes() {
@@ -13364,6 +13458,10 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260612.12', date:'2026-06-12', notify:true, items:[
+    '所属機関詳細「メモ」タブに「受け入れ状況（協力確認書）」を追加: 外国人の就労(特定技能以外)あり/なし(ありで技能実習/技人国/永住者・定住者/その他を選択)、他登録支援機関の利用あり/なし(ありで詳細欄・任意)',
+    '所属機関詳細「メモ」タブに「任意保険の加入状況」を追加: 保険案内指導の日程・担当、保険名、加入日・終了日、加入手続き(企業/本人/KMT/他支援機関)、保険料負担(企業/本人)、共有事項',
+  ]},
   { version:'ver.20260612.11', date:'2026-06-12', notify:true, items:[
     '所属機関詳細: 就業場所が複数ある場合の「就業場所を追加」ボタンを追加',
     'アラート一覧の各人材に「在籍ステータス」バッジを表示(申請予定なしでも転職予定等が一覧で分かるように)',
