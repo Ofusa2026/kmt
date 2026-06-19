@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260612.08 -->
+<!-- KMT_VERSION ver.20260612.09 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -308,7 +308,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260612.08</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260612.09</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -4220,6 +4220,10 @@ async function saveWorker(returnResult=false) {
     emergency_contact_raw:      g('wf_emergency_raw'),
     kmt_support:      g('wf_kmt_support'),
     staff:            g('wf_staff'),
+    sub_staff:        g('wf_sub_staff'),
+    residence_card_issued: document.getElementById('wf_residence_card_issued')?.checked || false,
+    card_tracking_no: g('wf_card_tracking_no'),
+    card_mailing_address: g('wf_card_mailing_address'),
     return_home_date: g('wf_return_home_date'),
     return_jp_date:   g('wf_return_jp_date'),
     tg2_expiry:       g('wf_tg2_expiry'),
@@ -4241,6 +4245,15 @@ async function saveWorker(returnResult=false) {
     notes:            g('wf_notes'),
   };
 
+  // 🔁 更新完了の特別処理: チャット自動投稿 / 新在留期限でステータス初期化
+  const _origWorker = editingWorkerId ? (allWorkers||[]).find(x => x.id === editingWorkerId) : null;
+  const _completing = (data.renewal_status === '完了');
+  const _newExpiryEntered = _completing && !!data.visa_expiry && (!_origWorker || data.visa_expiry !== (_origWorker.visa_expiry || ''));
+  const _doRenewalChatPost = _completing && !(_origWorker && _origWorker.renewal_completion_chat_posted)
+    && (data.residence_card_issued || data.card_tracking_no || data.card_mailing_address);
+  if (_doRenewalChatPost) data.renewal_completion_chat_posted = true;
+  if (_newExpiryEntered) { data.renewal_status = ''; data.renewal_completion_chat_posted = false; }
+
   const autoMode = returnResult; // 自動保存（モーダル開いたまま）モード
   // 新規作成の二重POSTガード
   if (!editingWorkerId) {
@@ -4259,11 +4272,30 @@ async function saveWorker(returnResult=false) {
       if (!autoMode) showToast('✅ 登録しました', 'success');
     }
     if (!autoMode) closeGenModal('workerModal');
+    if (_doRenewalChatPost && editingWorkerId) { _postRenewalCompletionToChat(editingWorkerId, data); }
     await loadWorkers();
     if (autoMode) { return true; }
   } catch(e) { _savingWorkerNew = false; showToast('❌ '+e.message,'error'); if(!autoMode) showLoading(false); return false; }
   if (!autoMode) showLoading(false);
   return true;
+}
+
+async function _postRenewalCompletionToChat(workerId, data) {
+  try {
+    let room = await sbFetch('chat_rooms?worker_id=eq.'+workerId+'&select=id&limit=1');
+    let roomId = room?.[0]?.id;
+    if (!roomId) {
+      const created = await sbFetch('chat_rooms', { method:'POST', headers:{'Prefer':'return=representation'}, body: JSON.stringify({ worker_id: workerId, created_by: currentUser?.name||'', status:'active' }) });
+      roomId = (Array.isArray(created)?created[0]:created)?.id;
+    }
+    if (!roomId) return;
+    const lines = ['📋 更新完了情報（自動投稿）'];
+    lines.push('・在留カードの情報: ' + (data.residence_card_issued ? '発行済み' : '未発行'));
+    if (data.visa_expiry) lines.push('・新しい在留期限: ' + data.visa_expiry);
+    if (data.card_tracking_no) lines.push('・在留カード郵送追跡番号: ' + data.card_tracking_no);
+    if (data.card_mailing_address) lines.push('・郵送先: ' + data.card_mailing_address);
+    await sbFetch('chat_messages', { method:'POST', body: JSON.stringify({ chat_room_id: roomId, room_id: roomId, sender_id: currentUser?.id||'', sender_name: currentUser?.name||'KMT', content: lines.join('\n'), created_at: new Date().toISOString() }) });
+  } catch(e) { console.warn('renewal completion chat post failed', e); }
 }
 
 // 人材モーダル: 緊急連絡先セクションの開閉
@@ -7434,14 +7466,18 @@ function buildWorkersScreen() {
   </div>
   </div>
   <div id="wsTab_renewal_panel" style="display:none;">
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center;">
       <input type="text" id="renSearch" placeholder="🔍 氏名・国籍・企業名・管理番号で検索" oninput="renderRenewalList()" style="flex:1;min-width:240px;padding:7px 12px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:12px;">
       <select id="renFilterStatus" onchange="renderRenewalList()" class="filter-select" style="min-width:140px;">
         <option value="">全ステータス</option>
         <option value="__only_filled__">入力済みのみ</option>
-        <option>更新なし</option><option>更新済(有)</option><option>更新済(無)</option>
-        <option>要確認</option><option>優先度高め</option><option>許可済み</option>
         <option value="__empty__">未設定</option>
+        <optgroup label="ステータス">
+          <option>更新決定</option><option>更新なし</option><option>優先度高め</option><option>要確認</option><option>申請依頼済み</option><option>完了</option>
+        </optgroup>
+        <optgroup label="旧ステータス">
+          <option>更新済(有)</option><option>更新済(無)</option><option>許可済み</option>
+        </optgroup>
       </select>
       <select id="renFilterCompany" onchange="renderRenewalList()" class="filter-select" style="min-width:160px;"><option value="">全企業</option></select>
       <select id="renFilterVisa" onchange="renderRenewalList()" class="filter-select">
@@ -7450,7 +7486,10 @@ function buildWorkersScreen() {
         <option>技能実習2号</option><option>技能実習3号</option><option>家族滞在</option>
         <option>技人国</option><option>その他</option>
       </select>
-      <select id="renFilterMainStaff" onchange="renderRenewalList()" class="filter-select" style="min-width:120px;"><option value="">全メイン担当</option></select>
+      <select id="renFilterMainStaff" onchange="renderRenewalList()" class="filter-select" style="min-width:110px;"><option value="">全担当</option></select>
+      <select id="renFilterSubStaff" onchange="renderRenewalList()" class="filter-select" style="min-width:120px;"><option value="">全サブ担当</option></select>
+      <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:#b45309;white-space:nowrap;cursor:pointer;padding:5px 9px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;"><input type="checkbox" id="renFilter4mo" onchange="renderRenewalList()">在留期限4か月以内</label>
+      <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:var(--navy);white-space:nowrap;cursor:pointer;padding:5px 9px;background:#f1f5f9;border:1px solid var(--gray-200);border-radius:8px;"><input type="checkbox" id="renGroupMonth" onchange="renderRenewalList()">📅 月ごと表示</label>
       <div id="renResultCount" style="margin-left:auto;align-self:center;font-size:12px;color:var(--gray-500);font-weight:700;"></div>
     </div>
     <div id="renTableArea" style="background:white;border:1px solid var(--gray-200);border-radius:8px;overflow-x:auto;"></div>
@@ -7458,12 +7497,15 @@ function buildWorkersScreen() {
 }
 
 const REN_STATUS_COLORS = {
+  '更新決定':   { bg:'#2563eb', text:'white' },
   '更新なし':   { bg:'#94a3b8', text:'white' },
+  '優先度高め': { bg:'#dc2626', text:'white' },
+  '要確認':     { bg:'#ea580c', text:'white' },
+  '申請依頼済み': { bg:'#7c3aed', text:'white' },
+  '完了':       { bg:'#047857', text:'white' },
   '更新済(無)': { bg:'#1d4ed8', text:'white' },
   '更新済(有)': { bg:'#059669', text:'white' },
-  '要確認':     { bg:'#ea580c', text:'white' },
-  '優先度高め': { bg:'#dc2626', text:'white' },
-  '許可済み':   { bg:'#047857', text:'white' },
+  '許可済み':   { bg:'#0891b2', text:'white' },
 };
 
 function _renewalStatusBadge(s) {
@@ -7519,12 +7561,26 @@ function _populateRenewalFilters() {
   }
   const msSel = document.getElementById('renFilterMainStaff');
   if (msSel) {
-    const staffs = [...new Set((allWorkers||[]).map(w => w.main_staff).filter(Boolean))].sort();
+    const staffs = [...new Set((allWorkers||[]).map(w => w.staff).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ja'));
     const cur = msSel.value;
-    msSel.innerHTML = '<option value="">全メイン担当</option>' +
+    msSel.innerHTML = '<option value="">全担当</option>' +
       staffs.map(s => `<option>${esc(s)}</option>`).join('');
     if (cur) msSel.value = cur;
   }
+  const subSel = document.getElementById('renFilterSubStaff');
+  if (subSel) {
+    const subs = [...new Set((allWorkers||[]).map(w => w.sub_staff).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ja'));
+    const cur = subSel.value;
+    subSel.innerHTML = '<option value="">全サブ担当</option>' +
+      subs.map(s => `<option>${esc(s)}</option>`).join('');
+    if (cur) subSel.value = cur;
+  }
+}
+
+function _renDaysLeft(w){
+  if (!w.visa_expiry) return null;
+  const today = new Date(); today.setHours(0,0,0,0);
+  return Math.floor((new Date(w.visa_expiry) - today)/86400000);
 }
 
 function renderRenewalList() {
@@ -7535,13 +7591,18 @@ function renderRenewalList() {
   const coFilter = document.getElementById('renFilterCompany')?.value || '';
   const visaFilter = document.getElementById('renFilterVisa')?.value || '';
   const msFilter = document.getElementById('renFilterMainStaff')?.value || '';
+  const subFilter = document.getElementById('renFilterSubStaff')?.value || '';
+  const only4mo = !!document.getElementById('renFilter4mo')?.checked;
+  const groupMonth = !!document.getElementById('renGroupMonth')?.checked;
 
   let list = (allWorkers || []).filter(w => {
     if (w.status === '退職済(帰国)' || w.status === '退職済(転職)') return false;
     if (w.kmt_support === 'KMT支援外') return false;
     if (coFilter && (w.companies?.name||'') !== coFilter) return false;
     if (visaFilter && (w.visa_status||'') !== visaFilter) return false;
-    if (msFilter && (w.main_staff||'') !== msFilter) return false;
+    if (msFilter && (w.staff||'') !== msFilter) return false;
+    if (subFilter && (w.sub_staff||'') !== subFilter) return false;
+    if (only4mo) { const d=_renDaysLeft(w); if (d===null || d>122) return false; }
     if (stFilter === '__empty__') {
       if (w.renewal_status) return false;
     } else if (stFilter === '__only_filled__') {
@@ -7554,45 +7615,59 @@ function renderRenewalList() {
     return true;
   });
 
-  list.sort((a,b) => {
-    const am = (a.management_no||'').match(/^(\d+)(?:-(\d+))?/);
-    const bm = (b.management_no||'').match(/^(\d+)(?:-(\d+))?/);
-    if (am && bm) {
-      const x = parseInt(am[1],10) - parseInt(bm[1],10);
-      if (x !== 0) return x;
-      return (parseInt(am[2]||'0',10)) - (parseInt(bm[2]||'0',10));
-    }
-    return (a.name||'').localeCompare(b.name||'', 'ja');
-  });
-
   const cnt = document.getElementById('renResultCount');
   if (cnt) cnt.textContent = '該当 ' + list.length + ' 名';
 
-  const gridCols = '44px 44px minmax(120px,1fr) minmax(120px,1.1fr) 74px 92px 92px 90px minmax(150px,1.4fr) minmax(150px,1.4fr) minmax(150px,1.4fr)';
-  const head = '<div style="display:grid;grid-template-columns:'+gridCols+';gap:6px;padding:8px 12px;background:#f8fafc;border-bottom:1px solid var(--gray-200);font-size:11px;font-weight:700;color:var(--navy);">'+
-    '<div>管理番号</div><div>写真</div><div>氏名</div><div>企業</div><div>在留資格</div><div>在留期限</div><div>ステータス</div><div>確認担当</div><div>現在の段階</div><div>申請メモ</div><div>確定雇用条件</div></div>';
+  const byMgmt = (a,b) => {
+    const am=(a.management_no||'').match(/^(\d+)(?:-(\d+))?/), bm=(b.management_no||'').match(/^(\d+)(?:-(\d+))?/);
+    if(am&&bm){const x=parseInt(am[1],10)-parseInt(bm[1],10);if(x)return x;return parseInt(am[2]||'0',10)-parseInt(bm[2]||'0',10);}
+    return (a.name||'').localeCompare(b.name||'','ja');
+  };
 
-  const rows = list.map(w => {
-    const stg = w.renewal_stage || '';
-    const mem = w.renewal_memo || '';
-    const cnd = w.employment_condition || '';
-    const photo = driveImageUrl(w.photo_url);
-    return '<div style="display:grid;grid-template-columns:'+gridCols+';gap:6px;padding:10px 12px;border-bottom:1px solid var(--gray-100);align-items:start;font-size:11px;cursor:pointer;background:white;" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'white\'" onclick="_openWorkerRenewalDetail(\''+w.id+'\')">'+
+  const gridCols = '44px 44px minmax(120px,1fr) minmax(120px,1.1fr) 74px 92px 92px 100px 90px minmax(150px,1.4fr) minmax(150px,1.4fr) minmax(150px,1.4fr)';
+  const head = '<div style="display:grid;grid-template-columns:'+gridCols+';gap:6px;padding:8px 12px;background:#f8fafc;border-bottom:1px solid var(--gray-200);font-size:11px;font-weight:700;color:var(--navy);">'+
+    '<div>管理番号</div><div>写真</div><div>氏名</div><div>企業</div><div>在留資格</div><div>在留期限</div><div>ステータス</div><div>担当/サブ</div><div>確認担当</div><div>現在の段階</div><div>申請メモ</div><div>確定雇用条件</div></div>';
+
+  const rowHtml = (w) => {
+    const stg=w.renewal_stage||'', mem=w.renewal_memo||'', cnd=w.employment_condition||'';
+    const photo=driveImageUrl(w.photo_url);
+    const d=_renDaysLeft(w);
+    const near = (d!==null && d<=122);
+    const rowBg = near ? '#fff7ed' : 'white';
+    const expStyle = near ? 'color:#ea580c;font-weight:800;' : 'color:var(--gray-600);';
+    const expSub = (near && d>=0) ? '<br><span style="font-size:9px;">あと'+d+'日</span>' : (near && d<0 ? '<br><span style="font-size:9px;color:#dc2626;">期限切れ</span>' : '');
+    return '<div style="display:grid;grid-template-columns:'+gridCols+';gap:6px;padding:10px 12px;border-bottom:1px solid var(--gray-100);align-items:start;font-size:11px;cursor:pointer;background:'+rowBg+';" onmouseover="this.style.background=\'#f1f5f9\'" onmouseout="this.style.background=\''+rowBg+'\'" onclick="_openWorkerRenewalDetail(\''+w.id+'\')">'+
       '<div style="font-weight:600;color:var(--gray-600);font-size:10px;line-height:1.2;word-break:break-all;white-space:normal;">'+esc(w.management_no||'-')+'</div>'+
       '<div style="display:flex;align-items:center;justify-content:center;">'+(photo?'<img src="'+esc(photo)+'" style="width:34px;height:34px;border-radius:50%;object-fit:cover;border:1px solid var(--gray-200);" onerror="this.style.display=\'none\';">':'<span style="font-size:15px;color:#cbd5e1;">👤</span>')+'</div>'+
       '<div style="font-weight:700;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;" title="'+esc(w.name||'')+'">'+natFlag(w.nationality||'')+' '+esc(w.name||'(未設定)')+'</div>'+
       '<div style="color:var(--gray-600);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;" title="'+esc(w.companies?.name||'')+'">'+esc(w.companies?.name||'-')+'</div>'+
       '<div style="color:var(--gray-600);">'+esc(w.visa_status||'-')+'</div>'+
-      '<div style="color:var(--gray-600);">'+esc(w.visa_expiry||'-')+'</div>'+
+      '<div style="'+expStyle+'">'+esc(w.visa_expiry||'-')+expSub+'</div>'+
       '<div>'+_renewalStatusBadge(w.renewal_status)+'</div>'+
+      '<div style="color:var(--gray-600);font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;" title="'+esc((w.staff||'-')+' / '+(w.sub_staff||'-'))+'">'+esc(w.staff||'-')+'<br><span style="color:#94a3b8;">'+esc(w.sub_staff||'-')+'</span></div>'+
       '<div style="color:var(--gray-600);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;" title="'+esc(w.renewal_check_staff||'')+'">'+esc(w.renewal_check_staff||'-')+'</div>'+
-      '<div style="color:var(--gray-700);white-space:pre-line;line-height:1.4;min-width:0;" title="'+esc(stg)+'">'+esc(_shortText(stg, 80))+'</div>'+
-      '<div style="color:var(--gray-700);white-space:pre-line;line-height:1.4;min-width:0;" title="'+esc(mem)+'">'+esc(_shortText(mem, 80))+'</div>'+
-      '<div style="color:var(--gray-700);white-space:pre-line;line-height:1.4;min-width:0;" title="'+esc(cnd)+'">'+esc(_shortText(cnd, 80))+'</div>'+
+      '<div style="color:var(--gray-700);white-space:pre-line;line-height:1.4;min-width:0;" title="'+esc(stg)+'">'+esc(_shortText(stg,80))+'</div>'+
+      '<div style="color:var(--gray-700);white-space:pre-line;line-height:1.4;min-width:0;" title="'+esc(mem)+'">'+esc(_shortText(mem,80))+'</div>'+
+      '<div style="color:var(--gray-700);white-space:pre-line;line-height:1.4;min-width:0;" title="'+esc(cnd)+'">'+esc(_shortText(cnd,80))+'</div>'+
     '</div>';
-  }).join('');
+  };
 
-  area.innerHTML = head + (rows || '<div style="padding:30px;text-align:center;color:var(--gray-400);">該当人材なし</div>');
+  if (groupMonth) {
+    const groups = {};
+    list.forEach(w => { const key = w.visa_expiry ? w.visa_expiry.slice(0,7) : '____'; (groups[key] = groups[key] || []).push(w); });
+    const keys = Object.keys(groups).sort();
+    const body = keys.map(k => {
+      const items = groups[k].sort(byMgmt);
+      const label = k==='____' ? '在留期限なし' : (parseInt(k.slice(0,4),10)+'年'+parseInt(k.slice(5,7),10)+'月');
+      return '<div style="background:#0f2040;color:white;padding:6px 14px;font-size:12px;font-weight:800;">📅 '+esc(label)+' <span style="opacity:.7;font-weight:600;">('+items.length+'名)</span></div>'+
+        items.map(rowHtml).join('');
+    }).join('');
+    area.innerHTML = head + (body || '<div style="padding:30px;text-align:center;color:var(--gray-400);">該当人材なし</div>');
+  } else {
+    list.sort(byMgmt);
+    const body = list.map(rowHtml).join('');
+    area.innerHTML = head + (body || '<div style="padding:30px;text-align:center;color:var(--gray-400);">該当人材なし</div>');
+  }
 }
 
 function _openWorkerRenewalDetail(workerId) {
@@ -7821,6 +7896,18 @@ function toggleExpectedLeaveField() {
   if (wrap) wrap.style.display = (v === '退職予定(更新なし決定)') ? '' : 'none';
 }
 
+function toggleRenewalCompletionFields() {
+  const v = document.getElementById('wf_renewal_status')?.value || '';
+  const box = document.getElementById('wf_renewal_completion_box');
+  if (box) box.style.display = (v === '完了') ? '' : 'none';
+}
+
+function syncRenewalVisaExpiry() {
+  const src = document.getElementById('wf_renewal_visa_expiry');
+  const dst = document.getElementById('wf_visa_expiry');
+  if (src && dst) dst.value = src.value;
+}
+
 function toggleLumpSumFields() {
   const v = document.getElementById('wf_lump_sum_plan')?.value || '';
   const d = document.getElementById('wf_lump_sum_detail');
@@ -7842,6 +7929,7 @@ function renderWorkerAlerts() {
   const kokkoTg2Alert = [];       // 2号変更報告未提出
   const lumpSumAlert = [];        // 脱退一時金あり & 転出/転入手続き未完了
   const leaveOverdueAlert = [];   // 退職予定日超過 & ステータス未変更 & 退職日未記入
+  const renewalDueAlert = [];     // 3か月以内×更新ステータス未入力 / 2か月以内×要確認
   const isConstruction = (w) => /建設/.test(w.applicant_field || '');
   (filteredWorkers.length ? filteredWorkers : allWorkers).forEach(w => {
     // KMT支援外は全アラートから除外(支援対象外なので)
@@ -7878,6 +7966,11 @@ function renderWorkerAlerts() {
     const days = Math.floor((exp-today)/86400000);
     // 退職済は全アラート対象外(退職予定(更新なし決定)は期限アラートには残す)
     if (['退職済(帰国)','退職済(転職)'].includes(w.status)) return;
+    // 📋 更新リマインド: 3か月以内×更新ステータス未入力 / 2か月以内×要確認(退職予定は除外)
+    if (w.status !== '退職予定(更新なし決定)') {
+      if (days <= 91 && !w.renewal_status) renewalDueAlert.push({ w, days, reason:'no_status' });
+      else if (days <= 61 && w.renewal_status === '要確認') renewalDueAlert.push({ w, days, reason:'needs_check' });
+    }
     // 申請忘れ判定(90日以内・期限切れ含む・申請予定なしor未設定)
     // ただし 退職予定(更新なし決定) と 2号企業単独 は「申請なし」アラートから除外(期限アラートはそのまま)
     const applyStatus = w.apply_status || '申請予定なし';
@@ -7900,7 +7993,7 @@ function renderWorkerAlerts() {
   });
   const total = alerts[1].length + alerts[2].length + alerts[3].length;
   const kokkoTotal = kokkoPlacementAlert.length + kokkoRetireAlert.length + kokkoTg2Alert.length;
-  if (!total && !missAlert.length && !shortageAlert.length && !kokkoTotal && !lumpSumAlert.length && !leaveOverdueAlert.length) { banner.innerHTML=''; return; }
+  if (!total && !missAlert.length && !shortageAlert.length && !kokkoTotal && !lumpSumAlert.length && !leaveOverdueAlert.length && !renewalDueAlert.length) { banner.innerHTML=''; return; }
   // 残り日数で昇順ソート(期限切れも含めて期日が近い順)
   missAlert.sort((a,b) => a.days - b.days);
   shortageAlert.sort((a,b) => a.tokureiDays - b.tokureiDays);
@@ -7989,6 +8082,36 @@ function renderWorkerAlerts() {
     const loList = document.createElement('div');
     loList.id = 'workerLeaveOverdueAlertList';
     wrap.appendChild(loList);
+  }
+
+  // 📋 更新リマインド(3か月以内×未入力 / 2か月以内×要確認)
+  if (renewalDueAlert.length) {
+    renewalDueAlert.sort((a,b) => a.days - b.days);
+    const noStatusN = renewalDueAlert.filter(x => x.reason==='no_status').length;
+    const checkN = renewalDueAlert.filter(x => x.reason==='needs_check').length;
+    const rd = document.createElement('div');
+    rd.style.cssText = 'background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%);border:2px solid #2563eb;border-radius:10px;padding:12px 16px;margin-bottom:10px;cursor:pointer;transition:.15s;box-shadow:0 2px 8px rgba(37,99,235,0.12);';
+    rd.onmouseover = () => rd.style.opacity = '0.92';
+    rd.onmouseout = () => rd.style.opacity = '1';
+    rd.innerHTML =
+      '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">'+
+        '<div style="display:flex;align-items:center;gap:10px;">'+
+          '<div style="font-size:28px;">📋</div>'+
+          '<div>'+
+            '<div style="font-size:13px;font-weight:900;color:#1d4ed8;">更新リマインド — 更新状況の入力・確認が必要</div>'+
+            '<div style="font-size:11px;color:#1e40af;margin-top:2px;">在留期限3か月以内で更新ステータス未入力: <strong>'+noStatusN+'名</strong> ／ 2か月以内で「要確認」のまま: <strong>'+checkN+'名</strong></div>'+
+          '</div>'+
+        '</div>'+
+        '<div style="text-align:right;">'+
+          '<div style="font-size:26px;font-weight:900;color:#1d4ed8;line-height:1;">'+renewalDueAlert.length+'<span style="font-size:13px;font-weight:600;">名</span></div>'+
+          '<div style="font-size:10px;color:#1d4ed8;margin-top:2px;">クリックで一覧表示 ▼</div>'+
+        '</div>'+
+      '</div>';
+    rd.onclick = () => toggleRenewalDueAlertList(renewalDueAlert);
+    wrap.appendChild(rd);
+    const rdList = document.createElement('div');
+    rdList.id = 'workerRenewalDueAlertList';
+    wrap.appendChild(rdList);
   }
 
   // 🟣 不足あり放置警告(独立した大きなバナー)
@@ -8290,6 +8413,28 @@ function toggleLeaveOverdueAlertList(list) {
     '</div>';
   }).join('');
   area.innerHTML = '<div style="margin-top:-2px;margin-bottom:10px;background:white;border:2px solid #b91c1c;border-top:none;border-radius:0 0 10px 10px;overflow:hidden;">'+rows+'</div>';
+  area.dataset.open = '1';
+}
+
+// 更新リマインドの人材リストを開閉
+function toggleRenewalDueAlertList(list) {
+  const area = document.getElementById('workerRenewalDueAlertList');
+  if (!area) return;
+  if (area.dataset.open === '1') { area.innerHTML=''; area.dataset.open=''; return; }
+  const rows = list.map(({w, days, reason}) => {
+    const tag = reason==='needs_check'
+      ? '<span style="background:#ea580c;color:white;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:800;">要確認のまま</span>'
+      : '<span style="background:#2563eb;color:white;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:800;">ステータス未入力</span>';
+    const dtag = days>=0 ? 'あと'+days+'日' : '期限切れ'+Math.abs(days)+'日';
+    return '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #bfdbfe;cursor:pointer;background:white;flex-wrap:wrap;" onclick="event.stopPropagation();openWorkerModal(\''+w.id+'\')">'+
+      '<div style="min-width:80px;font-size:11px;font-weight:600;color:#64748b;">'+esc(w.management_no||'-')+'</div>'+
+      '<div style="flex:1;min-width:160px;font-size:12px;"><strong>'+esc(w.name)+'</strong> <span style="color:#94a3b8;font-size:11px;">('+esc(w.nationality||'-')+')</span></div>'+
+      '<div style="font-size:11px;color:#64748b;flex:1;min-width:120px;">'+esc(w.companies?.name||'-')+'</div>'+
+      '<div style="font-size:11px;color:#1d4ed8;font-weight:700;">期限 '+formatDate(w.visa_expiry)+' / '+dtag+'</div>'+
+      '<div>'+tag+'</div>'+
+    '</div>';
+  }).join('');
+  area.innerHTML = '<div style="margin-top:-2px;margin-bottom:10px;background:white;border:2px solid #2563eb;border-top:none;border-radius:0 0 10px 10px;overflow:hidden;">'+rows+'</div>';
   area.dataset.open = '1';
 }
 
@@ -8672,6 +8817,7 @@ function buildWorkerModalBody(w) {
         ${['KMT支援','KMT支援外'].map(s=>`<option ${(w.kmt_support||'KMT支援')===s?'selected':''}>${s}</option>`).join('')}
       </select></div>
     <div class="form-group"><label class="form-label">KMT担当</label><input class="form-input" id="wf_staff" value="${esc(w.staff||'')}"></div>
+    <div class="form-group"><label class="form-label">KMTサブ担当</label><input class="form-input" id="wf_sub_staff" value="${esc(w.sub_staff||'')}"></div>
     <div class="section-title" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;user-select:none;" onclick="toggle2goSupportSection()">
       <span>🛡️ 特定技能2号支援区分</span>
       <span id="wf_2go_arrow" style="font-size:14px;color:var(--gray-500);transition:transform .15s;">▼</span>
@@ -8806,18 +8952,48 @@ function buildWorkerModalBody(w) {
     </div>
     <div class="form-grid">
       <div class="section-title">ステータス・進捗</div>
+      <div class="form-group full">
+        <div style="background:#f8fafc;border:1px solid var(--gray-200);border-radius:8px;padding:10px 12px;font-size:11px;color:var(--gray-700);display:flex;flex-wrap:wrap;gap:14px;align-items:center;">
+          <span style="opacity:.7;font-weight:700;">人材情報から自動反映:</span>
+          <span>申請種別: <strong>${esc(w.apply_type||'-')}</strong></span>
+          <span>申請ステータス: <strong>${esc(w.apply_status||'-')}</strong></span>
+          <span>一時帰国日: <strong>${w.return_home_date||'-'}</strong></span>
+          <span>再入国日: <strong>${w.return_jp_date||'-'}</strong></span>
+        </div>
+      </div>
       <div class="form-group">
         <label class="form-label">更新状況ステータス</label>
-        <select class="form-select" id="wf_renewal_status">
-          ${['','更新なし','更新済(有)','更新済(無)','要確認','優先度高め','許可済み'].map(s=>`<option value="${s}" ${(w.renewal_status||'')===s?'selected':''}>${s||'─ 選択 ─'}</option>`).join('')}
+        <select class="form-select" id="wf_renewal_status" onchange="toggleRenewalCompletionFields()">
+          ${(() => {
+            const opts = ['','更新決定','更新なし','優先度高め','要確認','申請依頼済み','完了'];
+            const cur = w.renewal_status || '';
+            if (cur && !opts.includes(cur)) opts.push(cur);
+            return opts.map(s=>`<option value="${s}" ${cur===s?'selected':''}>${s||'─ 選択 ─'}</option>`).join('');
+          })()}
         </select>
         <div style="font-size:10px;color:var(--gray-400);margin-top:3px;line-height:1.5;">
-          <strong>更新なし</strong>: 本帰国・転職等で更新申請しない / 
-          <strong>更新済(有)</strong>: 雇用条件変更ありで申請済 / 
-          <strong>更新済(無)</strong>: 雇用条件変更なしで申請済 / 
-          <strong>要確認</strong>: 状況確認中 / 
-          <strong>優先度高め</strong>: 急ぎ対応 / 
-          <strong>許可済み</strong>: 更新許可済み
+          <strong>更新決定</strong>: 更新方針確定 / <strong>更新なし</strong>: 本帰国・転職等で更新しない / <strong>優先度高め</strong>: 急ぎ対応 / <strong>要確認</strong>: 状況確認中 / <strong>申請依頼済み</strong>: 申請を依頼済み / <strong>完了</strong>: 更新完了
+        </div>
+      </div>
+      <div class="form-group full" id="wf_renewal_completion_box" style="display:${w.renewal_status==='完了'?'':'none'};">
+        <div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;padding:12px;">
+          <div style="font-size:11px;color:#047857;font-weight:700;margin-bottom:8px;">✅ 更新完了情報</div>
+          <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#047857;cursor:pointer;margin-bottom:10px;"><input type="checkbox" id="wf_residence_card_issued" ${w.residence_card_issued?'checked':''}>在留カードの情報 発行済み</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+            <div>
+              <label class="form-label" style="font-size:11px;">新しい在留期限 <span style="font-size:9px;color:var(--gray-400);">— 基本情報の在留期限と連動</span></label>
+              <input class="form-input" id="wf_renewal_visa_expiry" type="date" value="${w.visa_expiry||''}" onchange="syncRenewalVisaExpiry()">
+            </div>
+            <div>
+              <label class="form-label" style="font-size:11px;">在留カード 郵送追跡番号（在カパ）</label>
+              <input class="form-input" id="wf_card_tracking_no" value="${esc(w.card_tracking_no||'')}" placeholder="例: 1234-5678-9012">
+            </div>
+          </div>
+          <div>
+            <label class="form-label" style="font-size:11px;">郵送先</label>
+            <textarea class="form-textarea" id="wf_card_mailing_address" rows="2" placeholder="〒... 住所 / 宛名">${esc(w.card_mailing_address||'')}</textarea>
+          </div>
+          <div style="font-size:10px;color:#047857;margin-top:8px;line-height:1.5;">※「完了」で保存すると、上記の完了情報が人材チャットに自動投稿されます。<br>※ 新しい在留期限を入力して保存すると、次サイクルのため更新ステータスは空欄に初期化されます。</div>
         </div>
       </div>
       <div class="form-group">
@@ -13123,6 +13299,14 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260612.09', date:'2026-06-12', notify:true, items:[
+    '更新リスト フィルター強化: 「月ごと表示」(在留期限の月別グループ)、「在留期限4か月以内」、サブ担当フィルターを追加。担当フィルターはKMT担当(staff)基準に修正',
+    '更新リスト 着色: 在留期限が4か月以内の人材を行ごとオレンジ表示(残日数も表示)',
+    '更新リマインド通知: 在留期限3か月以内で更新ステータス未入力 / 2か月以内で「要確認」のままの人材を上部に通知',
+    '更新状況ステータスを刷新: 更新決定/更新なし/優先度高め/要確認/申請依頼済み/完了',
+    '更新状況タブに人材情報を自動反映表示(申請種別・申請ステータス・一時帰国日・再入国日)。サブ担当も追加',
+    '「完了」選択時に完了情報欄(在留カード発行済み・新在留期限[基本情報と連動]・郵送追跡番号・郵送先)を表示。保存で完了情報を人材チャットに自動投稿し、新しい在留期限を入力するとステータスは初期化',
+  ]},
   { version:'ver.20260612.08', date:'2026-06-12', notify:true, items:[
     '在職ステータス「退職予定(更新なし決定)」で退職予定日の入力欄を表示。予定日を過ぎてもステータス未変更・退職日未記入の人材を上部にアラート通知',
     '新規所属機関登録: KMTメイン/サブ担当を選択式(記入式→プルダウン)に変更',
