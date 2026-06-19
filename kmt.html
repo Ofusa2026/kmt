@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260612.10 -->
+<!-- KMT_VERSION ver.20260612.11 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -308,7 +308,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260612.10</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260612.11</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -571,6 +571,11 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
           <div class="form-group">
             <label class="form-label">事業所電話番号</label>
             <input class="form-input" id="co_workplace_tel" placeholder="03-xxxx-xxxx">
+          </div>
+          <div class="form-group full">
+            <label class="form-label">追加の就業場所 <span style="font-size:10px;color:var(--gray-400);font-weight:400;">— 就業場所が複数ある場合に追加</span></label>
+            <div id="co_workplaces_extra"></div>
+            <button type="button" class="btn btn-outline" style="font-size:11px;padding:4px 12px;margin-top:4px;" onclick="addExtraWorkplaceRow()">＋ 就業場所を追加</button>
           </div>
 
           <div class="section-title">👤 代表者・担当者</div>
@@ -1515,7 +1520,7 @@ const CO_FIELDS = [
   'memo','company_note','last_visit'
 ];
 
-function clearCoForm() { CO_FIELDS.forEach(f => { const el = document.getElementById('co_'+f); if(el) el.value=''; }); renderContactEmailRows(''); _coNotes = []; renderCompanyNotes(); }
+function clearCoForm() { CO_FIELDS.forEach(f => { const el = document.getElementById('co_'+f); if(el) el.value=''; }); renderContactEmailRows(''); renderExtraWorkplaces([]); _coNotes = []; renderCompanyNotes(); }
 
 function fillCoForm(co) {
   const map = {
@@ -1542,6 +1547,7 @@ function fillCoForm(co) {
     if (el && co[col] != null) el.value = co[col];
   });
   renderContactEmailRows(co.contact_email);
+  renderExtraWorkplaces(co.workplaces_extra);
   _coNotes = Array.isArray(co.company_notes) ? co.company_notes.slice() : [];
   renderCompanyNotes();
 }
@@ -1602,6 +1608,7 @@ function getCoFormData() {
     memo: document.getElementById('co_memo').value || null,
     company_note: document.getElementById('co_company_note').value || null,
     company_notes: _coNotes,
+    workplaces_extra: getExtraWorkplaces(),
     last_visit: document.getElementById('co_last_visit').value || null,
     updated_at: new Date().toISOString()
   };
@@ -1651,6 +1658,44 @@ function getContactEmails() {
 }
 
 let _coNotes = [];
+function _extraWorkplaceRowHtml(wp){
+  wp = wp || {};
+  const f = (k,ph) => '<input class="form-input co-wp-'+k+'" value="'+esc(wp[k]||'')+'" placeholder="'+ph+'" style="font-size:12px;">';
+  return '<div class="co-wp-row" style="border:1px solid var(--gray-200);border-radius:8px;padding:8px;margin-bottom:6px;background:#f8fafc;">'+
+    '<div style="display:flex;justify-content:flex-end;margin-bottom:4px;"><button type="button" class="btn btn-outline" style="font-size:10px;padding:2px 8px;color:var(--red);" onclick="this.closest(\'.co-wp-row\').remove()">✕ 削除</button></div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">'+
+      '<div style="grid-column:1/-1;">'+f('name','事業所名 例:○○工場 第一製造部')+'</div>'+
+      '<div>'+f('zip','〒123-4567')+'</div>'+
+      '<div>'+f('pref','都道府県')+'</div>'+
+      '<div>'+f('city','市区町村')+'</div>'+
+      '<div>'+f('address','番地・建物')+'</div>'+
+      '<div style="grid-column:1/-1;">'+f('tel','電話番号')+'</div>'+
+    '</div>'+
+  '</div>';
+}
+function renderExtraWorkplaces(arr){
+  const box = document.getElementById('co_workplaces_extra');
+  if(!box) return;
+  const list = Array.isArray(arr) ? arr : [];
+  box.innerHTML = list.map(_extraWorkplaceRowHtml).join('');
+}
+function addExtraWorkplaceRow(){
+  const box = document.getElementById('co_workplaces_extra');
+  if(box) box.insertAdjacentHTML('beforeend', _extraWorkplaceRowHtml({}));
+}
+function getExtraWorkplaces(){
+  const box = document.getElementById('co_workplaces_extra');
+  if(!box) return [];
+  return [...box.querySelectorAll('.co-wp-row')].map(row => ({
+    name: row.querySelector('.co-wp-name')?.value.trim()||'',
+    zip: row.querySelector('.co-wp-zip')?.value.trim()||'',
+    pref: row.querySelector('.co-wp-pref')?.value.trim()||'',
+    city: row.querySelector('.co-wp-city')?.value.trim()||'',
+    address: row.querySelector('.co-wp-address')?.value.trim()||'',
+    tel: row.querySelector('.co-wp-tel')?.value.trim()||'',
+  })).filter(wp => wp.name||wp.zip||wp.pref||wp.city||wp.address||wp.tel);
+}
+
 function renderCompanyNotes() {
   const box = document.getElementById('co_notes_list');
   if (!box) return;
@@ -7515,6 +7560,15 @@ const REN_STATUS_COLORS = {
   '許可済み':   { bg:'#0891b2', text:'white' },
 };
 
+function _zaisekiBadge(s){
+  if(!s) return '<span style="font-size:10px;color:#94a3b8;">-</span>';
+  let c='#334155';
+  if(s==='退職予定(更新なし決定)') c='#dc2626';
+  else if(s.indexOf('退職済')===0) c='#94a3b8';
+  else if(s.indexOf('在職中')===0) c='#059669';
+  else if(s==='配属前') c='#0891b2';
+  return '<span style="font-size:10px;font-weight:700;color:'+c+';white-space:normal;line-height:1.2;">'+esc(s)+'</span>';
+}
 function _renewalStatusBadge(s) {
   if (!s) return '<span style="font-size:10px;color:#94a3b8;">─</span>';
   const c = REN_STATUS_COLORS[s] || { bg:'#94a3b8', text:'white' };
@@ -7631,9 +7685,9 @@ function renderRenewalList() {
     return (a.name||'').localeCompare(b.name||'','ja');
   };
 
-  const gridCols = '44px 44px minmax(120px,1fr) minmax(120px,1.1fr) 74px 92px 92px 100px 90px minmax(150px,1.4fr) minmax(150px,1.4fr) minmax(150px,1.4fr)';
+  const gridCols = '44px 44px minmax(120px,1fr) minmax(120px,1.1fr) 74px 92px 104px 92px 100px 90px minmax(150px,1.4fr) minmax(150px,1.4fr) minmax(150px,1.4fr)';
   const head = '<div style="display:grid;grid-template-columns:'+gridCols+';gap:6px;padding:8px 12px;background:#f8fafc;border-bottom:1px solid var(--gray-200);font-size:11px;font-weight:700;color:var(--navy);">'+
-    '<div>管理番号</div><div>写真</div><div>氏名</div><div>企業</div><div>在留資格</div><div>在留期限</div><div>ステータス</div><div>担当/サブ</div><div>確認担当</div><div>現在の段階</div><div>申請メモ</div><div>確定雇用条件</div></div>';
+    '<div>管理番号</div><div>写真</div><div>氏名</div><div>企業</div><div>在留資格</div><div>在留期限</div><div>在籍ステータス</div><div>更新ステータス</div><div>担当/サブ</div><div>確認担当</div><div>現在の段階</div><div>申請メモ</div><div>確定雇用条件</div></div>';
 
   const rowHtml = (w) => {
     const stg=w.renewal_stage||'', mem=w.renewal_memo||'', cnd=w.employment_condition||'';
@@ -7650,6 +7704,7 @@ function renderRenewalList() {
       '<div style="color:var(--gray-600);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;" title="'+esc(w.companies?.name||'')+'">'+esc(w.companies?.name||'-')+'</div>'+
       '<div style="color:var(--gray-600);">'+esc(w.visa_status||'-')+'</div>'+
       '<div style="'+expStyle+'">'+esc(w.visa_expiry||'-')+expSub+'</div>'+
+      '<div style="min-width:0;">'+_zaisekiBadge(w.status)+'</div>'+
       '<div>'+_renewalStatusBadge(w.renewal_status)+'</div>'+
       '<div style="color:var(--gray-600);font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;" title="'+esc((w.staff||'-')+' / '+(w.sub_staff||'-'))+'">'+esc(w.staff||'-')+'<br><span style="color:#94a3b8;">'+esc(w.sub_staff||'-')+'</span></div>'+
       '<div style="color:var(--gray-600);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;" title="'+esc(w.renewal_check_staff||'')+'">'+esc(w.renewal_check_staff||'-')+'</div>'+
@@ -8331,6 +8386,7 @@ const APPLY_STATUS_STYLE = {
 };
 function _alertInfoBadges(w){
   const items = [];
+  if (w.status) { let sb='#475569'; if(w.status==='退職予定(更新なし決定)')sb='#dc2626'; else if(w.status.indexOf('退職済')===0)sb='#64748b'; else if(w.status.indexOf('在職中')===0)sb='#059669'; else if(w.status==='配属前')sb='#0891b2'; items.push({label:'在籍', val:w.status, bg:sb, fg:'white'}); }
   if (w.apply_status) { const s = APPLY_STATUS_STYLE[w.apply_status] || {bg:'#1e3a8a',fg:'white'}; items.push({label:'申請', val:w.apply_status, bg:s.bg, fg:s.fg}); }
   if (w.kmt_support) items.push({label:'KMT', val:w.kmt_support, bg:'#0891b2', fg:'white'});
   if (w.visa_status) items.push({label:'資格', val:w.visa_status, bg:'#4338ca', fg:'white'});
@@ -13308,6 +13364,11 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260612.11', date:'2026-06-12', notify:true, items:[
+    '所属機関詳細: 就業場所が複数ある場合の「就業場所を追加」ボタンを追加',
+    'アラート一覧の各人材に「在籍ステータス」バッジを表示(申請予定なしでも転職予定等が一覧で分かるように)',
+    '更新状況リスト: 「在籍ステータス」列を追加。従来の「ステータス」列は「更新ステータス」に名称変更',
+  ]},
   { version:'ver.20260612.10', date:'2026-06-12', notify:true, items:[
     '【不具合修正】チャットから人材詳細を開くと、入力済みの基本情報が反映されない問題を修正(他画面の軽量読込で部分データになっていた場合に完全データを再取得)',
     '【不具合修正】チャット開始時に既存ルームを見落として重複チャットルームを作る問題を修正(作成前にDBで既存ルームを確認)',
