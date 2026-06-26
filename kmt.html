@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260612.12 -->
+<!-- KMT_VERSION ver.20260612.13 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -308,7 +308,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260612.12</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260612.13</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -7632,7 +7632,7 @@ function buildWorkersScreen() {
         <option>技能実習2号</option><option>技能実習3号</option><option>家族滞在</option>
         <option>技人国</option><option>その他</option>
       </select>
-      <select id="renFilterMainStaff" onchange="renderRenewalList()" class="filter-select" style="min-width:110px;"><option value="">全担当</option></select>
+      <select id="renFilterMainStaff" onchange="renderRenewalList()" class="filter-select" style="min-width:110px;"><option value="">全メイン担当</option></select>
       <select id="renFilterSubStaff" onchange="renderRenewalList()" class="filter-select" style="min-width:120px;"><option value="">全サブ担当</option></select>
       <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:#b45309;white-space:nowrap;cursor:pointer;padding:5px 9px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;"><input type="checkbox" id="renFilter4mo" onchange="renderRenewalList()">在留期限4か月以内</label>
       <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:var(--navy);white-space:nowrap;cursor:pointer;padding:5px 9px;background:#f1f5f9;border:1px solid var(--gray-200);border-radius:8px;"><input type="checkbox" id="renGroupMonth" onchange="renderRenewalList()">📅 月ごと表示</label>
@@ -7700,7 +7700,7 @@ async function _ensureRenewalDataLoaded() {
   const needsFetch = !sample || !('renewal_status' in sample);
   if (needsFetch) {
     try {
-      const d = await sbFetch('workers?select=*,companies(name)&order=management_no.asc.nullslast,name.asc');
+      const d = await sbFetch('workers?select=*,companies(name,main_staff,sub_staff)&order=management_no.asc.nullslast,name.asc');
       allWorkers = d || [];
     } catch(e) { console.warn(e); }
   }
@@ -7716,15 +7716,15 @@ function _populateRenewalFilters() {
   }
   const msSel = document.getElementById('renFilterMainStaff');
   if (msSel) {
-    const staffs = [...new Set((allWorkers||[]).map(w => w.staff).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ja'));
+    const staffs = [...new Set((allWorkers||[]).map(w => w.companies?.main_staff).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ja'));
     const cur = msSel.value;
-    msSel.innerHTML = '<option value="">全担当</option>' +
+    msSel.innerHTML = '<option value="">全メイン担当</option>' +
       staffs.map(s => `<option>${esc(s)}</option>`).join('');
     if (cur) msSel.value = cur;
   }
   const subSel = document.getElementById('renFilterSubStaff');
   if (subSel) {
-    const subs = [...new Set((allWorkers||[]).map(w => w.sub_staff).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ja'));
+    const subs = [...new Set((allWorkers||[]).map(w => w.companies?.sub_staff).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ja'));
     const cur = subSel.value;
     subSel.innerHTML = '<option value="">全サブ担当</option>' +
       subs.map(s => `<option>${esc(s)}</option>`).join('');
@@ -7755,8 +7755,8 @@ function renderRenewalList() {
     if (w.kmt_support === 'KMT支援外') return false;
     if (coFilter && (w.companies?.name||'') !== coFilter) return false;
     if (visaFilter && (w.visa_status||'') !== visaFilter) return false;
-    if (msFilter && (w.staff||'') !== msFilter) return false;
-    if (subFilter && (w.sub_staff||'') !== subFilter) return false;
+    if (msFilter && (w.companies?.main_staff||'') !== msFilter) return false;
+    if (subFilter && (w.companies?.sub_staff||'') !== subFilter) return false;
     if (only4mo) { const d=_renDaysLeft(w); if (d===null || d>122) return false; }
     if (stFilter === '__empty__') {
       if (w.renewal_status) return false;
@@ -7781,7 +7781,7 @@ function renderRenewalList() {
 
   const gridCols = '44px 44px minmax(120px,1fr) minmax(120px,1.1fr) 74px 92px 104px 92px 100px 90px minmax(150px,1.4fr) minmax(150px,1.4fr) minmax(150px,1.4fr)';
   const head = '<div style="display:grid;grid-template-columns:'+gridCols+';gap:6px;padding:8px 12px;background:#f8fafc;border-bottom:1px solid var(--gray-200);font-size:11px;font-weight:700;color:var(--navy);">'+
-    '<div>管理番号</div><div>写真</div><div>氏名</div><div>企業</div><div>在留資格</div><div>在留期限</div><div>在籍ステータス</div><div>更新ステータス</div><div>担当/サブ</div><div>確認担当</div><div>現在の段階</div><div>申請メモ</div><div>確定雇用条件</div></div>';
+    '<div>管理番号</div><div>写真</div><div>氏名</div><div>企業</div><div>在留資格</div><div>在留期限</div><div>在籍ステータス</div><div>更新ステータス</div><div>メイン担当/サブ</div><div>確認担当</div><div>現在の段階</div><div>申請メモ</div><div>確定雇用条件</div></div>';
 
   const rowHtml = (w) => {
     const stg=w.renewal_stage||'', mem=w.renewal_memo||'', cnd=w.employment_condition||'';
@@ -7800,7 +7800,7 @@ function renderRenewalList() {
       '<div style="'+expStyle+'">'+esc(w.visa_expiry||'-')+expSub+'</div>'+
       '<div style="min-width:0;">'+_zaisekiBadge(w.status)+'</div>'+
       '<div>'+_renewalStatusBadge(w.renewal_status)+'</div>'+
-      '<div style="color:var(--gray-600);font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;" title="'+esc((w.staff||'-')+' / '+(w.sub_staff||'-'))+'">'+esc(w.staff||'-')+'<br><span style="color:#94a3b8;">'+esc(w.sub_staff||'-')+'</span></div>'+
+      '<div style="color:var(--gray-600);font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;" title="'+esc((w.companies?.main_staff||'-')+' / '+(w.companies?.sub_staff||'-'))+'">'+esc(w.companies?.main_staff||'-')+'<br><span style="color:#94a3b8;">'+esc(w.companies?.sub_staff||'-')+'</span></div>'+
       '<div style="color:var(--gray-600);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;" title="'+esc(w.renewal_check_staff||'')+'">'+esc(w.renewal_check_staff||'-')+'</div>'+
       '<div style="color:var(--gray-700);white-space:pre-line;line-height:1.4;min-width:0;" title="'+esc(stg)+'">'+esc(_shortText(stg,80))+'</div>'+
       '<div style="color:var(--gray-700);white-space:pre-line;line-height:1.4;min-width:0;" title="'+esc(mem)+'">'+esc(_shortText(mem,80))+'</div>'+
@@ -13458,6 +13458,9 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260612.13', date:'2026-06-12', notify:true, items:[
+    '更新状況リストの担当表示を「企業に紐づくメイン担当・サブ担当」に変更(従来は人材紐付けの担当)。メイン担当別・サブ担当別での絞り込みも企業担当基準に変更',
+  ]},
   { version:'ver.20260612.12', date:'2026-06-12', notify:true, items:[
     '所属機関詳細「メモ」タブに「受け入れ状況（協力確認書）」を追加: 外国人の就労(特定技能以外)あり/なし(ありで技能実習/技人国/永住者・定住者/その他を選択)、他登録支援機関の利用あり/なし(ありで詳細欄・任意)',
     '所属機関詳細「メモ」タブに「任意保険の加入状況」を追加: 保険案内指導の日程・担当、保険名、加入日・終了日、加入手続き(企業/本人/KMT/他支援機関)、保険料負担(企業/本人)、共有事項',
