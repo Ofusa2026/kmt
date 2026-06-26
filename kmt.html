@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260612.13 -->
+<!-- KMT_VERSION ver.20260612.14 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -308,7 +308,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260612.13</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260612.14</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -606,9 +606,9 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
             <label class="form-label">KMTメイン担当</label>
             <select class="form-select" id="co_main_staff"><option value="">─ 選択 ─</option></select>
           </div>
-          <div class="form-group">
-            <label class="form-label">KMTサブ担当</label>
-            <select class="form-select" id="co_sub_staff"><option value="">─ 選択 ─</option></select>
+          <div class="form-group full">
+            <label class="form-label">KMTサブ担当 <span style="font-size:10px;color:var(--gray-400);font-weight:400;">— 複数選択可</span></label>
+            <div id="co_sub_staff_box" style="display:flex;flex-wrap:wrap;gap:10px 16px;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:12px;"></div>
           </div>
           <div class="form-group full">
             <label class="form-label">社内メモ <span style="font-size:10px;color:var(--gray-400);font-weight:400;">— KMT側共有用</span></label>
@@ -1583,7 +1583,7 @@ const CO_FIELDS = [
   'insurance_guidance_date','insurance_guidance_staff','insurance_name','insurance_start_date','insurance_end_date','insurance_procedure_by','insurance_premium_by','insurance_note'
 ];
 
-function clearCoForm() { CO_FIELDS.forEach(f => { const el = document.getElementById('co_'+f); if(el) el.value=''; }); renderContactEmailRows(''); renderExtraWorkplaces([]); document.querySelectorAll('.co-offt').forEach(cb=>cb.checked=false); if(typeof toggleOtherForeignTypes==='function')toggleOtherForeignTypes(); if(typeof toggleOtherSupportOrg==='function')toggleOtherSupportOrg(); _coNotes = []; renderCompanyNotes(); }
+function clearCoForm() { CO_FIELDS.forEach(f => { const el = document.getElementById('co_'+f); if(el) el.value=''; }); renderContactEmailRows(''); renderExtraWorkplaces([]); document.querySelectorAll('.co-offt').forEach(cb=>cb.checked=false); document.querySelectorAll('.co-substaff').forEach(cb=>cb.checked=false); if(typeof toggleOtherForeignTypes==='function')toggleOtherForeignTypes(); if(typeof toggleOtherSupportOrg==='function')toggleOtherSupportOrg(); _coNotes = []; renderCompanyNotes(); }
 
 function fillCoForm(co) {
   const map = {
@@ -1649,7 +1649,7 @@ function getCoFormData() {
     contact_tel: document.getElementById('co_contact_tel').value || null,
     contact_email: getContactEmails(),
     main_staff: document.getElementById('co_main_staff').value || null,
-    sub_staff: document.getElementById('co_sub_staff').value || null,
+    sub_staff: getCompanySubStaff(),
     drive_url: document.getElementById('co_drive_url').value || null,
     drive_url2: document.getElementById('co_drive_url_kmt').value || null,
     fee_per_person: document.getElementById('co_fee_per_person').value ? parseInt(document.getElementById('co_fee_per_person').value) : null,
@@ -1698,23 +1698,35 @@ function getCoFormData() {
   };
 }
 
+// 正式なKMT担当者ロスター(表記ゆれ防止のためフォームのメイン/サブ担当はこのリストから選択)
+const KMT_STAFF_ROSTER = ['蛭田','高村','ウスマン','ファウザン','白井','アヒュ','ニサ','ガイ','ナム','ナディ','ノイ','ソマッド','亀谷','坂齊','大房　明良'];
+
 function populateCompanyStaffSelects(co) {
-  const build = () => {
-    const staff = [...new Set((allUsers||[]).map(u=>u.name).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ja'));
-    [['co_main_staff','main_staff'],['co_sub_staff','sub_staff']].forEach(([elId, key]) => {
-      const sel = document.getElementById(elId);
-      if (!sel) return;
-      const cur = co ? (co[key]||'') : '';
-      const list = [...staff];
-      if (cur && !list.includes(cur)) list.unshift(cur);
-      sel.innerHTML = '<option value="">─ 選択 ─</option>' + list.map(n=>'<option>'+esc(n)+'</option>').join('');
-      sel.value = cur;
-    });
-  };
-  build();
-  if (!(allUsers && allUsers.length)) {
-    sbFetch('users?select=name&order=name.asc').then(d => { if (d && d.length) { allUsers = d; build(); } }).catch(()=>{});
+  // メイン担当: ロスターから単一選択(既存値が外れていても保持)
+  const mainSel = document.getElementById('co_main_staff');
+  if (mainSel) {
+    const cur = co ? (co.main_staff||'') : '';
+    const list = [...KMT_STAFF_ROSTER];
+    if (cur && !list.includes(cur)) list.unshift(cur);
+    mainSel.innerHTML = '<option value="">─ 選択 ─</option>' + list.map(n=>'<option>'+esc(n)+'</option>').join('');
+    mainSel.value = cur;
   }
+  // サブ担当: ロスターから複数選択(チェックボックス)。既存の値もチェック・ロスター外はその他として追加
+  const box = document.getElementById('co_sub_staff_box');
+  if (box) {
+    const selected = (co && co.sub_staff) ? co.sub_staff.split(/[,、]/).map(s=>s.trim()).filter(Boolean) : [];
+    const list = [...KMT_STAFF_ROSTER];
+    selected.forEach(s => { if (!list.includes(s)) list.push(s); });
+    box.innerHTML = list.map(n =>
+      '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;white-space:nowrap;"><input type="checkbox" class="co-substaff" value="'+esc(n)+'" '+(selected.includes(n)?'checked':'')+'>'+esc(n)+'</label>'
+    ).join('');
+  }
+}
+function getCompanySubStaff() {
+  const box = document.getElementById('co_sub_staff_box');
+  if (!box) return null;
+  const vals = [...box.querySelectorAll('.co-substaff')].filter(cb=>cb.checked).map(cb=>cb.value);
+  return vals.length ? vals.join(', ') : null;
 }
 
 function _emailRowHtml(val) {
@@ -7724,7 +7736,7 @@ function _populateRenewalFilters() {
   }
   const subSel = document.getElementById('renFilterSubStaff');
   if (subSel) {
-    const subs = [...new Set((allWorkers||[]).map(w => w.companies?.sub_staff).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ja'));
+    const subs = [...new Set((allWorkers||[]).flatMap(w => (w.companies?.sub_staff||'').split(/[,、]/).map(s=>s.trim())).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ja'));
     const cur = subSel.value;
     subSel.innerHTML = '<option value="">全サブ担当</option>' +
       subs.map(s => `<option>${esc(s)}</option>`).join('');
@@ -7756,7 +7768,7 @@ function renderRenewalList() {
     if (coFilter && (w.companies?.name||'') !== coFilter) return false;
     if (visaFilter && (w.visa_status||'') !== visaFilter) return false;
     if (msFilter && (w.companies?.main_staff||'') !== msFilter) return false;
-    if (subFilter && (w.companies?.sub_staff||'') !== subFilter) return false;
+    if (subFilter && !(w.companies?.sub_staff||'').split(/[,、]/).map(s=>s.trim()).includes(subFilter)) return false;
     if (only4mo) { const d=_renDaysLeft(w); if (d===null || d>122) return false; }
     if (stFilter === '__empty__') {
       if (w.renewal_status) return false;
@@ -13458,6 +13470,11 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260612.14', date:'2026-06-12', notify:true, items:[
+    '担当者名の表記ゆれを整理: 「蛭田　裕紀」を「蛭田」に統一、企業のサブ担当の区切りを「, 」に統一(重複名も除去)',
+    '所属機関フォームのKMTメイン担当を正式ロスターからのプルダウンに、サブ担当を正式ロスターからの複数選択(チェックボックス)に変更し表記ゆれを防止',
+    '更新状況リストのサブ担当フィルターを個人名で絞り込めるよう改善(複数名のサブ担当にも対応)',
+  ]},
   { version:'ver.20260612.13', date:'2026-06-12', notify:true, items:[
     '更新状況リストの担当表示を「企業に紐づくメイン担当・サブ担当」に変更(従来は人材紐付けの担当)。メイン担当別・サブ担当別での絞り込みも企業担当基準に変更',
   ]},
