@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260612.15 -->
+<!-- KMT_VERSION ver.20260612.16 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -308,7 +308,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260612.15</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260612.16</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -7808,9 +7808,9 @@ function renderRenewalList() {
     return (a.name||'').localeCompare(b.name||'','ja');
   };
 
-  const gridCols = '44px 44px minmax(120px,1fr) minmax(120px,1.1fr) 74px 92px 104px 92px 100px 90px minmax(150px,1.4fr) minmax(150px,1.4fr) minmax(150px,1.4fr)';
+  const gridCols = '44px 44px minmax(120px,1fr) minmax(120px,1.1fr) 74px 92px 100px 104px 92px 100px 90px minmax(150px,1.4fr) minmax(150px,1.4fr) minmax(150px,1.4fr)';
   const head = '<div style="display:grid;grid-template-columns:'+gridCols+';gap:6px;padding:8px 12px;background:#f8fafc;border-bottom:1px solid var(--gray-200);font-size:11px;font-weight:700;color:var(--navy);">'+
-    '<div>管理番号</div><div>写真</div><div>氏名</div><div>企業</div><div>在留資格</div><div>在留期限</div><div>在籍ステータス</div><div>更新ステータス</div><div>メイン担当/サブ</div><div>確認担当</div><div>現在の段階</div><div>申請メモ</div><div>確定雇用条件</div></div>';
+    '<div>管理番号</div><div>写真</div><div>氏名</div><div>企業</div><div>在留資格</div><div>在留期限</div><div>5年満了日(仮)</div><div>在籍ステータス</div><div>更新ステータス</div><div>メイン担当/サブ</div><div>確認担当</div><div>現在の段階</div><div>申請メモ</div><div>確定雇用条件</div></div>';
 
   const rowHtml = (w) => {
     const stg=w.renewal_stage||'', mem=w.renewal_memo||'', cnd=w.employment_condition||'';
@@ -7820,6 +7820,11 @@ function renderRenewalList() {
     const rowBg = near ? '#fff7ed' : 'white';
     const expStyle = near ? 'color:#ea580c;font-weight:800;' : 'color:var(--gray-600);';
     const expSub = (near && d>=0) ? '<br><span style="font-size:9px;">あと'+d+'日</span>' : (near && d<0 ? '<br><span style="font-size:9px;color:#dc2626;">期限切れ</span>' : '');
+    const _today0 = new Date(); _today0.setHours(0,0,0,0);
+    const tg2d = w.tg2_expiry ? Math.floor((new Date(w.tg2_expiry) - _today0)/86400000) : null;
+    const tg2Near = (tg2d !== null && tg2d < 365); // 満了まで残り1年未満
+    const tg2Style = tg2Near ? 'color:#dc2626;font-weight:800;' : 'color:#64748b;';
+    const tg2Sub = (tg2Near && tg2d>=0) ? '<br><span style="font-size:9px;">あと'+tg2d+'日</span>' : (tg2Near && tg2d<0 ? '<br><span style="font-size:9px;">超過</span>' : '');
     return '<div style="display:grid;grid-template-columns:'+gridCols+';gap:6px;padding:10px 12px;border-bottom:1px solid var(--gray-100);align-items:start;font-size:11px;cursor:pointer;background:'+rowBg+';" onmouseover="this.style.background=\'#f1f5f9\'" onmouseout="this.style.background=\''+rowBg+'\'" onclick="_openWorkerRenewalDetail(\''+w.id+'\')">'+
       '<div style="font-weight:600;color:var(--gray-600);font-size:10px;line-height:1.2;word-break:break-all;white-space:normal;">'+esc(w.management_no||'-')+'</div>'+
       '<div style="display:flex;align-items:center;justify-content:center;">'+(photo?'<img src="'+esc(photo)+'" style="width:34px;height:34px;border-radius:50%;object-fit:cover;border:1px solid var(--gray-200);" onerror="this.style.display=\'none\';">':'<span style="font-size:15px;color:#cbd5e1;">👤</span>')+'</div>'+
@@ -7827,6 +7832,7 @@ function renderRenewalList() {
       '<div style="color:var(--gray-600);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;" title="'+esc(w.companies?.name||'')+'">'+esc(w.companies?.name||'-')+'</div>'+
       '<div style="color:var(--gray-600);">'+esc(w.visa_status||'-')+'</div>'+
       '<div style="'+expStyle+'">'+esc(w.visa_expiry||'-')+expSub+'</div>'+
+      '<div style="'+tg2Style+'">'+(w.tg2_expiry?esc(w.tg2_expiry):'<span style="color:#cbd5e1;">-</span>')+tg2Sub+'</div>'+
       '<div style="min-width:0;">'+_zaisekiBadge(w.status)+'</div>'+
       '<div>'+_renewalStatusBadge(w.renewal_status)+'</div>'+
       '<div style="color:var(--gray-600);font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;" title="'+esc((w.companies?.main_staff||'-')+' / '+(w.companies?.sub_staff||'-'))+'">'+esc(w.companies?.main_staff||'-')+'<br><span style="color:#94a3b8;">'+esc(w.companies?.sub_staff||'-')+'</span></div>'+
@@ -13487,6 +13493,9 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260612.16', date:'2026-06-12', notify:true, items:[
+    '更新状況リストに「5年満了日(仮)」列を在留期限の右に追加。満了まで残り1年未満は赤字で表示(確定数値ではないため(仮)表記)',
+  ]},
   { version:'ver.20260612.15', date:'2026-06-12', notify:true, items:[
     '所属機関(企業)一覧に「メイン担当」「サブ担当」を表示。担当列をメイン担当に改名しサブ担当列を追加',
     '所属機関一覧の絞り込みにメイン担当・サブ担当フィルターを追加(サブ担当は複数名でも個人名で絞り込み可能)',
