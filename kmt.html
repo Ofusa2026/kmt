@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260612.14 -->
+<!-- KMT_VERSION ver.20260612.15 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -308,7 +308,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260612.14</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260612.15</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -410,8 +410,12 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
         <option value="">すべて</option>
         <option>口振</option><option>振込</option><option>現金</option>
       </select>
-      <span class="filter-label">担当</span>
+      <span class="filter-label">メイン担当</span>
       <select class="filter-select" id="filterStaff" onchange="applyFilters()">
+        <option value="">すべて</option>
+      </select>
+      <span class="filter-label">サブ担当</span>
+      <select class="filter-select" id="filterSubStaff" onchange="applyFilters()">
         <option value="">すべて</option>
       </select>
       <button class="btn btn-outline" style="font-size:11px;padding:4px 10px;" onclick="clearFilters()">✕ リセット</button>
@@ -428,7 +432,8 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
             <th>企業名</th>
             <th>業種</th>
             <th>都道府県</th>
-            <th>担当</th>
+            <th>メイン担当</th>
+            <th>サブ担当</th>
             <th>在職中</th>
             <th>委託費/人</th>
             <th>請求サイクル</th>
@@ -1094,6 +1099,14 @@ function buildFilterOptions() {
   const staffVal = staffSel.value;
   staffSel.innerHTML = '<option value="">すべて</option>' + staffs.map(s => `<option>${s}</option>`).join('');
   staffSel.value = staffVal;
+  // サブ担当(複数名カンマ区切りを分解して個人名で)
+  const subSel = document.getElementById('filterSubStaff');
+  if (subSel) {
+    const subs = [...new Set(allCompanies.flatMap(c => (c.sub_staff||'').split(/[,、]/).map(s=>s.trim())).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ja'));
+    const subVal = subSel.value;
+    subSel.innerHTML = '<option value="">すべて</option>' + subs.map(s => `<option>${esc(s)}</option>`).join('');
+    subSel.value = subVal;
+  }
 }
 
 // 企業ごとの在職中人材数(キャッシュ)
@@ -1133,6 +1146,7 @@ function applyFilters() {
   const pref = document.getElementById('filterPref').value;
   const payment = document.getElementById('filterPayment').value;
   const staff = document.getElementById('filterStaff').value;
+  const subStaff = document.getElementById('filterSubStaff')?.value || '';
 
   filteredCompanies = allCompanies.filter(c => {
     if (statFilter === 'active' && c.status === 'past') return false;
@@ -1142,6 +1156,7 @@ function applyFilters() {
     if (pref && c.pref !== pref) return false;
     if (payment && c.payment_method !== payment) return false;
     if (staff && c.main_staff !== staff) return false;
+    if (subStaff && !(c.sub_staff||'').split(/[,、]/).map(s=>s.trim()).includes(subStaff)) return false;
     return true;
   });
   currentPage = 1;
@@ -1154,6 +1169,7 @@ function clearFilters() {
   document.getElementById('filterPref').value = '';
   document.getElementById('filterPayment').value = '';
   document.getElementById('filterStaff').value = '';
+  { const s=document.getElementById('filterSubStaff'); if(s) s.value=''; }
   statFilter = 'all';
   document.querySelectorAll('.stat-card').forEach((c,i) => c.classList.toggle('active', i===0));
   applyFilters();
@@ -1167,7 +1183,7 @@ function renderTable() {
   const page = filteredCompanies.slice(start, start + PAGE_SIZE);
 
   if (!page.length) {
-    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--gray-400);">該当する企業がありません</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:40px;color:var(--gray-400);">該当する企業がありません</td></tr>';
     document.getElementById('paginationBar').innerHTML = '';
     return;
   }
@@ -1187,6 +1203,7 @@ function renderTable() {
       <td class="co-industry">${esc(c.industry||'-')}</td>
       <td>${esc(c.pref||'-')}</td>
       <td>${esc(c.main_staff||'-')}</td>
+      <td style="font-size:11px;color:var(--gray-600);">${esc(c.sub_staff||'-')}</td>
       <td>${activeDisp}</td>
       <td class="fee-text">${fee}</td>
       <td class="fee-text">${cycle}</td>
@@ -7468,8 +7485,8 @@ function renderScreenContent(name) {
     contentWrap.innerHTML = `<div class="table-wrap">
       <table><thead><tr>
         <th>No.</th><th>企業名</th><th>業種</th><th>都道府県</th>
-        <th>担当</th><th>在職中</th><th>委託費/人</th><th>請求サイクル</th><th>支払方法</th><th>ステータス</th>
-      </tr></thead><tbody id="companyTbody"><tr><td colspan="10" style="text-align:center;padding:40px;color:var(--gray-400)">読み込み中...</td></tr></tbody></table>
+        <th>メイン担当</th><th>サブ担当</th><th>在職中</th><th>委託費/人</th><th>請求サイクル</th><th>支払方法</th><th>ステータス</th>
+      </tr></thead><tbody id="companyTbody"><tr><td colspan="11" style="text-align:center;padding:40px;color:var(--gray-400)">読み込み中...</td></tr></tbody></table>
       <div class="pagination-bar" id="paginationBar"></div>
     </div>`;
     return;
@@ -13470,6 +13487,10 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260612.15', date:'2026-06-12', notify:true, items:[
+    '所属機関(企業)一覧に「メイン担当」「サブ担当」を表示。担当列をメイン担当に改名しサブ担当列を追加',
+    '所属機関一覧の絞り込みにメイン担当・サブ担当フィルターを追加(サブ担当は複数名でも個人名で絞り込み可能)',
+  ]},
   { version:'ver.20260612.14', date:'2026-06-12', notify:true, items:[
     '担当者名の表記ゆれを整理: 「蛭田　裕紀」を「蛭田」に統一、企業のサブ担当の区切りを「, 」に統一(重複名も除去)',
     '所属機関フォームのKMTメイン担当を正式ロスターからのプルダウンに、サブ担当を正式ロスターからの複数選択(チェックボックス)に変更し表記ゆれを防止',
