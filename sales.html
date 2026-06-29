@@ -164,6 +164,10 @@
   table.matrix .mo{padding-left:5px;padding-right:5px;font-size:10.5px;min-width:0}
   table.matrix tbody tr:hover .fz{background:var(--surface-2)}
   .mcell.actual{color:var(--ink);font-weight:600}
+  .mcell.ed{cursor:cell}
+  .mcell.ed:hover{outline:1.5px solid var(--accent);outline-offset:-1.5px;background:var(--accent-soft)}
+  .mcell.ov{color:var(--accent-ink);font-weight:700;box-shadow:inset 0 -2px 0 var(--accent)}
+  input.celledit{width:100%;box-sizing:border-box;border:none;outline:2px solid var(--accent);border-radius:4px;font-family:"JetBrains Mono";font-size:11px;text-align:right;padding:1px 3px;background:#fff;color:var(--ink)}
   table.matrix tbody tr.totrow td{background:var(--accent-soft);color:var(--accent-ink);font-weight:700;text-align:right;font-family:"JetBrains Mono"}
   table.matrix tbody tr.totrow .fz{z-index:5;background:var(--accent-soft);font-family:"Noto Sans JP";text-align:left}
   .tfoot{padding:12px 14px;background:var(--surface-2);border-top:1px solid var(--line);font-size:12px;color:var(--ink-2);display:flex;justify-content:space-between;align-items:center}
@@ -224,7 +228,7 @@
       <button data-pg="fc"><span class="ic">◔</span><span>売上見込み</span></button>
       <button data-pg="comp"><span class="ic">▤</span><span>企業マスタ</span></button>
     </nav>
-    <div class="foot"><span class="dot"></span>KMT案件管理DB 接続中<br><span style="font-size:9px;color:#6b6e65">ver.20260529.18</span></div>
+    <div class="foot"><span class="dot"></span>KMT案件管理DB 接続中<br><span style="font-size:9px;color:#6b6e65">ver.20260529.19</span></div>
   </aside>
 
   <main class="main">
@@ -526,6 +530,7 @@ const toast=(m)=>{const t=$("toast");t.textContent=m;t.classList.add("on");setTi
 // data stores
 let FEES=[],FC=[],COMP=[],WORKERS=[];
 let combos={};
+let OVERRIDES={};
 let compMap={};
 let CUR_MONTH=ym(new Date());
 let charts={};
@@ -539,13 +544,16 @@ async function api(path,opt={}){
 async function loadAll(){
   $("kpis").innerHTML='<div class="loading"><span class="spin"></span>読み込み中…</div>';
   try{
-    [COMP,FEES,FC,WORKERS]=await Promise.all([
+    let OVR;
+    [COMP,FEES,FC,WORKERS,OVR]=await Promise.all([
       api("companies?select=id,name,name_kana,folder_no,fee_per_person,billing_cycle,billing_timing,billing_start_month,invoice_to,invoice_method,payment_method,status,kmt_corp_type,main_staff,sub_staff&order=name"),
       api("support_fees?select=*,companies(name)&order=billing_month.desc"),
       api("sales_forecast?select=*,companies(name)&order=billing_month.desc"),
-      api("workers?select=id,company_id,name,name_kana,nationality,status,staff,sub_staff,management_no,joined_date,entry_date,billing_start_month,left_date,return_home_date,return_jp_date")
+      api("workers?select=id,company_id,name,name_kana,nationality,status,staff,sub_staff,management_no,joined_date,entry_date,billing_start_month,left_date,return_home_date,return_jp_date"),
+      api("worker_fee_overrides?select=management_no,billing_month,amount")
     ]);
     compMap={};COMP.forEach(c=>compMap[c.id]=c);
+    OVERRIDES={};(OVR||[]).forEach(o=>{(OVERRIDES[o.management_no]=OVERRIDES[o.management_no]||{})[o.billing_month]=o.amount;});
     fillSelects();renderAll();
   }catch(e){
     $("kpis").innerHTML='<div class="card" style="grid-column:1/-1;color:var(--red)">接続エラー: '+esc(e.message)+'</div>';
@@ -928,7 +936,7 @@ function renderMgmt(){
   $("mgmtYearLab").textContent=mgmtYear;
   const months=[];for(let m=1;m<=12;m++)months.push(mgmtYear+"-"+String(m).padStart(2,"0"));
   const T=$("mgmtTable");const colTot=months.map(()=>0);let gTot=0;
-  $("mgmtNoteText").innerHTML='在職者×月の委託費。<b>〜2026/05 は実績</b>（エクセル記入値・濃字）、<b>2026/06以降は見込</b>（単価×支払サイクルの計算値・淡字）。Nか月サイクルはN月ごとに単価×Nを計上。単位: 円。';
+  $("mgmtNoteText").innerHTML='在職者×月の委託費。<b>〜2026/05 は実績</b>（エクセル記入値・濃字）、<b>2026/06以降は見込</b>（単価×支払サイクルの計算値・淡字）。<b>各月の数字はクリックで編集</b>でき、編集した値は下線付きで保存されます（空にすると既定値に戻る）。単位: 円。';
   fillStaffFilters();
   const msF=$("mgFilterMain")?.value||"",subF=$("mgFilterSub")?.value||"";
   const ws=WORKERS.filter(w=>{
@@ -945,18 +953,19 @@ function renderMgmt(){
   ws.forEach(w=>{const c=compMap[w.company_id]||{};const unit=c.fee_per_person||0;const N=cycleN(c.billing_cycle);
     const s=wStart(w),e=wEnd(w);const act=FEE_ACTUALS[w.management_no]||null;let rowTot=0;
     const cells=months.map((m,i)=>{
-      if(m<=ACTUAL_CUTOFF){
-        const a=act?act[m]:0;
-        if(a){rowTot+=a;colTot[i]+=a;return `<td class="mcell mo actual">${fmt(a)}</td>`;}
-        const active=(!s||m>=s)&&(!e||m<=e);
-        return `<td class="mcell mo zero">${active?"–":"·"}</td>`;
-      }
+      const mno=w.management_no||"";
+      const ov=OVERRIDES[mno]||{};
+      const hasOv=!!mno&&Object.prototype.hasOwnProperty.call(ov,m);
       const active=(!s||m>=s)&&(!e||m<=e);
-      if(!active)return `<td class="mcell mo zero">·</td>`;
-      const bill=s?(monthDiff(s,m)%N===0):true;
-      if(!bill)return `<td class="mcell mo sched" title="在職中（請求月でない）">–</td>`;
-      const amt=unit*(s?N:1);rowTot+=amt;colTot[i]+=amt;
-      return `<td class="mcell mo sched">${fmt(amt)}</td>`;
+      let val,kind;
+      if(hasOv){val=ov[m]||0;kind="ov";}
+      else if(m<=ACTUAL_CUTOFF){val=(act?act[m]:0)||0;kind="actual";}
+      else if(!active){val=0;kind="off";}
+      else{const bill=s?(monthDiff(s,m)%N===0):true;val=bill?unit*(s?N:1):0;kind=bill?"sched":"nobill";}
+      rowTot+=val;colTot[i]+=val;
+      const cls="mcell mo"+(mno?" ed":"")+(hasOv?" ov":kind==="actual"?" actual":kind==="sched"?" sched":" zero");
+      const disp=val?fmt(val):(active?"–":"·");
+      return `<td class="${cls}"${mno?` data-mno="${esc(mno)}" data-m="${m}" data-val="${val}"`:""}>${disp}</td>`;
     }).join("");
     gTot+=rowTot;
     body+=`<tr><td class="fz fz1"><div class="mname" title="${esc(w.name||"")}">${esc(w.name||"(無名)")}</div>${(w.management_no||w.nationality)?`<div class="mmeta natline"><span>${esc(w.management_no||"")}</span><span>${esc(w.nationality||"")}</span></div>`:""}</td><td class="fz fz2"><div class="mname" title="${esc(c.name||"")}">${esc(c.name||"")}</div>${(c.main_staff||c.sub_staff)?`<div class="mmeta">${esc(c.main_staff||"")}${c.sub_staff?" / "+esc(c.sub_staff):""}</div>`:""}</td><td class="fz fz3 mmeta r">${unit?fmt(unit):"-"}</td><td class="fz fz4 mmeta"><div>${esc(c.billing_cycle||"-")}</div>${c.billing_timing?`<div style="font-size:10px;color:var(--ink-3)" title="${esc(c.billing_timing)}">${esc(c.billing_timing)}</div>`:""}</td><td class="stcol">${stBadge(w.status)}</td>${cells}<td class="mrowtot">${yen(rowTot)}</td></tr>`;
@@ -975,6 +984,33 @@ function mgmtAdd(companyId,month){
 window.mgmtAdd=mgmtAdd;
 $("mgmtPrev").onclick=()=>{mgmtYear--;renderMgmt();};
 $("mgmtNext").onclick=()=>{mgmtYear++;renderMgmt();};
+function mgmtCellEdit(e){
+  const td=e.target.closest("td.ed");if(!td||td.querySelector("input"))return;
+  const mno=td.dataset.mno,m=td.dataset.m;if(!mno||!m)return;
+  const cur=+td.dataset.val||0;
+  const inp=document.createElement("input");inp.type="text";inp.className="celledit";inp.value=cur||"";
+  td.innerHTML="";td.appendChild(inp);inp.focus();inp.select();
+  let done=false;
+  const finish=save=>{if(done)return;done=true;if(!save){renderMgmt();return;}saveOverride(mno,m,inp.value.trim());};
+  inp.addEventListener("keydown",ev=>{if(ev.key==="Enter"){ev.preventDefault();finish(true);}else if(ev.key==="Escape"){ev.preventDefault();finish(false);}});
+  inp.addEventListener("blur",()=>finish(true));
+}
+async function saveOverride(mno,m,raw){
+  try{
+    if(raw===""){
+      await api(`worker_fee_overrides?management_no=eq.${encodeURIComponent(mno)}&billing_month=eq.${encodeURIComponent(m)}`,{method:"DELETE",headers:{...H,Prefer:"return=minimal"}});
+      if(OVERRIDES[mno])delete OVERRIDES[mno][m];
+      toast("既定値に戻しました");
+    }else{
+      const amt=Math.round(parseYen(raw));
+      await api("worker_fee_overrides",{method:"POST",headers:{...H,Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({management_no:mno,billing_month:m,amount:amt})});
+      (OVERRIDES[mno]=OVERRIDES[mno]||{})[m]=amt;
+      toast("保存しました "+m);
+    }
+  }catch(err){toast("保存失敗: "+err.message);}
+  renderMgmt();
+}
+$("mgmtTable").addEventListener("click",mgmtCellEdit);
 $("mgFilterMain").onchange=renderMgmt;$("mgFilterSub").onchange=renderMgmt;
 
 /* 売上明細：企業ごと集計（マトリクス） */
