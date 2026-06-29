@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260612.16 -->
+<!-- KMT_VERSION ver.20260629.02 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -308,7 +308,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260612.16</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.02</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -2287,6 +2287,47 @@ async function submitNewRequest() {
 // ==============================
 let decisionReportType = 'kmt'; // 'kmt' | 'solo' | 'other'
 
+// 諸手当・控除行の追加・削除
+function _drAddRow(containerId, nameClass, amtClass, namePlaceholder) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const row = document.createElement('div');
+  row.className = 'dr-dynamic-row';
+  row.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:6px;';
+  row.innerHTML = '<input class="form-input ' + nameClass + '" placeholder="' + namePlaceholder + '" style="flex:1.2;min-width:0;">'
+    + '<input class="form-input ' + amtClass + '" type="number" placeholder="金額" style="flex:1;min-width:0;">'
+    + '<span style="font-size:12px;white-space:nowrap;">円</span>'
+    + '<button onclick="drRemoveRow(this)" style="background:none;border:none;color:#9ca3af;font-size:16px;cursor:pointer;padding:0 2px;line-height:1;">✕</button>';
+  container.appendChild(row);
+}
+function drAddAllowanceRow() { _drAddRow('dr_allowance_rows', 'dr-allow-name', 'dr-allow-amt', '手当名'); }
+function drAddDeductionRow() { _drAddRow('dr_deduction_rows', 'dr-deduct-name', 'dr-deduct-amt', '控除名'); }
+function drRemoveRow(btn) {
+  const row = btn.closest('.dr-allowance-row, .dr-dynamic-row');
+  if (row && row.parentNode.children.length > 1) row.remove();
+}
+// 諸手当・控除リスト取得（テキスト生成用）
+function getDrAllowances() {
+  const rows = document.querySelectorAll('#dr_allowance_rows .dr-allowance-row, #dr_allowance_rows .dr-dynamic-row');
+  const result = [];
+  rows.forEach(row => {
+    const name = row.querySelector('.dr-allow-name')?.value?.trim() || '';
+    const amt  = row.querySelector('.dr-allow-amt')?.value?.trim() || '';
+    if (name || amt) result.push({ name, amt });
+  });
+  return result;
+}
+function getDrDeductions() {
+  const rows = document.querySelectorAll('#dr_deduction_rows .dr-dynamic-row');
+  const result = [];
+  rows.forEach(row => {
+    const name = row.querySelector('.dr-deduct-name')?.value?.trim() || '';
+    const amt  = row.querySelector('.dr-deduct-amt')?.value?.trim() || '';
+    if (name || amt) result.push({ name, amt });
+  });
+  return result;
+}
+
 function buildDecisionReportScreen() {
   const companies = allCompanies.filter(c=>c.status!=='past').slice().sort(cmpFolderNo);
   return `
@@ -2364,15 +2405,50 @@ function buildDecisionReportScreen() {
             <select class="form-select" id="dr_invoice_method"><option value="メール" selected>メール</option><option value="郵送">郵送</option><option value="FAX">FAX</option><option value="その他">その他</option></select></div>
           <div class="form-group"><label class="form-label">請求書送付担当</label><input class="form-input" id="dr_invoice_staff" value="白井"></div>
           <div class="section-title">📋 雇用条件</div>
-          <div class="form-group"><label class="form-label">入社希望日</label>
+          <div class="form-group full"><label class="form-label">入社希望日</label>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
               <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;"><input type="radio" name="dr_join_type" value="許可おり次第" onchange="document.getElementById('dr_join_date').style.display='none'" checked>許可おり次第</label>
               <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;"><input type="radio" name="dr_join_type" value="日付指定" onchange="document.getElementById('dr_join_date').style.display=''">日付指定</label>
               <input class="form-input" id="dr_join_date" type="date" style="display:none;width:auto;flex:1;">
             </div></div>
-          <div class="form-group"><label class="form-label">基本給</label><div style="display:flex;align-items:center;gap:6px;"><input class="form-input" id="dr_base_salary" type="number" placeholder="例: 200000" style="flex:1;"><span style="font-size:13px">円</span></div></div>
-          <div class="form-group"><label class="form-label">居住費（控除）</label><div style="display:flex;align-items:center;gap:6px;"><input class="form-input" id="dr_housing_fee" type="number" placeholder="例: 20000" style="flex:1;"><span style="font-size:13px">円</span></div></div>
-          <div class="form-group"><label class="form-label">光熱費等（控除）</label><div style="display:flex;align-items:center;gap:6px;"><input class="form-input" id="dr_utility_fee" type="number" placeholder="例: 5000" style="flex:1;"><span style="font-size:13px">円</span></div></div>
+          <div class="form-group full"><label class="form-label">基本給</label><div style="display:flex;align-items:center;gap:6px;"><input class="form-input" id="dr_base_salary" type="number" placeholder="例: 200000" style="flex:1;"><span style="font-size:13px">円</span></div></div>
+          <!-- 諸手当・控除 2カラム -->
+          <div class="form-group full" style="padding:0;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start;">
+              <!-- 左：諸手当 -->
+              <div style="background:#f0f7ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px;">
+                <div style="font-size:12px;font-weight:700;color:#1d4ed8;margin-bottom:8px;">【諸手当】</div>
+                <div id="dr_allowance_rows">
+                  <div class="dr-allowance-row" style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
+                    <input class="form-input dr-allow-name" placeholder="手当名" style="flex:1.2;min-width:0;">
+                    <input class="form-input dr-allow-amt" type="number" placeholder="金額" style="flex:1;min-width:0;">
+                    <span style="font-size:12px;white-space:nowrap;">円</span>
+                    <button onclick="drRemoveRow(this)" style="background:none;border:none;color:#9ca3af;font-size:16px;cursor:pointer;padding:0 2px;line-height:1;">✕</button>
+                  </div>
+                </div>
+                <button onclick="drAddAllowanceRow()" style="font-size:11px;color:#1d4ed8;background:none;border:1px dashed #93c5fd;border-radius:4px;padding:3px 10px;cursor:pointer;width:100%;">＋ 手当を追加</button>
+              </div>
+              <!-- 右：控除 -->
+              <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:12px;">
+                <div style="font-size:12px;font-weight:700;color:#c2410c;margin-bottom:8px;">【控除】</div>
+                <div id="dr_deduction_rows">
+                  <div class="dr-dynamic-row" style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
+                    <input class="form-input dr-deduct-name" placeholder="控除名" style="flex:1.2;min-width:0;" value="居住費">
+                    <input class="form-input dr-deduct-amt" type="number" placeholder="金額" id="dr_housing_fee" style="flex:1;min-width:0;">
+                    <span style="font-size:12px;white-space:nowrap;">円</span>
+                    <button onclick="drRemoveRow(this)" style="background:none;border:none;color:#9ca3af;font-size:16px;cursor:pointer;padding:0 2px;line-height:1;">✕</button>
+                  </div>
+                  <div class="dr-dynamic-row" style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
+                    <input class="form-input dr-deduct-name" placeholder="控除名" style="flex:1.2;min-width:0;" value="光熱費等">
+                    <input class="form-input dr-deduct-amt" type="number" placeholder="金額" id="dr_utility_fee" style="flex:1;min-width:0;">
+                    <span style="font-size:12px;white-space:nowrap;">円</span>
+                    <button onclick="drRemoveRow(this)" style="background:none;border:none;color:#9ca3af;font-size:16px;cursor:pointer;padding:0 2px;line-height:1;">✕</button>
+                  </div>
+                </div>
+                <button onclick="drAddDeductionRow()" style="font-size:11px;color:#c2410c;background:none;border:1px dashed #fed7aa;border-radius:4px;padding:3px 10px;cursor:pointer;width:100%;">＋ 控除を追加</button>
+              </div>
+            </div>
+          </div>
           <div class="form-group full"><label class="form-label">その他雇用条件・備考</label><textarea class="form-textarea" id="dr_employment_note" rows="2" placeholder="例: 直近で決定したXXさんと同じ条件"></textarea></div>
           <div class="section-title">💬 コメント</div>
           <div class="form-group full"><label class="form-label">26. コメント・特記事項</label><textarea class="form-textarea" id="dr_comment" rows="3" placeholder="特記事項など"></textarea></div>
@@ -2836,8 +2912,8 @@ function getDecisionData() {
       '請求書: ' + g('dr_invoice_method') + '/' + g('dr_invoice_staff'),
       '入社希望日: ' + getDecisionJoinDate(),
       g('dr_base_salary') ? '基本給: ' + g('dr_base_salary') + '円' : '',
-      g('dr_housing_fee') ? '居住費: ' + g('dr_housing_fee') + '円' : '',
-      g('dr_utility_fee') ? '光熱費等: ' + g('dr_utility_fee') + '円' : '',
+      ...getDrAllowances().map(a => a.name && a.amt ? a.name + ': ' + a.amt + '円' : '').filter(Boolean),
+      ...getDrDeductions().map(d => d.name && d.amt ? '[控除]' + d.name + ':' + d.amt + '円' : '').filter(Boolean),
       g('dr_employment_note') ? 'その他: ' + g('dr_employment_note') : '',
     ].filter(Boolean).join(' / '),
   };
@@ -13493,7 +13569,7 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
-  { version:'ver.20260612.16', date:'2026-06-12', notify:true, items:[
+  { version:'ver.20260629.02', date:'2026-06-12', notify:true, items:[
     '更新状況リストに「5年満了日(仮)」列を在留期限の右に追加。満了まで残り1年未満は赤字で表示(確定数値ではないため(仮)表記)',
   ]},
   { version:'ver.20260612.15', date:'2026-06-12', notify:true, items:[
