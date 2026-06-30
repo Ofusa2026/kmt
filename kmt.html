@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260629.02 -->
+<!-- KMT_VERSION ver.20260629.03 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -308,7 +308,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.02</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.03</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -8954,7 +8954,7 @@ function buildWorkerModalBody(w) {
       </select></div>
     <div class="form-group"><label class="form-label">希望在留資格</label>
       <select class="form-select" id="wf_desired_visa">
-        ${['','特定技能1号','特定技能2号','特定活動'].map(s=>`<option value="${s}" ${(w.desired_visa||'')===s?'selected':''}>${s||'─ 選択 ─'}</option>`).join('')}
+        ${['','特定技能1号','特定技能2号','特定活動','技人国','家族滞在'].map(s=>`<option value="${s}" ${(w.desired_visa||'')===s?'selected':''}>${s||'─ 選択 ─'}</option>`).join('')}
       </select></div>
     <div class="section-title">📱 本人SNS</div>
     <div class="form-group"><label class="form-label">WhatsApp</label>
@@ -13569,7 +13569,7 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
-  { version:'ver.20260629.02', date:'2026-06-12', notify:true, items:[
+  { version:'ver.20260629.03', date:'2026-06-12', notify:true, items:[
     '更新状況リストに「5年満了日(仮)」列を在留期限の右に追加。満了まで残り1年未満は赤字で表示(確定数値ではないため(仮)表記)',
   ]},
   { version:'ver.20260612.15', date:'2026-06-12', notify:true, items:[
