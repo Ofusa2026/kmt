@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260629.03 -->
+<!-- KMT_VERSION ver.20260629.06 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -308,7 +308,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.03</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.06</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -2400,6 +2400,11 @@ function buildDecisionReportScreen() {
             <select class="form-select" id="dr_delivery"><option value="">選択</option><option>窓口</option><option>郵送</option><option>オンライン</option></select></div>
           <div class="section-title">💴 請求条件</div>
           <div class="form-group"><label class="form-label">初期費用（税抜）</label><input class="form-input" id="dr_initial_fee" placeholder="例: 50,000円"></div>
+          <div class="form-group"><label class="form-label">請求タイミング</label>
+            <select class="form-select" id="dr_billing_timing">
+              <option value="決定時請求">決定時請求</option>
+              <option value="配属後請求（その他）">配属後請求（その他）</option>
+            </select></div>
           <div class="form-group"><label class="form-label">20. 支援委託費（税抜）</label><input class="form-input" id="dr_support_fee" placeholder="例: 20,000円"></div>
           <div class="form-group"><label class="form-label">請求書送付方法</label>
             <select class="form-select" id="dr_invoice_method"><option value="メール" selected>メール</option><option value="郵送">郵送</option><option value="FAX">FAX</option><option value="その他">その他</option></select></div>
@@ -2776,7 +2781,7 @@ async function fillDecisionFromWorker() {
 // 決定報告フォームをクリア
 function clearDecisionForm() {
   if (!confirm('フォームの内容をすべてクリアしますか?')) return;
-  const ids = ['dr_existing_worker','dr_worker_search','dr_received_date','dr_visa_type','dr_app_type','dr_experience','dr_field','dr_case_name','dr_person_name','dr_company_name','dr_expire_date','dr_tokurei','dr_temp_return','dr_total_period','dr_nationality','dr_current_visa','dr_ginou_end','dr_support_staff','dr_target_date','dr_delivery','dr_initial_fee','dr_support_fee','dr_invoice_method','dr_invoice_staff','dr_join_date','dr_base_salary','dr_housing_fee','dr_utility_fee','dr_employment_note','dr_comment'];
+  const ids = ['dr_existing_worker','dr_worker_search','dr_received_date','dr_visa_type','dr_app_type','dr_experience','dr_field','dr_case_name','dr_person_name','dr_company_name','dr_expire_date','dr_tokurei','dr_temp_return','dr_total_period','dr_nationality','dr_current_visa','dr_ginou_end','dr_support_staff','dr_target_date','dr_delivery','dr_initial_fee','dr_billing_timing','dr_support_fee','dr_invoice_method','dr_invoice_staff','dr_join_date','dr_base_salary','dr_housing_fee','dr_utility_fee','dr_employment_note','dr_comment'];
   ids.forEach(id => { const el = document.getElementById(id); if (el && el.type !== 'radio') { el.value = ''; if (el.dataset) delete el.dataset.autoFilled; } });
   // 既定値復元
   const mgEl = document.getElementById('dr_ohfusa_mg'); if (mgEl) mgEl.value = '書類部';
@@ -2900,6 +2905,7 @@ function getDecisionData() {
     ginou_end: g('dr_ginou_end'),
     support_staff: g('dr_support_staff'),
     support_fee: g('dr_support_fee'),
+    billing_timing: g('dr_billing_timing'),
     progress: '',
     referral_fee: '',
     target_date: g('dr_target_date'),
@@ -2909,6 +2915,7 @@ function getDecisionData() {
       contactParty ? '企業連絡担当: ' + contactParty : '',
       g('dr_comment'),
       g('dr_initial_fee') ? '初期費用: ' + g('dr_initial_fee') : '',
+      g('dr_billing_timing') ? '請求タイミング: ' + g('dr_billing_timing') : '',
       '請求書: ' + g('dr_invoice_method') + '/' + g('dr_invoice_staff'),
       '入社希望日: ' + getDecisionJoinDate(),
       g('dr_base_salary') ? '基本給: ' + g('dr_base_salary') + '円' : '',
@@ -2987,6 +2994,52 @@ async function submitDecisionReport() {
     if (confirm('この内容を「外国人材」に追加しますか？\n（人材名・国籍・在留期限・在留資格などを保存します）')) {
       await saveDecisionAsWorker(data);
     }
+  }
+  // 初期費用が入力されていれば売上管理に自動登録
+  if (sentOk && data.initial_fee) {
+    await saveDecisionInitialFeeToSales(data);
+  }
+}
+
+// 決定報告の初期費用を sales_forecast に自動登録
+async function saveDecisionInitialFeeToSales(data) {
+  try {
+    const feeRaw = String(data.initial_fee || '').replace(/[,，円\s]/g, '');
+    const feeNum = parseInt(feeRaw);
+    if (!feeNum || isNaN(feeNum)) return; // 数値変換できない場合はスキップ
+    // 企業IDを逆引き
+    let companyId = null;
+    if (data.company_name) {
+      const co = (allCompanies || []).find(c => c.name === data.company_name);
+      if (co) companyId = co.id;
+    }
+    // 請求法人: 企業の kmt_corp_type から判定
+    let kmtEntity = '株式会社KMT';
+    if (companyId) {
+      const co = (allCompanies || []).find(c => c.id === companyId);
+      if (co && co.kmt_corp_type === '一般社団法人KMT請求') kmtEntity = '一般社団法人KMT';
+    }
+    // 請求月: 当月
+    const now = new Date();
+    const billingMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+    const billingTiming = data.billing_timing || '決定時請求';
+    const isPending = billingTiming === '配属後請求（その他）';
+    const saleData = {
+      company_id:    companyId,
+      worker_name:   data.person_name || null,
+      billing_month: isPending ? null : billingMonth,
+      kmt_entity:    kmtEntity,
+      item_name:     '初期費用',
+      amount_excl:   feeNum,
+      category:      '初期費用',
+      notes:         isPending ? '配属後請求（その他）/ 決定報告から自動登録' : '決定報告から自動登録',
+      updated_at:    new Date().toISOString(),
+    };
+    await sbFetch('sales_forecast', { method: 'POST', body: JSON.stringify(saleData), prefer: 'return=representation' });
+    showToast('💰 初期費用 ' + feeNum.toLocaleString() + '円 を' + (isPending ? '配属後請求ページに' : '売上管理（' + billingMonth + '）に') + '登録しました', 'success');
+    if (typeof loadSales === 'function') { try { await loadSales(salePage); } catch(e){} }
+  } catch(e) {
+    showToast('⚠️ 売上への初期費用登録に失敗: ' + e.message, 'error');
   }
 }
 
@@ -10681,10 +10734,15 @@ async function loadSales(page) {
   if (page) salePage = page;
   showLoading(true);
   try {
-    const ym = `${saleYear}-${saleActiveTab}`;
-    let q = `select=*,companies(name)&order=created_at.desc&billing_month=eq.${encodeURIComponent(ym)}`;
-    const cert = document.getElementById('saFilterCertainty')?.value || '';
-    if (cert) q += '&certainty=eq.' + encodeURIComponent(cert);
+    let q, ym;
+    if (saleActiveTab === 'pending') {
+      // 配属後請求タブ: billing_month が null のもの
+      ym = 'pending';
+      q = `select=*,companies(name)&order=created_at.desc&billing_month=is.null`;
+    } else {
+      ym = `${saleYear}-${saleActiveTab}`;
+      q = `select=*,companies(name)&order=created_at.desc&billing_month=eq.${encodeURIComponent(ym)}`;
+    }
     const { data, total } = await sbFetchPage('sales_forecast', q, salePage, PAGE_SIZE);
     allSales = data || [];
     saleTotalCount = total;
@@ -12024,9 +12082,7 @@ function buildSalesScreen() {
         ${yearOptions.map(y=>`<option value="${y}" ${y===saleYear?'selected':''}>${y}年</option>`).join('')}
       </select>
     </div>
-    <select class="filter-select" id="saFilterCertainty" onchange="loadSales(1)" style="font-size:12px;">
-      <option value="">全確度</option><option>確定</option><option>50%</option><option>期待</option>
-    </select>
+
     <button class="btn btn-outline" onclick="loadSales(1)">🔄 更新</button>
     <button class="btn btn-primary" onclick="openSaleModal(null)">＋ 売上登録</button>
   </div>
@@ -12038,6 +12094,10 @@ function buildSalesScreen() {
       style="padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;border-bottom:2px solid ${m===saleActiveTab?'var(--blue)':'transparent'};color:${m===saleActiveTab?'var(--blue)':'var(--gray-400)'};margin-bottom:-2px;transition:.15s;">
       ${parseInt(m)}月
     </div>`).join('')}
+    <div class="sale-tab ${'pending'===saleActiveTab?' sale-tab-active':''}" id="saleTab_pending" onclick="switchSaleTab('pending')"
+      style="padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;border-bottom:2px solid ${'pending'===saleActiveTab?'var(--blue)':'transparent'};color:${'pending'===saleActiveTab?'var(--blue)':'#f97316'};margin-bottom:-2px;transition:.15s;border-left:2px solid var(--gray-200);margin-left:4px;">
+      📦 配属後請求
+    </div>
   </div>
 
   <!-- コンテンツ -->
@@ -12497,7 +12557,7 @@ function buildResumeHTML(c) {
 </div>`;
 }
 
-function buildSaleModalBody(s){s=s||{};return `<div class="form-grid"><div class="section-title">売上情報</div><div class="form-group full"><label class="form-label">企業</label><select class="form-select" id="saf_company_id"><option value="">選択...</option>${allCompanies.map(c=>`<option value="${c.id}" ${s.company_id===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">請求月 (YYYY-MM)</label><input class="form-input" id="saf_billing_month" value="${esc(s.billing_month||'')}"></div><div class="form-group"><label class="form-label">請求法人</label><select class="form-select" id="saf_kmt_entity">${['','株式会社KMT','一般社団法人KMT'].map(v=>`<option ${s.kmt_entity===v?'selected':''}>${v}</option>`).join('')}</select></div><div class="form-group full"><label class="form-label">項目名</label><input class="form-input" id="saf_item_name" value="${esc(s.item_name||'')}"></div><div class="form-group"><label class="form-label">単価（円）</label><input class="form-input" id="saf_unit_price" type="number" value="${s.unit_price??''}"></div><div class="form-group"><label class="form-label">数量</label><input class="form-input" id="saf_quantity" type="number" value="${s.quantity??''}"></div><div class="form-group"><label class="form-label">金額（税抜）</label><input class="form-input" id="saf_amount_excl" type="number" value="${s.amount_excl??''}"></div><div class="form-group"><label class="form-label">金額（税込）</label><input class="form-input" id="saf_amount_incl" type="number" value="${s.amount_incl??''}"></div><div class="form-group"><label class="form-label">確度</label><select class="form-select" id="saf_certainty">${['確定','50%','期待'].map(v=>`<option ${s.certainty===v?'selected':''}>${v}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">カテゴリ</label><select class="form-select" id="saf_category">${['委託費','初期費用','紹介費','その他'].map(v=>`<option ${s.category===v?'selected':''}>${v}</option>`).join('')}</select></div><div class="form-group full"><label class="form-label">備考</label><textarea class="form-textarea" id="saf_notes">${esc(s.notes||'')}</textarea></div></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)"><button class="btn btn-outline" onclick="closeGenModal('saleModal')">閉じる</button></div>`;}
+function buildSaleModalBody(s){s=s||{};return `<div class="form-grid"><div class="section-title">売上情報</div><div class="form-group full"><label class="form-label">企業</label><select class="form-select" id="saf_company_id"><option value="">選択...</option>${allCompanies.map(c=>`<option value="${c.id}" ${s.company_id===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">人材名</label><input class="form-input" id="saf_worker_name" value="${esc(s.worker_name||'')}"></div><div class="form-group"><label class="form-label">請求月 (YYYY-MM)</label><input class="form-input" id="saf_billing_month" value="${esc(s.billing_month||'')}"></div><div class="form-group"><label class="form-label">請求法人</label><select class="form-select" id="saf_kmt_entity">${['','株式会社KMT','一般社団法人KMT'].map(v=>`<option ${s.kmt_entity===v?'selected':''}>${v}</option>`).join('')}</select></div><div class="form-group full"><label class="form-label">項目名</label><input class="form-input" id="saf_item_name" value="${esc(s.item_name||'')}"></div><div class="form-group"><label class="form-label">単価（円）</label><input class="form-input" id="saf_unit_price" type="number" value="${s.unit_price??''}"></div><div class="form-group"><label class="form-label">数量</label><input class="form-input" id="saf_quantity" type="number" value="${s.quantity??''}"></div><div class="form-group"><label class="form-label">金額（税抜）</label><input class="form-input" id="saf_amount_excl" type="number" value="${s.amount_excl??''}"></div><div class="form-group"><label class="form-label">金額（税込）</label><input class="form-input" id="saf_amount_incl" type="number" value="${s.amount_incl??''}"></div><div class="form-group"><label class="form-label">カテゴリ</label><select class="form-select" id="saf_category">${['委託費','初期費用','紹介費','その他'].map(v=>`<option ${s.category===v?'selected':''}>${v}</option>`).join('')}</select></div><div class="form-group full"><label class="form-label">備考</label><textarea class="form-textarea" id="saf_notes">${esc(s.notes||'')}</textarea></div></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)"><button class="btn btn-outline" onclick="closeGenModal('saleModal')">閉じる</button></div>`;}
 
 function buildUserModalBody(u){u=u||{};const teams=['GLT','営業','総務','大房'];const teamSel=u.team&&!teams.includes(u.team)?[u.team,...teams]:teams;return `<div class="form-grid"><div class="section-title">ユーザー情報</div><div class="form-group full"><label class="form-label">名前 *</label><input class="form-input" id="uf_name" value="${esc(u.name||'')}"></div><div class="form-group"><label class="form-label">フリガナ</label><input class="form-input" id="uf_name_kana" value="${esc(u.name_kana||'')}"></div><div class="form-group"><label class="form-label">メールアドレス</label><input class="form-input" id="uf_email" type="email" value="${esc(u.email||'')}"></div><div class="form-group"><label class="form-label">役職</label><select class="form-select" id="uf_position">${['管理者','代表','経理','マネージャー','リーダー','社員','パート','その他'].map(s=>`<option ${(u.position||'社員')===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">チーム</label><select class="form-select" id="uf_team"><option value="">選択...</option>${teamSel.map(s=>`<option ${u.team===s?'selected':''}>${esc(s)}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">権限</label><select class="form-select" id="uf_role">${['','管理者','一般','閲覧のみ'].map(s=>`<option ${u.role===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">アクティブ</label><select class="form-select" id="uf_active"><option value="true" ${u.is_active!==false?'selected':''}>有効</option><option value="false" ${u.is_active===false?'selected':''}>無効</option></select></div><div class="form-group full" style="border-top:1px dashed var(--gray-200);padding-top:10px;margin-top:6px;"><label class="form-label" style="color:#7c3aed;">🔐 暗証番号(4桁)　<span style="font-size:10px;color:#94a3b8;font-weight:400;">※変更しない場合は空欄のまま</span></label><input class="form-input" id="uf_pin" type="text" maxlength="4" pattern="\\d{4}" inputmode="numeric" autocomplete="off" placeholder="例: 1234" value=""></div></div><div style="display:flex;gap:8px;justify-content:space-between;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)"><button class="btn" id="ufDeleteBtn" onclick="deleteUser()" style="display:${editingUserId?'':'none'};border:1px solid #dc2626;color:#dc2626;background:white;">🗑 削除</button><button class="btn btn-outline" onclick="closeGenModal('userModal')">閉じる</button></div>`;}
 
@@ -13019,17 +13079,17 @@ function renderPartnerTable(){const tbody=document.getElementById('partnerTbody'
 function renderSaleMonthTable(ym) {
   const area = document.getElementById('saleContentArea');
   if (!area) return;
-  const cCls = {確定:'st-active','50%':'st-review',期待:'st-none'};
+  const isPending = ym === 'pending';
+  const label = isPending ? '📦 配属後請求' : ym;
 
   const totalExcl = allSales.reduce((s, f) => s + (f.amount_excl||0), 0);
   const totalIncl = allSales.reduce((s, f) => s + (f.amount_incl||0), 0);
-  const confirmed = allSales.filter(f => f.certainty === '確定').length;
 
   area.innerHTML = `
   <!-- サマリ -->
   <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
     <div class="stat-card" style="min-width:100px">
-      <div class="stat-label">${ym} 件数</div>
+      <div class="stat-label">${label} 件数</div>
       <div class="stat-num blue">${saleTotalCount}</div>
     </div>
     <div class="stat-card" style="min-width:150px">
@@ -13040,32 +13100,29 @@ function renderSaleMonthTable(ym) {
       <div class="stat-label">合計（税込）</div>
       <div class="stat-num" style="font-size:18px">${totalIncl.toLocaleString()}円</div>
     </div>
-    <div class="stat-card" style="min-width:100px">
-      <div class="stat-label">確定件数</div>
-      <div class="stat-num green">${confirmed}</div>
-    </div>
   </div>
 
   <!-- テーブル -->
   <div class="table-wrap">
     <table><thead><tr>
-      <th>企業名</th><th>項目</th><th>単価</th><th>数量</th>
-      <th>税抜</th><th>税込</th><th>確度</th><th>カテゴリ</th><th>法人</th>
+      <th>企業名</th><th>人材名</th><th>項目</th><th>単価</th><th>数量</th>
+      <th>税抜</th><th>税込</th><th>カテゴリ</th><th>法人</th>${isPending?'<th>備考</th>':''}
     </tr></thead>
     <tbody>
     ${allSales.length ? allSales.map(s => `
       <tr onclick="openSaleModal('${s.id}')">
         <td style="font-size:12px;font-weight:600">${esc(s.companies?.name||'-')}</td>
+        <td style="font-size:12px">${esc(s.worker_name||'-')}</td>
         <td style="font-size:12px">${esc(s.item_name||'-')}</td>
         <td style="font-size:12px">${s.unit_price?Number(s.unit_price).toLocaleString()+'円':'-'}</td>
         <td style="text-align:center">${s.quantity??'-'}</td>
         <td style="font-weight:700">${s.amount_excl?Number(s.amount_excl).toLocaleString()+'円':'-'}</td>
         <td>${s.amount_incl?Number(s.amount_incl).toLocaleString()+'円':'-'}</td>
-        <td><span class="st-badge ${cCls[s.certainty]||'st-none'}">${esc(s.certainty||'-')}</span></td>
         <td style="font-size:11px">${esc(s.category||'-')}</td>
         <td style="font-size:11px">${esc(s.kmt_entity||'-')}</td>
+        ${isPending?`<td style="font-size:11px;color:var(--gray-400)">${esc(s.notes||'-')}</td>`:''}
       </tr>`).join('') :
-      `<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--gray-400)">${ym} のデータがありません</td></tr>`}
+      `<tr><td colspan="${isPending?10:9}" style="text-align:center;padding:40px;color:var(--gray-400)">${label} のデータがありません</td></tr>`}
     </tbody></table>
     <div class="pagination-bar" id="salePagination"></div>
   </div>`;
@@ -13163,7 +13220,7 @@ async function saveResume() {
   showLoading(false);
 }
 
-async function saveSale(){const g=id=>document.getElementById(id)?.value||null;const ni=id=>document.getElementById(id)?.value?parseInt(document.getElementById(id).value):null;const data={company_id:g('saf_company_id'),billing_month:g('saf_billing_month'),kmt_entity:g('saf_kmt_entity'),item_name:g('saf_item_name'),unit_price:ni('saf_unit_price'),quantity:ni('saf_quantity'),amount_excl:ni('saf_amount_excl'),amount_incl:ni('saf_amount_incl'),certainty:g('saf_certainty'),category:g('saf_category'),notes:g('saf_notes'),updated_at:new Date().toISOString()};if(!data.billing_month){showToast('❌ 請求月は必須','error');return;}showLoading(true);try{if(editingSaleId){await sbFetch('sales_forecast?id=eq.'+editingSaleId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新','success');}else{const _r=await sbFetch('sales_forecast',{method:'POST',body:JSON.stringify(data),prefer:'return=representation'});if(_r&&_r[0]&&_r[0].id)editingSaleId=_r[0].id;showToast('✅ 登録','success');}closeGenModal('saleModal');await loadSales(salePage);}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
+async function saveSale(){const g=id=>document.getElementById(id)?.value||null;const ni=id=>document.getElementById(id)?.value?parseInt(document.getElementById(id).value):null;const data={company_id:g('saf_company_id'),worker_name:g('saf_worker_name'),billing_month:g('saf_billing_month'),kmt_entity:g('saf_kmt_entity'),item_name:g('saf_item_name'),unit_price:ni('saf_unit_price'),quantity:ni('saf_quantity'),amount_excl:ni('saf_amount_excl'),amount_incl:ni('saf_amount_incl'),category:g('saf_category'),notes:g('saf_notes'),updated_at:new Date().toISOString()};if(!data.billing_month){showToast('❌ 請求月は必須','error');return;}showLoading(true);try{if(editingSaleId){await sbFetch('sales_forecast?id=eq.'+editingSaleId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新','success');}else{const _r=await sbFetch('sales_forecast',{method:'POST',body:JSON.stringify(data),prefer:'return=representation'});if(_r&&_r[0]&&_r[0].id)editingSaleId=_r[0].id;showToast('✅ 登録','success');}closeGenModal('saleModal');await loadSales(salePage);}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
 
 async function saveUser(){const g=id=>document.getElementById(id)?.value||null;const data={name:g('uf_name'),name_kana:g('uf_name_kana'),email:g('uf_email'),role:g('uf_role'),team:g('uf_team'),position:g('uf_position'),is_active:document.getElementById('uf_active')?.value!=='false',updated_at:new Date().toISOString()};const pinVal=(document.getElementById('uf_pin')?.value||'').trim();if(pinVal){if(!/^\d{4}$/.test(pinVal)){showToast('❌ 暗証番号は4桁の数字で入力してください','error');return;}data.pin_code=pinVal;}if(!data.name){showToast('❌ 名前は必須','error');return;}showLoading(true);try{if(editingUserId){await sbFetch('users?id=eq.'+editingUserId,{method:'PATCH',body:JSON.stringify(data)});showToast(pinVal?'✅ 更新（暗証番号も変更）':'✅ 更新','success');}else{if(!data.pin_code)data.pin_code='0000';const _r=await sbFetch('users',{method:'POST',body:JSON.stringify(data),prefer:'return=representation'});if(_r&&_r[0]&&_r[0].id)editingUserId=_r[0].id;showToast('✅ 登録','success');}closeGenModal('userModal');await loadUsers();}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
 
@@ -13569,7 +13626,7 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
-  { version:'ver.20260629.03', date:'2026-06-12', notify:true, items:[
+  { version:'ver.20260629.06', date:'2026-06-12', notify:true, items:[
     '更新状況リストに「5年満了日(仮)」列を在留期限の右に追加。満了まで残り1年未満は赤字で表示(確定数値ではないため(仮)表記)',
   ]},
   { version:'ver.20260612.15', date:'2026-06-12', notify:true, items:[
