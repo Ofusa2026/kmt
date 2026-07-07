@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260629.12 -->
+<!-- KMT_VERSION ver.20260629.13 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -308,7 +308,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.12</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.13</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -3132,20 +3132,53 @@ async function saveDecisionAsWorker(data) {
     if (data.ginou_end)    memoParts.push('技能実習修了日: ' + data.ginou_end);
     if (data.target_date)  memoParts.push('申請目標日: ' + data.target_date);
 
-    const worker = {
+    const workerData = {
       name:           data.person_name || '',
       nationality:    data.nationality || null,
-      visa_status:    data.current_visa || null,   // 現在の在留資格
-      visa_expiry:    data.expire_date || null,    // 在留期限
-      applicant_field:data.field || null,          // 申請分野
-      staff:          data.support_staff || null,  // 支援担当者
+      visa_status:    data.current_visa || null,
+      visa_expiry:    data.expire_date || null,
+      applicant_field:data.field || null,
+      staff:          data.support_staff || null,
       company_id:     companyId,
-      return_home_date: data.temp_return || null,  // 一時帰国日
+      return_home_date: data.temp_return || null,
       memo:           memoParts.join(' / ') || null,
       status:         '配属前',
       apply_status:   '申請準備中',
     };
-    const res = await sbFetch('workers', { method:'POST', body: JSON.stringify(worker), prefer:'return=representation' });
+
+    const appType = (data.app_type || '').trim();
+    const isNew = (appType === '認定' || appType === '');
+
+    if (!isNew) {
+      // 変更・更新 → 既存人材をname+company_idで検索してUPDATE
+      const existing = await sbFetch(
+        'workers?name=eq.' + encodeURIComponent(workerData.name) +
+        (companyId ? '&company_id=eq.' + companyId : '') +
+        '&order=created_at.asc&limit=1'
+      );
+      if (existing && existing.length > 0) {
+        const existId = existing[0].id;
+        // statusはそのまま維持、その他情報をUPDATE
+        const updateData = { ...workerData };
+        delete updateData.status;
+        delete updateData.apply_status;
+        updateData.apply_status = '申請準備中';
+        await sbFetch('workers?id=eq.' + existId, { method: 'PATCH', body: JSON.stringify(updateData) });
+        showToast('✅ 既存人材（' + workerData.name + '）を更新しました', 'success');
+        showLoading(false);
+        return;
+      } else {
+        // 既存人材が見つからない場合は確認してから新規INSERT
+        const doInsert = confirm(
+          '[' + appType + '] ですが、同名の既存人材が見つかりませんでした。\n' +
+          '氏名: ' + workerData.name + '\n企業: ' + (data.company_name || '未設定') + '\n\n新規登録しますか?'
+        );
+        if (!doInsert) { showLoading(false); return; }
+      }
+    }
+
+    // 認定 or 既存なしで新規登録を選択した場合 → INSERT
+    const res = await sbFetch('workers', { method:'POST', body: JSON.stringify(workerData), prefer:'return=representation' });
     const newId = res && res[0] && res[0].id;
     // チャットルームを自動作成（企業ごとの集約は表示側で自動。group_idは使わない）
     let chatMsg = '';
@@ -13695,7 +13728,7 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
-  { version:'ver.20260629.12', date:'2026-06-29', notify:true, items:[
+  { version:'ver.20260629.13', date:'2026-06-29', notify:true, items:[
     '所属機関詳細 人材タブ：デフォルトを管理番号順に変更。在留期限ヘッダーをクリックで「早い順↑」→「遅い順↓」→「管理番号順」の3段階切替が可能に',
   ]},
   { version:'ver.20260629.09', date:'2026-06-29', notify:true, items:[
