@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260629.16 -->
+<!-- KMT_VERSION ver.20260629.17 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -308,7 +308,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.16</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.17</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -6224,8 +6224,9 @@ function renderSingleMessage(m, opts) {
   const bodyHtml = fileHtml + bodyText;
   const editedMark = (isEdited && !isDeleted) ? '<span style="font-size:10px;color:' + (isMine?'rgba(255,255,255,.6)':'#94a3b8') + ';margin-left:4px;">(編集済)</span>' : '';
 
+  const _replyMsgId = m.reply_to?.message_id || null;
   const replyQuote = (m.reply_to && !isDeleted)
-    ? '<div style="border-left:3px solid ' + (isMine?'rgba(255,255,255,.6)':'#9e9e9e') + ';background:' + (isMine?'rgba(255,255,255,.15)':'#e8eaed') + ';border-radius:4px;padding:4px 8px;margin-bottom:6px;font-size:11px;color:' + (isMine?'rgba(255,255,255,.85)':'#5f6368') + ';overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><b>' + esc(m.reply_to.sender_name||'') + '</b>: ' + esc((m.reply_to.content||'').slice(0,50)) + '</div>'
+    ? '<div onclick="' + (_replyMsgId ? 'scrollToChatMsg(\'' + _replyMsgId + '\')' : '') + '" style="border-left:3px solid ' + (isMine?'rgba(255,255,255,.6)':'#9e9e9e') + ';background:' + (isMine?'rgba(255,255,255,.15)':'#e8eaed') + ';border-radius:4px;padding:4px 8px;margin-bottom:6px;font-size:11px;color:' + (isMine?'rgba(255,255,255,.85)':'#5f6368') + ';overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' + (_replyMsgId?'cursor:pointer;':'') + '"><b>' + esc(m.reply_to.sender_name||'') + '</b>: ' + esc((m.reply_to.content||'').slice(0,50)) + (_replyMsgId ? ' <span style="font-size:10px;opacity:.7;">↗</span>' : '') + '</div>'
     : '';
 
   // リアクション表示
@@ -6266,7 +6267,7 @@ function renderSingleMessage(m, opts) {
     '<div class="msg-actions" style="opacity:0;position:absolute;top:-14px;' + (isMine?'left':'right') + ':4px;background:white;border:1px solid #dadce0;border-radius:16px;padding:2px 4px;box-shadow:0 1px 4px rgba(0,0,0,.15);display:flex;gap:2px;transition:opacity .15s;z-index:5;">' +
       '<button onclick="openReactionPicker(\'' + m.id + '\', this)" title="リアクション" style="background:none;border:none;cursor:pointer;font-size:13px;padding:3px 5px;border-radius:50%;">😊</button>' +
       (!isThreadView ? '<button onclick="openThreadPanel(\'' + m.id + '\')" title="スレッドで返信" style="background:none;border:none;cursor:pointer;font-size:13px;padding:3px 5px;border-radius:50%;">🧵</button>' : '') +
-      (!isThreadView ? '<button onclick="setReply(\'' + senderEsc + '\',\'' + contentEsc + '\',\'' + m.created_at + '\')" title="インライン返信" style="background:none;border:none;cursor:pointer;font-size:13px;padding:3px 5px;border-radius:50%;">↩</button>' : '') +
+      (!isThreadView ? '<button onclick="setReply(\'' + senderEsc + '\',\'' + contentEsc + '\',\'' + m.created_at + '\',\'' + m.id + '\')" title="インライン返信" style="background:none;border:none;cursor:pointer;font-size:13px;padding:3px 5px;border-radius:50%;">↩</button>' : '') +
       '<button onclick="markUnreadFromMessage(\'' + m.id + '\')" title="ここから未読に戻す" style="background:none;border:none;cursor:pointer;font-size:13px;padding:3px 5px;border-radius:50%;color:#f59e0b;">◉</button>' +
       (isMine ? '<button onclick="startEditMessage(\'' + m.id + '\')" title="編集" style="background:none;border:none;cursor:pointer;font-size:13px;padding:3px 5px;border-radius:50%;">✏️</button>' : '') +
       (isMine ? '<button onclick="deleteMessage(\'' + m.id + '\')" title="削除" style="background:none;border:none;cursor:pointer;font-size:13px;padding:3px 5px;border-radius:50%;color:#dc2626;">🗑</button>' : '') +
@@ -6743,10 +6744,10 @@ function exitChatFullscreen() {
 // ==============================
 // 💬 リプライ（LINE式引用返信）
 // ==============================
-let _replyTo = null; // { sender_name, content, created_at }
+let _replyTo = null; // { sender_name, content, created_at, message_id }
 
-function setReply(senderName, text, ts) {
-  _replyTo = { sender_name: senderName, content: text, created_at: ts };
+function setReply(senderName, text, ts, msgId) {
+  _replyTo = { sender_name: senderName, content: text, created_at: ts, message_id: msgId || null };
   const preview = document.getElementById('chatReplyPreview');
   const sender = document.getElementById('chatReplySender');
   const replyText = document.getElementById('chatReplyText');
@@ -6754,6 +6755,18 @@ function setReply(senderName, text, ts) {
   if (sender) sender.textContent = senderName + ' への返信';
   if (replyText) replyText.textContent = text ? text.slice(0,60)+(text.length>60?'…':'') : '📎 ファイル';
   document.getElementById('chatTextInput')?.focus();
+}
+
+function scrollToChatMsg(msgId) {
+  const el = document.querySelector('[data-mid="' + msgId + '"]');
+  if (!el) { showToast('元のメッセージが見つかりません', 'error'); return; }
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  // バブル部分をハイライト
+  const bubble = el.querySelector('[style*="border-radius"]');
+  const target = bubble || el;
+  target.style.transition = 'box-shadow .2s';
+  target.style.boxShadow = '0 0 0 3px #fbbf24';
+  setTimeout(() => { target.style.boxShadow = ''; }, 1500);
 }
 
 function clearReply() {
@@ -6980,7 +6993,7 @@ async function sendChatMessage() {
       file_name: attachments.length === 1 ? attachments[0].name : null,
       attachments: attachments.length > 0 ? attachments : null,
       mentions: expandedMentions.length ? expandedMentions : null,
-      reply_to: _replyTo ? { sender_name: _replyTo.sender_name, content: (_replyTo.content||'').slice(0,80) } : null,
+      reply_to: _replyTo ? { sender_name: _replyTo.sender_name, content: (_replyTo.content||'').slice(0,80), message_id: _replyTo.message_id || null } : null,
       created_at: new Date().toISOString(),
     };
     clearReply();
@@ -7191,7 +7204,7 @@ function startEditMessage(messageId) {
   if (!bubble) return;
   const original = m.content || '';
   bubble.innerHTML =
-    '<textarea id="editArea_' + messageId + '" style="width:100%;min-width:200px;min-height:60px;border:1px solid #dadce0;border-radius:8px;padding:6px 8px;font-size:13px;font-family:inherit;background:white;color:#202124;resize:vertical;">' + esc(original) + '</textarea>' +
+    '<textarea id="editArea_' + messageId + '" style="width:100%;min-width:320px;min-height:100px;max-height:300px;border:1px solid #1a73e8;border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;background:white;color:#202124;resize:vertical;box-shadow:0 0 0 2px rgba(26,115,232,.2);line-height:1.6;">' + esc(original) + '</textarea>' +
     '<div style="display:flex;gap:6px;margin-top:6px;justify-content:flex-end;">' +
       '<button onclick="cancelEditMessage()" style="background:white;color:#5f6368;border:1px solid #dadce0;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;">キャンセル</button>' +
       '<button onclick="saveEditMessage(\'' + messageId + '\')" style="background:#1a73e8;color:white;border:none;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:600;">保存</button>' +
@@ -13734,7 +13747,9 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
-  { version:'ver.20260629.16', date:'2026-07-08', notify:true, items:[
+  { version:'ver.20260629.17', date:'2026-07-08', notify:true, items:[
+    'チャット：リプライ元をクリックすると元のメッセージまでスクロール＋ハイライト表示（新規リプライから有効）',
+    'チャット：メッセージ編集エリアのサイズを拡大',
     '売上管理：売上登録の項目名を選択式に変更（初期費用 / 人材紹介料 / 通訳・翻訳費用 / その他）',
     '売上管理：月別サマリに「決定数（初期費用件数）」「紹介人数（人材紹介料件数）」を追加、件数表示を削除',
     '売上管理：売上登録の企業名を選択＋手入力両対応に変更',
