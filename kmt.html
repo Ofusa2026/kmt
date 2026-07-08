@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260629.17 -->
+<!-- KMT_VERSION ver.20260629.18 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -308,7 +308,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.17</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.18</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -1959,7 +1959,7 @@ async function saveCompany(autoMode=false) {
       if (!autoMode) showToast('✅ 企業を登録しました', 'success');
     }
     if (!autoMode) closeCompanyModal();
-    await loadCompanies();
+    if (!autoMode) await loadCompanies();
     if (autoMode) return true;
   } catch(e) {
     _savingCompanyNew = false;
@@ -13747,7 +13747,7 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
-  { version:'ver.20260629.17', date:'2026-07-08', notify:true, items:[
+  { version:'ver.20260629.18', date:'2026-07-08', notify:true, items:[
     'チャット：リプライ元をクリックすると元のメッセージまでスクロール＋ハイライト表示（新規リプライから有効）',
     'チャット：メッセージ編集エリアのサイズを拡大',
     '売上管理：売上登録の項目名を選択式に変更（初期費用 / 人材紹介料 / 通訳・翻訳費用 / その他）',
