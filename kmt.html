@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260629.19 -->
+<!-- KMT_VERSION ver.20260629.20 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -308,7 +308,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.19</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.20</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -615,16 +615,9 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
             <label class="form-label">KMTサブ担当 <span style="font-size:10px;color:var(--gray-400);font-weight:400;">— 複数選択可</span></label>
             <div id="co_sub_staff_box" style="display:flex;flex-wrap:wrap;gap:10px 16px;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:12px;"></div>
           </div>
-          <div class="form-group">
-            <label class="form-label">チーム内サブ担当</label>
-            <select class="form-select" id="co_team_staff">
-              <option value="">未選択</option>
-              <option>レシカ</option>
-              <option>シスカ</option>
-              <option>リアン</option>
-              <option>チュオン</option>
-              <option>アウン</option>
-            </select>
+          <div class="form-group full">
+            <label class="form-label">チーム内サブ担当 <span style="font-size:10px;color:var(--gray-400);font-weight:400;">— 複数選択可</span></label>
+            <div id="co_team_staff_box" style="display:flex;flex-wrap:wrap;gap:10px 16px;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:12px;"></div>
           </div>
           <div class="form-group full">
             <label class="form-label">社内メモ <span style="font-size:10px;color:var(--gray-400);font-weight:400;">— KMT側共有用</span></label>
@@ -1700,7 +1693,7 @@ function fillCoForm(co) {
     net_pl_y1:'net_pl_y1', net_pl_y2:'net_pl_y2', net_pl_y3:'net_pl_y3',
     net_assets_y1:'net_assets_y1', net_assets_y2:'net_assets_y2', net_assets_y3:'net_assets_y3',
     capital:'capital', employees:'employees', foreign_employees:'foreign_employees',
-    memo:'memo', company_note:'company_note', last_visit:'last_visit', team_staff:'team_staff',
+    memo:'memo', company_note:'company_note', last_visit:'last_visit',
     other_foreign_employment:'other_foreign_employment', other_support_org_used:'other_support_org_used', other_support_org_detail:'other_support_org_detail',
     insurance_guidance_date:'insurance_guidance_date', insurance_guidance_staff:'insurance_guidance_staff', insurance_name:'insurance_name',
     insurance_start_date:'insurance_start_date', insurance_end_date:'insurance_end_date', insurance_procedure_by:'insurance_procedure_by',
@@ -1747,7 +1740,7 @@ function getCoFormData() {
     contact_email: getContactEmails(),
     main_staff: document.getElementById('co_main_staff').value || null,
     sub_staff: getCompanySubStaff(),
-    team_staff: (document.getElementById('co_team_staff')?.value || null) || null,
+    team_staff: getCompanyTeamStaff(),
     drive_url: document.getElementById('co_drive_url').value || null,
     drive_url2: document.getElementById('co_drive_url_kmt').value || null,
     fee_per_person: document.getElementById('co_fee_per_person').value ? parseInt(document.getElementById('co_fee_per_person').value) : null,
@@ -1819,6 +1812,23 @@ function populateCompanyStaffSelects(co) {
       '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;white-space:nowrap;"><input type="checkbox" class="co-substaff" value="'+esc(n)+'" '+(selected.includes(n)?'checked':'')+'>'+esc(n)+'</label>'
     ).join('');
   }
+  populateCompanyTeamStaff(co);
+}
+function populateCompanyTeamStaff(co) {
+  const box = document.getElementById('co_team_staff_box');
+  if (!box) return;
+  const selected = (co && co.team_staff) ? co.team_staff.split(/[,、]/).map(s=>s.trim()).filter(Boolean) : [];
+  const list = ['レシカ', 'シスカ', 'リアン', 'チュオン', 'アウン'];
+  selected.forEach(s => { if (!list.includes(s)) list.push(s); });
+  box.innerHTML = list.map(n =>
+    '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;white-space:nowrap;"><input type="checkbox" class="co-teamstaff" value="'+esc(n)+'" '+(selected.includes(n)?'checked':'')+'>'+esc(n)+'</label>'
+  ).join('');
+}
+function getCompanyTeamStaff() {
+  const box = document.getElementById('co_team_staff_box');
+  if (!box) return null;
+  const vals = [...box.querySelectorAll('.co-teamstaff')].filter(cb=>cb.checked).map(cb=>cb.value);
+  return vals.length ? vals.join(', ') : null;
 }
 function getCompanySubStaff() {
   const box = document.getElementById('co_sub_staff_box');
@@ -13759,7 +13769,7 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
-  { version:'ver.20260629.19', date:'2026-07-09', notify:true, items:[
+  { version:'ver.20260629.20', date:'2026-07-09', notify:true, items:[
     '所属機関詳細：KMTサブ担当の下に「チーム内サブ担当」を追加（レシカ / シスカ / リアン / チュオン / アウン から選択）',
     'チャット：リプライ元をクリックすると元のメッセージまでスクロール＋ハイライト表示（新規リプライから有効）',
     'チャット：メッセージ編集エリアのサイズを拡大',
