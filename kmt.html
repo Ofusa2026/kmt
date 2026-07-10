@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260629.20 -->
+<!-- KMT_VERSION ver.20260629.21 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -308,7 +308,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.20</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.21</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -4471,10 +4471,13 @@ function buildChatScreen() {
           <div id="chatFileUploadTarget" style="display:flex;align-items:center;gap:10px;padding:4px 0;border-top:1px solid #bae6fd;margin-top:2px;">
             <span style="font-size:10px;font-weight:700;color:#0369a1;">アップロード先：</span>
             <label style="display:flex;align-items:center;gap:3px;cursor:pointer;font-size:11px;color:#1a73e8;font-weight:600;">
-              <input type="radio" name="chatUploadTarget" value="ofusa" checked style="margin:0;cursor:pointer;"> 📁 大房Drive
+              <input type="checkbox" id="chatUploadOfusa" checked style="margin:0;cursor:pointer;"> 📁 大房Drive
             </label>
             <label style="display:flex;align-items:center;gap:3px;cursor:pointer;font-size:11px;color:#137333;font-weight:600;">
-              <input type="radio" name="chatUploadTarget" value="kmt" style="margin:0;cursor:pointer;"> 📁 KMT Drive
+              <input type="checkbox" id="chatUploadKmt" style="margin:0;cursor:pointer;"> 📁 KMT Drive
+            </label>
+            <label style="display:flex;align-items:center;gap:3px;cursor:pointer;font-size:11px;color:#6b7280;font-weight:600;">
+              <input type="checkbox" id="chatUploadChatOnly" style="margin:0;cursor:pointer;" onchange="if(this.checked){document.getElementById('chatUploadOfusa').checked=false;document.getElementById('chatUploadKmt').checked=false;}"> 💬 チャットのみ
             </label>
             <span id="chatFileUploadHint" style="font-size:10px;color:#94a3b8;margin-left:auto;"></span>
           </div>
@@ -6856,8 +6859,8 @@ function renderChatFilePreview() {
 // 添付ファイルのアップロード先選択UIの状態を、現在のルームのDrive設定に応じて更新
 function updateChatUploadTargetUI() {
   if (!currentRoom) return;
-  const ofusaRadio = document.querySelector('input[name=chatUploadTarget][value=ofusa]');
-  const kmtRadio = document.querySelector('input[name=chatUploadTarget][value=kmt]');
+  const ofusaRadio = document.getElementById('chatUploadOfusa');
+  const kmtRadio = document.getElementById('chatUploadKmt');
   const hint = document.getElementById('chatFileUploadHint');
   if (!ofusaRadio || !kmtRadio) return;
   const hasOfusa = !!currentRoom.drive_url;
@@ -6931,30 +6934,50 @@ async function sendChatMessage() {
   try {
     let attachments = []; // [{url, name, mimeType, size}, ...]
 
-    // 複数ファイルアップロード（順次GAS経由でDrive）
+    // 複数ファイルアップロード
     if (_chatFiles.length > 0) {
-      if (!currentRoom.drive_url && !currentRoom.drive_url_kmt) {
-        showToast('⚠️ このルームにDrive URLが設定されていません', 'error');
-        if (btn) btn.disabled = false;
-        return;
-      }
-      // ラジオで選ばれたアップロード先（大房 or KMT）
+      // ラジオで選ばれたアップロード先
       const targetRadio = document.querySelector('input[name=chatUploadTarget]:checked');
       const target = targetRadio?.value || 'ofusa';
-      const uploadDriveUrl = target === 'kmt'
-        ? (currentRoom.drive_url_kmt || currentRoom.drive_url)
-        : (currentRoom.drive_url || currentRoom.drive_url_kmt);
-      if (target === 'kmt' && !currentRoom.drive_url_kmt) {
-        showToast('⚠️ KMT Driveが未設定のため大房Driveに送信します', 'success');
-      } else if (target === 'ofusa' && !currentRoom.drive_url) {
-        showToast('⚠️ 大房Driveが未設定のためKMT Driveに送信します', 'success');
-      }
+
+      // チェックボックスの状態を取得
+      const toOfusa = document.getElementById('chatUploadOfusa')?.checked && !document.getElementById('chatUploadChatOnly')?.checked;
+      const toKmt   = document.getElementById('chatUploadKmt')?.checked && !document.getElementById('chatUploadChatOnly')?.checked;
+      const toChatOnly = document.getElementById('chatUploadChatOnly')?.checked;
       const gasUrl = localStorage.getItem('kmt_gas_url') || '';
+      const chatOnlyDriveUrl = localStorage.getItem('kmt_chat_only_drive_url') || '';
+
       if (!gasUrl) {
         showToast('⚠️ GAS URLが設定されていません（ユーザー設定で登録）', 'error');
         if (btn) btn.disabled = false;
         return;
       }
+
+      // アップロード先リストを決定（重複なし）
+      const uploadTargets = [];
+      if (toChatOnly) {
+        uploadTargets.push({ label: 'チャット用', url: chatOnlyDriveUrl });
+      } else {
+        if (toOfusa) uploadTargets.push({ label: '大房Drive', url: currentRoom.drive_url || '' });
+        if (toKmt)   uploadTargets.push({ label: 'KMT Drive', url: currentRoom.drive_url_kmt || '' });
+        // どちらも未選択またはURLなしの場合はチャット用にフォールバック
+        if (uploadTargets.length === 0 || uploadTargets.every(t => !t.url)) {
+          uploadTargets.length = 0;
+          uploadTargets.push({ label: 'チャット用', url: chatOnlyDriveUrl });
+          if (toOfusa || toKmt) showToast('⚠️ Drive URLが未設定のためチャット用フォルダに送信します', 'success');
+        } else {
+          // URLが空のターゲットを除外
+          uploadTargets.forEach((t, i) => { if (!t.url) showToast('⚠️ ' + t.label + 'が未設定のためスキップします', 'success'); });
+          uploadTargets.splice(0, uploadTargets.length, ...uploadTargets.filter(t => t.url));
+        }
+      }
+      if (!chatOnlyDriveUrl && uploadTargets.some(t => t.label === 'チャット用')) {
+        showToast('⚠️ チャット用DriveフォルダURLが設定されていません', 'error');
+        if (btn) btn.disabled = false;
+        return;
+      }
+
+      {
 
       for (let i = 0; i < _chatFiles.length; i++) {
         const item = _chatFiles[i];
@@ -6967,18 +6990,19 @@ async function sendChatMessage() {
           reader.onerror = rej;
           reader.readAsDataURL(item.file);
         });
-        // キャッシュバスター付きURL（連続POSTでstale 404になるのを回避）
-        const sep = gasUrl.includes('?') ? '&' : '?';
-        const urlWithBust = gasUrl + sep + 't=' + Date.now() + '_' + i;
-        const resp = await fetch(urlWithBust, {
-          method: 'POST',
-          cache: 'no-store',
-          redirect: 'follow',
-          // text/plain で送るとCORS preflightを回避できる（GAS定番）
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({
-            action: 'uploadFileToDrive',
-            driveUrl: uploadDriveUrl,
+        // 各ターゲットにアップロード（最初のターゲットの結果をattachmentsに追加）
+        let firstResult = null;
+        for (const tgt of uploadTargets) {
+          const sep = gasUrl.includes('?') ? '&' : '?';
+          const urlWithBust = gasUrl + sep + 't=' + Date.now() + '_' + i;
+          const resp = await fetch(urlWithBust, {
+            method: 'POST',
+            cache: 'no-store',
+            redirect: 'follow',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({
+              action: 'uploadFileToDrive',
+              driveUrl: tgt.url,
             fileName: finalName,
             fileData: b64,
             mimeType: item.file.type,
@@ -6987,17 +7011,20 @@ async function sendChatMessage() {
         if (!resp.ok) throw new Error('「' + finalName + '」: HTTP ' + resp.status);
         const result = await resp.json();
         if (!result.success) throw new Error('「' + finalName + '」: ' + (result.error || 'アップロード失敗'));
-        attachments.push({
-          url: result.fileUrl,
-          name: finalName,
-          mimeType: item.file.type,
-          size: item.file.size
-        });
-        // 連続POSTでGASのリダイレクトキャッシュとぶつからないよう間隔を空ける
-        if (i < _chatFiles.length - 1) {
-          await new Promise(r => setTimeout(r, 400));
+          if (!firstResult) firstResult = result;
+          await new Promise(r => setTimeout(r, 300));
+        } // end targets loop
+        if (firstResult) {
+          attachments.push({
+            url: firstResult.fileUrl,
+            name: finalName,
+            mimeType: item.file.type,
+            size: item.file.size
+          });
         }
+        if (i < _chatFiles.length - 1) await new Promise(r => setTimeout(r, 400));
       }
+      } // end Drive/ChatOnly block
       showToast('✅ ' + attachments.length + '件アップロード完了', 'success');
     }
 
@@ -12008,6 +12035,11 @@ function buildUsersScreen(){
       <div style="font-size:11px;color:var(--gray-400);margin-bottom:8px;">チャットにファイルを添付するとGAS経由でDriveにアップロードします</div>
       <input class="form-input" id="gasUrlInput" value="${localStorage.getItem('kmt_gas_url')||''}" placeholder="https://script.google.com/macros/s/..." style="font-size:12px;width:100%;box-sizing:border-box;">
     </div>
+    <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--gray-200);">
+      <div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:4px;">📁 チャットのみ用 DriveフォルダURL</div>
+      <div style="font-size:11px;color:var(--gray-400);margin-bottom:8px;">「チャットのみ」でファイルを送る際のアップロード先フォルダ</div>
+      <input class="form-input" id="chatOnlyDriveUrlInput" value="${localStorage.getItem('kmt_chat_only_drive_url')||''}" placeholder="https://drive.google.com/drive/folders/..." style="font-size:12px;width:100%;box-sizing:border-box;">
+    </div>
     <div style="margin-top:12px;display:flex;gap:8px;">
       <button class="btn btn-primary" onclick="saveApiKey()" style="white-space:nowrap;">💾 設定を保存</button>
       ${savedKey ? '<button class="btn btn-outline" onclick="clearApiKey()" style="white-space:nowrap;color:var(--red);">APIキー削除</button>' : ''}
@@ -13307,6 +13339,13 @@ function renderWorkHistoryInputs() {
     </div>`).join('');
 }
 
+// チャット用DriveフォルダURLのデフォルト設定
+(function() {
+  if (!localStorage.getItem('kmt_chat_only_drive_url')) {
+    localStorage.setItem('kmt_chat_only_drive_url', 'https://drive.google.com/drive/folders/1cfrO1_jk8E8uw5oT_fhd4v5IPsJL3tcv');
+  }
+})();
+
 function saveApiKey() {
   const key = document.getElementById('apiKeyInput')?.value.trim();
   if (!key) { showToast('⚠️ APIキーを入力してください', 'error'); return; }
@@ -13314,6 +13353,8 @@ function saveApiKey() {
     localStorage.setItem('ofusa_apiKey', key);
     const gasUrl = document.getElementById('gasUrlInput')?.value.trim();
     if (gasUrl) localStorage.setItem('kmt_gas_url', gasUrl);
+    const chatOnlyUrl = document.getElementById('chatOnlyDriveUrlInput')?.value.trim();
+    if (chatOnlyUrl) localStorage.setItem('kmt_chat_only_drive_url', chatOnlyUrl);
     showToast('✅ 設定を保存しました', 'success');
   } catch(e) {
     showToast('⚠️ ローカルファイルでは保存できません。GitHub Pagesで開いてください。', 'error');
@@ -13769,7 +13810,10 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
-  { version:'ver.20260629.20', date:'2026-07-09', notify:true, items:[
+  { version:'ver.20260629.21', date:'2026-07-10', notify:true, items:[
+    'チャット：ファイル添付のアップロード先を「大房Drive・KMT Drive・チャットのみ」のチェックボックス形式に変更（複数選択可）',
+    'チャット：Drive URLが未設定でもチャット用フォルダにフォールバックして送信可能に',
+    'チャット：チャットのみ選択時は専用のGoogleDriveフォルダに保存',
     '所属機関詳細：KMTサブ担当の下に「チーム内サブ担当」を追加（レシカ / シスカ / リアン / チュオン / アウン から選択）',
     'チャット：リプライ元をクリックすると元のメッセージまでスクロール＋ハイライト表示（新規リプライから有効）',
     'チャット：メッセージ編集エリアのサイズを拡大',
