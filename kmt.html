@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260629.22 -->
+<!-- KMT_VERSION ver.20260629.23 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -240,6 +240,13 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   .table-wrap table{min-width:600px;}
   /* モーダルを全画面に */
   .modal-box{width:100vw !important;max-width:100vw !important;max-height:100vh !important;border-radius:0 !important;margin:0;}
+  /* チャット：スマホ時は左パネル全幅・右パネルは隠す */
+  #chatFullWrap{flex-direction:column;}
+  #chatFullWrap > div:first-child{width:100% !important;flex-shrink:unset;}
+  #chatFullWrap > div:nth-child(2){display:none;}
+  /* スマホ時にメッセージ画面が開いたら左を隠す */
+  #chatFullWrap.mobile-message-open > div:first-child{display:none !important;}
+  #chatFullWrap.mobile-message-open > div:nth-child(2){display:flex !important;}
 }
 .mobile-menu-btn{display:none;align-items:center;justify-content:center;width:36px;height:36px;border-radius:8px;border:1.5px solid var(--gray-200);background:white;cursor:pointer;font-size:18px;}
 </style>
@@ -311,7 +318,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.22</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.23</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -4447,7 +4454,7 @@ function buildChatScreen() {
       <!-- ヘッダー -->
       <!-- 全画面時の戻るボタン -->
       <div id="chatFullscreenBar" style="display:none;padding:8px 16px;background:#1a73e8;color:white;font-size:13px;font-weight:700;align-items:center;gap:10px;flex-shrink:0;">
-        <button onclick="exitChatFullscreen()" style="background:none;border:none;color:white;font-size:20px;cursor:pointer;padding:0 4px;">←</button>
+        <button onclick="exitChatFullscreen()" style="background:none;border:none;color:white;font-size:20px;cursor:pointer;padding:0 4px;" title="チャット一覧に戻る">←</button>
         <span id="chatFullscreenTitle">チャット</span>
       </div>
       <div id="chatRoomHeader" style="padding:12px 16px;border-bottom:1px solid var(--gray-200);background:white;display:flex;align-items:center;gap:10px;flex-shrink:0;">
@@ -6026,6 +6033,13 @@ async function setChatDriveUrl(roomId, which) {
 }
 
 async function openChatRoom(roomId) {
+  // スマホ時はメッセージ画面に切り替え（LINEライク）
+  if (window.innerWidth <= 768) {
+    const wrap = document.getElementById('chatFullWrap');
+    if (wrap) wrap.classList.add('mobile-message-open');
+    const bar = document.getElementById('chatFullscreenBar');
+    if (bar) bar.style.display = 'flex';
+  }
   const room = chatRooms.find(r => r.id === roomId);
   if (!room) return;
   currentRoom = room;
@@ -6754,13 +6768,20 @@ function enterChatFullscreen(roomId) {
 }
 
 function exitChatFullscreen() {
+  // スマホ時はルーム一覧に戻るだけ
+  const wrap = document.getElementById('chatFullWrap');
+  if (window.innerWidth <= 768) {
+    if (wrap) wrap.classList.remove('mobile-message-open');
+    const bar = document.getElementById('chatFullscreenBar');
+    if (bar) bar.style.display = 'none';
+    return;
+  }
   document.getElementById('sidebar').style.display = '';
   document.getElementById('sidebarToggleBtn').style.display = '';
   const topbar = document.querySelector('.topbar');
   if (topbar) topbar.style.display = '';
   const mainWrap = document.getElementById('mainWrap');
   if (mainWrap) mainWrap.style.marginLeft = '';
-  const wrap = document.getElementById('chatFullWrap');
   if (wrap) wrap.style.height = '';
   const bar = document.getElementById('chatFullscreenBar');
   if (bar) bar.style.display = 'none';
@@ -13813,7 +13834,7 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
-  { version:'ver.20260629.22', date:'2026-07-10', notify:true, items:[
+  { version:'ver.20260629.23', date:'2026-07-10', notify:true, items:[
     'チャット：ファイル添付のアップロード先を「大房Drive・KMT Drive・チャットのみ」のチェックボックス形式に変更（複数選択可）',
     'チャット：Drive URLが未設定でもチャット用フォルダにフォールバックして送信可能に',
     'チャット：チャットのみ選択時は専用のGoogleDriveフォルダに保存',
