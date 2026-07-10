@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260629.23 -->
+<!-- KMT_VERSION ver.20260629.24 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -318,7 +318,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.23</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.24</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -6968,7 +6968,7 @@ async function sendChatMessage() {
       const toOfusa = document.getElementById('chatUploadOfusa')?.checked && !document.getElementById('chatUploadChatOnly')?.checked;
       const toKmt   = document.getElementById('chatUploadKmt')?.checked && !document.getElementById('chatUploadChatOnly')?.checked;
       const toChatOnly = document.getElementById('chatUploadChatOnly')?.checked;
-      const gasUrl = localStorage.getItem('kmt_gas_url') || '';
+      const gasUrl = localStorage.getItem('kmt_gas_url') || 'https://script.google.com/macros/s/AKfycbzFG1X4KAUR09MLzwy3l-LJL_7HRnbB0rHfQwUwilxyf3PGTTGXFGqKiMXyv2kHJdIm/exec';
       const chatOnlyDriveUrl = localStorage.getItem('kmt_chat_only_drive_url') || '';
 
       if (!gasUrl) {
@@ -7444,7 +7444,7 @@ async function openDrivePicker() {
 async function loadDriveFilesForPicker() {
   const list = document.getElementById('drivePickerList');
   if (!list) return;
-  const gasUrl = localStorage.getItem('kmt_gas_url') || '';
+  const gasUrl = localStorage.getItem('kmt_gas_url') || 'https://script.google.com/macros/s/AKfycbzFG1X4KAUR09MLzwy3l-LJL_7HRnbB0rHfQwUwilxyf3PGTTGXFGqKiMXyv2kHJdIm/exec';
   if (!gasUrl) {
     list.innerHTML = '<div style="color:#dc2626;padding:14px;font-size:12px;">⚠️ GAS URLが設定されていません（ユーザー設定で登録）</div>';
     return;
@@ -12057,7 +12057,7 @@ function buildUsersScreen(){
     <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--gray-200);">
       <div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:4px;">📁 チャットファイルアップ GAS URL</div>
       <div style="font-size:11px;color:var(--gray-400);margin-bottom:8px;">チャットにファイルを添付するとGAS経由でDriveにアップロードします</div>
-      <input class="form-input" id="gasUrlInput" value="${localStorage.getItem('kmt_gas_url')||''}" placeholder="https://script.google.com/macros/s/..." style="font-size:12px;width:100%;box-sizing:border-box;">
+      <input class="form-input" id="gasUrlInput" value="${localStorage.getItem('kmt_gas_url')||'https://script.google.com/macros/s/AKfycbzFG1X4KAUR09MLzwy3l-LJL_7HRnbB0rHfQwUwilxyf3PGTTGXFGqKiMXyv2kHJdIm/exec'}" placeholder="https://script.google.com/macros/s/..." style="font-size:12px;width:100%;box-sizing:border-box;">
     </div>
     <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--gray-200);">
       <div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:4px;">📁 チャットのみ用 DriveフォルダURL</div>
@@ -13834,7 +13834,7 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
-  { version:'ver.20260629.23', date:'2026-07-10', notify:true, items:[
+  { version:'ver.20260629.24', date:'2026-07-10', notify:true, items:[
     'チャット：ファイル添付のアップロード先を「大房Drive・KMT Drive・チャットのみ」のチェックボックス形式に変更（複数選択可）',
     'チャット：Drive URLが未設定でもチャット用フォルダにフォールバックして送信可能に',
     'チャット：チャットのみ選択時は専用のGoogleDriveフォルダに保存',
