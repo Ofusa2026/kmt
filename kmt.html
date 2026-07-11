@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260629.30 -->
+<!-- KMT_VERSION ver.20260629.31 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -318,7 +318,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.30</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.31</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -4663,8 +4663,8 @@ async function saveWorker(returnResult=false) {
     emergency_contact_sns:      g('wf_emergency_sns'),
     emergency_contact_raw:      g('wf_emergency_raw'),
     kmt_support:      g('wf_kmt_support'),
-    staff:            g('wf_staff'),
-    sub_staff:        g('wf_sub_staff'),
+    staff:            g('wf_staff') || null,
+    sub_staff:        g('wf_sub_staff') || null,
     residence_card_issued: document.getElementById('wf_residence_card_issued')?.checked || false,
     card_tracking_no: g('wf_card_tracking_no'),
     card_mailing_address: g('wf_card_mailing_address'),
@@ -9035,7 +9035,7 @@ async function openWorkerModal(id) {
   const _partial = w && !('visa_expiry' in w);
   if (id && (!w || _partial)) {
     try {
-      const d = await sbFetch('workers?id=eq.' + encodeURIComponent(id) + '&select=*,companies(name,main_staff,sub_staff,kokko_system_id,kokko_system_password,kokko_system_memo)&limit=1');
+      const d = await sbFetch('workers?id=eq.' + encodeURIComponent(id) + '&select=*,companies(name,main_staff,sub_staff,team_staff,kokko_system_id,kokko_system_password,kokko_system_memo)&limit=1');
       if (d && d.length) {
         w = d[0];
         // allWorkersの該当を完全データに置き換え(無ければ追加)してキャッシュ
@@ -9374,11 +9374,11 @@ function buildWorkerModalBody(w) {
         ${['KMT支援','KMT支援外'].map(s=>`<option ${(w.kmt_support||'KMT支援')===s?'selected':''}>${s}</option>`).join('')}
       </select></div>
     <div class="form-group full"><label class="form-label">メイン担当 <span style="font-size:10px;color:var(--gray-400);">（企業情報から自動反映）</span></label>
-      <input class="form-input" id="wf_staff" value="${esc(w.staff||'')}" readonly style="background:#f8fafc;"></div>
+      <input class="form-input" id="wf_staff" value="${esc(w.companies?.main_staff||w.staff||'')}" readonly style="background:#f8fafc;"></div>
     <div class="form-group full"><label class="form-label">サブ担当 <span style="font-size:10px;color:var(--gray-400);">（企業情報から自動反映）</span></label>
-      <input class="form-input" id="wf_sub_staff" value="${esc(w.sub_staff||'')}" readonly style="background:#f8fafc;"></div>
+      <input class="form-input" id="wf_sub_staff" value="${esc(w.companies?.sub_staff||w.sub_staff||'')}" readonly style="background:#f8fafc;"></div>
     <div class="form-group full"><label class="form-label">チーム担当 <span style="font-size:10px;color:var(--gray-400);">（企業情報から自動反映）</span></label>
-      <input class="form-input" id="wf_team_staff" value="${esc(w.team_staff||'')}" readonly style="background:#f8fafc;"></div>
+      <input class="form-input" id="wf_team_staff" value="${esc(w.companies?.team_staff||w.team_staff||'')}" readonly style="background:#f8fafc;"></div>
     <div class="section-title" style="grid-column:1/-1;font-size:11px;padding:4px 0 2px;">一時帰国</div>
     <div class="form-group"><label class="form-label">一時帰国日</label><input class="form-input" id="wf_return_home_date" type="date" value="${w.return_home_date||''}"></div>
     <div class="form-group"><label class="form-label">再入国日</label><input class="form-input" id="wf_return_jp_date" type="date" value="${w.return_jp_date||''}"></div>
@@ -13955,7 +13955,7 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
-  { version:'ver.20260629.30', date:'2026-07-10', notify:true, items:[
+  { version:'ver.20260629.31', date:'2026-07-10', notify:true, items:[
     'スマホ対応：テーブルを横スクロールで全列表示に変更',
     'スマホ対応：チャット画面をLINEライク（一覧→タップでメッセージ→←で戻る）に変更',
     'チャット：ファイル送信のGAS URLを設定不要化（スマホ含めすべての端末でそのまま送信可能に）',
