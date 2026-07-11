@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260629.27 -->
+<!-- KMT_VERSION ver.20260629.28 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -318,7 +318,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.27</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.28</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -4604,6 +4604,11 @@ async function saveWorker(returnResult=false) {
   const g = id => document.getElementById(id)?.value || null;
   const name = (g('wf_name')||'').trim();
   if (!name) { showToast('❌ 氏名は必須です', 'error'); return false; }
+  const applyStatus = g('wf_apply_status') || '';
+  if (applyStatus && applyStatus !== '申請予定なし') {
+    if (!g('wf_apply_type')) { showToast('❌ 申請種別は必須です', 'error'); return false; }
+    if (!g('wf_desired_visa')) { showToast('❌ 希望在留資格は必須です', 'error'); return false; }
+  }
 
   // 就業場所: セレクトが __custom__ の時はカスタム入力欄を採用
   let workplaceName = g('wf_workplace_name');
@@ -4643,6 +4648,8 @@ async function saveWorker(returnResult=false) {
     apply_status:     g('wf_apply_status'),
     apply_type:       g('wf_apply_type'),
     desired_visa:     g('wf_desired_visa'),
+    work_start_date:  g('wf_work_start_date') || null,
+    last_year_address: g('wf_last_year_address') || null,
     worker_whatsapp:    g('wf_worker_whatsapp'),
     worker_fb:          g('wf_worker_fb'),
     worker_instagram:   g('wf_worker_instagram'),
@@ -9145,6 +9152,35 @@ function updateWorkerPhotoPreview() {
   box.innerHTML = '<img src="' + esc(img) + '" style="max-width:90px;max-height:90px;border-radius:8px;border:1px solid var(--gray-200);object-fit:cover;" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'block\';"><div style="display:none;font-size:11px;color:#ef4444;">画像を表示できません（共有設定を確認）</div>';
 }
 
+function getLastYearDate() {
+  const y = new Date().getFullYear() - 1;
+  return y + '年1月1日（' + y + '0101）';
+}
+function copyJpAddressToLastYear() {
+  const jp = document.getElementById('wf_jp_address')?.value || '';
+  const el = document.getElementById('wf_last_year_address');
+  if (el) el.value = jp;
+}
+function onApplyStatusChange() {
+  const status = document.getElementById('wf_apply_status')?.value || '';
+  const resetFields = ['wf_apply_type','wf_desired_visa','wf_request_date','wf_apply_date','wf_apply_number'];
+  if (status === '申請予定なし') {
+    const hasData = resetFields.some(id => {
+      const el = document.getElementById(id);
+      return el && (el.value || '').trim() !== '' && (el.value || '').trim() !== '─ 選択 ─' && el.value !== '';
+    });
+    if (hasData && confirm('申請予定なしに変更しますか？\n申請種別・希望在留資格・申請依頼日・申請日・申請番号がリセットされます。')) {
+      document.getElementById('wf_apply_type').value = '';
+      document.getElementById('wf_desired_visa').value = '';
+      document.getElementById('wf_request_date').value = '';
+      document.getElementById('wf_apply_date').value = '';
+      document.getElementById('wf_apply_number').value = '';
+    } else if (!hasData) {
+      // データなし、何もしない
+    }
+  }
+}
+
 function buildWorkerModalBody(w) {
   w = w||{};
   // 候補者セレクトのオプション生成
@@ -9181,95 +9217,96 @@ function buildWorkerModalBody(w) {
   </div>
   <!-- 基本情報タブ -->
   <div id="wtab_basic_panel">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 20px;align-items:start;">
+
+  <!-- ===== 左カラム ===== -->
+  <div>
+
+  <!-- 1. 申請 -->
+  <div class="section-title">1. 申請</div>
   <div class="form-grid">
-    <div class="section-title">ステータス</div>
-    <div class="form-group"><label class="form-label">在職ステータス</label>
+    <div class="form-group"><label class="form-label">申請ステータス <span style="color:#ef4444;">*</span></label>
+      <select class="form-select" id="wf_apply_status" onchange="onApplyStatusChange()">
+        ${['申請予定なし','申請準備中','審査中','申請済み・不足あり','審査完了'].map(s=>`<option ${(w.apply_status||'申請予定なし')===s?'selected':''}>${s}</option>`).join('')}
+      </select></div>
+    <div class="form-group"><label class="form-label">申請種別 <span style="color:#ef4444;">*</span><span style="font-size:10px;color:var(--gray-400);"> (申請予定なし以外は必須)</span></label>
+      <select class="form-select" id="wf_apply_type">
+        ${['','認定','変更','更新','申請なし'].map(s=>`<option value="${s}" ${(w.apply_type||'')===s?'selected':''}>${s||'─ 選択 ─'}</option>`).join('')}
+      </select></div>
+    <div class="form-group"><label class="form-label">希望在留資格 <span style="color:#ef4444;">*</span><span style="font-size:10px;color:var(--gray-400);"> (申請予定なし以外は必須)</span></label>
+      <select class="form-select" id="wf_desired_visa">
+        ${['','特定技能1号','特定技能2号','特定活動','技人国','家族滞在'].map(s=>`<option value="${s}" ${(w.desired_visa||'')===s?'selected':''}>${s||'─ 選択 ─'}</option>`).join('')}
+      </select></div>
+    <div class="form-group"><label class="form-label">申請依頼日</label><input class="form-input" id="wf_request_date" type="date" value="${w.request_date||''}"></div>
+    <div class="form-group"><label class="form-label">申請日</label><input class="form-input" id="wf_apply_date" type="date" value="${w.apply_date||''}"></div>
+    <div class="form-group"><label class="form-label">申請番号</label><input class="form-input" id="wf_apply_number" value="${esc(w.apply_number||'')}" placeholder="例: 2024-T-001"></div>
+    <div class="form-group full">
+      <label class="form-label">` + (new Date().getFullYear()-1) + `年1月1日の住所</label>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <input class="form-input" id="wf_last_year_address" value="${esc(w.last_year_address||'')}" placeholder="昨年1月1日時点の住所" style="flex:1;">
+        <button type="button" onclick="copyJpAddressToLastYear()" class="btn btn-outline" style="font-size:11px;white-space:nowrap;flex-shrink:0;">現住所と同じ</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. 在留情報 -->
+  <div class="section-title">2. 在留情報</div>
+  <div class="form-grid">
+    <div class="form-group"><label class="form-label">在留資格 <span style="color:#ef4444;">*</span></label>
+      <select class="form-select" id="wf_visa_status">
+        ${['','特定技能1号','特定技能2号','特定活動','技能実習2号','技能実習3号','家族滞在','技人国','その他'].map(s=>`<option value="${s}" ${(w.visa_status||'')===s?'selected':''}>${s||'─ 選択 ─'}</option>`).join('')}
+      </select></div>
+    <div class="form-group"><label class="form-label">在留期限 <span style="color:#ef4444;">*</span></label><input class="form-input" id="wf_visa_expiry" type="date" value="${w.visa_expiry||''}"></div>
+    <div class="form-group"><label class="form-label">在留カード番号</label><input class="form-input" id="wf_residence_card" value="${esc(w.residence_card||'')}"></div>
+    <div class="form-group"><label class="form-label">初回特定技能取得日</label><input class="form-input" id="wf_first_tokutei_date" type="date" value="${w.first_tokutei_date||''}"></div>
+    <div class="form-group full"><label class="form-label">在留カード履歴</label>
+      <textarea class="form-textarea" id="wf_residence_card_history" rows="3" placeholder="例: 2022/04/15 留学 在留カード番号XXXX 期限2024/04/15">${esc(w.residence_card_history||'')}</textarea>
+    </div>
+  </div>
+
+  <!-- 3. ドライブリンク -->
+  <div class="section-title">3. ドライブリンク</div>
+  <div class="form-grid">
+    <div class="form-group full"><label class="form-label">大房側ドライブURL</label>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <input class="form-input" id="wf_drive_url" value="${esc(w.drive_url||'')}" placeholder="https://drive.google.com/..." style="flex:1;">
+        <button type="button" class="btn btn-outline" style="font-size:16px;padding:4px 10px;flex-shrink:0;" onclick="openDriveLink('wf_drive_url')">📁</button>
+      </div></div>
+    <div class="form-group full"><label class="form-label">KMT側ドライブURL</label>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <input class="form-input" id="wf_drive_url_kmt" value="${esc(w.drive_url_kmt||'')}" placeholder="https://drive.google.com/..." style="flex:1;">
+        <button type="button" class="btn btn-outline" style="font-size:16px;padding:4px 10px;flex-shrink:0;" onclick="openDriveLink('wf_drive_url_kmt')">📁</button>
+      </div></div>
+    <div class="form-group full"><label class="form-label">顔写真URL</label>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <input class="form-input" id="wf_photo_url" value="${esc(w.photo_url||'')}" placeholder="https://drive.google.com/file/d/..." style="flex:1;" oninput="updateWorkerPhotoPreview()">
+        <button type="button" class="btn btn-outline" style="font-size:16px;padding:4px 10px;flex-shrink:0;" onclick="openDriveLink('wf_photo_url')">📁</button>
+      </div>
+      <div id="wf_photo_preview" style="margin-top:8px;"></div>
+    </div>
+  </div>
+
+  <!-- 4. メモ -->
+  <div class="section-title">4. メモ</div>
+  <div class="form-group full"><label class="form-label">備考</label><textarea class="form-textarea" id="wf_memo">${esc(w.memo||'')}</textarea></div>
+
+  </div><!-- end 左カラム -->
+
+  <!-- ===== 右カラム ===== -->
+  <div>
+
+  <!-- 5. 人材情報 -->
+  <div class="section-title">5. 人材情報</div>
+  <div class="form-grid">
+    <div class="form-group full"><label class="form-label">在職ステータス <span style="color:#ef4444;">*</span></label>
       <select class="form-select" id="wf_status" onchange="toggleExpectedLeaveField()">
         ${['配属前','在職中','在職中(一時帰国中)','退職予定(更新なし決定)','退職済(帰国)','退職済(転職)'].map(s=>`<option ${w.status===s?'selected':''}>${s}</option>`).join('')}
       </select></div>
     <div class="form-group" id="wf_expected_leave_wrap" style="display:${w.status==='退職予定(更新なし決定)'?'':'none'};">
-      <label class="form-label">退職予定日 <span style="font-size:10px;color:var(--gray-400);font-weight:400;">— 予定日を過ぎてもステータス未変更・退職日未記入だとアラート</span></label>
+      <label class="form-label">退職予定日</label>
       <input class="form-input" id="wf_expected_leave_date" type="date" value="${w.expected_leave_date||''}">
     </div>
-    <div class="form-group"><label class="form-label">申請ステータス</label>
-      <select class="form-select" id="wf_apply_status">
-        ${['申請予定なし','申請準備中','審査中','申請済み・不足あり','審査完了'].map(s=>`<option ${(w.apply_status||'申請予定なし')===s?'selected':''}>${s}</option>`).join('')}
-      </select></div>
-    <div class="form-group"><label class="form-label">申請種別</label>
-      <select class="form-select" id="wf_apply_type">
-        ${['','認定','変更','更新','申請なし'].map(s=>`<option value="${s}" ${(w.apply_type||'')===s?'selected':''}>${s||'─ 選択 ─'}</option>`).join('')}
-      </select></div>
-    <div class="form-group"><label class="form-label">希望在留資格</label>
-      <select class="form-select" id="wf_desired_visa">
-        ${['','特定技能1号','特定技能2号','特定活動','技人国','家族滞在'].map(s=>`<option value="${s}" ${(w.desired_visa||'')===s?'selected':''}>${s||'─ 選択 ─'}</option>`).join('')}
-      </select></div>
-    <div class="section-title">📱 本人SNS</div>
-    <div class="form-group"><label class="form-label">WhatsApp</label>
-      <input class="form-input" id="wf_worker_whatsapp" value="${esc(w.worker_whatsapp||'')}" placeholder="例: +62 821-xxxx-xxxx">
-    </div>
-    <div class="form-group"><label class="form-label">Facebook</label>
-      <input class="form-input" id="wf_worker_fb" value="${esc(w.worker_fb||'')}" placeholder="URL or ユーザー名">
-    </div>
-    <div class="form-group"><label class="form-label">Instagram</label>
-      <input class="form-input" id="wf_worker_instagram" value="${esc(w.worker_instagram||'')}" placeholder="例: @username">
-    </div>
-    <div class="form-group"><label class="form-label">その他SNS</label>
-      <input class="form-input" id="wf_worker_sns_other" value="${esc(w.worker_sns_other||'')}" placeholder="LINE個人ID / Telegram 等">
-    </div>
-    <div class="section-title" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;user-select:none;" onclick="toggleEmergencySection()">
-      <span>🆘 緊急連絡先</span>
-      <span id="wf_emergency_arrow" style="font-size:14px;color:var(--gray-500);transition:transform .15s;">▼</span>
-    </div>
-    <div class="form-group emergency-field" style="display:none;"><label class="form-label">氏名</label>
-      <input class="form-input" id="wf_emergency_name" value="${esc(w.emergency_contact_name||'')}" placeholder="例: Aam Marpuah">
-    </div>
-    <div class="form-group emergency-field" style="display:none;"><label class="form-label">続柄</label>
-      <input class="form-input" id="wf_emergency_relation" value="${esc(w.emergency_contact_relation||'')}" placeholder="例: 妻 / 母 / istri">
-    </div>
-    <div class="form-group emergency-field" style="display:none;"><label class="form-label">電話</label>
-      <input class="form-input" id="wf_emergency_phone" value="${esc(w.emergency_contact_phone||'')}" placeholder="例: +62 821-xxxx-xxxx">
-    </div>
-    <div class="form-group emergency-field" style="display:none;"><label class="form-label">WhatsApp</label>
-      <input class="form-input" id="wf_emergency_whatsapp" value="${esc(w.emergency_contact_whatsapp||'')}" placeholder="例: +62 821-xxxx-xxxx">
-    </div>
-    <div class="form-group full emergency-field" style="display:none;"><label class="form-label">住所</label>
-      <input class="form-input" id="wf_emergency_address" value="${esc(w.emergency_contact_address||'')}" placeholder="例: Bekasi, Jawa Barat">
-    </div>
-    <div class="form-group full emergency-field" style="display:none;"><label class="form-label">SNS</label>
-      <input class="form-input" id="wf_emergency_sns" value="${esc(w.emergency_contact_sns||'')}" placeholder="例: FB:John Doe / IG:@john">
-    </div>
-    <div class="form-group full emergency-field" style="display:none;"><label class="form-label">原文(参照用) <span style="font-size:10px;color:var(--gray-400);font-weight:400;">— Stockノートからインポート時の元テキスト</span></label>
-      <textarea class="form-textarea" id="wf_emergency_raw" rows="3" placeholder="原文テキスト">${esc(w.emergency_contact_raw||'')}</textarea>
-    </div>
-    <div class="section-title">📁 ドライブ</div>
-    <div class="form-group full"><label class="form-label">大房側ドライブURL</label>
-      <div style="display:flex;gap:6px;align-items:center;">
-        <input class="form-input" id="wf_drive_url" value="${esc(w.drive_url||'')}" placeholder="https://drive.google.com/..." style="flex:1;">
-        <button type="button" class="btn btn-outline" title="リンク先を開く" style="font-size:16px;padding:4px 10px;flex-shrink:0;" onclick="openDriveLink('wf_drive_url')">📁</button>
-      </div>
-    </div>
-    <div class="form-group full"><label class="form-label">KMTドライブURL</label>
-      <div style="display:flex;gap:6px;align-items:center;">
-        <input class="form-input" id="wf_drive_url_kmt" value="${esc(w.drive_url_kmt||'')}" placeholder="https://drive.google.com/..." style="flex:1;">
-        <button type="button" class="btn btn-outline" title="リンク先を開く" style="font-size:16px;padding:4px 10px;flex-shrink:0;" onclick="openDriveLink('wf_drive_url_kmt')">📁</button>
-      </div>
-    </div>
-    <div class="form-group full"><label class="form-label">📄 最新雇用条件書ドライブURL <span style="font-size:10px;color:var(--gray-400);font-weight:400;">— 直近の雇用条件書PDFのドライブリンク</span></label>
-      <div style="display:flex;gap:6px;align-items:center;">
-        <input class="form-input" id="wf_latest_contract_url" value="${esc(w.latest_contract_url||'')}" placeholder="https://drive.google.com/file/d/..." style="flex:1;">
-        <button type="button" class="btn btn-outline" title="リンク先を開く" style="font-size:16px;padding:4px 10px;flex-shrink:0;" onclick="openDriveLink('wf_latest_contract_url')">📁</button>
-      </div>
-    </div>
-    <div class="section-title">📷 顔写真</div>
-    <div class="form-group full"><label class="form-label">顔写真のドライブURL <span style="font-size:10px;color:var(--gray-400);font-weight:400;">（共有設定「リンクを知っている全員」が必要）</span></label>
-      <div style="display:flex;gap:6px;align-items:center;">
-        <input class="form-input" id="wf_photo_url" value="${esc(w.photo_url||'')}" placeholder="https://drive.google.com/file/d/..." style="flex:1;" oninput="updateWorkerPhotoPreview()">
-        <button type="button" class="btn btn-outline" title="リンク先を開く" style="font-size:16px;padding:4px 10px;flex-shrink:0;" onclick="openDriveLink('wf_photo_url')">📁</button>
-      </div>
-      <div id="wf_photo_preview" style="margin-top:8px;"></div>
-    </div>
-    <div class="section-title">基本情報</div>
-    <div class="form-group full" style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:10px 12px;margin-bottom:4px;">
+    <div class="form-group full" style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:10px 12px;">
       <label class="form-label" style="color:#0369a1;font-weight:800;">📋 候補者から自動入力</label>
       <div style="display:flex;gap:8px;align-items:center;">
         <select id="wf_candidate_src" class="form-select" style="flex:1;font-size:12px;">
@@ -9279,7 +9316,9 @@ function buildWorkerModalBody(w) {
         <button class="btn btn-outline" style="font-size:11px;white-space:nowrap;flex-shrink:0;" onclick="fillWorkerFromCandidate()">→ 転記</button>
       </div>
     </div>
-    <div class="form-group full"><label class="form-label">氏名（ローマ字）*</label><input class="form-input" id="wf_name" value="${esc(w.name||'')}"></div>
+    <div class="form-group"><label class="form-label">管理番号 <span style="color:#ef4444;">*</span></label>
+      <input class="form-input" id="wf_management_no" value="${esc(w.management_no||'')}" placeholder="例: 091-006"></div>
+    <div class="form-group full"><label class="form-label">氏名（ローマ字）<span style="color:#ef4444;">*</span></label><input class="form-input" id="wf_name" value="${esc(w.name||'')}"></div>
     <div class="form-group"><label class="form-label">フリガナ</label><input class="form-input" id="wf_name_kana" value="${esc(w.name_kana||'')}"></div>
     <div class="form-group"><label class="form-label">国籍</label>
       <select class="form-select" id="wf_nationality">
@@ -9290,19 +9329,19 @@ function buildWorkerModalBody(w) {
         ${['','男','女'].map(n=>`<option ${w.gender===n?'selected':''}>${n}</option>`).join('')}
       </select></div>
     <div class="form-group"><label class="form-label">生年月日</label><input class="form-input" id="wf_birthdate" type="date" value="${w.birthdate||''}"></div>
-    <div class="section-title">所属・就労</div>
-    <div class="form-group full"><label class="form-label">所属機関</label>
+    <div class="form-group full"><label class="form-label">日本住所</label><input class="form-input" id="wf_jp_address" value="${esc(w.jp_address||'')}"></div>
+  </div>
+
+  <!-- 6. 所属機関・受け入れ情報 -->
+  <div class="section-title">6. 所属機関・受け入れ情報</div>
+  <div class="form-grid">
+    <div class="form-group full"><label class="form-label">所属機関 <span style="color:#ef4444;">*</span></label>
       <select class="form-select" id="wf_company_id" onchange="onWorkerCompanyChange()">
         <option value="">選択...</option>
         ${allCompanies.slice().sort(cmpFolderNo).map(c=>`<option value="${c.id}" ${w.company_id===c.id?'selected':''}>${esc(companyOptionLabel(c))}</option>`).join('')}
       </select></div>
-    <div class="form-group"><label class="form-label">管理番号 <span style="font-size:10px;color:var(--gray-400);font-weight:400;">（新規時は企業選択で自動採番）</span></label>
-      <input class="form-input" id="wf_management_no" value="${esc(w.management_no||'')}" placeholder="例: 091-006">
-    </div>
-    <div class="form-group"><label class="form-label">分野</label><input class="form-input" id="wf_applicant_field" value="${esc(w.applicant_field||'')}"></div>
+    <div class="form-group"><label class="form-label">分野 <span style="color:#ef4444;">*</span></label><input class="form-input" id="wf_applicant_field" value="${esc(w.applicant_field||'')}"></div>
     <div class="form-group"><label class="form-label">職種</label><input class="form-input" id="wf_job_category" value="${esc(w.job_category||'')}"></div>
-    <div class="form-group"><label class="form-label">配属日</label><input class="form-input" id="wf_joined_date" type="date" value="${w.joined_date||''}"></div>
-    <div class="form-group"><label class="form-label">退職日</label><input class="form-input" id="wf_left_date" type="date" value="${w.left_date||''}"></div>
     <div class="form-group full"><label class="form-label">就業場所名</label>
       <select class="form-select" id="wf_workplace_name" onchange="onWorkerWorkplaceChange()">
         <option value="">選択...</option>
@@ -9311,48 +9350,25 @@ function buildWorkerModalBody(w) {
       </select>
       <input class="form-input" id="wf_workplace_name_custom" style="margin-top:4px;${w.workplace_name&&!allCompanies.find(c=>c.workplace_name===w.workplace_name)?'':'display:none'}" value="${esc(w.workplace_name||'')}" placeholder="事業所名を入力">
     </div>
-    <div class="section-title">在留情報</div>
-    <div class="form-group"><label class="form-label">在留資格</label>
-      <select class="form-select" id="wf_visa_status">
-        ${['','特定技能1号','特定技能2号','特定活動','技能実習2号','技能実習3号','家族滞在','技人国','その他'].map(s=>`<option value="${s}" ${(w.visa_status||'')===s?'selected':''}>${s||'─ 選択 ─'}</option>`).join('')}
-      </select>
-    </div>
-    <div class="form-group"><label class="form-label">在留期限</label><input class="form-input" id="wf_visa_expiry" type="date" value="${w.visa_expiry||''}"></div>
-    <div class="form-group"><label class="form-label">在留カード番号</label><input class="form-input" id="wf_residence_card" value="${esc(w.residence_card||'')}"></div>
-    <div class="form-group"><label class="form-label">入国日</label><input class="form-input" id="wf_entry_date" type="date" value="${w.entry_date||''}"></div>
-    <div class="form-group"><label class="form-label">初回特定技能取得日</label><input class="form-input" id="wf_first_tokutei_date" type="date" value="${w.first_tokutei_date||''}"></div>
-    <div class="form-group full"><label class="form-label">在留カードの履歴 <span style="font-size:10px;color:var(--gray-400);font-weight:400;">— 過去の在留カード番号・期限・資格などの履歴をテキストで記録(STOCKデータ移行用)</span></label>
-      <textarea class="form-textarea" id="wf_residence_card_history" rows="3" placeholder="例: 2022/04/15 留学 在留カード番号XXXX 期限2024/04/15&#10;2024/04/16 特定技能1号 在留カード番号YYYY 期限2025/04/16">${esc(w.residence_card_history||'')}</textarea>
-    </div>
-    <div class="section-title">申請情報</div>
-    <div class="form-group"><label class="form-label">申請依頼日 <span style="font-size:10px;color:var(--gray-400);">（入力でアラートから除外）</span></label><input class="form-input" id="wf_request_date" type="date" value="${w.request_date||''}"></div>
-    <div class="form-group"><label class="form-label">申請日</label><input class="form-input" id="wf_apply_date" type="date" value="${w.apply_date||''}"></div>
-    <div class="form-group"><label class="form-label">申請番号</label><input class="form-input" id="wf_apply_number" value="${esc(w.apply_number||'')}" placeholder="例: 2024-T-001"></div>
-    <div class="section-title">KMT支援区分</div>
-    <div class="form-group"><label class="form-label">KMT支援区分</label>
+    <div class="form-group"><label class="form-label">配属日 <span style="color:#ef4444;">*</span></label><input class="form-input" id="wf_joined_date" type="date" value="${w.joined_date||''}"></div>
+    <div class="form-group"><label class="form-label">就労開始日</label><input class="form-input" id="wf_work_start_date" type="date" value="${w.work_start_date||''}"></div>
+    <div class="form-group"><label class="form-label">退職日</label><input class="form-input" id="wf_left_date" type="date" value="${w.left_date||''}"></div>
+  </div>
+
+  <!-- 7. 支援情報 -->
+  <div class="section-title">7. 支援情報</div>
+  <div class="form-grid">
+    <div class="form-group"><label class="form-label">KMT支援区分 <span style="color:#ef4444;">*</span></label>
       <select class="form-select" id="wf_kmt_support">
         ${['KMT支援','KMT支援外'].map(s=>`<option ${(w.kmt_support||'KMT支援')===s?'selected':''}>${s}</option>`).join('')}
       </select></div>
-    <div class="form-group"><label class="form-label">KMT担当</label><input class="form-input" id="wf_staff" value="${esc(w.staff||'')}"></div>
-    <div class="form-group"><label class="form-label">KMTサブ担当</label><input class="form-input" id="wf_sub_staff" value="${esc(w.sub_staff||'')}"></div>
-    <div class="section-title" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;user-select:none;" onclick="toggle2goSupportSection()">
-      <span>🛡️ 特定技能2号支援区分</span>
-      <span id="wf_2go_arrow" style="font-size:14px;color:var(--gray-500);transition:transform .15s;">▼</span>
-    </div>
-    <div class="form-group full support2go-field" style="display:none;"><label class="form-label">支援区分</label>
-      <select class="form-select" id="wf_support_type_2go">
-        ${['','2号支援継続','2号支援終了・書類サポート','2号企業単独'].map(s=>`<option value="${s}" ${(w.support_type_2go||'')===s?'selected':''}>${s||'─ 選択 ─'}</option>`).join('')}
-      </select>
-      <div style="font-size:10px;color:var(--gray-400);font-weight:400;margin-top:4px;line-height:1.5;">
-        <strong>2号支援継続</strong>: 特定技能2号で引き続きKMTが全面支援<br>
-        <strong>2号支援終了・書類サポート</strong>: 支援は終了、更新と定期報告はKMTが書類サポート<br>
-        <strong>2号企業単独</strong>: 更新や定期報告も書類も企業単独又は人材本人で対応
-      </div>
-    </div>
-    <div class="section-title">一時帰国 / 5年満了</div>
+    <div class="form-group"><label class="form-label">メイン担当</label><input class="form-input" id="wf_staff" value="${esc(w.staff||'')}" placeholder="企業情報から自動反映"></div>
+    <div class="form-group"><label class="form-label">サブ担当</label><input class="form-input" id="wf_sub_staff" value="${esc(w.sub_staff||'')}" placeholder="企業情報から自動反映"></div>
+    <div class="form-group"><label class="form-label">チーム担当</label><input class="form-input" id="wf_team_staff" value="${esc(w.team_staff||'')}" readonly placeholder="企業情報から自動反映" style="background:#f8fafc;"></div>
+    <div class="section-title" style="grid-column:1/-1;font-size:11px;padding:4px 0 2px;">一時帰国</div>
     <div class="form-group"><label class="form-label">一時帰国日</label><input class="form-input" id="wf_return_home_date" type="date" value="${w.return_home_date||''}"></div>
     <div class="form-group"><label class="form-label">再入国日</label><input class="form-input" id="wf_return_jp_date" type="date" value="${w.return_jp_date||''}"></div>
-    <div class="form-group"><label class="form-label">脱退一時金の予定</label>
+    <div class="form-group full"><label class="form-label">脱退一時金の予定</label>
       <select class="form-select" id="wf_lump_sum_plan" onchange="toggleLumpSumFields()">
         <option value="" ${!w.lump_sum_plan?'selected':''}>─ 選択 ─</option>
         <option ${w.lump_sum_plan==='あり'?'selected':''}>あり</option>
@@ -9361,7 +9377,7 @@ function buildWorkerModalBody(w) {
     </div>
     <div class="form-group full" id="wf_lump_sum_detail" style="display:${w.lump_sum_plan==='あり'?'':'none'};">
       <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:12px;">
-        <div style="font-size:11px;color:#92400e;margin-bottom:8px;font-weight:700;">転出・転入手続き（脱退一時金あり）— 日付が過ぎても「済み」が未チェックだとアラートが出ます</div>
+        <div style="font-size:11px;color:#92400e;margin-bottom:8px;font-weight:700;">転出・転入手続き</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
           <div>
             <label class="form-label" style="font-size:11px;">転出手続き日付</label>
@@ -9380,15 +9396,31 @@ function buildWorkerModalBody(w) {
         </div>
       </div>
     </div>
-    <div class="form-group"><label class="form-label">5年満了日</label><input class="form-input" id="wf_tg2_expiry" type="date" value="${w.tg2_expiry||''}"></div>
+    <div class="section-title" style="grid-column:1/-1;font-size:11px;padding:4px 0 2px;">5年満了</div>
+    <div class="form-group"><label class="form-label">5年満了日 <span style="color:#ef4444;">*</span></label><input class="form-input" id="wf_tg2_expiry" type="date" value="${w.tg2_expiry||''}"></div>
     <div class="form-group"><label class="form-label">5年満了状況</label><input class="form-input" id="wf_tg2_status" value="${esc(w.tg2_status||'')}"></div>
-    <div class="section-title">連絡先</div>
-    <div class="form-group"><label class="form-label">電話番号</label><input class="form-input" id="wf_phone" value="${esc(w.phone||'')}"></div>
-    <div class="form-group"><label class="form-label">メール</label><input class="form-input" id="wf_email" value="${esc(w.email||'')}"></div>
-    <div class="form-group full"><label class="form-label">日本住所</label><input class="form-input" id="wf_jp_address" value="${esc(w.jp_address||'')}"></div>
-    <div class="section-title">メモ</div>
-    <div class="form-group full"><label class="form-label">備考</label><textarea class="form-textarea" id="wf_memo">${esc(w.memo||'')}</textarea></div>
   </div>
+
+  <!-- 8. 連絡先 -->
+  <div class="section-title">8. 連絡先</div>
+  <div class="form-grid">
+    <div class="form-group"><label class="form-label">メール <span style="color:#ef4444;">*</span></label><input class="form-input" id="wf_email" value="${esc(w.email||'')}"></div>
+    <div class="form-group"><label class="form-label">電話番号</label><input class="form-input" id="wf_phone" value="${esc(w.phone||'')}"></div>
+    <div class="form-group"><label class="form-label">WhatsApp</label><input class="form-input" id="wf_worker_whatsapp" value="${esc(w.worker_whatsapp||'')}" placeholder="例: +62 821-xxxx-xxxx"></div>
+    <div class="form-group"><label class="form-label">Facebook</label><input class="form-input" id="wf_worker_fb" value="${esc(w.worker_fb||'')}" placeholder="URL or ユーザー名"></div>
+    <div class="form-group"><label class="form-label">Instagram</label><input class="form-input" id="wf_worker_instagram" value="${esc(w.worker_instagram||'')}" placeholder="例: @username"></div>
+    <div class="form-group"><label class="form-label">その他SNS</label><input class="form-input" id="wf_worker_sns_other" value="${esc(w.worker_sns_other||'')}" placeholder="LINE個人ID / Telegram 等"></div>
+    <div class="form-group full"><label class="form-label">現地住所</label><input class="form-input" id="wf_emergency_address" value="${esc(w.emergency_contact_address||'')}"></div>
+    <div class="section-title" style="grid-column:1/-1;font-size:11px;padding:4px 0 2px;">緊急連絡先</div>
+    <div class="form-group"><label class="form-label">氏名</label><input class="form-input" id="wf_emergency_name" value="${esc(w.emergency_contact_name||'')}" placeholder="例: Aam Marpuah"></div>
+    <div class="form-group"><label class="form-label">続柄</label><input class="form-input" id="wf_emergency_relation" value="${esc(w.emergency_contact_relation||'')}" placeholder="例: 妻 / 母"></div>
+    <div class="form-group"><label class="form-label">電話</label><input class="form-input" id="wf_emergency_phone" value="${esc(w.emergency_contact_phone||'')}"></div>
+    <div class="form-group"><label class="form-label">WhatsApp</label><input class="form-input" id="wf_emergency_whatsapp" value="${esc(w.emergency_contact_whatsapp||'')}"></div>
+    <div class="form-group full"><label class="form-label">SNS</label><input class="form-input" id="wf_emergency_sns" value="${esc(w.emergency_contact_sns||'')}"></div>
+  </div>
+
+  </div><!-- end 右カラム -->
+  </div><!-- end grid -->
   </div>
   <!-- ノートタブ -->
   <div id="wtab_note_panel" style="display:none;padding:4px 0;">
@@ -13909,7 +13941,7 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
-  { version:'ver.20260629.27', date:'2026-07-10', notify:true, items:[
+  { version:'ver.20260629.28', date:'2026-07-10', notify:true, items:[
     'スマホ対応：テーブルを横スクロールで全列表示に変更',
     'スマホ対応：チャット画面をLINEライク（一覧→タップでメッセージ→←で戻る）に変更',
     'チャット：ファイル送信のGAS URLを設定不要化（スマホ含めすべての端末でそのまま送信可能に）',
