@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260629.28 -->
+<!-- KMT_VERSION ver.20260629.29 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -318,7 +318,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.28</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.29</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -4764,13 +4764,24 @@ function toggle2goSupportSection() {
 
 // 人材モーダル: 所属機関の変更時に管理番号を自動採番(新規のみ・空欄のときのみ)
 async function onWorkerCompanyChange() {
-  if (editingWorkerId) return; // 既存編集時は採番しない
   const cidEl = document.getElementById('wf_company_id');
   const mnoEl = document.getElementById('wf_management_no');
+  // 担当を企業から自動反映（新規・既存共通）
+  const cid = cidEl?.value;
+  const co = (allCompanies || []).find(x => x.id === cid);
+  if (co) {
+    const staffEl = document.getElementById('wf_staff');
+    const subEl = document.getElementById('wf_sub_staff');
+    const teamEl = document.getElementById('wf_team_staff');
+    if (staffEl) staffEl.value = co.main_staff || '';
+    if (subEl) subEl.value = co.sub_staff || '';
+    if (teamEl) teamEl.value = co.team_staff || '';
+  }
+  if (editingWorkerId) return; // 既存編集時は採番しない
   if (!cidEl || !mnoEl) return;
   // 既に入力されていれば触らない(ユーザー手動入力を保護)
   if ((mnoEl.value || '').trim()) return;
-  const cid = cidEl.value;
+  // cid は上で取得済み
   if (!cid) return;
   // 企業のfolder_noを取得
   const c = (allCompanies || []).find(x => x.id === cid);
@@ -9217,29 +9228,29 @@ function buildWorkerModalBody(w) {
   </div>
   <!-- 基本情報タブ -->
   <div id="wtab_basic_panel">
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 20px;align-items:start;">
+  <div style="display:grid;grid-template-columns:1fr 1px 1fr;gap:0;align-items:start;">
 
   <!-- ===== 左カラム ===== -->
   <div>
 
   <!-- 1. 申請 -->
-  <div class="section-title">1. 申請</div>
-  <div class="form-grid">
-    <div class="form-group"><label class="form-label">申請ステータス <span style="color:#ef4444;">*</span></label>
+  <div class="section-title">1. 申請情報</div>
+  <div class="form-grid" style="grid-template-columns:1fr;">
+    <div class="form-group full"><label class="form-label">申請ステータス <span style="color:#ef4444;">*</span></label>
       <select class="form-select" id="wf_apply_status" onchange="onApplyStatusChange()">
         ${['申請予定なし','申請準備中','審査中','申請済み・不足あり','審査完了'].map(s=>`<option ${(w.apply_status||'申請予定なし')===s?'selected':''}>${s}</option>`).join('')}
       </select></div>
-    <div class="form-group"><label class="form-label">申請種別 <span style="color:#ef4444;">*</span><span style="font-size:10px;color:var(--gray-400);"> (申請予定なし以外は必須)</span></label>
+    <div class="form-group full"><label class="form-label">申請種別 <span style="color:#ef4444;">*</span><span style="font-size:10px;color:var(--gray-400);"> (申請予定なし以外は必須)</span></label>
       <select class="form-select" id="wf_apply_type">
         ${['','認定','変更','更新','申請なし'].map(s=>`<option value="${s}" ${(w.apply_type||'')===s?'selected':''}>${s||'─ 選択 ─'}</option>`).join('')}
       </select></div>
-    <div class="form-group"><label class="form-label">希望在留資格 <span style="color:#ef4444;">*</span><span style="font-size:10px;color:var(--gray-400);"> (申請予定なし以外は必須)</span></label>
+    <div class="form-group full"><label class="form-label">希望在留資格 <span style="color:#ef4444;">*</span><span style="font-size:10px;color:var(--gray-400);"> (申請予定なし以外は必須)</span></label>
       <select class="form-select" id="wf_desired_visa">
         ${['','特定技能1号','特定技能2号','特定活動','技人国','家族滞在'].map(s=>`<option value="${s}" ${(w.desired_visa||'')===s?'selected':''}>${s||'─ 選択 ─'}</option>`).join('')}
       </select></div>
-    <div class="form-group"><label class="form-label">申請依頼日</label><input class="form-input" id="wf_request_date" type="date" value="${w.request_date||''}"></div>
-    <div class="form-group"><label class="form-label">申請日</label><input class="form-input" id="wf_apply_date" type="date" value="${w.apply_date||''}"></div>
-    <div class="form-group"><label class="form-label">申請番号</label><input class="form-input" id="wf_apply_number" value="${esc(w.apply_number||'')}" placeholder="例: 2024-T-001"></div>
+    <div class="form-group full"><label class="form-label">申請依頼日</label><input class="form-input" id="wf_request_date" type="date" value="${w.request_date||''}"></div>
+    <div class="form-group full"><label class="form-label">申請日</label><input class="form-input" id="wf_apply_date" type="date" value="${w.apply_date||''}"></div>
+    <div class="form-group full"><label class="form-label">申請番号</label><input class="form-input" id="wf_apply_number" value="${esc(w.apply_number||'')}" placeholder="例: 2024-T-001"></div>
     <div class="form-group full">
       <label class="form-label">` + (new Date().getFullYear()-1) + `年1月1日の住所</label>
       <div style="display:flex;gap:6px;align-items:center;">
@@ -9251,14 +9262,14 @@ function buildWorkerModalBody(w) {
 
   <!-- 2. 在留情報 -->
   <div class="section-title">2. 在留情報</div>
-  <div class="form-grid">
-    <div class="form-group"><label class="form-label">在留資格 <span style="color:#ef4444;">*</span></label>
+  <div class="form-grid" style="grid-template-columns:1fr;">
+    <div class="form-group full"><label class="form-label">在留資格 <span style="color:#ef4444;">*</span></label>
       <select class="form-select" id="wf_visa_status">
         ${['','特定技能1号','特定技能2号','特定活動','技能実習2号','技能実習3号','家族滞在','技人国','その他'].map(s=>`<option value="${s}" ${(w.visa_status||'')===s?'selected':''}>${s||'─ 選択 ─'}</option>`).join('')}
       </select></div>
-    <div class="form-group"><label class="form-label">在留期限 <span style="color:#ef4444;">*</span></label><input class="form-input" id="wf_visa_expiry" type="date" value="${w.visa_expiry||''}"></div>
-    <div class="form-group"><label class="form-label">在留カード番号</label><input class="form-input" id="wf_residence_card" value="${esc(w.residence_card||'')}"></div>
-    <div class="form-group"><label class="form-label">初回特定技能取得日</label><input class="form-input" id="wf_first_tokutei_date" type="date" value="${w.first_tokutei_date||''}"></div>
+    <div class="form-group full"><label class="form-label">在留期限 <span style="color:#ef4444;">*</span></label><input class="form-input" id="wf_visa_expiry" type="date" value="${w.visa_expiry||''}"></div>
+    <div class="form-group full"><label class="form-label">在留カード番号</label><input class="form-input" id="wf_residence_card" value="${esc(w.residence_card||'')}"></div>
+    <div class="form-group full"><label class="form-label">初回特定技能取得日</label><input class="form-input" id="wf_first_tokutei_date" type="date" value="${w.first_tokutei_date||''}"></div>
     <div class="form-group full"><label class="form-label">在留カード履歴</label>
       <textarea class="form-textarea" id="wf_residence_card_history" rows="3" placeholder="例: 2022/04/15 留学 在留カード番号XXXX 期限2024/04/15">${esc(w.residence_card_history||'')}</textarea>
     </div>
@@ -9292,8 +9303,11 @@ function buildWorkerModalBody(w) {
 
   </div><!-- end 左カラム -->
 
+  <!-- 仕切り線 -->
+  <div style="background:var(--gray-200);margin:0 12px;"></div>
+
   <!-- ===== 右カラム ===== -->
-  <div>
+  <div style="padding-left:8px;">
 
   <!-- 5. 人材情報 -->
   <div class="section-title">5. 人材情報</div>
@@ -9358,13 +9372,16 @@ function buildWorkerModalBody(w) {
   <!-- 7. 支援情報 -->
   <div class="section-title">7. 支援情報</div>
   <div class="form-grid">
-    <div class="form-group"><label class="form-label">KMT支援区分 <span style="color:#ef4444;">*</span></label>
+    <div class="form-group full"><label class="form-label">KMT支援区分 <span style="color:#ef4444;">*</span></label>
       <select class="form-select" id="wf_kmt_support">
         ${['KMT支援','KMT支援外'].map(s=>`<option ${(w.kmt_support||'KMT支援')===s?'selected':''}>${s}</option>`).join('')}
       </select></div>
-    <div class="form-group"><label class="form-label">メイン担当</label><input class="form-input" id="wf_staff" value="${esc(w.staff||'')}" placeholder="企業情報から自動反映"></div>
-    <div class="form-group"><label class="form-label">サブ担当</label><input class="form-input" id="wf_sub_staff" value="${esc(w.sub_staff||'')}" placeholder="企業情報から自動反映"></div>
-    <div class="form-group"><label class="form-label">チーム担当</label><input class="form-input" id="wf_team_staff" value="${esc(w.team_staff||'')}" readonly placeholder="企業情報から自動反映" style="background:#f8fafc;"></div>
+    <div class="form-group full"><label class="form-label">メイン担当 <span style="font-size:10px;color:var(--gray-400);">（企業情報から自動反映）</span></label>
+      <input class="form-input" id="wf_staff" value="${esc(w.staff||'')}" readonly style="background:#f8fafc;"></div>
+    <div class="form-group full"><label class="form-label">サブ担当 <span style="font-size:10px;color:var(--gray-400);">（企業情報から自動反映）</span></label>
+      <input class="form-input" id="wf_sub_staff" value="${esc(w.sub_staff||'')}" readonly style="background:#f8fafc;"></div>
+    <div class="form-group full"><label class="form-label">チーム担当 <span style="font-size:10px;color:var(--gray-400);">（企業情報から自動反映）</span></label>
+      <input class="form-input" id="wf_team_staff" value="${esc(w.team_staff||'')}" readonly style="background:#f8fafc;"></div>
     <div class="section-title" style="grid-column:1/-1;font-size:11px;padding:4px 0 2px;">一時帰国</div>
     <div class="form-group"><label class="form-label">一時帰国日</label><input class="form-input" id="wf_return_home_date" type="date" value="${w.return_home_date||''}"></div>
     <div class="form-group"><label class="form-label">再入国日</label><input class="form-input" id="wf_return_jp_date" type="date" value="${w.return_jp_date||''}"></div>
@@ -13941,7 +13958,7 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
-  { version:'ver.20260629.28', date:'2026-07-10', notify:true, items:[
+  { version:'ver.20260629.29', date:'2026-07-10', notify:true, items:[
     'スマホ対応：テーブルを横スクロールで全列表示に変更',
     'スマホ対応：チャット画面をLINEライク（一覧→タップでメッセージ→←で戻る）に変更',
     'チャット：ファイル送信のGAS URLを設定不要化（スマホ含めすべての端末でそのまま送信可能に）',
