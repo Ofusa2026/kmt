@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260629.36 -->
+<!-- KMT_VERSION ver.20260629.37 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -320,13 +320,14 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.36</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.37</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
   <div style="height:1px;background:rgba(255,255,255,0.08);margin:4px 16px 8px;"></div>
   <div class="nav-item active" onclick="showScreen('ofusa_view')" style="margin:8px 8px 4px;border-radius:6px;">📊 案件進捗確認</div>
   <div class="nav-item" onclick="showScreen('notices')">📋 社内共有事項</div>
+  <div class="nav-item" onclick="showScreen('staff_list')">👥 担当一覧</div>
   <div class="nav-item" onclick="showScreen('decision_report')" style="margin:2px 8px 4px;border-radius:6px;">📋 決定報告</div>
   <div style="height:1px;background:rgba(255,255,255,0.08);margin:4px 16px 8px;"></div>
   <div class="sidebar-section">メイン</div>
@@ -2034,6 +2035,227 @@ const NOTICE_CATEGORIES = ['業務共有事項', '注意事項', '企業対応',
 const NOTICE_FIELDS_19 = ['介護', 'ビルクリーニング', '素形材・産業機械・電気電子情報関連製造業', '建設', '造船・舶用工業', '自動車整備', '航空', '宿泊', '農業', '漁業', '飲食料品製造業', '外食業', '工業製品製造業（素形材等）', '自動車運送業', '鉄道', '林業', '木材産業', '電気・電子・情報関連産業', 'その他分野'];
 let _notices = [];
 let _noticeEditId = null;
+
+
+// ===== 担当一覧 =====
+function buildStaffListScreen() {
+  return `<div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px;">
+      <select id="staffListFilter" class="form-select" onchange="renderStaffList()" style="width:auto;font-size:12px;">
+        <option value="all">全担当者</option>
+      </select>
+      <div style="display:flex;gap:6px;margin-left:auto;">
+        <button onclick="setStaffViewMode('card')" id="staffViewCard" class="btn btn-primary" style="font-size:11px;padding:4px 12px;">🗂️ カード</button>
+        <button onclick="setStaffViewMode('table')" id="staffViewTable" class="btn btn-outline" style="font-size:11px;padding:4px 12px;">📋 テーブル</button>
+      </div>
+    </div>
+    <div id="staffListWrap"></div>
+  </div>`;
+}
+
+let _staffListData = null;
+let _staffViewMode = 'card';
+
+function setStaffViewMode(mode) {
+  _staffViewMode = mode;
+  document.getElementById('staffViewCard').className = 'btn ' + (mode==='card'?'btn-primary':'btn-outline');
+  document.getElementById('staffViewTable').className = 'btn ' + (mode==='table'?'btn-primary':'btn-outline');
+  renderStaffList();
+}
+
+async function loadStaffList() {
+  showLoading(true);
+  try {
+    // 全企業と在籍中人材を取得
+    const [companies, workers] = await Promise.all([
+      sbFetch('companies?select=id,name,pref,main_staff,sub_staff,folder_no&is_deleted=eq.false&order=name.asc'),
+      sbFetch('workers?select=id,company_id,status&is_deleted=eq.false'),
+    ]);
+
+    // 企業ごとの在籍中人材数
+    const workerCount = {};
+    (workers || []).forEach(w => {
+      if (!['退職済(帰国)','退職済(転職)','退職済'].includes(w.status)) {
+        workerCount[w.company_id] = (workerCount[w.company_id] || 0) + 1;
+      }
+    });
+
+    // 担当者リストを収集（メイン・サブ両方）
+    const staffSet = new Set();
+    (companies || []).forEach(c => {
+      if (c.main_staff) c.main_staff.split(/[,、]/).map(s=>s.trim()).filter(Boolean).forEach(s=>staffSet.add(s));
+      if (c.sub_staff)  c.sub_staff.split(/[,、]/).map(s=>s.trim()).filter(Boolean).forEach(s=>staffSet.add(s));
+    });
+    const allStaff = [...staffSet].sort((a,b) => a.localeCompare(b, 'ja'));
+
+    _staffListData = { companies: companies||[], workerCount, allStaff };
+
+    // フィルターセレクトを更新
+    const sel = document.getElementById('staffListFilter');
+    if (sel) {
+      sel.innerHTML = '<option value="all">全担当者</option>' +
+        allStaff.map(s=>`<option value="${esc(s)}">${esc(s)}</option>`).join('');
+    }
+
+    renderStaffList();
+  } catch(e) { showToast('❌ ' + e.message, 'error'); }
+  showLoading(false);
+}
+
+function renderStaffList() {
+  const wrap = document.getElementById('staffListWrap');
+  if (!wrap || !_staffListData) return;
+  const { companies, workerCount, allStaff } = _staffListData;
+  const filterStaff = document.getElementById('staffListFilter')?.value || 'all';
+  const targetStaff = filterStaff === 'all' ? allStaff : [filterStaff];
+
+  if (_staffViewMode === 'table') {
+    renderStaffTable(wrap, companies, workerCount, targetStaff);
+  } else {
+    renderStaffCards(wrap, companies, workerCount, targetStaff);
+  }
+}
+
+function getStaffColor(name) {
+  const colors = ['#1d4ed8','#7c3aed','#059669','#d97706','#dc2626','#0891b2','#be185d','#065f46','#4b5563','#92400e','#1e40af'];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return colors[Math.abs(hash) % colors.length];
+}
+
+function renderStaffCards(wrap, companies, workerCount, targetStaff) {
+  if (!targetStaff.length) { wrap.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray-400);">担当者データがありません</div>'; return; }
+
+  wrap.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(480px,1fr));gap:20px;">' +
+  targetStaff.map(staff => {
+    const color = getStaffColor(staff);
+
+    // メイン担当の企業
+    const mainCos = companies.filter(c => {
+      const mains = (c.main_staff||'').split(/[,、]/).map(s=>s.trim()).filter(Boolean);
+      return mains.includes(staff);
+    });
+    const mainWorkers = mainCos.reduce((acc,c) => acc + (workerCount[c.id]||0), 0);
+
+    // サブ担当の企業
+    const subCos = companies.filter(c => {
+      const subs = (c.sub_staff||'').split(/[,、]/).map(s=>s.trim()).filter(Boolean);
+      return subs.includes(staff);
+    });
+    const subWorkers = subCos.reduce((acc,c) => acc + (workerCount[c.id]||0), 0);
+
+    const mainCoRows = mainCos.map(c => `
+      <tr>
+        <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap;">${esc(c.pref||'-')}</td>
+        <td style="padding:5px 8px;font-size:12px;font-weight:600;color:var(--navy);">${esc(c.name)}</td>
+        <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);">${esc(c.sub_staff||'-')}</td>
+        <td style="padding:5px 8px;font-size:12px;font-weight:700;text-align:right;color:${color};">${workerCount[c.id]||0}名</td>
+      </tr>`).join('');
+
+    const subCoRows = subCos.map(c => `
+      <tr>
+        <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap;">${esc(c.pref||'-')}</td>
+        <td style="padding:5px 8px;font-size:12px;font-weight:600;color:var(--navy);">${esc(c.name)}</td>
+        <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);">${esc(c.main_staff||'-')}</td>
+        <td style="padding:5px 8px;font-size:12px;font-weight:700;text-align:right;color:${color};">${workerCount[c.id]||0}名</td>
+      </tr>`).join('');
+
+    return `<div style="background:white;border:1px solid var(--gray-200);border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06);">
+      <!-- ヘッダー -->
+      <div style="background:${color};padding:16px 20px;display:flex;align-items:center;gap:12px;">
+        <div style="width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:white;">${esc(staff.slice(0,1))}</div>
+        <div>
+          <div style="font-size:17px;font-weight:800;color:white;">${esc(staff)}</div>
+          <div style="font-size:11px;color:rgba(255,255,255,.8);margin-top:2px;">
+            合計 ${mainWorkers+subWorkers}名 担当
+          </div>
+        </div>
+        <div style="margin-left:auto;display:flex;gap:16px;text-align:center;">
+          <div style="color:white;">
+            <div style="font-size:20px;font-weight:800;">${mainCos.length}</div>
+            <div style="font-size:10px;opacity:.8;">メイン社</div>
+          </div>
+          <div style="color:white;">
+            <div style="font-size:20px;font-weight:800;">${mainWorkers}</div>
+            <div style="font-size:10px;opacity:.8;">メイン名</div>
+          </div>
+          <div style="color:rgba(255,255,255,.6);font-size:18px;align-self:center;">|</div>
+          <div style="color:white;">
+            <div style="font-size:20px;font-weight:800;">${subCos.length}</div>
+            <div style="font-size:10px;opacity:.8;">サブ社</div>
+          </div>
+          <div style="color:white;">
+            <div style="font-size:20px;font-weight:800;">${subWorkers}</div>
+            <div style="font-size:10px;opacity:.8;">サブ名</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- メイン担当 -->
+      ${mainCos.length ? `
+      <div style="padding:12px 16px 4px;">
+        <div style="font-size:11px;font-weight:700;color:${color};margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;">🔵 メイン担当（${mainCos.length}社・${mainWorkers}名）</div>
+        <table style="width:100%;border-collapse:collapse;">
+          <thead><tr style="background:#f8fafc;">
+            <th style="padding:4px 8px;font-size:10px;color:var(--gray-400);text-align:left;font-weight:600;">都道府県</th>
+            <th style="padding:4px 8px;font-size:10px;color:var(--gray-400);text-align:left;font-weight:600;">企業名</th>
+            <th style="padding:4px 8px;font-size:10px;color:var(--gray-400);text-align:left;font-weight:600;">サブ担当</th>
+            <th style="padding:4px 8px;font-size:10px;color:var(--gray-400);text-align:right;font-weight:600;">人数</th>
+          </tr></thead>
+          <tbody>${mainCoRows}</tbody>
+        </table>
+      </div>` : ''}
+
+      <!-- サブ担当 -->
+      ${subCos.length ? `
+      <div style="padding:12px 16px 4px;${mainCos.length?'border-top:1px solid var(--gray-100);':''}">
+        <div style="font-size:11px;font-weight:700;color:#6b7280;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;">⚪ サブ担当（${subCos.length}社・${subWorkers}名）</div>
+        <table style="width:100%;border-collapse:collapse;">
+          <thead><tr style="background:#f8fafc;">
+            <th style="padding:4px 8px;font-size:10px;color:var(--gray-400);text-align:left;font-weight:600;">都道府県</th>
+            <th style="padding:4px 8px;font-size:10px;color:var(--gray-400);text-align:left;font-weight:600;">企業名</th>
+            <th style="padding:4px 8px;font-size:10px;color:var(--gray-400);text-align:left;font-weight:600;">メイン担当</th>
+            <th style="padding:4px 8px;font-size:10px;color:var(--gray-400);text-align:right;font-weight:600;">人数</th>
+          </tr></thead>
+          <tbody>${subCoRows}</tbody>
+        </table>
+      </div>` : ''}
+      <div style="height:8px;"></div>
+    </div>`;
+  }).join('') + '</div>';
+}
+
+function renderStaffTable(wrap, companies, workerCount, targetStaff) {
+  // テーブルビュー：担当者×企業の一覧
+  const rows = [];
+  targetStaff.forEach(staff => {
+    const mainCos = companies.filter(c => (c.main_staff||'').split(/[,、]/).map(s=>s.trim()).includes(staff));
+    const subCos  = companies.filter(c => (c.sub_staff||'').split(/[,、]/).map(s=>s.trim()).includes(staff));
+    mainCos.forEach(c => rows.push({ staff, role:'メイン', pref:c.pref||'', name:c.name, partner: c.sub_staff||'-', count: workerCount[c.id]||0 }));
+    subCos.forEach(c  => rows.push({ staff, role:'サブ',   pref:c.pref||'', name:c.name, partner: c.main_staff||'-', count: workerCount[c.id]||0 }));
+  });
+
+  if (!rows.length) { wrap.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray-400);">データがありません</div>'; return; }
+
+  wrap.innerHTML = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;">' +
+    '<thead><tr style="background:#f8fafc;border-bottom:2px solid var(--gray-200);">' +
+    '<th style="padding:8px 12px;text-align:left;font-weight:700;color:var(--navy);">担当者</th>' +
+    '<th style="padding:8px 12px;text-align:left;font-weight:700;color:var(--navy);">区分</th>' +
+    '<th style="padding:8px 12px;text-align:left;font-weight:700;color:var(--navy);">都道府県</th>' +
+    '<th style="padding:8px 12px;text-align:left;font-weight:700;color:var(--navy);">企業名</th>' +
+    '<th style="padding:8px 12px;text-align:left;font-weight:700;color:var(--navy);">相手方担当</th>' +
+    '<th style="padding:8px 12px;text-align:right;font-weight:700;color:var(--navy);">人数</th>' +
+    '</tr></thead><tbody>' +
+    rows.map((r,i) => `<tr style="border-bottom:1px solid var(--gray-100);background:${i%2?'#fafafa':'white'};">
+      <td style="padding:7px 12px;font-weight:700;color:${getStaffColor(r.staff)};">${esc(r.staff)}</td>
+      <td style="padding:7px 12px;"><span style="font-size:10px;padding:2px 8px;border-radius:10px;font-weight:700;background:${r.role==='メイン'?'#dbeafe':'#f3f4f6'};color:${r.role==='メイン'?'#1d4ed8':'#6b7280'};">${r.role}</span></td>
+      <td style="padding:7px 12px;color:var(--gray-500);">${esc(r.pref)}</td>
+      <td style="padding:7px 12px;font-weight:600;color:var(--navy);">${esc(r.name)}</td>
+      <td style="padding:7px 12px;color:var(--gray-500);">${esc(r.partner)}</td>
+      <td style="padding:7px 12px;text-align:right;font-weight:700;color:var(--navy);">${r.count}名</td>
+    </tr>`).join('') +
+    '</tbody></table></div>';
+}
 
 function buildNoticesScreen() {
   const catOpts = NOTICE_CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('');
@@ -7940,6 +8162,7 @@ const SCREENS = {
   chat_teams:{ title: '💬 チャットグループ', init: loadChatTeams },
   ofusa_view:{ title: '📊 案件進捗確認', init: loadOfusaView },
   notices:    { title: '📋 社内共有事項', init: loadNotices },
+  staff_list: { title: '👥 担当一覧', init: loadStaffList },
   decision_report:{ title: '📋 決定報告', init: loadDecisionReport },
   resume:    { title: '📝 履歴書作成', init: loadResumeScreen },
   job_flyer: { title: '📄 求人票作成', init: (id) => loadJobFlyer(id) },
@@ -7995,6 +8218,7 @@ function updateTopbarButtons(name) {
     expenses:     `<button class="btn btn-outline" onclick="loadExpenses()">🔄 更新</button><button class="btn btn-primary" onclick="openExpenseModal(null)">＋ 立替登録</button>`,
     users:        `<button class="btn btn-outline" onclick="loadUsers()">🔄 更新</button><button class="btn btn-primary" onclick="openUserModal(null)">＋ ユーザー追加</button>`,
     decision_report: ``,
+    staff_list:   `<button class="btn btn-outline" onclick="loadStaffList()">🔄 更新</button>`,
     notices:      `<button class="btn btn-primary" onclick="openNoticeModal(null)">＋ 新規投稿</button>`,
     ofusa_view:   `<button class="btn btn-outline" onclick="document.getElementById('ofusaIframe').src=document.getElementById('ofusaIframe').src">🔄 更新</button><a href="https://ofusa2026.github.io/org-view/share.html?token=a952840c-7e8a-464e-a4fd-776a485d49e7" target="_blank" class="btn btn-outline">↗️ 別タブで開く</a>`,
     resume:       `<button class="btn btn-outline" onclick="printResume()">🖨️ 印刷</button>`,
@@ -8025,6 +8249,7 @@ function renderScreenContent(name) {
     chat_teams: buildChatTeamsScreen(),
     ofusa_view: buildOfusaViewScreen(),
     notices:    buildNoticesScreen(),
+    staff_list: buildStaffListScreen(),
     resume: buildResumeScreen(),
     // chat は専用処理で描画
   };
@@ -14173,7 +14398,7 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
-  { version:'ver.20260629.36', date:'2026-07-10', notify:true, items:[
+  { version:'ver.20260629.37', date:'2026-07-10', notify:true, items:[
     'スマホ対応：テーブルを横スクロールで全列表示に変更',
     'スマホ対応：チャット画面をLINEライク（一覧→タップでメッセージ→←で戻る）に変更',
     'チャット：ファイル送信のGAS URLを設定不要化（スマホ含めすべての端末でそのまま送信可能に）',
