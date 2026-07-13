@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260629.40 -->
+<!-- KMT_VERSION ver.20260629.41 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -320,7 +320,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.40</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.41</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -480,6 +480,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
       <div class="modal-tab" onclick="switchCoTab('workers')">👥 人材</div>
       <div class="modal-tab" onclick="switchCoTab('meetings')">📅 定期面談</div>
       <div class="modal-tab" onclick="switchCoTab('schedules')">📅 支援スケジュール</div>
+      <div class="modal-tab" onclick="switchCoTab('changelog')">📜 変更履歴</div>
     </div>
     <div class="modal-body">
       <!-- 基本情報 -->
@@ -624,6 +625,10 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
           <div class="form-group">
             <label class="form-label">KMTメイン担当</label>
             <select class="form-select" id="co_main_staff"><option value="">─ 選択 ─</option></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">引継ぎ予定 <span style="font-size:10px;color:var(--gray-400);">（変更後担当者）</span></label>
+            <select class="form-select" id="co_next_main_staff"><option value="">─ なし ─</option></select>
           </div>
           <div class="form-group full">
             <label class="form-label">KMTサブ担当 <span style="font-size:10px;color:var(--gray-400);font-weight:400;">— 複数選択可</span></label>
@@ -897,6 +902,14 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
           <button class="btn btn-primary" style="font-size:12px;padding:5px 14px;" onclick="openScheduleModalForCompany(editingCompanyId)">＋ 予定を追加</button>
         </div>
         <div id="companyScheduleArea"><div style="text-align:center;padding:30px;color:var(--gray-400);font-size:13px;">読み込み中...</div></div>
+      </div>
+      <!-- 変更履歴 -->
+      <div class="tab-panel" id="tab-changelog">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <div style="font-size:13px;font-weight:700;color:var(--navy);">基本情報・契約・委託費の変更履歴</div>
+          <button onclick="loadCompanyChangeLog()" class="btn btn-outline" style="font-size:11px;padding:3px 10px;">🔄 更新</button>
+        </div>
+        <div id="coChangeLogList"><div style="text-align:center;padding:40px;color:var(--gray-400);font-size:13px;">「変更履歴」タブを開くと自動で読み込まれます</div></div>
       </div>
     </div>
     <div class="modal-footer">
@@ -1284,7 +1297,7 @@ function openCompanyModal(id) {
   if (delBtn) delBtn.style.display = id ? '' : 'none';
   document.getElementById('companyModal').classList.add('show');
   // 自動保存は既存編集時のみ（新規登録時は手動保存ボタンで登録）
-  if (id) setTimeout(() => setupAutoSave(saveCompany), 100);
+  if (id) setTimeout(() => { setupAutoSave(saveCompany); takeCoSnapshot(); }, 200);
 }
 
 // ==============================
@@ -1485,7 +1498,8 @@ async function deleteCompany() {
 }
 
 function switchCoTab(tab) {
-  const tabs = ['basic','contract','finance','memo','workers','meetings','schedules'];
+  const tabs = ['basic','contract','finance','memo','workers','meetings','schedules','changelog'];
+  if (tab === 'changelog') setTimeout(loadCompanyChangeLog, 50);
   const tabBar = document.getElementById('coModalTabs');
   if (tabBar) {
     tabBar.querySelectorAll('.modal-tab').forEach((t, i) => {
@@ -1756,6 +1770,7 @@ function getCoFormData() {
     contact_tel: document.getElementById('co_contact_tel').value || null,
     contact_email: getContactEmails(),
     main_staff: document.getElementById('co_main_staff').value || null,
+    next_main_staff: document.getElementById('co_next_main_staff')?.value || null,
     sub_staff: getCompanySubStaff(),
     team_staff: getCompanyTeamStaff(),
     drive_url: document.getElementById('co_drive_url').value || null,
@@ -1830,6 +1845,13 @@ function populateCompanyStaffSelects(co) {
     ).join('');
   }
   populateCompanyTeamStaff(co);
+  // 引継ぎ予定セット
+  const nextSel = document.getElementById('co_next_main_staff');
+  if (nextSel) {
+    const curNext = (co && co.next_main_staff) || '';
+    nextSel.innerHTML = '<option value="">─ なし ─</option>' +
+      KMT_STAFF_ROSTER.map(s => '<option value="'+s+'" '+(s===curNext?'selected':'')+'>'+s+'</option>').join('');
+  }
 }
 function populateCompanyTeamStaff(co) {
   const box = document.getElementById('co_team_staff_box');
@@ -1979,6 +2001,7 @@ function copyMainAddressToWorkplace() {
 }
 
 async function saveCompany(autoMode=false) {
+  if (!autoMode) takeCoSnapshot(); // 手動保存前にスナップショット
   const data = getCoFormData();
   if (!data.name) { if(!autoMode) showToast('❌ 機関名は必須です', 'error'); return false; }
   if (!editingCoId) {
@@ -1989,7 +2012,7 @@ async function saveCompany(autoMode=false) {
   try {
     if (editingCoId) {
       await sbFetch('companies?id=eq.' + editingCoId, { method:'PATCH', body: JSON.stringify(data), prefer:'return=representation' });
-      if (!autoMode) showToast('✅ 企業情報を更新しました', 'success');
+      if (!autoMode) { showToast('✅ 企業情報を更新しました', 'success'); saveCoChangeLogs(data); }
     } else {
       const res = await sbFetch('companies', { method:'POST', body: JSON.stringify(data), prefer:'return=representation' });
       const newId = res?.[0]?.id || null;
@@ -2029,6 +2052,83 @@ function toggleMobile() {
 // ==============================
 // 📊 OFUSA案件進捗確認
 // ==============================
+
+
+// ===== 所属機関 変更履歴 =====
+
+// 監視するフィールドのラベルマップ（基本情報・契約・委託費）
+const CO_WATCH_FIELDS = {
+  name: '企業名', pref: '都道府県', address: '住所', tel: '電話番号',
+  email: 'メールアドレス', contact_person: '担当者名',
+  main_staff: 'KMTメイン担当', sub_staff: 'KMTサブ担当', team_staff: 'チーム内サブ担当',
+  next_main_staff: '引継ぎ予定担当者',
+  kmt_corp_type: '請求法人区分', fee_per_person: '1人あたり委託費',
+  billing_start_month: '請求開始月', billing_cycle: '請求サイクル',
+  billing_method: '請求方法', payment_terms: '支払条件',
+  contract_start: '契約開始日', contract_end: '契約終了日',
+  support_type: '支援区分',
+};
+
+let _coSnapshotBefore = {}; // 保存前のスナップショット
+
+function takeCoSnapshot() {
+  const data = getCoFormData();
+  _coSnapshotBefore = {};
+  Object.keys(CO_WATCH_FIELDS).forEach(k => {
+    _coSnapshotBefore[k] = data[k] ?? null;
+  });
+}
+
+async function saveCoChangeLogs(newData) {
+  if (!editingCompanyId) return;
+  const who = currentUser?.name || '';
+  const logs = [];
+  Object.keys(CO_WATCH_FIELDS).forEach(k => {
+    const oldVal = String(_coSnapshotBefore[k] ?? '');
+    const newVal = String(newData[k] ?? '');
+    if (oldVal !== newVal && !(oldVal === 'null' && newVal === '') && !(oldVal === '' && newVal === 'null')) {
+      logs.push({
+        company_id: editingCompanyId,
+        changed_by: who,
+        changed_at: new Date().toISOString(),
+        field_name: k,
+        field_label: CO_WATCH_FIELDS[k],
+        old_value: oldVal === 'null' ? null : (oldVal || null),
+        new_value: newVal === 'null' ? null : (newVal || null),
+      });
+    }
+  });
+  if (!logs.length) return;
+  for (const log of logs) {
+    await sbFetch('company_change_log', { method: 'POST', body: JSON.stringify(log), prefer: 'return=minimal' });
+  }
+}
+
+async function loadCompanyChangeLog() {
+  if (!editingCompanyId) return;
+  const wrap = document.getElementById('coChangeLogList');
+  if (!wrap) return;
+  wrap.innerHTML = '<div style="text-align:center;padding:20px;color:var(--gray-400);">読み込み中...</div>';
+  try {
+    const logs = await sbFetch('company_change_log?company_id=eq.' + editingCompanyId + '&order=changed_at.desc&limit=200');
+    if (!logs || !logs.length) {
+      wrap.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray-400);font-size:13px;">変更履歴はありません</div>';
+      return;
+    }
+    wrap.innerHTML = '<div style="border:1px solid var(--gray-200);border-radius:8px;overflow:hidden;">' +
+      '<div style="display:grid;grid-template-columns:130px 90px 140px 1fr 1fr;gap:0;background:#f8fafc;border-bottom:2px solid var(--gray-200);padding:8px 12px;font-size:11px;font-weight:700;color:var(--navy);">' +
+        '<div>日時</div><div>変更者</div><div>項目</div><div>変更前</div><div>変更後</div>' +
+      '</div>' +
+      logs.map((l, i) => `<div style="display:grid;grid-template-columns:130px 90px 140px 1fr 1fr;gap:0;padding:8px 12px;border-bottom:1px solid var(--gray-100);background:${i%2?'#fafafa':'white'};font-size:12px;align-items:center;">
+        <div style="color:var(--gray-500);font-size:11px;">${esc((l.changed_at||'').slice(0,16).replace('T',' '))}</div>
+        <div style="font-weight:600;color:var(--navy);">${esc(l.changed_by||'-')}</div>
+        <div style="color:var(--gray-600);">${esc(l.field_label||l.field_name)}</div>
+        <div style="color:#dc2626;text-decoration:line-through;font-size:11px;">${esc(l.old_value||'（空）')}</div>
+        <div style="color:#059669;font-weight:600;font-size:11px;">${esc(l.new_value||'（空）')}</div>
+      </div>`).join('') +
+    '</div>';
+  } catch(e) { wrap.innerHTML = '<div style="color:#dc2626;padding:20px;">' + esc(e.message) + '</div>'; }
+}
 
 // ===== 社内共有事項 =====
 const NOTICE_CATEGORIES = ['業務共有事項', '注意事項', '企業対応', '人材対応', '求人関連', '書類関連', '新規営業', '分野ごと', 'その他'];
@@ -2086,7 +2186,7 @@ async function loadStaffList() {
   try {
     // 全企業と在籍中人材を取得
     const [companies, workers] = await Promise.all([
-      sbFetch('companies?select=id,name,pref,main_staff,sub_staff,folder_no&is_deleted=eq.false&order=name.asc'),
+      sbFetch('companies?select=id,name,pref,main_staff,sub_staff,next_main_staff,folder_no&is_deleted=eq.false&order=name.asc'),
       sbFetch('workers?select=id,company_id,status&is_deleted=eq.false'),
     ]);
 
@@ -2189,6 +2289,7 @@ function renderStaffCards(wrap, companies, workerCount, targetStaff) {
         <div style="width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:white;">${esc(staff.slice(0,1))}</div>
         <div>
           <div style="font-size:17px;font-weight:800;color:white;">${esc(staff)}</div>
+          <div style="font-size:11px;color:rgba(255,255,255,.8);margin-top:2px;">${mainCos.filter(c=>c.next_main_staff).map(c=>'→ '+esc(c.next_main_staff)+'（'+esc(c.name)+'）').join(' / ') || ''}</div>
           <div style="font-size:11px;color:rgba(255,255,255,.8);margin-top:2px;">
             合計 ${mainWorkers+subWorkers}名 担当
           </div>
@@ -14421,7 +14522,7 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
-  { version:'ver.20260629.40', date:'2026-07-10', notify:true, items:[
+  { version:'ver.20260629.41', date:'2026-07-10', notify:true, items:[
     'スマホ対応：テーブルを横スクロールで全列表示に変更',
     'スマホ対応：チャット画面をLINEライク（一覧→タップでメッセージ→←で戻る）に変更',
     'チャット：ファイル送信のGAS URLを設定不要化（スマホ含めすべての端末でそのまま送信可能に）',
