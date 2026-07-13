@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260629.39 -->
+<!-- KMT_VERSION ver.20260629.40 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -320,7 +320,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.39</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.40</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -2037,7 +2037,25 @@ let _notices = [];
 let _noticeEditId = null;
 
 
+// 都道府県ソート順
+const PREF_ORDER = ['北海道', '青森県', '岩手県', '宮城県', '秋田県', '山形県', '福島県', '茨城県', '栃木県', '群馬県', '埼玉県', '千葉県', '東京都', '神奈川県', '新潟県', '富山県', '石川県', '福井県', '山梨県', '長野県', '岐阜県', '静岡県', '愛知県', '三重県', '滋賀県', '京都府', '大阪府', '兵庫県', '奈良県', '和歌山県', '鳥取県', '島根県', '岡山県', '広島県', '山口県', '徳島県', '香川県', '愛媛県', '高知県', '福岡県', '佐賀県', '長崎県', '熊本県', '大分県', '宮崎県', '鹿児島県', '沖縄県'];
+function prefSortKey(pref) {
+  const idx = PREF_ORDER.indexOf(pref);
+  return idx === -1 ? 99 : idx;
+}
+
 // ===== 担当一覧 =====
+let _staffCompanyListVisible = true;
+function toggleStaffCompanyList() {
+  _staffCompanyListVisible = !_staffCompanyListVisible;
+  const btn = document.getElementById('staffListToggleBtn');
+  if (btn) btn.textContent = _staffCompanyListVisible ? '📋 企業一覧を隠す' : '📋 企業一覧を表示';
+  // 全カードの企業テーブル部分をトグル
+  document.querySelectorAll('.staff-company-section').forEach(el => {
+    el.style.display = _staffCompanyListVisible ? '' : 'none';
+  });
+}
+
 function buildStaffListScreen() {
   return `<div>
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px;">
@@ -2139,14 +2157,14 @@ function renderStaffCards(wrap, companies, workerCount, targetStaff) {
     const mainCos = companies.filter(c => {
       const mains = (c.main_staff||'').split(/[,、]/).map(s=>s.trim()).filter(Boolean);
       return mains.includes(staff);
-    });
+    }).sort((a,b) => prefSortKey(a.pref||'') - prefSortKey(b.pref||'') || (a.name||'').localeCompare(b.name||'','ja'));
     const mainWorkers = mainCos.reduce((acc,c) => acc + (workerCount[c.id]||0), 0);
 
     // サブ担当の企業
     const subCos = companies.filter(c => {
       const subs = (c.sub_staff||'').split(/[,、]/).map(s=>s.trim()).filter(Boolean);
       return subs.includes(staff);
-    });
+    }).sort((a,b) => prefSortKey(a.pref||'') - prefSortKey(b.pref||'') || (a.name||'').localeCompare(b.name||'','ja'));
     const subWorkers = subCos.reduce((acc,c) => acc + (workerCount[c.id]||0), 0);
 
     const mainCoRows = mainCos.map(c => `
@@ -2198,7 +2216,7 @@ function renderStaffCards(wrap, companies, workerCount, targetStaff) {
 
       <!-- メイン担当 -->
       ${mainCos.length ? `
-      <div style="padding:12px 16px 4px;">
+      <div class="staff-company-section" style="padding:12px 16px 4px;">
         <div style="font-size:11px;font-weight:700;color:${color};margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;">🔵 メイン担当（${mainCos.length}社・${mainWorkers}名）</div>
         <table style="width:100%;border-collapse:collapse;">
           <thead><tr style="background:#f8fafc;">
@@ -2213,7 +2231,7 @@ function renderStaffCards(wrap, companies, workerCount, targetStaff) {
 
       <!-- サブ担当 -->
       ${subCos.length ? `
-      <div style="padding:12px 16px 4px;${mainCos.length?'border-top:1px solid var(--gray-100);':''}">
+      <div class="staff-company-section" style="padding:12px 16px 4px;${mainCos.length?'border-top:1px solid var(--gray-100);':''}">
         <div style="font-size:11px;font-weight:700;color:#6b7280;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;">⚪ サブ担当（${subCos.length}社・${subWorkers}名）</div>
         <table style="width:100%;border-collapse:collapse;">
           <thead><tr style="background:#f8fafc;">
@@ -8223,7 +8241,7 @@ function updateTopbarButtons(name) {
     expenses:     `<button class="btn btn-outline" onclick="loadExpenses()">🔄 更新</button><button class="btn btn-primary" onclick="openExpenseModal(null)">＋ 立替登録</button>`,
     users:        `<button class="btn btn-outline" onclick="loadUsers()">🔄 更新</button><button class="btn btn-primary" onclick="openUserModal(null)">＋ ユーザー追加</button>`,
     decision_report: ``,
-    staff_list:   `<button class="btn btn-outline" onclick="loadStaffList()">🔄 更新</button>`,
+    staff_list:   `<button class="btn btn-outline" onclick="loadStaffList()">🔄 更新</button><button id="staffListToggleBtn" class="btn btn-outline" onclick="toggleStaffCompanyList()" style="margin-left:4px;">📋 企業一覧を隠す</button>`,
     notices:      `<button class="btn btn-primary" onclick="openNoticeModal(null)">＋ 新規投稿</button>`,
     ofusa_view:   `<button class="btn btn-outline" onclick="document.getElementById('ofusaIframe').src=document.getElementById('ofusaIframe').src">🔄 更新</button><a href="https://ofusa2026.github.io/org-view/share.html?token=a952840c-7e8a-464e-a4fd-776a485d49e7" target="_blank" class="btn btn-outline">↗️ 別タブで開く</a>`,
     resume:       `<button class="btn btn-outline" onclick="printResume()">🖨️ 印刷</button>`,
@@ -14403,7 +14421,7 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
-  { version:'ver.20260629.39', date:'2026-07-10', notify:true, items:[
+  { version:'ver.20260629.40', date:'2026-07-10', notify:true, items:[
     'スマホ対応：テーブルを横スクロールで全列表示に変更',
     'スマホ対応：チャット画面をLINEライク（一覧→タップでメッセージ→←で戻る）に変更',
     'チャット：ファイル送信のGAS URLを設定不要化（スマホ含めすべての端末でそのまま送信可能に）',
