@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260629.38 -->
+<!-- KMT_VERSION ver.20260629.39 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -320,7 +320,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.38</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.39</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -2152,7 +2152,7 @@ function renderStaffCards(wrap, companies, workerCount, targetStaff) {
     const mainCoRows = mainCos.map(c => `
       <tr>
         <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap;">${esc(c.pref||'-')}</td>
-        <td style="padding:5px 8px;font-size:12px;font-weight:600;color:var(--navy);">${esc(c.name)}</td>
+        <td style="padding:5px 8px;font-size:12px;font-weight:600;"><a onclick="openCompanyModal('${c.id}')" style="color:var(--navy);cursor:pointer;text-decoration:underline dotted;">${esc(c.name)}</a></td>
         <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);">${esc(c.sub_staff||'-')}</td>
         <td style="padding:5px 8px;font-size:12px;font-weight:700;text-align:right;color:${color};">${workerCount[c.id]||0}名</td>
       </tr>`).join('');
@@ -2160,7 +2160,7 @@ function renderStaffCards(wrap, companies, workerCount, targetStaff) {
     const subCoRows = subCos.map(c => `
       <tr>
         <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap;">${esc(c.pref||'-')}</td>
-        <td style="padding:5px 8px;font-size:12px;font-weight:600;color:var(--navy);">${esc(c.name)}</td>
+        <td style="padding:5px 8px;font-size:12px;font-weight:600;"><a onclick="openCompanyModal('${c.id}')" style="color:var(--navy);cursor:pointer;text-decoration:underline dotted;">${esc(c.name)}</a></td>
         <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);">${esc(c.main_staff||'-')}</td>
         <td style="padding:5px 8px;font-size:12px;font-weight:700;text-align:right;color:${color};">${workerCount[c.id]||0}名</td>
       </tr>`).join('');
@@ -2236,8 +2236,8 @@ function renderStaffTable(wrap, companies, workerCount, targetStaff) {
   targetStaff.forEach(staff => {
     const mainCos = companies.filter(c => (c.main_staff||'').split(/[,、]/).map(s=>s.trim()).includes(staff));
     const subCos  = companies.filter(c => (c.sub_staff||'').split(/[,、]/).map(s=>s.trim()).includes(staff));
-    mainCos.forEach(c => rows.push({ staff, role:'メイン', pref:c.pref||'', name:c.name, partner: c.sub_staff||'-', count: workerCount[c.id]||0 }));
-    subCos.forEach(c  => rows.push({ staff, role:'サブ',   pref:c.pref||'', name:c.name, partner: c.main_staff||'-', count: workerCount[c.id]||0 }));
+    mainCos.forEach(c => rows.push({ staff, role:'メイン', pref:c.pref||'', name:c.name, id:c.id, partner: c.sub_staff||'-', count: workerCount[c.id]||0 }));
+    subCos.forEach(c  => rows.push({ staff, role:'サブ',   pref:c.pref||'', name:c.name, id:c.id, partner: c.main_staff||'-', count: workerCount[c.id]||0 }));
   });
 
   if (!rows.length) { wrap.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray-400);">データがありません</div>'; return; }
@@ -2255,7 +2255,7 @@ function renderStaffTable(wrap, companies, workerCount, targetStaff) {
       <td style="padding:7px 12px;font-weight:700;color:${getStaffColor(r.staff)};">${esc(r.staff)}</td>
       <td style="padding:7px 12px;"><span style="font-size:10px;padding:2px 8px;border-radius:10px;font-weight:700;background:${r.role==='メイン'?'#dbeafe':'#f3f4f6'};color:${r.role==='メイン'?'#1d4ed8':'#6b7280'};">${r.role}</span></td>
       <td style="padding:7px 12px;color:var(--gray-500);">${esc(r.pref)}</td>
-      <td style="padding:7px 12px;font-weight:600;color:var(--navy);">${esc(r.name)}</td>
+      <td style="padding:7px 12px;font-weight:600;"><a onclick="openCompanyModal('${r.id}')" style="color:var(--navy);cursor:pointer;text-decoration:underline dotted;">${esc(r.name)}</a></td>
       <td style="padding:7px 12px;color:var(--gray-500);">${esc(r.partner)}</td>
       <td style="padding:7px 12px;text-align:right;font-weight:700;color:var(--navy);">${r.count}名</td>
     </tr>`).join('') +
@@ -14403,7 +14403,7 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
-  { version:'ver.20260629.38', date:'2026-07-10', notify:true, items:[
+  { version:'ver.20260629.39', date:'2026-07-10', notify:true, items:[
     'スマホ対応：テーブルを横スクロールで全列表示に変更',
     'スマホ対応：チャット画面をLINEライク（一覧→タップでメッセージ→←で戻る）に変更',
     'チャット：ファイル送信のGAS URLを設定不要化（スマホ含めすべての端末でそのまま送信可能に）',
