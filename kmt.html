@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260629.35 -->
+<!-- KMT_VERSION ver.20260629.36 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -320,12 +320,13 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.35</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.36</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
   <div style="height:1px;background:rgba(255,255,255,0.08);margin:4px 16px 8px;"></div>
   <div class="nav-item active" onclick="showScreen('ofusa_view')" style="margin:8px 8px 4px;border-radius:6px;">📊 案件進捗確認</div>
+  <div class="nav-item" onclick="showScreen('notices')">📋 社内共有事項</div>
   <div class="nav-item" onclick="showScreen('decision_report')" style="margin:2px 8px 4px;border-radius:6px;">📋 決定報告</div>
   <div style="height:1px;background:rgba(255,255,255,0.08);margin:4px 16px 8px;"></div>
   <div class="sidebar-section">メイン</div>
@@ -2027,6 +2028,197 @@ function toggleMobile() {
 // ==============================
 // 📊 OFUSA案件進捗確認
 // ==============================
+
+// ===== 社内共有事項 =====
+const NOTICE_CATEGORIES = ['業務共有事項', '注意事項', '企業対応', '人材対応', '求人関連', '書類関連', '新規営業', '分野ごと', 'その他'];
+const NOTICE_FIELDS_19 = ['介護', 'ビルクリーニング', '素形材・産業機械・電気電子情報関連製造業', '建設', '造船・舶用工業', '自動車整備', '航空', '宿泊', '農業', '漁業', '飲食料品製造業', '外食業', '工業製品製造業（素形材等）', '自動車運送業', '鉄道', '林業', '木材産業', '電気・電子・情報関連産業', 'その他分野'];
+let _notices = [];
+let _noticeEditId = null;
+
+function buildNoticesScreen() {
+  const catOpts = NOTICE_CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('');
+  return `<div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px;">
+      <input id="noticeSearch" class="form-input" placeholder="🔍 キーワードで検索..." oninput="renderNotices()" style="flex:1;min-width:180px;font-size:12px;">
+      <select id="noticeCatFilter" class="form-select" onchange="renderNotices()" style="width:auto;font-size:12px;">
+        <option value="">全カテゴリー</option>
+        ${catOpts}
+      </select>
+      <select id="noticeSubFilter" class="form-select" onchange="renderNotices()" style="width:auto;font-size:12px;display:none;">
+        <option value="">全分野</option>
+        ${NOTICE_FIELDS_19.map(f=>`<option>${f}</option>`).join('')}
+      </select>
+      <button onclick="document.getElementById('noticeCatFilter').value='';document.getElementById('noticeSearch').value='';renderNotices();" style="font-size:11px;padding:4px 10px;border:1px solid var(--gray-200);border-radius:6px;background:white;cursor:pointer;color:var(--gray-500);">✕ クリア</button>
+    </div>
+    <div id="noticesList"></div>
+  </div>`;
+}
+
+async function loadNotices() {
+  showLoading(true);
+  try {
+    const data = await sbFetch('company_notices?is_deleted=eq.false&order=created_at.desc');
+    _notices = data || [];
+    renderNotices();
+  } catch(e) { showToast('❌ ' + e.message, 'error'); }
+  showLoading(false);
+}
+
+function renderNotices() {
+  const wrap = document.getElementById('noticesList');
+  if (!wrap) return;
+  const q = (document.getElementById('noticeSearch')?.value || '').toLowerCase().trim();
+  const fCat = document.getElementById('noticeCatFilter')?.value || '';
+  const fSub = document.getElementById('noticeSubFilter')?.value || '';
+  // 分野ごと選択時はサブフィルターを表示
+  const subWrap = document.getElementById('noticeSubFilter');
+  if (subWrap) subWrap.style.display = fCat === '分野ごと' ? '' : 'none';
+
+  const filtered = _notices.filter(n => {
+    if (fCat && n.category !== fCat) return false;
+    if (fSub && n.subcategory !== fSub) return false;
+    if (q && !(
+      (n.title||'').toLowerCase().includes(q) ||
+      (n.content||'').toLowerCase().includes(q) ||
+      (n.created_by||'').toLowerCase().includes(q)
+    )) return false;
+    return true;
+  });
+
+  if (!filtered.length) {
+    wrap.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray-400);font-size:13px;">該当する共有事項がありません</div>';
+    return;
+  }
+
+  // カテゴリ別にグループ化
+  const groups = {};
+  filtered.forEach(n => {
+    const key = n.category + (n.subcategory ? '／' + n.subcategory : '');
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(n);
+  });
+
+  const catColors = {
+    '業務共有事項':'#1d4ed8','注意事項':'#dc2626','企業対応':'#7c3aed',
+    '人材対応':'#059669','求人関連':'#d97706','書類関連':'#0891b2',
+    '新規営業':'#be185d','分野ごと':'#065f46','その他':'#4b5563'
+  };
+
+  wrap.innerHTML = Object.entries(groups).map(([key, items]) => {
+    const cat = items[0].category;
+    const color = catColors[cat] || '#4b5563';
+    return `<div style="margin-bottom:20px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <span style="background:${color};color:white;font-size:11px;font-weight:700;padding:3px 12px;border-radius:12px;">${esc(key)}</span>
+        <span style="font-size:11px;color:var(--gray-400);">${items.length}件</span>
+      </div>
+      ${items.map(n => `
+      <div style="background:white;border:1px solid var(--gray-200);border-left:4px solid ${color};border-radius:8px;padding:14px 16px;margin-bottom:8px;position:relative;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px;">
+          <div style="font-size:13px;font-weight:700;color:var(--navy);flex:1;">${esc(n.title)}</div>
+          <div style="display:flex;gap:4px;flex-shrink:0;">
+            <button onclick="openNoticeModal('${n.id}')" class="btn btn-outline" style="font-size:11px;padding:2px 10px;">✏️ 編集</button>
+            <button onclick="deleteNotice('${n.id}','${esc(n.title)}')" class="btn btn-outline" style="font-size:11px;padding:2px 10px;color:#dc2626;border-color:#dc2626;">🗑️</button>
+          </div>
+        </div>
+        <div style="font-size:12px;color:var(--gray-600);white-space:pre-wrap;line-height:1.7;">${esc(n.content)}</div>
+        <div style="margin-top:8px;font-size:11px;color:var(--gray-400);">${esc(n.created_by||'')} · ${esc((n.created_at||'').slice(0,10))}${n.updated_at!==n.created_at?' (編集済み)':''}</div>
+      </div>`).join('')}
+    </div>`;
+  }).join('');
+}
+
+function openNoticeModal(id) {
+  _noticeEditId = id;
+  const n = id ? _notices.find(x=>x.id===id) : null;
+  const catOpts = NOTICE_CATEGORIES.map(c=>`<option value="${c}" ${n?.category===c?'selected':''}>${c}</option>`).join('');
+  const subOpts = NOTICE_FIELDS_19.map(f=>`<option value="${f}" ${n?.subcategory===f?'selected':''}>${f}</option>`).join('');
+  const modalHtml = `<div id="noticeModal" style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;">
+    <div style="background:white;border-radius:12px;width:600px;max-width:100%;max-height:90vh;overflow-y:auto;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.3);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <h3 style="font-size:16px;font-weight:800;color:var(--navy);">${id ? '✏️ 共有事項を編集' : '＋ 新規共有事項'}</h3>
+        <button onclick="document.getElementById('noticeModal').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--gray-400);">✕</button>
+      </div>
+      <div class="form-grid" style="grid-template-columns:1fr;">
+        <div class="form-group full">
+          <label class="form-label">カテゴリー <span style="color:#ef4444;">*</span></label>
+          <select class="form-select" id="nm_category" onchange="toggleNoticeSubcat()">
+            <option value="">── 選択 ──</option>${catOpts}
+          </select>
+        </div>
+        <div class="form-group full" id="nm_subcat_wrap" style="display:${n?.category==='分野ごと'?'':'none'}">
+          <label class="form-label">分野 <span style="color:#ef4444;">*</span></label>
+          <select class="form-select" id="nm_subcategory">
+            <option value="">── 選択 ──</option>${subOpts}
+          </select>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">タイトル <span style="color:#ef4444;">*</span></label>
+          <input class="form-input" id="nm_title" value="${esc(n?.title||'')}" placeholder="例: ○○業務の注意点">
+        </div>
+        <div class="form-group full">
+          <label class="form-label">内容 <span style="color:#ef4444;">*</span></label>
+          <textarea class="form-textarea" id="nm_content" rows="6" placeholder="共有したい内容を入力...">${esc(n?.content||'')}</textarea>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">投稿者名</label>
+          <input class="form-input" id="nm_created_by" value="${esc(n?.created_by||currentUser?.name||'')}" placeholder="例: 蛭田">
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+        <button onclick="document.getElementById('noticeModal').remove()" class="btn btn-outline">キャンセル</button>
+        <button onclick="saveNotice()" class="btn btn-primary">💾 保存</button>
+      </div>
+    </div>
+  </div>`;
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+function toggleNoticeSubcat() {
+  const cat = document.getElementById('nm_category')?.value;
+  const wrap = document.getElementById('nm_subcat_wrap');
+  if (wrap) wrap.style.display = cat === '分野ごと' ? '' : 'none';
+}
+
+async function saveNotice() {
+  const cat   = document.getElementById('nm_category')?.value || '';
+  const sub   = document.getElementById('nm_subcategory')?.value || '';
+  const title = document.getElementById('nm_title')?.value.trim() || '';
+  const content = document.getElementById('nm_content')?.value.trim() || '';
+  const who   = document.getElementById('nm_created_by')?.value.trim() || '';
+
+  if (!cat)     { showToastTop('❌ カテゴリーを選択してください'); return; }
+  if (cat === '分野ごと' && !sub) { showToastTop('❌ 分野を選択してください'); return; }
+  if (!title)   { showToastTop('❌ タイトルを入力してください'); return; }
+  if (!content) { showToastTop('❌ 内容を入力してください'); return; }
+
+  showLoading(true);
+  try {
+    const body = { category: cat, subcategory: sub || null, title, content, created_by: who || null, updated_at: new Date().toISOString() };
+    if (_noticeEditId) {
+      await sbFetch('company_notices?id=eq.' + _noticeEditId, { method: 'PATCH', body: JSON.stringify(body) });
+      showToast('✅ 更新しました', 'success');
+    } else {
+      await sbFetch('company_notices', { method: 'POST', body: JSON.stringify(body), prefer: 'return=minimal' });
+      showToast('✅ 投稿しました', 'success');
+    }
+    document.getElementById('noticeModal')?.remove();
+    await loadNotices();
+  } catch(e) { showToast('❌ ' + e.message, 'error'); }
+  showLoading(false);
+}
+
+async function deleteNotice(id, title) {
+  if (!confirm('「' + title + '」を削除しますか？')) return;
+  showLoading(true);
+  try {
+    await sbFetch('company_notices?id=eq.' + id, { method: 'PATCH', body: JSON.stringify({ is_deleted: true, deleted_at: new Date().toISOString(), deleted_by: currentUser?.name || '' }) });
+    showToast('🗑️ 削除しました', 'success');
+    await loadNotices();
+  } catch(e) { showToast('❌ ' + e.message, 'error'); }
+  showLoading(false);
+}
+
 function buildOfusaViewScreen() {
   return `
   <div style="height:calc(100vh - 110px);">
@@ -7747,6 +7939,7 @@ const SCREENS = {
   shift_kanri:{ title: '📅 シフト管理', init: loadShiftKanri },
   chat_teams:{ title: '💬 チャットグループ', init: loadChatTeams },
   ofusa_view:{ title: '📊 案件進捗確認', init: loadOfusaView },
+  notices:    { title: '📋 社内共有事項', init: loadNotices },
   decision_report:{ title: '📋 決定報告', init: loadDecisionReport },
   resume:    { title: '📝 履歴書作成', init: loadResumeScreen },
   job_flyer: { title: '📄 求人票作成', init: (id) => loadJobFlyer(id) },
@@ -7802,6 +7995,7 @@ function updateTopbarButtons(name) {
     expenses:     `<button class="btn btn-outline" onclick="loadExpenses()">🔄 更新</button><button class="btn btn-primary" onclick="openExpenseModal(null)">＋ 立替登録</button>`,
     users:        `<button class="btn btn-outline" onclick="loadUsers()">🔄 更新</button><button class="btn btn-primary" onclick="openUserModal(null)">＋ ユーザー追加</button>`,
     decision_report: ``,
+    notices:      `<button class="btn btn-primary" onclick="openNoticeModal(null)">＋ 新規投稿</button>`,
     ofusa_view:   `<button class="btn btn-outline" onclick="document.getElementById('ofusaIframe').src=document.getElementById('ofusaIframe').src">🔄 更新</button><a href="https://ofusa2026.github.io/org-view/share.html?token=a952840c-7e8a-464e-a4fd-776a485d49e7" target="_blank" class="btn btn-outline">↗️ 別タブで開く</a>`,
     resume:       `<button class="btn btn-outline" onclick="printResume()">🖨️ 印刷</button>`,
   };
@@ -7830,6 +8024,7 @@ function renderScreenContent(name) {
     shift_kanri: buildShiftKanriScreen(),
     chat_teams: buildChatTeamsScreen(),
     ofusa_view: buildOfusaViewScreen(),
+    notices:    buildNoticesScreen(),
     resume: buildResumeScreen(),
     // chat は専用処理で描画
   };
@@ -13978,7 +14173,7 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
-  { version:'ver.20260629.35', date:'2026-07-10', notify:true, items:[
+  { version:'ver.20260629.36', date:'2026-07-10', notify:true, items:[
     'スマホ対応：テーブルを横スクロールで全列表示に変更',
     'スマホ対応：チャット画面をLINEライク（一覧→タップでメッセージ→←で戻る）に変更',
     'チャット：ファイル送信のGAS URLを設定不要化（スマホ含めすべての端末でそのまま送信可能に）',
