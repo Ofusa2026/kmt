@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260629.45 -->
+<!-- KMT_VERSION ver.20260629.46 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -320,7 +320,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.45</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.46</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -2187,7 +2187,7 @@ async function loadStaffList() {
   try {
     // 全企業と在籍中人材を取得
     const [companies, workers] = await Promise.all([
-      sbFetch('companies?select=id,name,pref,main_staff,sub_staff,next_main_staff,folder_no&is_deleted=eq.false&order=name.asc'),
+      sbFetch('companies?select=id,name,pref,main_staff,sub_staff,team_staff,next_main_staff,folder_no&is_deleted=eq.false&order=name.asc'),
       sbFetch('workers?select=id,company_id,status&is_deleted=eq.false'),
     ]);
 
@@ -2202,13 +2202,15 @@ async function loadStaffList() {
     // 担当者リストを収集（メイン・サブ両方）
     const staffSet = new Set();
     (companies || []).forEach(c => {
-      if (c.main_staff) c.main_staff.split(/[,、]/).map(s=>s.trim()).filter(Boolean).forEach(s=>staffSet.add(s));
-      if (c.sub_staff)  c.sub_staff.split(/[,、]/).map(s=>s.trim()).filter(Boolean).forEach(s=>staffSet.add(s));
+      if (c.main_staff)  c.main_staff.split(/[,、]/).map(s=>s.trim()).filter(Boolean).forEach(s=>staffSet.add(s));
+      if (c.sub_staff)   c.sub_staff.split(/[,、]/).map(s=>s.trim()).filter(Boolean).forEach(s=>staffSet.add(s));
+      if (c.team_staff)  c.team_staff.split(/[,、]/).map(s=>s.trim()).filter(Boolean).forEach(s=>staffSet.add(s));
     });
     // メイン担当企業数が多い順にソート
     const allStaff = [...staffSet].sort((a, b) => {
       const aMain = (companies||[]).filter(c => (c.main_staff||'').split(/[,、]/).map(s=>s.trim()).includes(a)).length;
       const bMain = (companies||[]).filter(c => (c.main_staff||'').split(/[,、]/).map(s=>s.trim()).includes(b)).length;
+      // チームのみの場合はメイン0扱いで後ろに
       return bMain - aMain || a.localeCompare(b, 'ja');
     });
 
@@ -2284,6 +2286,20 @@ function renderStaffCards(wrap, companies, workerCount, targetStaff) {
         <td style="padding:5px 8px;font-size:12px;font-weight:700;text-align:right;color:${color};">${workerCount[c.id]||0}名</td>
       </tr>`).join('');
 
+    // チーム内サブ担当の企業
+    const teamCos = companies.filter(c => {
+      const teams = (c.team_staff||'').split(/[,、]/).map(s=>s.trim()).filter(Boolean);
+      return teams.includes(staff);
+    }).sort((a,b) => prefSortKey(a.pref||'') - prefSortKey(b.pref||'') || (a.name||'').localeCompare(b.name||'','ja'));
+    const teamWorkers = teamCos.reduce((acc,c) => acc + (workerCount[c.id]||0), 0);
+    const teamCoRows = teamCos.map(c => `
+      <tr>
+        <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap;">${esc(c.pref||'-')}</td>
+        <td style="padding:5px 8px;font-size:12px;font-weight:600;"><a onclick="openCompanyModal('${c.id}')" style="color:var(--navy);cursor:pointer;text-decoration:underline dotted;">${esc(c.name)}</a></td>
+        <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);">${esc(c.main_staff||'-')}</td>
+        <td style="padding:5px 8px;font-size:12px;font-weight:700;text-align:right;color:${color};">${workerCount[c.id]||0}名</td>
+      </tr>`).join('');
+
     return `<div style="background:white;border:1px solid var(--gray-200);border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06);">
       <!-- ヘッダー -->
       <div style="background:${color};padding:16px 20px;display:flex;align-items:center;gap:12px;">
@@ -2292,7 +2308,7 @@ function renderStaffCards(wrap, companies, workerCount, targetStaff) {
           <div style="font-size:17px;font-weight:800;color:white;">${esc(staff)}</div>
           <div style="font-size:11px;color:rgba(255,255,255,.8);margin-top:2px;">${mainCos.filter(c=>c.next_main_staff).map(c=>'→ '+esc(c.next_main_staff)+'（'+esc(c.name)+'）').join(' / ') || ''}</div>
           <div style="font-size:11px;color:rgba(255,255,255,.8);margin-top:2px;">
-            合計 ${mainWorkers+subWorkers}名 担当
+            合計 ${mainWorkers+subWorkers+teamWorkers}名 担当
           </div>
         </div>
         <div style="margin-left:auto;display:flex;gap:16px;text-align:center;">
@@ -2312,6 +2328,15 @@ function renderStaffCards(wrap, companies, workerCount, targetStaff) {
           <div style="color:white;">
             <div style="font-size:20px;font-weight:800;">${subWorkers}</div>
             <div style="font-size:10px;opacity:.8;">サブ名</div>
+          </div>
+          <div style="color:rgba(255,255,255,.6);font-size:18px;align-self:center;">|</div>
+          <div style="color:white;">
+            <div style="font-size:20px;font-weight:800;">${teamCos.length}</div>
+            <div style="font-size:10px;opacity:.8;">チーム社</div>
+          </div>
+          <div style="color:white;">
+            <div style="font-size:20px;font-weight:800;">${teamWorkers}</div>
+            <div style="font-size:10px;opacity:.8;">チーム名</div>
           </div>
         </div>
       </div>
@@ -2345,6 +2370,19 @@ function renderStaffCards(wrap, companies, workerCount, targetStaff) {
           <tbody>${subCoRows}</tbody>
         </table>
       </div>` : ''}
+      ${teamCos.length ? `
+      <div class="staff-company-section" style="padding:12px 16px 4px;border-top:1px solid var(--gray-100);">
+        <div style="font-size:11px;font-weight:700;color:#7c3aed;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;">🟣 チーム内サブ担当（${teamCos.length}社・${teamWorkers}名）</div>
+        <table style="width:100%;border-collapse:collapse;">
+          <thead><tr style="background:#f8fafc;">
+            <th style="padding:4px 8px;font-size:10px;color:var(--gray-400);text-align:left;font-weight:600;">都道府県</th>
+            <th style="padding:4px 8px;font-size:10px;color:var(--gray-400);text-align:left;font-weight:600;">企業名</th>
+            <th style="padding:4px 8px;font-size:10px;color:var(--gray-400);text-align:left;font-weight:600;">メイン担当</th>
+            <th style="padding:4px 8px;font-size:10px;color:var(--gray-400);text-align:right;font-weight:600;">人数</th>
+          </tr></thead>
+          <tbody>${teamCoRows}</tbody>
+        </table>
+      </div>` : ''}
       <div style="height:8px;"></div>
     </div>`;
   }).join('') + '</div>';
@@ -2358,6 +2396,8 @@ function renderStaffTable(wrap, companies, workerCount, targetStaff) {
     const subCos  = companies.filter(c => (c.sub_staff||'').split(/[,、]/).map(s=>s.trim()).includes(staff));
     mainCos.forEach(c => rows.push({ staff, role:'メイン', pref:c.pref||'', name:c.name, id:c.id, partner: c.sub_staff||'-', count: workerCount[c.id]||0 }));
     subCos.forEach(c  => rows.push({ staff, role:'サブ',   pref:c.pref||'', name:c.name, id:c.id, partner: c.main_staff||'-', count: workerCount[c.id]||0 }));
+    const tCos = companies.filter(c => (c.team_staff||'').split(/[,、]/).map(s=>s.trim()).includes(staff));
+    tCos.forEach(c => rows.push({ staff, role:'チーム', pref:c.pref||'', name:c.name, id:c.id, partner: c.main_staff||'-', count: workerCount[c.id]||0 }));
   });
 
   if (!rows.length) { wrap.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray-400);">データがありません</div>'; return; }
@@ -2373,7 +2413,7 @@ function renderStaffTable(wrap, companies, workerCount, targetStaff) {
     '</tr></thead><tbody>' +
     rows.map((r,i) => `<tr style="border-bottom:1px solid var(--gray-100);background:${i%2?'#fafafa':'white'};">
       <td style="padding:7px 12px;font-weight:700;color:${getStaffColor(r.staff)};">${esc(r.staff)}</td>
-      <td style="padding:7px 12px;"><span style="font-size:10px;padding:2px 8px;border-radius:10px;font-weight:700;background:${r.role==='メイン'?'#dbeafe':'#f3f4f6'};color:${r.role==='メイン'?'#1d4ed8':'#6b7280'};">${r.role}</span></td>
+      <td style="padding:7px 12px;"><span style="font-size:10px;padding:2px 8px;border-radius:10px;font-weight:700;background:${r.role==='メイン'?'#dbeafe':r.role==='サブ'?'#f3f4f6':'#ede9fe'};color:${r.role==='メイン'?'#1d4ed8':r.role==='サブ'?'#6b7280':'#7c3aed'};">${r.role}</span></td>
       <td style="padding:7px 12px;color:var(--gray-500);">${esc(r.pref)}</td>
       <td style="padding:7px 12px;font-weight:600;"><a onclick="openCompanyModal('${r.id}')" style="color:var(--navy);cursor:pointer;text-decoration:underline dotted;">${esc(r.name)}</a></td>
       <td style="padding:7px 12px;color:var(--gray-500);">${esc(r.partner)}</td>
@@ -14527,7 +14567,7 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
-  { version:'ver.20260629.45', date:'2026-07-10', notify:true, items:[
+  { version:'ver.20260629.46', date:'2026-07-10', notify:true, items:[
     'スマホ対応：テーブルを横スクロールで全列表示に変更',
     'スマホ対応：チャット画面をLINEライク（一覧→タップでメッセージ→←で戻る）に変更',
     'チャット：ファイル送信のGAS URLを設定不要化（スマホ含めすべての端末でそのまま送信可能に）',
