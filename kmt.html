@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260629.43 -->
+<!-- KMT_VERSION ver.20260629.44 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -320,7 +320,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.43</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.44</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -9819,13 +9819,7 @@ function buildWorkerModalBody(w) {
     <div class="form-group full"><label class="form-label">申請日</label><input class="form-input" id="wf_apply_date" type="date" value="${w.apply_date||''}" style="max-width:180px;"></div>
     <div class="form-group full"><label class="form-label">申請番号</label><input class="form-input" id="wf_apply_number" value="${esc(w.apply_number||'')}" placeholder="例: 2024-T-001"></div>
     <div class="form-group full"><label class="form-label">申請メモ</label><textarea class="form-textarea" id="wf_apply_memo" rows="3" placeholder="特定技能通算・技能実習修了日・申請目標日など">${esc(w.apply_memo||'')}</textarea></div>
-    <div class="form-group full">
-      <label class="form-label">` + (new Date().getFullYear()-1) + `年1月1日の住所</label>
-      <div style="display:flex;gap:6px;align-items:center;">
-        <input class="form-input" id="wf_last_year_address" value="${esc(w.last_year_address||'')}" placeholder="昨年1月1日時点の住所" style="flex:1;">
-        <button type="button" onclick="copyJpAddressToLastYear()" class="btn btn-outline" style="font-size:11px;white-space:nowrap;flex-shrink:0;">現住所と同じ</button>
-      </div>
-    </div>
+
   </div>
 
   <!-- 2. 在留情報 -->
@@ -9909,6 +9903,13 @@ function buildWorkerModalBody(w) {
       </select></div>
     <div class="form-group"><label class="form-label">生年月日</label><input class="form-input" id="wf_birthdate" type="date" value="${w.birthdate||''}"></div>
     <div class="form-group full"><label class="form-label">日本住所</label><input class="form-input" id="wf_jp_address" value="${esc(w.jp_address||'')}"></div>
+    <div class="form-group full">
+      <label class="form-label">` + (new Date().getFullYear()-1) + `年1月1日の住所</label>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <input class="form-input" id="wf_last_year_address" value="${esc(w.last_year_address||'')}" placeholder="昨年1月1日時点の住所" style="flex:1;">
+        <button type="button" onclick="copyJpAddressToLastYear()" class="btn btn-outline" style="font-size:11px;white-space:nowrap;flex-shrink:0;">現住所と同じ</button>
+      </div>
+    </div>
   </div>
 
   <!-- 6. 所属機関・受け入れ情報 -->
@@ -14523,7 +14524,7 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
-  { version:'ver.20260629.43', date:'2026-07-10', notify:true, items:[
+  { version:'ver.20260629.44', date:'2026-07-10', notify:true, items:[
     'スマホ対応：テーブルを横スクロールで全列表示に変更',
     'スマホ対応：チャット画面をLINEライク（一覧→タップでメッセージ→←で戻る）に変更',
     'チャット：ファイル送信のGAS URLを設定不要化（スマホ含めすべての端末でそのまま送信可能に）',
