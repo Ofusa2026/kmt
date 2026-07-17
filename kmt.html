@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260629.48 -->
+<!-- KMT_VERSION ver.20260629.49 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -320,7 +320,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.48</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.49</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -328,6 +328,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="nav-item active" onclick="showScreen('ofusa_view')" style="margin:8px 8px 4px;border-radius:6px;">📊 案件進捗確認</div>
   <div class="nav-item" onclick="showScreen('notices')">📋 社内共有事項</div>
   <div class="nav-item" onclick="showScreen('staff_list')">👥 担当一覧</div>
+  <div class="nav-item" onclick="showScreen('mail_list')">📧 メール送信</div>
   <div class="nav-item" onclick="showScreen('decision_report')" style="margin:2px 8px 4px;border-radius:6px;">📋 決定報告</div>
   <div style="height:1px;background:rgba(255,255,255,0.08);margin:4px 16px 8px;"></div>
   <div class="sidebar-section">メイン</div>
@@ -2143,6 +2144,254 @@ const PREF_ORDER = ['北海道', '青森県', '岩手県', '宮城県', '秋田�
 function prefSortKey(pref) {
   const idx = PREF_ORDER.indexOf(pref);
   return idx === -1 ? 99 : idx;
+}
+
+
+// ===== メール送信 =====
+const KMT_MAIL_GAS_URL = 'https://script.google.com/macros/s/AKfycbxfSng4FHeRlBCytSP9BmjsrVDziNwygnfWVuxOE7r7QOU3KTkw6ja9jpnoxBrJQhBM/exec';
+let _mailCompanies = [];
+let _mailUsers = [];
+
+function buildMailListScreen() {
+  return `<div style="display:grid;grid-template-columns:380px 1fr;gap:16px;align-items:start;">
+
+    <!-- 左：企業リスト -->
+    <div style="border:1px solid var(--gray-200);border-radius:10px;overflow:hidden;">
+      <div style="background:#f8fafc;padding:10px 14px;border-bottom:1px solid var(--gray-200);">
+        <div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px;">📋 送信先企業を選択</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
+          <select id="mailFilterStaff" class="form-select" onchange="filterMailCompanies()" style="font-size:11px;width:auto;flex:1;">
+            <option value="">全担当者</option>
+          </select>
+          <select id="mailFilterField" class="form-select" onchange="filterMailCompanies()" style="font-size:11px;width:auto;flex:1;">
+            <option value="">全分野</option>
+          </select>
+          <select id="mailFilterPref" class="form-select" onchange="filterMailCompanies()" style="font-size:11px;width:auto;flex:1;">
+            <option value="">全都道府県</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <input id="mailSearchCo" class="form-input" placeholder="🔍 企業名検索..." oninput="filterMailCompanies()" style="font-size:11px;flex:1;">
+          <button onclick="mailCheckAll(true)" class="btn btn-outline" style="font-size:10px;padding:3px 8px;white-space:nowrap;">全選択</button>
+          <button onclick="mailCheckAll(false)" class="btn btn-outline" style="font-size:10px;padding:3px 8px;white-space:nowrap;">解除</button>
+        </div>
+        <div id="mailSelectedCount" style="font-size:11px;color:var(--gray-400);margin-top:6px;">0社選択中</div>
+      </div>
+      <div id="mailCompanyList" style="max-height:500px;overflow-y:auto;"></div>
+    </div>
+
+    <!-- 右：メール作成 -->
+    <div>
+      <!-- スタッフCC選択 -->
+      <div style="border:1px solid var(--gray-200);border-radius:10px;padding:14px;margin-bottom:14px;">
+        <div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:10px;">👤 スタッフCC（任意）</div>
+        <div id="mailStaffList" style="display:flex;flex-wrap:wrap;gap:8px 16px;"></div>
+      </div>
+
+      <!-- メール作成 -->
+      <div style="border:1px solid var(--gray-200);border-radius:10px;padding:14px;">
+        <div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:12px;">✉️ メール作成</div>
+        <div class="form-group full" style="margin-bottom:10px;">
+          <label class="form-label">件名 <span style="color:#ef4444;">*</span></label>
+          <input class="form-input" id="mailSubject" placeholder="件名を入力">
+        </div>
+        <div class="form-group full" style="margin-bottom:10px;">
+          <label class="form-label">本文 <span style="color:#ef4444;">*</span></label>
+          <textarea class="form-textarea" id="mailBody" rows="10" placeholder="本文を入力..." style="font-size:13px;line-height:1.8;"></textarea>
+        </div>
+        <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:11px;color:#0369a1;">
+          ℹ️ 送信元：so-mu@k-m-t.jp　／　企業宛は個人情報保護のためBCC送信
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+          <button onclick="previewMail()" class="btn btn-outline" style="font-size:12px;">👁️ 送信確認</button>
+          <button onclick="sendMailBulk()" class="btn btn-primary" style="font-size:12px;">📧 送信する</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+async function loadMailList() {
+  showLoading(true);
+  try {
+    const [cos, users] = await Promise.all([
+      sbFetch('companies?select=id,name,pref,main_staff,sub_staff,contact_email,folder_no,applicant_field&is_deleted=eq.false&order=name.asc'),
+      sbFetch('users?select=id,name,email&order=name.asc'),
+    ]);
+    _mailCompanies = (cos || []).filter(c => c.contact_email);
+    _mailUsers = (users || []).filter(u => u.email);
+
+    // フィルターセレクトを構築
+    const staffSet = new Set();
+    const fieldSet = new Set();
+    const prefSet  = new Set();
+    _mailCompanies.forEach(c => {
+      (c.main_staff||'').split(/[,、]/).map(s=>s.trim()).filter(Boolean).forEach(s=>staffSet.add(s));
+      if (c.applicant_field) c.applicant_field.split(/[,、\/]/).map(s=>s.trim()).filter(Boolean).forEach(s=>fieldSet.add(s));
+      if (c.pref) prefSet.add(c.pref);
+    });
+
+    const staffSel = document.getElementById('mailFilterStaff');
+    const fieldSel = document.getElementById('mailFilterField');
+    const prefSel  = document.getElementById('mailFilterPref');
+    if (staffSel) staffSel.innerHTML = '<option value="">全担当者</option>' + [...staffSet].sort().map(s=>`<option>${esc(s)}</option>`).join('');
+    if (fieldSel) fieldSel.innerHTML = '<option value="">全分野</option>' + [...fieldSet].sort().map(s=>`<option>${esc(s)}</option>`).join('');
+    if (prefSel)  prefSel.innerHTML  = '<option value="">全都道府県</option>' + [...prefSet].sort((a,b)=>prefSortKey(a)-prefSortKey(b)).map(s=>`<option>${esc(s)}</option>`).join('');
+
+    // スタッフリスト
+    const staffWrap = document.getElementById('mailStaffList');
+    if (staffWrap) {
+      staffWrap.innerHTML = _mailUsers.map(u =>
+        `<label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;">
+          <input type="checkbox" class="mail-staff-cb" value="${esc(u.email)}" data-name="${esc(u.name)}">
+          ${esc(u.name)}<span style="color:var(--gray-400);font-size:10px;">${esc(u.email)}</span>
+        </label>`
+      ).join('');
+    }
+
+    filterMailCompanies();
+  } catch(e) { showToast('❌ ' + e.message, 'error'); }
+  showLoading(false);
+}
+
+function filterMailCompanies() {
+  const fStaff = document.getElementById('mailFilterStaff')?.value || '';
+  const fField = document.getElementById('mailFilterField')?.value || '';
+  const fPref  = document.getElementById('mailFilterPref')?.value || '';
+  const q      = (document.getElementById('mailSearchCo')?.value || '').toLowerCase().trim();
+
+  const filtered = _mailCompanies.filter(c => {
+    if (fStaff && !(c.main_staff||'').split(/[,、]/).map(s=>s.trim()).includes(fStaff)) return false;
+    if (fField && !(c.applicant_field||'').includes(fField)) return false;
+    if (fPref  && c.pref !== fPref) return false;
+    if (q && !(c.name||'').toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  const wrap = document.getElementById('mailCompanyList');
+  if (!wrap) return;
+
+  if (!filtered.length) {
+    wrap.innerHTML = '<div style="text-align:center;padding:30px;color:var(--gray-400);font-size:13px;">メールアドレスが登録された企業がありません</div>';
+    updateMailSelectedCount();
+    return;
+  }
+
+  wrap.innerHTML = filtered.map(c => {
+    const emails = (c.contact_email||'').split(/\r?\n/).filter(Boolean);
+    return `<label style="display:flex;align-items:flex-start;gap:8px;padding:10px 14px;border-bottom:1px solid var(--gray-100);cursor:pointer;font-size:12px;" class="mail-co-row">
+      <input type="checkbox" class="mail-co-cb" value="${c.id}" style="margin-top:2px;flex-shrink:0;" onchange="updateMailSelectedCount()">
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:700;color:var(--navy);">${esc(c.name)}</div>
+        <div style="color:var(--gray-400);font-size:11px;margin-top:2px;">
+          ${c.pref?esc(c.pref)+' · ':''}${c.main_staff?esc(c.main_staff)+' · ':''}
+          ${emails.map(e=>'📧 '+esc(e)).join(' / ')}
+        </div>
+      </div>
+    </label>`;
+  }).join('');
+
+  updateMailSelectedCount();
+}
+
+function mailCheckAll(check) {
+  document.querySelectorAll('.mail-co-cb').forEach(cb => cb.checked = check);
+  updateMailSelectedCount();
+}
+
+function updateMailSelectedCount() {
+  const count = document.querySelectorAll('.mail-co-cb:checked').length;
+  const el = document.getElementById('mailSelectedCount');
+  if (el) el.textContent = count + '社選択中';
+}
+
+function getMailTargets() {
+  const selectedIds = [...document.querySelectorAll('.mail-co-cb:checked')].map(cb => cb.value);
+  const toEmails = [];
+  selectedIds.forEach(id => {
+    const co = _mailCompanies.find(c => c.id === id);
+    if (!co) return;
+    (co.contact_email||'').split(/\r?\n/).filter(Boolean).forEach(e => {
+      if (!toEmails.includes(e.trim())) toEmails.push(e.trim());
+    });
+  });
+  const ccEmails = [...document.querySelectorAll('.mail-staff-cb:checked')].map(cb => cb.value);
+  return { toEmails, ccEmails, selectedIds };
+}
+
+function previewMail() {
+  const { toEmails, ccEmails, selectedIds } = getMailTargets();
+  const subject = document.getElementById('mailSubject')?.value.trim() || '';
+  const body    = document.getElementById('mailBody')?.value.trim() || '';
+
+  if (!selectedIds.length) { showToastTop('❌ 企業を1社以上選択してください'); return; }
+  if (!subject) { showToastTop('❌ 件名を入力してください'); return; }
+  if (!body)    { showToastTop('❌ 本文を入力してください'); return; }
+
+  const ccNames = [...document.querySelectorAll('.mail-staff-cb:checked')].map(cb => cb.dataset.name);
+  const preview = [
+    '【送信確認】',
+    '',
+    '送信先（BCC）：' + toEmails.length + '件',
+    toEmails.slice(0,5).map(e=>'  ' + e).join('\n') + (toEmails.length>5 ? '\n  ... 他' + (toEmails.length-5) + '件' : ''),
+    '',
+    ccNames.length ? 'CC：' + ccNames.join(' / ') : '',
+    '',
+    '件名：' + subject,
+    '',
+    '本文（冒頭）：',
+    body.slice(0, 200) + (body.length > 200 ? '...' : ''),
+  ].filter(s => s !== undefined).join('\n');
+
+  if (confirm(preview + '\n\n送信しますか？')) {
+    sendMailBulk(true);
+  }
+}
+
+async function sendMailBulk(confirmed = false) {
+  const { toEmails, ccEmails, selectedIds } = getMailTargets();
+  const subject = document.getElementById('mailSubject')?.value.trim() || '';
+  const body    = document.getElementById('mailBody')?.value.trim() || '';
+
+  if (!selectedIds.length) { showToastTop('❌ 企業を1社以上選択してください'); return; }
+  if (!subject) { showToastTop('❌ 件名を入力してください'); return; }
+  if (!body)    { showToastTop('❌ 本文を入力してください'); return; }
+
+  if (!confirmed) {
+    previewMail();
+    return;
+  }
+
+  showLoading(true);
+  try {
+    const payload = {
+      action: 'sendMail',
+      subject,
+      body,
+      to: toEmails,
+      cc: ccEmails,
+      senderName: 'KMT事務局',
+    };
+    const sep = KMT_MAIL_GAS_URL.includes('?') ? '&' : '?';
+    const resp = await fetch(KMT_MAIL_GAS_URL + sep + 't=' + Date.now(), {
+      method: 'POST', redirect: 'follow', cache: 'no-store',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload),
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const result = await resp.json();
+    if (result.success) {
+      showToast('✅ ' + toEmails.length + '件に送信しました', 'success');
+      // 送信後にチェックをリセット
+      document.querySelectorAll('.mail-co-cb').forEach(cb => cb.checked = false);
+      document.querySelectorAll('.mail-staff-cb').forEach(cb => cb.checked = false);
+      updateMailSelectedCount();
+    } else {
+      const errMsg = result.errors?.map(e => e.to + ': ' + e.error).join('\n') || result.error || '送信失敗';
+      showToastTop('❌ 送信エラー: ' + errMsg);
+    }
+  } catch(e) { showToastTop('❌ ' + e.message); }
+  showLoading(false);
 }
 
 // ===== 担当一覧 =====
@@ -8336,6 +8585,7 @@ const SCREENS = {
   ofusa_view:{ title: '📊 案件進捗確認', init: loadOfusaView },
   notices:    { title: '📋 社内共有事項', init: loadNotices },
   staff_list: { title: '👥 担当一覧', init: loadStaffList },
+  mail_list:  { title: '📧 メール送信', init: loadMailList },
   decision_report:{ title: '📋 決定報告', init: loadDecisionReport },
   resume:    { title: '📝 履歴書作成', init: loadResumeScreen },
   job_flyer: { title: '📄 求人票作成', init: (id) => loadJobFlyer(id) },
@@ -8392,6 +8642,7 @@ function updateTopbarButtons(name) {
     users:        `<button class="btn btn-outline" onclick="loadUsers()">🔄 更新</button><button class="btn btn-primary" onclick="openUserModal(null)">＋ ユーザー追加</button>`,
     decision_report: ``,
     staff_list:   `<button class="btn btn-outline" onclick="loadStaffList()">🔄 更新</button><button id="staffListToggleBtn" class="btn btn-outline" onclick="toggleStaffCompanyList()" style="margin-left:4px;">📋 企業一覧を隠す</button>`,
+    mail_list:    `<button class="btn btn-outline" onclick="loadMailList()">🔄 更新</button>`,
     notices:      `<button class="btn btn-primary" onclick="openNoticeModal(null)">＋ 新規投稿</button>`,
     ofusa_view:   `<button class="btn btn-outline" onclick="document.getElementById('ofusaIframe').src=document.getElementById('ofusaIframe').src">🔄 更新</button><a href="https://ofusa2026.github.io/org-view/share.html?token=a952840c-7e8a-464e-a4fd-776a485d49e7" target="_blank" class="btn btn-outline">↗️ 別タブで開く</a>`,
     resume:       `<button class="btn btn-outline" onclick="printResume()">🖨️ 印刷</button>`,
@@ -8423,6 +8674,7 @@ function renderScreenContent(name) {
     ofusa_view: buildOfusaViewScreen(),
     notices:    buildNoticesScreen(),
     staff_list: buildStaffListScreen(),
+    mail_list:  buildMailListScreen(),
     resume: buildResumeScreen(),
     // chat は専用処理で描画
   };
@@ -14572,7 +14824,7 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
-  { version:'ver.20260629.48', date:'2026-07-10', notify:true, items:[
+  { version:'ver.20260629.49', date:'2026-07-10', notify:true, items:[
     'スマホ対応：テーブルを横スクロールで全列表示に変更',
     'スマホ対応：チャット画面をLINEライク（一覧→タップでメッセージ→←で戻る）に変更',
     'チャット：ファイル送信のGAS URLを設定不要化（スマホ含めすべての端末でそのまま送信可能に）',
