@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260629.52 -->
+<!-- KMT_VERSION ver.20260629.53 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -320,7 +320,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.52</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.53</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -2174,6 +2174,10 @@ function buildMailListScreen() {
           <input id="mailSearchCo" class="form-input" placeholder="🔍 企業名検索..." oninput="filterMailCompanies()" style="font-size:11px;flex:1;">
           <button onclick="mailCheckAll(true)" class="btn btn-outline" style="font-size:10px;padding:3px 8px;white-space:nowrap;">全選択</button>
           <button onclick="mailCheckAll(false)" class="btn btn-outline" style="font-size:10px;padding:3px 8px;white-space:nowrap;">解除</button>
+          <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;padding:3px 8px;border:1px solid var(--gray-200);border-radius:6px;background:white;white-space:nowrap;">
+            <input type="checkbox" id="mailFilterNoEmail" onchange="filterMailCompanies()">📵 未登録のみ
+          </label>
+          <button onclick="exportNoEmailList()" class="btn btn-outline" style="font-size:10px;padding:3px 8px;white-space:nowrap;">📋 担当別</button>
         </div>
         <div id="mailSelectedCount" style="font-size:11px;color:var(--gray-400);margin-top:6px;">0社選択中</div>
       </div>
@@ -2258,6 +2262,7 @@ async function loadMailList() {
 function filterMailCompanies() {
   const fStaff = document.getElementById('mailFilterStaff')?.value || '';
   const fField = document.getElementById('mailFilterField')?.value || '';
+  const fNoMail = document.getElementById('mailFilterNoEmail')?.checked || false;
   const fPref  = document.getElementById('mailFilterPref')?.value || '';
   const q      = (document.getElementById('mailSearchCo')?.value || '').toLowerCase().trim();
 
@@ -2266,6 +2271,7 @@ function filterMailCompanies() {
     if (fStaff && !(c.main_staff||'').split(/[,、]/).map(s=>s.trim()).includes(fStaff)) return false;
     // fField: applicant_fieldはcompaniesに存在しないためスキップ
     if (fPref  && c.pref !== fPref) return false;
+    if (fNoMail && c.contact_email) return false;
     if (q && !(c.name||'').toLowerCase().includes(q)) return false;
     return true;
   });
@@ -2287,7 +2293,7 @@ function filterMailCompanies() {
     return `<label style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border-bottom:1px solid var(--gray-100);cursor:${hasEmail?'pointer':'default'};${!hasEmail?'opacity:.45;':''}background:white;" class="mail-co-row">
       <input type="checkbox" class="mail-co-cb" value="${c.id}" ${!hasEmail?'disabled':''} style="margin-top:3px;flex-shrink:0;width:16px;height:16px;" onchange="updateMailSelectedCount()">
       <div style="flex:1;min-width:0;">
-        <div style="font-weight:700;color:var(--navy);font-size:13px;">${esc(c.name)}</div>
+        <div style="font-weight:700;font-size:13px;"><a onclick="event.preventDefault();event.stopPropagation();openCompanyModal('${c.id}')" style="color:var(--navy);cursor:pointer;text-decoration:underline dotted;">${esc(c.name)}</a></div>
         ${hasEmail
           ? `<div style="color:#6b7280;font-size:11px;margin-top:3px;line-height:1.6;">${emails.map(e=>esc(e)).join('、')}</div>`
           : `<div style="color:#d1d5db;font-size:11px;margin-top:3px;">メールアドレス未登録</div>`
@@ -2308,6 +2314,55 @@ function updateMailSelectedCount() {
   const count = document.querySelectorAll('.mail-co-cb:checked').length;
   const el = document.getElementById('mailSelectedCount');
   if (el) el.textContent = count + '社選択中';
+}
+
+function exportNoEmailList() {
+  const src = _mailCompanies_all || [];
+  const noEmail = src.filter(c => !c.contact_email);
+  if (!noEmail.length) { showToast('メール未登録の企業はありません', 'success'); return; }
+
+  // 担当者ごとにグループ化
+  const groups = {};
+  noEmail.forEach(c => {
+    const staff = c.main_staff || '（未設定）';
+    staff.split(/[,、]/).map(s=>s.trim()).filter(Boolean).forEach(s => {
+      if (!groups[s]) groups[s] = [];
+      groups[s].push(c);
+    });
+    if (!c.main_staff) {
+      if (!groups['（未設定）']) groups['（未設定）'] = [];
+      groups['（未設定）'].push(c);
+    }
+  });
+
+  // モーダル表示
+  const content = Object.entries(groups).sort(([a],[b])=>a.localeCompare(b,'ja')).map(([staff, cos]) =>
+    `<div style="margin-bottom:16px;">
+      <div style="font-size:12px;font-weight:700;color:var(--navy);background:#f0f7ff;padding:6px 12px;border-radius:6px;margin-bottom:6px;">
+        ${esc(staff)}（${cos.length}社）
+      </div>
+      <div style="padding:0 8px;">
+        ${cos.map(c => `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--gray-100);font-size:12px;">
+          <span style="color:var(--gray-400);font-size:11px;white-space:nowrap;">${esc(c.pref||'-')}</span>
+          <a onclick="openCompanyModal('${c.id}')" style="color:var(--navy);cursor:pointer;text-decoration:underline dotted;font-weight:600;">${esc(c.name)}</a>
+        </div>`).join('')}
+      </div>
+    </div>`
+  ).join('');
+
+  const modal = `<div id="noEmailModal" style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;">
+    <div style="background:white;border-radius:12px;width:560px;max-width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);">
+      <div style="position:sticky;top:0;background:white;padding:16px 20px;border-bottom:1px solid var(--gray-200);display:flex;justify-content:space-between;align-items:center;z-index:1;">
+        <div style="font-size:15px;font-weight:800;color:var(--navy);">📵 メール未登録企業（担当別）</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span style="font-size:12px;color:var(--gray-400);">計${noEmail.length}社</span>
+          <button onclick="document.getElementById('noEmailModal').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--gray-400);">✕</button>
+        </div>
+      </div>
+      <div style="padding:16px 20px;">${content}</div>
+    </div>
+  </div>`;
+  document.body.insertAdjacentHTML('beforeend', modal);
 }
 
 function getMailTargets() {
@@ -14829,7 +14884,7 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
-  { version:'ver.20260629.52', date:'2026-07-10', notify:true, items:[
+  { version:'ver.20260629.53', date:'2026-07-10', notify:true, items:[
     'スマホ対応：テーブルを横スクロールで全列表示に変更',
     'スマホ対応：チャット画面をLINEライク（一覧→タップでメッセージ→←で戻る）に変更',
     'チャット：ファイル送信のGAS URLを設定不要化（スマホ含めすべての端末でそのまま送信可能に）',
