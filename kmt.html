@@ -1477,12 +1477,13 @@ function closeCompanyModal(force=false) {
     const current = getCoFormData();
     const snapshot = _coSnapshotBefore;
     // スナップショットにあるキーのみ比較（スナップショットにないキーは無視）
-    const changed = Object.keys(snapshot).some(k => {
+    const diffKeys = Object.keys(snapshot).filter(k => {
       const a = String(current[k] ?? '');
       const b = String(snapshot[k] ?? '');
       return a !== b && !(a === 'null' && b === '') && !(a === '' && b === 'null');
     });
-    if (changed) {
+    if (diffKeys.length > 0) {
+      console.log('変更あり:', diffKeys.map(k => k + ': [' + String(snapshot[k]) + '] → [' + String(current[k]) + ']'));
       if (!confirm('変更が保存されていません。閉じますか？')) return;
     }
   }
