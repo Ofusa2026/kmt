@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260629.55 -->
+<!-- KMT_VERSION ver.20260629.56 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -320,7 +320,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.55</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.56</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -2196,6 +2196,125 @@ function prefSortKey(pref) {
 }
 
 
+
+// ===== メールテンプレート・送信履歴 =====
+let _mailTemplates = [];
+
+async function loadMailTemplates() {
+  try {
+    const data = await sbFetch('mail_templates?is_deleted=eq.false&order=name.asc');
+    _mailTemplates = data || [];
+    const sel = document.getElementById('mailTemplateSelect');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">📋 テンプレートを選択</option>' +
+      _mailTemplates.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('');
+  } catch(e) {}
+}
+
+function applyMailTemplate() {
+  const sel = document.getElementById('mailTemplateSelect');
+  const id = sel?.value;
+  if (!id) return;
+  const t = _mailTemplates.find(x => x.id === id);
+  if (!t) return;
+  const subEl = document.getElementById('mailSubject');
+  const bodyEl = document.getElementById('mailBody');
+  if (subEl) subEl.value = t.subject;
+  if (bodyEl) bodyEl.value = t.body;
+}
+
+async function saveMailTemplate() {
+  const subject = document.getElementById('mailSubject')?.value.trim() || '';
+  const body    = document.getElementById('mailBody')?.value.trim() || '';
+  if (!subject && !body) { showToastTop('❌ 件名または本文を入力してください'); return; }
+
+  const name = prompt('テンプレート名を入力してください：');
+  if (!name) return;
+
+  showLoading(true);
+  try {
+    // 同名テンプレートがあれば上書き確認
+    const existing = _mailTemplates.find(t => t.name === name);
+    if (existing) {
+      if (!confirm(`「${name}」は既に存在します。上書きしますか？`)) { showLoading(false); return; }
+      await sbFetch('mail_templates?id=eq.' + existing.id, {
+        method: 'PATCH',
+        body: JSON.stringify({ subject, body, updated_at: new Date().toISOString() })
+      });
+    } else {
+      await sbFetch('mail_templates', {
+        method: 'POST',
+        body: JSON.stringify({ name, subject, body, created_by: currentUser?.name || '' }),
+        prefer: 'return=minimal'
+      });
+    }
+    showToast('✅ テンプレートを保存しました', 'success');
+    await loadMailTemplates();
+    // 保存したテンプレートを選択状態に
+    const sel = document.getElementById('mailTemplateSelect');
+    if (sel) {
+      const t = _mailTemplates.find(x => x.name === name);
+      if (t) sel.value = t.id;
+    }
+  } catch(e) { showToast('❌ ' + e.message, 'error'); }
+  showLoading(false);
+}
+
+async function showMailLogs() {
+  showLoading(true);
+  try {
+    const logs = await sbFetch('mail_logs?order=sent_at.desc&limit=100');
+    const content = (logs && logs.length) ? logs.map((l, i) => `
+      <div style="border:1px solid var(--gray-200);border-radius:8px;padding:12px 14px;margin-bottom:8px;background:${i%2?'#fafafa':'white'};">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px;">
+          <div style="font-size:13px;font-weight:700;color:var(--navy);flex:1;">${esc(l.subject||'（件名なし）')}</div>
+          <div style="font-size:11px;color:var(--gray-400);white-space:nowrap;">${esc((l.sent_at||'').slice(0,16).replace('T',' '))}</div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:var(--gray-500);margin-bottom:6px;">
+          <span>📤 ${esc(l.sent_by||'-')}</span>
+          <span>📬 ${l.to_count||0}社</span>
+          ${l.cc_list ? '<span>CC: '+esc(l.cc_list)+'</span>' : ''}
+          <span style="color:${l.success?'#059669':'#dc2626'};font-weight:700;">${l.success?'✅ 送信成功':'❌ 送信失敗'}</span>
+        </div>
+        <div style="font-size:11px;color:var(--gray-400);background:#f8fafc;padding:6px 10px;border-radius:6px;white-space:pre-wrap;max-height:80px;overflow-y:auto;">${esc((l.body||'').slice(0,200))}${(l.body||'').length>200?'...':''}</div>
+        ${l.to_list ? `<details style="margin-top:6px;"><summary style="font-size:11px;color:var(--gray-400);cursor:pointer;">送信先一覧</summary><div style="font-size:11px;color:var(--gray-500);padding:4px 8px;">${esc(l.to_list).replace(/\n/g,'<br>')}</div></details>` : ''}
+      </div>`).join('')
+    : '<div style="text-align:center;padding:40px;color:var(--gray-400);">送信履歴がありません</div>';
+
+    const modal = `<div id="mailLogModal" style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;">
+      <div style="background:white;border-radius:12px;width:700px;max-width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);">
+        <div style="position:sticky;top:0;background:white;padding:16px 20px;border-bottom:1px solid var(--gray-200);display:flex;justify-content:space-between;align-items:center;z-index:1;">
+          <div style="font-size:15px;font-weight:800;color:var(--navy);">📜 送信履歴</div>
+          <button onclick="document.getElementById('mailLogModal').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--gray-400);">✕</button>
+        </div>
+        <div style="padding:16px 20px;">${content}</div>
+      </div>
+    </div>`;
+    document.body.insertAdjacentHTML('beforeend', modal);
+  } catch(e) { showToast('❌ ' + e.message, 'error'); }
+  showLoading(false);
+}
+
+async function saveMailLog(subject, body, toEmails, ccEmails, success, errorMsg) {
+  try {
+    await sbFetch('mail_logs', {
+      method: 'POST',
+      body: JSON.stringify({
+        subject,
+        body: body.slice(0, 2000),
+        to_count: toEmails.length,
+        to_list: toEmails.join('\n').slice(0, 5000),
+        cc_list: ccEmails.join(', ') || null,
+        sent_by: currentUser?.name || '',
+        sent_at: new Date().toISOString(),
+        success,
+        error_msg: errorMsg || null,
+      }),
+      prefer: 'return=minimal'
+    });
+  } catch(e) { console.error('ログ保存失敗:', e); }
+}
+
 // ===== メール送信 =====
 const KMT_MAIL_GAS_URL = 'https://script.google.com/macros/s/AKfycbxfSng4FHeRlBCytSP9BmjsrVDziNwygnfWVuxOE7r7QOU3KTkw6ja9jpnoxBrJQhBM/exec';
 let _mailCompanies = [];
@@ -2243,7 +2362,15 @@ function buildMailListScreen() {
 
       <!-- メール作成 -->
       <div style="border:1px solid var(--gray-200);border-radius:10px;padding:14px;">
-        <div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:12px;">✉️ メール作成</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <div style="font-size:13px;font-weight:700;color:var(--navy);">✉️ メール作成</div>
+          <div style="display:flex;gap:6px;">
+            <select id="mailTemplateSelect" class="form-select" onchange="applyMailTemplate()" style="font-size:11px;width:160px;">
+              <option value="">📋 テンプレートを選択</option>
+            </select>
+            <button onclick="saveMailTemplate()" class="btn btn-outline" style="font-size:11px;padding:3px 10px;white-space:nowrap;">💾 テンプレ保存</button>
+          </div>
+        </div>
         <div class="form-group full" style="margin-bottom:10px;">
           <label class="form-label">件名 <span style="color:#ef4444;">*</span></label>
           <input class="form-input" id="mailSubject" placeholder="件名を入力">
@@ -2256,6 +2383,7 @@ function buildMailListScreen() {
           ℹ️ 送信元：so-mu@k-m-t.jp　／　企業宛は個人情報保護のためBCC送信
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;">
+          <button onclick="showMailLogs()" class="btn btn-outline" style="font-size:12px;">📜 送信履歴</button>
           <button onclick="previewMail()" class="btn btn-outline" style="font-size:12px;">👁️ 送信確認</button>
           <button onclick="sendMailBulk()" class="btn btn-primary" style="font-size:12px;">📧 送信する</button>
         </div>
@@ -2304,6 +2432,7 @@ async function loadMailList() {
     }
 
     filterMailCompanies();
+    await loadMailTemplates();
   } catch(e) { showToast('❌ ' + e.message, 'error'); }
   showLoading(false);
 }
@@ -2491,12 +2620,14 @@ async function sendMailBulk(confirmed = false) {
     const result = await resp.json();
     if (result.success) {
       showToast('✅ ' + toEmails.length + '件に送信しました', 'success');
+      await saveMailLog(subject, body, toEmails, ccEmails, true, null);
       // 送信後にチェックをリセット
       document.querySelectorAll('.mail-co-cb').forEach(cb => cb.checked = false);
       document.querySelectorAll('.mail-staff-cb').forEach(cb => cb.checked = false);
       updateMailSelectedCount();
     } else {
       const errMsg = result.errors?.map(e => e.to + ': ' + e.error).join('\n') || result.error || '送信失敗';
+      await saveMailLog(subject, body, toEmails, ccEmails, false, errMsg);
       showToastTop('❌ 送信エラー: ' + errMsg);
     }
   } catch(e) { showToastTop('❌ ' + e.message); }
@@ -14933,7 +15064,7 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
-  { version:'ver.20260629.55', date:'2026-07-10', notify:true, items:[
+  { version:'ver.20260629.56', date:'2026-07-10', notify:true, items:[
     'スマホ対応：テーブルを横スクロールで全列表示に変更',
     'スマホ対応：チャット画面をLINEライク（一覧→タップでメッセージ→←で戻る）に変更',
     'チャット：ファイル送信のGAS URLを設定不要化（スマホ含めすべての端末でそのまま送信可能に）',
