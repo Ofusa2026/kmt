@@ -1298,7 +1298,8 @@ function openCompanyModal(id) {
   if (delBtn) delBtn.style.display = id ? '' : 'none';
   document.getElementById('companyModal').classList.add('show');
   // フォーム描画完了後にスナップショット（100ms待機）
-  if (id) setTimeout(takeCoSnapshot, 100);
+  console.log('[openCompanyModal] id:', id, '→ takeCoSnapshot予約');
+  if (id) setTimeout(() => { console.log('[openCompanyModal] takeCoSnapshot実行'); takeCoSnapshot(); }, 100);
 }
 
 // ==============================
