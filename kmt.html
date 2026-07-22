@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260629.60 -->
+<!-- KMT_VERSION ver.20260629.61 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -320,7 +320,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.60</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.61</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -2202,6 +2202,61 @@ function prefSortKey(pref) {
 // ===== メールテンプレート・送信履歴 =====
 let _mailTemplates = [];
 
+function updateMailAttachPreview() {
+  const input = document.getElementById('mailAttachInput');
+  const preview = document.getElementById('mailAttachPreview');
+  if (!preview) return;
+  const files = input?.files ? [...input.files] : [];
+  if (!files.length) { preview.textContent = ''; return; }
+  preview.innerHTML = files.map(f =>
+    `<span style="display:inline-flex;align-items:center;gap:4px;background:#f0f7ff;border:1px solid #bae6fd;border-radius:4px;padding:2px 8px;margin:2px;">
+      📎 ${esc(f.name)} <span style="color:var(--gray-400);">(${(f.size/1024).toFixed(1)}KB)</span>
+    </span>`
+  ).join('');
+}
+
+function clearMailAttach() {
+  const input = document.getElementById('mailAttachInput');
+  if (input) input.value = '';
+  const preview = document.getElementById('mailAttachPreview');
+  if (preview) preview.innerHTML = '';
+}
+
+async function uploadMailAttachments() {
+  const input = document.getElementById('mailAttachInput');
+  const files = input?.files ? [...input.files] : [];
+  if (!files.length) return [];
+
+  const gasUrl = localStorage.getItem('kmt_gas_url') ||
+    'https://script.google.com/macros/s/AKfycbzFG1X4KAUR09MLzwy3l-LJL_7HRnbB0rHfQwUwilxyf3PGTTGXFGqKiMXyv2kHJdIm/exec';
+  const driveUrl = localStorage.getItem('kmt_chat_only_drive_url') ||
+    'https://drive.google.com/drive/folders/1cfrO1_jk8E8uw5oT_fhd4v5IPsJL3tcv';
+
+  const links = [];
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    showToast(`📤 (${i+1}/${files.length}) ${file.name} をアップロード中...`, 'success');
+    const b64 = await new Promise((res, rej) => {
+      const reader = new FileReader();
+      reader.onload = e => res(e.target.result.split(',')[1]);
+      reader.onerror = rej;
+      reader.readAsDataURL(file);
+    });
+    const sep = gasUrl.includes('?') ? '&' : '?';
+    const resp = await fetch(gasUrl + sep + 't=' + Date.now() + '_' + i, {
+      method: 'POST', cache: 'no-store', redirect: 'follow',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'uploadFileToDrive', driveUrl, fileName: file.name, fileData: b64, mimeType: file.type }),
+    });
+    if (!resp.ok) throw new Error(file.name + ': HTTP ' + resp.status);
+    const result = await resp.json();
+    if (!result.success) throw new Error(file.name + ': ' + (result.error || 'アップロード失敗'));
+    links.push({ name: file.name, url: result.fileUrl });
+    if (i < files.length - 1) await new Promise(r => setTimeout(r, 400));
+  }
+  return links;
+}
+
 async function loadMailTemplates() {
   try {
     const data = await sbFetch('mail_templates?is_deleted=eq.false&order=name.asc');
@@ -2381,8 +2436,16 @@ function buildMailListScreen() {
           <label class="form-label">本文 <span style="color:#ef4444;">*</span></label>
           <textarea class="form-textarea" id="mailBody" rows="10" placeholder="本文を入力..." style="font-size:13px;line-height:1.8;"></textarea>
         </div>
+        <div class="form-group full" style="margin-bottom:10px;">
+          <label class="form-label">ファイル添付 <span style="font-size:10px;color:var(--gray-400);">（DriveにアップロードしてURLを本文末尾に挿入）</span></label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="file" id="mailAttachInput" multiple style="font-size:12px;flex:1;" onchange="updateMailAttachPreview()">
+            <button onclick="clearMailAttach()" class="btn btn-outline" style="font-size:11px;padding:3px 10px;color:#dc2626;white-space:nowrap;">✕ クリア</button>
+          </div>
+          <div id="mailAttachPreview" style="margin-top:6px;font-size:11px;color:var(--gray-500);"></div>
+        </div>
         <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:11px;color:#0369a1;">
-          ℹ️ 送信元：so-mu@k-m-t.jp　／　企業宛は個人情報保護のためBCC送信
+          ℹ️ 送信元：so-mu@k-m-t.jp　／　企業宛は個人情報保護のためBCC送信　／　添付ファイルはDriveリンクとして本文末尾に挿入
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;">
           <button onclick="showMailLogs()" class="btn btn-outline" style="font-size:12px;">📜 送信履歴</button>
@@ -2604,10 +2667,24 @@ async function sendMailBulk(confirmed = false) {
 
   showLoading(true);
   try {
+    // ファイル添付：DriveにアップロードしてURLを本文末尾に追加
+    let finalBody = body;
+    try {
+      const attachLinks = await uploadMailAttachments();
+      if (attachLinks.length) {
+        finalBody += '\n\n---\n📎 添付ファイル\n' +
+          attachLinks.map(l => `${l.name}\n${l.url}`).join('\n\n');
+      }
+    } catch(attachErr) {
+      if (!confirm('ファイルのアップロードに失敗しました。\n' + attachErr.message + '\n\nファイルなしで送信しますか？')) {
+        showLoading(false);
+        return;
+      }
+    }
     const payload = {
       action: 'sendMail',
       subject,
-      body,
+      body: finalBody,
       to: toEmails,
       cc: ccEmails,
       senderName: 'KMT事務局',
@@ -2622,11 +2699,12 @@ async function sendMailBulk(confirmed = false) {
     const result = await resp.json();
     if (result.success) {
       showToast('✅ ' + toEmails.length + '件に送信しました', 'success');
-      await saveMailLog(subject, body, toEmails, ccEmails, true, null);
+      await saveMailLog(subject, finalBody, toEmails, ccEmails, true, null);
       // 送信後にチェックをリセット
       document.querySelectorAll('.mail-co-cb').forEach(cb => cb.checked = false);
       document.querySelectorAll('.mail-staff-cb').forEach(cb => cb.checked = false);
       updateMailSelectedCount();
+      clearMailAttach();
     } else {
       const errMsg = result.errors?.map(e => e.to + ': ' + e.error).join('\n') || result.error || '送信失敗';
       await saveMailLog(subject, body, toEmails, ccEmails, false, errMsg);
@@ -15066,7 +15144,7 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
-  { version:'ver.20260629.60', date:'2026-07-10', notify:true, items:[
+  { version:'ver.20260629.61', date:'2026-07-10', notify:true, items:[
     'スマホ対応：テーブルを横スクロールで全列表示に変更',
     'スマホ対応：チャット画面をLINEライク（一覧→タップでメッセージ→←で戻る）に変更',
     'チャット：ファイル送信のGAS URLを設定不要化（スマホ含めすべての端末でそのまま送信可能に）',
