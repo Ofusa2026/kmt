@@ -2128,6 +2128,7 @@ function takeCoSnapshot() {
   const data = getCoFormData();
   // 全フィールドをスナップショットに保存
   _coSnapshotBefore = Object.assign({}, data);
+  console.log('[takeCoSnapshot] 完了 keys:', Object.keys(_coSnapshotBefore).length, 'name:', _coSnapshotBefore.name);
 }
 
 async function saveCoChangeLogs(newData) {
