@@ -1464,6 +1464,7 @@ async function deleteMeeting(id) {
 
 async function closeCompanyModal(force=false) {
   if (_autoSaveActive) return;
+  console.log('[closeCompanyModal] editingCoId:', editingCoId, 'force:', force, 'snapshotKeys:', Object.keys(_coSnapshotBefore).length);
   // 既存企業編集中の場合、未保存変更があれば確認
   if (!force && editingCoId) {
     const current = getCoFormData();
