@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260629.61 -->
+<!-- KMT_VERSION ver.20260629.62 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -320,7 +320,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.61</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260629.62</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -607,14 +607,6 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
           <div class="form-group">
             <label class="form-label">代表者役職</label>
             <input class="form-input" id="co_rep_title" placeholder="代表取締役">
-          </div>
-          <div class="form-group">
-            <label class="form-label">担当者名</label>
-            <input class="form-input" id="co_contact_name" placeholder="鈴木 花子">
-          </div>
-          <div class="form-group">
-            <label class="form-label">担当者連絡先</label>
-            <input class="form-input" id="co_contact_tel" placeholder="090-xxxx-xxxx">
           </div>
           <div class="form-group full">
             <label class="form-label">担当者連絡先</label>
@@ -1739,7 +1731,7 @@ function fillCoForm(co) {
     workplace_name:'workplace_name', workplace_zip:'workplace_zip',
     workplace_pref:'workplace_pref', workplace_city:'workplace_city',
     workplace_address:'workplace_address', workplace_tel:'workplace_tel',
-    contact_name:'contact_name', contact_tel:'contact_tel',
+
     drive_url:'drive_url', drive_url_kmt:'drive_url2', fee_per_person:'fee_per_person', billing_cycle:'billing_cycle', billing_timing:'billing_timing', billing_start_month:'billing_start_month',
     payment_method:'payment_method', invoice_method:'invoice_method', invoice_to:'invoice_to',
     kmt_corp_type:'kmt_corp_type', direct_debit_applied:'direct_debit_applied',
@@ -1792,8 +1784,8 @@ function getCoFormData() {
     workplace_tel: document.getElementById('co_workplace_tel').value || null,
     rep_name: document.getElementById('co_rep_name').value || null,
     rep_title: document.getElementById('co_rep_title').value || null,
-    contact_name: document.getElementById('co_contact_name').value || null,
-    contact_tel: document.getElementById('co_contact_tel').value || null,
+    contact_name: null,
+    contact_tel: null,
     contact_email: getContactEmails(),
     contact_persons: getContactPersons(),
     contact_note: document.getElementById('co_contact_note')?.value || null,
@@ -15144,7 +15136,7 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
-  { version:'ver.20260629.61', date:'2026-07-10', notify:true, items:[
+  { version:'ver.20260629.62', date:'2026-07-10', notify:true, items:[
     'スマホ対応：テーブルを横スクロールで全列表示に変更',
     'スマホ対応：チャット画面をLINEライク（一覧→タップでメッセージ→←で戻る）に変更',
     'チャット：ファイル送信のGAS URLを設定不要化（スマホ含めすべての端末でそのまま送信可能に）',
