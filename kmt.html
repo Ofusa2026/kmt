@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260723.05 -->
+<!-- KMT_VERSION ver.20260723.06 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -320,7 +320,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260723.05</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260723.06</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -2206,6 +2206,155 @@ function prefSortKey(pref) {
 
 
 
+
+// ===== 御中自動挿入 =====
+function autoInsertSalutation() {
+  const checked = [...document.querySelectorAll('.mail-co-cb:checked')];
+  const bodyEl = document.getElementById('mailBody');
+  if (!bodyEl) return;
+
+  // 御中行を生成
+  let salutation = '';
+  if (checked.length === 1) {
+    const name = checked[0].dataset.name || '';
+    salutation = name + ' 御中\n\n';
+  } else if (checked.length > 1) {
+    salutation = checked.map(cb => (cb.dataset.name || '') + ' 御中').join('\n') + '\n\n';
+  }
+
+  // 既存の御中行を置き換え（本文先頭の御中行を更新）
+  const body = bodyEl.value;
+  const salutationEndIdx = body.indexOf('\n\n');
+  const firstSection = salutationEndIdx >= 0 ? body.slice(0, salutationEndIdx) : '';
+  const isExistingSalutation = firstSection.includes('御中');
+  if (isExistingSalutation) {
+    bodyEl.value = salutation + body.slice(salutationEndIdx + 2);
+  } else if (salutation) {
+    bodyEl.value = salutation + body;
+  }
+}
+
+// ===== メールプレビュー =====
+function showMailPreview() {
+  const { toEmails, ccEmails, selectedIds } = getMailTargets();
+  const subject = document.getElementById('mailSubject')?.value.trim() || '';
+  const body    = document.getElementById('mailBody')?.value.trim() || '';
+
+  if (!selectedIds.length) { showToastTop('❌ 企業を1社以上選択してください'); return; }
+  if (!subject) { showToastTop('❌ 件名を入力してください'); return; }
+  if (!body)    { showToastTop('❌ 本文を入力してください'); return; }
+
+  const ccNames = [...document.querySelectorAll('.mail-staff-cb:checked')].map(cb => cb.dataset.name);
+  const attachInput = document.getElementById('mailAttachInput');
+  const attachFiles = attachInput?.files ? [...attachInput.files] : [];
+
+  const modal = `<div id="mailPreviewModal" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;">
+    <div style="background:white;border-radius:12px;width:700px;max-width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.4);">
+      <div style="position:sticky;top:0;background:white;padding:16px 20px;border-bottom:1px solid var(--gray-200);display:flex;justify-content:space-between;align-items:center;z-index:1;">
+        <div style="font-size:15px;font-weight:800;color:var(--navy);">👁️ 送信プレビュー</div>
+        <button onclick="document.getElementById('mailPreviewModal').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--gray-400);">✕</button>
+      </div>
+      <div style="padding:20px;">
+        <!-- 送信先 -->
+        <div style="background:#f8fafc;border:1px solid var(--gray-200);border-radius:8px;padding:14px;margin-bottom:14px;">
+          <div style="display:grid;grid-template-columns:80px 1fr;gap:8px;font-size:12px;">
+            <div style="font-weight:700;color:var(--gray-500);">送信先</div>
+            <div style="color:var(--navy);">${selectedIds.length}社（${toEmails.length}件）<br><span style="font-size:11px;color:var(--gray-400);">${toEmails.slice(0,5).join('、')}${toEmails.length>5?'…他'+(toEmails.length-5)+'件':''}</span></div>
+            ${ccNames.length?`<div style="font-weight:700;color:var(--gray-500);">CC</div><div>${ccNames.join(' / ')}</div>`:''}
+            <div style="font-weight:700;color:var(--gray-500);">送信元</div>
+            <div>so-mu@k-m-t.jp</div>
+            ${attachFiles.length?`<div style="font-weight:700;color:var(--gray-500);">添付</div><div>${attachFiles.map(f=>f.name).join('、')}</div>`:''}
+          </div>
+        </div>
+        <!-- メール本文 -->
+        <div style="border:1px solid var(--gray-200);border-radius:8px;overflow:hidden;">
+          <div style="background:#f0f7ff;padding:10px 16px;border-bottom:1px solid var(--gray-200);">
+            <div style="font-size:11px;color:var(--gray-500);">件名</div>
+            <div style="font-size:14px;font-weight:700;color:var(--navy);">${esc(subject)}</div>
+          </div>
+          <div style="padding:16px;font-size:13px;line-height:1.8;white-space:pre-wrap;color:var(--navy);min-height:200px;">${esc(body)}</div>
+        </div>
+      </div>
+      <div style="position:sticky;bottom:0;background:white;padding:14px 20px;border-top:1px solid var(--gray-200);display:flex;gap:8px;justify-content:flex-end;">
+        <button onclick="document.getElementById('mailPreviewModal').remove()" class="btn btn-outline" style="font-size:13px;">修正する</button>
+        <button onclick="document.getElementById('mailPreviewModal').remove();sendMailBulk(true);" class="btn btn-primary" style="font-size:13px;padding:8px 24px;">📧 この内容で送信する</button>
+      </div>
+    </div>
+  </div>`;
+  document.body.insertAdjacentHTML('beforeend', modal);
+}
+
+// ===== テンプレート管理 =====
+async function manageMailTemplates() {
+  await loadMailTemplates();
+  if (!_mailTemplates.length) { showToast('テンプレートがありません', 'success'); return; }
+
+  const renderList = () => _mailTemplates.map((t, i) => `
+    <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--gray-100);font-size:12px;" id="tmpl_row_${t.id}">
+      <div style="flex:1;font-weight:600;color:var(--navy);">${esc(t.name)}</div>
+      <div style="color:var(--gray-400);font-size:11px;">${esc((t.updated_at||'').slice(0,10))}</div>
+      <button onclick="editMailTemplate('${t.id}')" class="btn btn-outline" style="font-size:11px;padding:2px 10px;">✏️ 編集</button>
+      <button onclick="deleteMailTemplate('${t.id}','${esc(t.name)}')" class="btn btn-outline" style="font-size:11px;padding:2px 10px;color:#dc2626;border-color:#dc2626;">🗑️</button>
+    </div>`).join('');
+
+  const modal = `<div id="mailTmplMgrModal" style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;">
+    <div style="background:white;border-radius:12px;width:600px;max-width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);">
+      <div style="position:sticky;top:0;background:white;padding:16px 20px;border-bottom:1px solid var(--gray-200);display:flex;justify-content:space-between;align-items:center;z-index:1;">
+        <div style="font-size:15px;font-weight:800;color:var(--navy);">📋 テンプレート管理</div>
+        <button onclick="document.getElementById('mailTmplMgrModal').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--gray-400);">✕</button>
+      </div>
+      <div id="tmplMgrList" style="padding:0 8px;">${renderList()}</div>
+    </div>
+  </div>`;
+  document.body.insertAdjacentHTML('beforeend', modal);
+}
+
+async function editMailTemplate(id) {
+  const t = _mailTemplates.find(x => x.id === id);
+  if (!t) return;
+  const newName = prompt('テンプレート名：', t.name);
+  if (newName === null) return;
+  const newSubject = prompt('件名：', t.subject);
+  if (newSubject === null) return;
+  // 本文は textarea で編集
+  const newBody = prompt('本文（プレーンテキスト）：', t.body);
+  if (newBody === null) return;
+  showLoading(true);
+  try {
+    await sbFetch('mail_templates?id=eq.' + id, {
+      method: 'PATCH',
+      body: JSON.stringify({ name: newName, subject: newSubject, body: newBody, updated_at: new Date().toISOString() })
+    });
+    showToast('✅ 更新しました', 'success');
+    await loadMailTemplates();
+    const list = document.getElementById('tmplMgrList');
+    if (list) list.innerHTML = _mailTemplates.map((t,i) => `
+      <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--gray-100);font-size:12px;">
+        <div style="flex:1;font-weight:600;color:var(--navy);">${esc(t.name)}</div>
+        <div style="color:var(--gray-400);font-size:11px;">${esc((t.updated_at||'').slice(0,10))}</div>
+        <button onclick="editMailTemplate('${t.id}')" class="btn btn-outline" style="font-size:11px;padding:2px 10px;">✏️ 編集</button>
+        <button onclick="deleteMailTemplate('${t.id}','${esc(t.name)}')" class="btn btn-outline" style="font-size:11px;padding:2px 10px;color:#dc2626;border-color:#dc2626;">🗑️</button>
+      </div>`).join('');
+  } catch(e) { showToast('❌ ' + e.message, 'error'); }
+  showLoading(false);
+}
+
+async function deleteMailTemplate(id, name) {
+  if (!confirm('「' + name + '」を削除しますか？')) return;
+  showLoading(true);
+  try {
+    await sbFetch('mail_templates?id=eq.' + id, {
+      method: 'PATCH',
+      body: JSON.stringify({ is_deleted: true })
+    });
+    showToast('✅ 削除しました', 'success');
+    await loadMailTemplates();
+    const row = document.getElementById('tmpl_row_' + id);
+    if (row) row.remove();
+  } catch(e) { showToast('❌ ' + e.message, 'error'); }
+  showLoading(false);
+}
+
 // ===== メールテンプレート・送信履歴 =====
 let _mailTemplates = [];
 
@@ -2443,6 +2592,7 @@ function buildMailListScreen() {
               <option value="">📋 テンプレートを選択</option>
             </select>
             <button onclick="saveMailTemplate()" class="btn btn-outline" style="font-size:11px;padding:3px 10px;white-space:nowrap;">💾 テンプレ保存</button>
+            <button onclick="manageMailTemplates()" class="btn btn-outline" style="font-size:11px;padding:3px 10px;white-space:nowrap;">⚙️ テンプレ管理</button>
           </div>
         </div>
         <div class="form-group full" style="margin-bottom:10px;">
@@ -2466,7 +2616,7 @@ function buildMailListScreen() {
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;">
           <button onclick="showMailLogs()" class="btn btn-outline" style="font-size:12px;">📜 送信履歴</button>
-          <button onclick="previewMail()" class="btn btn-outline" style="font-size:12px;">👁️ 送信確認</button>
+          <button onclick="showMailPreview()" class="btn btn-outline" style="font-size:12px;">👁️ プレビュー・送信</button>
           <button onclick="sendMailBulk()" class="btn btn-primary" style="font-size:12px;">📧 送信する</button>
         </div>
       </div>
@@ -2551,7 +2701,7 @@ function filterMailCompanies() {
     const emails = (c.contact_email||'').split(/[\r\n]+/).map(s=>s.trim()).filter(Boolean);
     const hasEmail = emails.length > 0;
     return `<label style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border-bottom:1px solid var(--gray-100);cursor:${hasEmail?'pointer':'default'};${!hasEmail?'opacity:.45;':''}background:white;" class="mail-co-row">
-      <input type="checkbox" class="mail-co-cb" value="${c.id}" ${!hasEmail?'disabled':''} style="margin-top:3px;flex-shrink:0;width:16px;height:16px;" onchange="updateMailSelectedCount()">
+      <input type="checkbox" class="mail-co-cb" value="${c.id}" data-name="${esc(c.name)}" ${!hasEmail?'disabled':''} style="margin-top:3px;flex-shrink:0;width:16px;height:16px;" onchange="updateMailSelectedCount();autoInsertSalutation();">
       <div style="flex:1;min-width:0;">
         <div style="font-weight:700;font-size:13px;"><a onclick="event.preventDefault();event.stopPropagation();openCompanyModalFromMail('${c.id}')" style="color:var(--navy);cursor:pointer;text-decoration:underline dotted;">${esc(c.name)}</a></div>
         ${hasEmail
@@ -15172,7 +15322,7 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
-  { version:'ver.20260723.05', date:'2026-07-23', notify:true, items:[
+  { version:'ver.20260723.06', date:'2026-07-23', notify:true, items:[
     '更新状況：全人材に特例期間（在留期限+2ヶ月）を一括設定・左側フィルターに「特例期間中」追加',
     '所属機関：担当者連絡先を4項目横並び（担当者名/役職/メール/電話）に変更・連絡先備考欄追加',
     '所属機関：未保存で閉じる時の確認ダイアログ追加（OK=保存して閉じる）・保存ボタンを大きく左へ',
@@ -15183,7 +15333,7 @@ const WHATS_NEW = [
     '論理削除導入：人材・企業・チャットの削除をis_deletedフラグ管理・設定画面から復元可能に',
     'スマホ対応：チャット一覧スクロールバグ修正',
   ]},
-  { version:'ver.20260723.05', date:'2026-07-10', notify:false, items:[
+  { version:'ver.20260723.06', date:'2026-07-10', notify:false, items:[
     'スマホ対応：テーブルを横スクロールで全列表示に変更',
     'スマホ対応：チャット画面をLINEライク（一覧→タップでメッセージ→←で戻る）に変更',
     'チャット：ファイル送信のGAS URLを設定不要化（スマホ含めすべての端末でそのまま送信可能に）',
