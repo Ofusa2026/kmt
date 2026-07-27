@@ -2950,6 +2950,7 @@ async function sendMailBulk(confirmed = false) {
     const finalBodyHtml = mailBodyEl ? (mailBodyEl.innerHTML || '') : '';
     const finalBodyText = mailBodyEl ? (mailBodyEl.innerText || '') : body;
     const bodyForLog = finalBodyText;
+    console.log('[sendMailBulk] finalBodyHtml:', finalBodyHtml.slice(0, 200));
     try {
       const attachLinks = await uploadMailAttachments();
       if (attachLinks.length) {
