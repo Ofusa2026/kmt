@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260723.11 -->
+<!-- KMT_VERSION ver.20260723.12 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -320,7 +320,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260723.11</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260723.12</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -2208,17 +2208,40 @@ function prefSortKey(pref) {
 
 
 
+
+// ===== メール書式ボタン =====
+function mailFormat(cmd, val) {
+  document.getElementById('mailBody')?.focus();
+  document.execCommand(cmd, false, val || null);
+}
+
+// mailBodyの値取得（contenteditable対応）
+function getMailBody() {
+  const el = document.getElementById('mailBody');
+  if (!el) return '';
+  return el.innerHTML || '';
+}
+function getMailBodyText() {
+  const el = document.getElementById('mailBody');
+  if (!el) return '';
+  return el.innerText || '';
+}
+function setMailBody(text) {
+  const el = document.getElementById('mailBody');
+  if (!el) return;
+  el.innerHTML = text.replace(/\n/g, '<br>');
+}
+
 // ===== 御中自動挿入（チェック1社のみプレビュー用）=====
 function autoInsertSalutation() {
-  // 個別送信モードのため、プレビューには「{会社名} 御中」のプレースホルダーを表示
-  // 実際の送信時は各社名が自動で差し込まれる
+  // 個別送信のため自動挿入なし
 }
 
 // ===== メールプレビュー =====
 function showMailPreview() {
   const { toEmails, ccEmails, selectedIds } = getMailTargets();
   const subject = document.getElementById('mailSubject')?.value.trim() || '';
-  const body    = document.getElementById('mailBody')?.value.trim() || '';
+  const body    = getMailBodyText().trim() || '';
 
   if (!selectedIds.length) { showToastTop('❌ 企業を1社以上選択してください'); return; }
   if (!subject) { showToastTop('❌ 件名を入力してください'); return; }
@@ -2457,12 +2480,12 @@ function applyMailTemplate() {
   const subEl = document.getElementById('mailSubject');
   const bodyEl = document.getElementById('mailBody');
   if (subEl) subEl.value = t.subject;
-  if (bodyEl) bodyEl.value = t.body;
+  if (bodyEl) setMailBody(t.body);
 }
 
 async function saveMailTemplate() {
   const subject = document.getElementById('mailSubject')?.value.trim() || '';
-  const body    = document.getElementById('mailBody')?.value.trim() || '';
+  const body    = getMailBodyText().trim() || '';
   if (!subject && !body) { showToastTop('❌ 件名または本文を入力してください'); return; }
 
   const name = prompt('テンプレート名を入力してください：');
@@ -2615,7 +2638,24 @@ function buildMailListScreen() {
         </div>
         <div class="form-group full" style="margin-bottom:10px;">
           <label class="form-label">本文 <span style="color:#ef4444;">*</span></label>
-          <textarea class="form-textarea" id="mailBody" rows="10" placeholder="本文を入力..." style="font-size:13px;line-height:1.8;"></textarea>
+          <div style="display:flex;flex-wrap:wrap;gap:2px;padding:6px 8px;background:#f8fafc;border:1px solid var(--gray-200);border-bottom:none;border-radius:8px 8px 0 0;">
+            <button type="button" onclick="mailFormat('bold')" title="太字" style="background:none;border:none;cursor:pointer;padding:4px 8px;border-radius:4px;font-weight:bold;font-size:14px;" onmouseover="this.style.background='#e8eaed'" onmouseout="this.style.background='none'">B</button>
+            <button type="button" onclick="mailFormat('italic')" title="斜体" style="background:none;border:none;cursor:pointer;padding:4px 8px;border-radius:4px;font-size:14px;font-style:italic;" onmouseover="this.style.background='#e8eaed'" onmouseout="this.style.background='none'">I</button>
+            <button type="button" onclick="mailFormat('underline')" title="下線" style="background:none;border:none;cursor:pointer;padding:4px 8px;border-radius:4px;font-size:14px;text-decoration:underline;" onmouseover="this.style.background='#e8eaed'" onmouseout="this.style.background='none'">U</button>
+            <div style="width:1px;background:var(--gray-200);margin:2px 4px;"></div>
+            <button type="button" onclick="mailFormat('insertUnorderedList')" title="箇条書き" style="background:none;border:none;cursor:pointer;padding:4px 8px;border-radius:4px;font-size:15px;" onmouseover="this.style.background='#e8eaed'" onmouseout="this.style.background='none'">☰</button>
+            <button type="button" onclick="mailFormat('insertOrderedList')" title="番号付き" style="background:none;border:none;cursor:pointer;padding:4px 8px;border-radius:4px;font-size:12px;" onmouseover="this.style.background='#e8eaed'" onmouseout="this.style.background='none'">1.</button>
+            <div style="width:1px;background:var(--gray-200);margin:2px 4px;"></div>
+            <select onchange="mailFormat('fontSize',this.value);this.value=''" style="font-size:11px;border:none;background:none;cursor:pointer;padding:2px 4px;border-radius:4px;">
+              <option value="">サイズ</option>
+              <option value="1">小</option><option value="3">標準</option><option value="5">大</option><option value="7">特大</option>
+            </select>
+            <div style="width:1px;background:var(--gray-200);margin:2px 4px;"></div>
+            <label title="文字色" style="display:flex;align-items:center;gap:2px;cursor:pointer;padding:2px 6px;border-radius:4px;font-size:12px;font-weight:700;" onmouseover="this.style.background='#e8eaed'" onmouseout="this.style.background='none'">A<input type="color" onchange="mailFormat('foreColor',this.value)" style="width:18px;height:14px;border:none;cursor:pointer;padding:0;margin-left:2px;"></label>
+            <div style="width:1px;background:var(--gray-200);margin:2px 4px;"></div>
+            <button type="button" onclick="mailFormat('removeFormat')" title="書式クリア" style="background:none;border:none;cursor:pointer;padding:4px 8px;border-radius:4px;font-size:11px;color:var(--gray-500);" onmouseover="this.style.background='#e8eaed'" onmouseout="this.style.background='none'">Tx</button>
+          </div>
+          <div id="mailBody" contenteditable="true" style="min-height:220px;border:1px solid var(--gray-200);border-top:none;border-radius:0 0 8px 8px;padding:12px 14px;font-size:13px;line-height:1.8;outline:none;background:white;color:#202124;"></div>
         </div>
         <div class="form-group full" style="margin-bottom:10px;">
           <label class="form-label">ファイル添付 <span style="font-size:10px;color:var(--gray-400);">（DriveにアップロードしてURLを本文末尾に挿入）</span></label>
@@ -2806,7 +2846,7 @@ function getMailTargets() {
 function previewMail() {
   const { toEmails, ccEmails, selectedIds } = getMailTargets();
   const subject = document.getElementById('mailSubject')?.value.trim() || '';
-  const body    = document.getElementById('mailBody')?.value.trim() || '';
+  const body    = getMailBodyText().trim() || '';
 
   if (!selectedIds.length) { showToastTop('❌ 企業を1社以上選択してください'); return; }
   if (!subject) { showToastTop('❌ 件名を入力してください'); return; }
@@ -2835,7 +2875,7 @@ function previewMail() {
 async function sendMailBulk(confirmed = false) {
   const { toEmails, ccEmails, selectedIds } = getMailTargets();
   const subject = document.getElementById('mailSubject')?.value.trim() || '';
-  const body    = document.getElementById('mailBody')?.value.trim() || '';
+  const body    = getMailBodyText().trim() || '';
 
   if (!selectedIds.length) { showToastTop('❌ 企業を1社以上選択してください'); return; }
   if (!subject) { showToastTop('❌ 件名を入力してください'); return; }
@@ -2849,7 +2889,9 @@ async function sendMailBulk(confirmed = false) {
   showLoading(true);
   try {
     // ファイル添付：DriveにアップロードしてURLを本文末尾に追加
-    let finalBody = body;
+    const mailBodyEl = document.getElementById('mailBody');
+    let finalBody = mailBodyEl ? (mailBodyEl.innerHTML || '') : body;
+    const bodyForLog = mailBodyEl ? (mailBodyEl.innerText || '') : body;
     try {
       const attachLinks = await uploadMailAttachments();
       if (attachLinks.length) {
@@ -2877,7 +2919,7 @@ async function sendMailBulk(confirmed = false) {
       if (!coEmails.length) continue;
 
       // 各社の本文先頭に「〇〇 御中」を差し込む
-      const personalBody = co.name + ' 御中\n\n' + finalBody;
+      const personalBody = '<b>' + esc(co.name) + ' 御中</b><br><br>' + finalBody;
       showToast('📤 (' + (i+1) + '/' + selectedCos.length + ') ' + co.name + ' に送信中...', 'success');
 
       try {
@@ -2898,13 +2940,14 @@ async function sendMailBulk(confirmed = false) {
 
     if (sendErrors.length === 0) {
       showToast('✅ ' + sentCount + '社に送信しました', 'success');
-      await saveMailLog(subject, finalBody, toEmails, ccEmails, true, null);
+      await saveMailLog(subject, bodyForLog, toEmails, ccEmails, true, null);
       document.querySelectorAll('.mail-co-cb').forEach(cb => cb.checked = false);
       document.querySelectorAll('.mail-staff-cb').forEach(cb => cb.checked = false);
       updateMailSelectedCount();
+      const bodyEl = document.getElementById('mailBody'); if(bodyEl) bodyEl.innerHTML='';
       clearMailAttach();
     } else {
-      await saveMailLog(subject, finalBody, toEmails, ccEmails, false, sendErrors.join('\n'));
+      await saveMailLog(subject, bodyForLog, toEmails, ccEmails, false, sendErrors.join('\n'));
       showToastTop('❌ ' + sendErrors.length + '社でエラー: ' + sendErrors.join(' / '));
       if (sentCount > 0) showToast('✅ ' + sentCount + '社には送信済み', 'success');
     }
@@ -15353,7 +15396,7 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
-  { version:'ver.20260723.11', date:'2026-07-23', notify:true, items:[
+  { version:'ver.20260723.12', date:'2026-07-23', notify:true, items:[
     '更新状況：全人材に特例期間（在留期限+2ヶ月）を一括設定・左側フィルターに「特例期間中」追加',
     '所属機関：担当者連絡先を4項目横並び（担当者名/役職/メール/電話）に変更・連絡先備考欄追加',
     '所属機関：未保存で閉じる時の確認ダイアログ追加（OK=保存して閉じる）・保存ボタンを大きく左へ',
@@ -15364,7 +15407,7 @@ const WHATS_NEW = [
     '論理削除導入：人材・企業・チャットの削除をis_deletedフラグ管理・設定画面から復元可能に',
     'スマホ対応：チャット一覧スクロールバグ修正',
   ]},
-  { version:'ver.20260723.11', date:'2026-07-10', notify:false, items:[
+  { version:'ver.20260723.12', date:'2026-07-10', notify:false, items:[
     'スマホ対応：テーブルを横スクロールで全列表示に変更',
     'スマホ対応：チャット画面をLINEライク（一覧→タップでメッセージ→←で戻る）に変更',
     'チャット：ファイル送信のGAS URLを設定不要化（スマホ含めすべての端末でそのまま送信可能に）',
