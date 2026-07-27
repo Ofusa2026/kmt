@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260723.14 -->
+<!-- KMT_VERSION ver.20260723.15 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -320,7 +320,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260723.14</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260723.15</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -2265,6 +2265,7 @@ function showMailPreview() {
   const { toEmails, ccEmails, selectedIds } = getMailTargets();
   const subject = document.getElementById('mailSubject')?.value.trim() || '';
   const body    = getMailBodyText().trim() || '';
+  const bodyHtml = getMailBody() || '';
 
   if (!selectedIds.length) { showToastTop('❌ 企業を1社以上選択してください'); return; }
   if (!subject) { showToastTop('❌ 件名を入力してください'); return; }
@@ -2301,7 +2302,7 @@ function showMailPreview() {
             <div style="font-size:14px;font-weight:700;color:var(--navy);">${esc(subject)}</div>
           </div>
           <div style="background:#fffbeb;padding:8px 16px;border-bottom:1px solid #fde68a;font-size:11px;color:#92400e;">⚠️ 送信時に各社名が「〇〇 御中」として本文先頭に自動差し込まれます</div>
-          <div style="padding:16px;font-size:13px;line-height:1.8;white-space:pre-wrap;color:var(--navy);min-height:200px;">${esc(body)}</div>
+          <div style="padding:16px;font-size:13px;line-height:1.8;color:var(--navy);min-height:200px;">${bodyHtml}</div>
         </div>
       </div>
       <div style="position:sticky;bottom:0;background:white;padding:14px 20px;border-top:1px solid var(--gray-200);display:flex;gap:8px;justify-content:flex-end;">
@@ -2945,8 +2946,9 @@ async function sendMailBulk(confirmed = false) {
   try {
     // ファイル添付：DriveにアップロードしてURLを本文末尾に追加
     const mailBodyEl = document.getElementById('mailBody');
-    let finalBody = mailBodyEl ? (mailBodyEl.innerHTML || '') : body;
-    const bodyForLog = mailBodyEl ? (mailBodyEl.innerText || '') : body;
+    const finalBodyHtml = mailBodyEl ? (mailBodyEl.innerHTML || '') : '';
+    const finalBodyText = mailBodyEl ? (mailBodyEl.innerText || '') : body;
+    const bodyForLog = finalBodyText;
     try {
       const attachLinks = await uploadMailAttachments();
       if (attachLinks.length) {
@@ -2973,12 +2975,17 @@ async function sendMailBulk(confirmed = false) {
       const coEmails = (co.contact_email || '').split(/[\r\n]+/).map(s => s.trim()).filter(Boolean);
       if (!coEmails.length) continue;
 
-      // 各社の本文先頭に「〇〇 御中」を差し込む
-      const personalBody = '<b>' + esc(co.name) + ' 御中</b><br><br>' + finalBody;
+      // 各社の本文先頭に「〇〇 御中」を差し込む（HTMLメール）
+      const personalBody = '<b>' + esc(co.name) + ' 御中</b><br><br>' + finalBodyHtml;
       showToast('📤 (' + (i+1) + '/' + selectedCos.length + ') ' + co.name + ' に送信中...', 'success');
 
       try {
-        const payload = { action: 'sendMail', subject, body: personalBody, to: coEmails, cc: ccEmails, senderName: 'KMT事務局' };
+        const payload = {
+          action: 'sendMail', subject,
+          body: finalBodyText.slice(0,200) + '...（HTMLメール）',
+          bodyHtml: personalBody,
+          to: coEmails, cc: ccEmails, senderName: 'KMT事務局'
+        };
         const resp = await fetch(KMT_MAIL_GAS_URL + sep + 't=' + Date.now() + '_' + i, {
           method: 'POST', redirect: 'follow', cache: 'no-store',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -15451,7 +15458,7 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
-  { version:'ver.20260723.14', date:'2026-07-23', notify:true, items:[
+  { version:'ver.20260723.15', date:'2026-07-23', notify:true, items:[
     '更新状況：全人材に特例期間（在留期限+2ヶ月）を一括設定・左側フィルターに「特例期間中」追加',
     '所属機関：担当者連絡先を4項目横並び（担当者名/役職/メール/電話）に変更・連絡先備考欄追加',
     '所属機関：未保存で閉じる時の確認ダイアログ追加（OK=保存して閉じる）・保存ボタンを大きく左へ',
@@ -15462,7 +15469,7 @@ const WHATS_NEW = [
     '論理削除導入：人材・企業・チャットの削除をis_deletedフラグ管理・設定画面から復元可能に',
     'スマホ対応：チャット一覧スクロールバグ修正',
   ]},
-  { version:'ver.20260723.14', date:'2026-07-10', notify:false, items:[
+  { version:'ver.20260723.15', date:'2026-07-10', notify:false, items:[
     'スマホ対応：テーブルを横スクロールで全列表示に変更',
     'スマホ対応：チャット画面をLINEライク（一覧→タップでメッセージ→←で戻る）に変更',
     'チャット：ファイル送信のGAS URLを設定不要化（スマホ含めすべての端末でそのまま送信可能に）',
