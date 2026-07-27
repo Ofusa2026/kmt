@@ -2292,16 +2292,45 @@ async function manageMailTemplates() {
   document.body.insertAdjacentHTML('beforeend', modal);
 }
 
-async function editMailTemplate(id) {
+function editMailTemplate(id) {
   const t = _mailTemplates.find(x => x.id === id);
   if (!t) return;
-  const newName = prompt('テンプレート名：', t.name);
-  if (newName === null) return;
-  const newSubject = prompt('件名：', t.subject);
-  if (newSubject === null) return;
-  // 本文は textarea で編集
-  const newBody = prompt('本文（プレーンテキスト）：', t.body);
-  if (newBody === null) return;
+
+  const modal = `<div id="mailTmplEditModal" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:20000;display:flex;align-items:center;justify-content:center;padding:20px;">
+    <div style="background:white;border-radius:12px;width:680px;max-width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.4);">
+      <div style="position:sticky;top:0;background:white;padding:16px 20px;border-bottom:1px solid var(--gray-200);display:flex;justify-content:space-between;align-items:center;z-index:1;">
+        <div style="font-size:15px;font-weight:800;color:var(--navy);">✏️ テンプレートを編集</div>
+        <button onclick="document.getElementById('mailTmplEditModal').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--gray-400);">✕</button>
+      </div>
+      <div style="padding:20px;">
+        <div class="form-group full" style="margin-bottom:12px;">
+          <label class="form-label">テンプレート名 <span style="color:#ef4444;">*</span></label>
+          <input class="form-input" id="tmplEditName" value="${esc(t.name)}">
+        </div>
+        <div class="form-group full" style="margin-bottom:12px;">
+          <label class="form-label">件名 <span style="color:#ef4444;">*</span></label>
+          <input class="form-input" id="tmplEditSubject" value="${esc(t.subject)}">
+        </div>
+        <div class="form-group full" style="margin-bottom:12px;">
+          <label class="form-label">本文</label>
+          <textarea class="form-textarea" id="tmplEditBody" rows="14" style="font-size:13px;line-height:1.8;">${esc(t.body)}</textarea>
+        </div>
+      </div>
+      <div style="position:sticky;bottom:0;background:white;padding:14px 20px;border-top:1px solid var(--gray-200);display:flex;gap:8px;justify-content:flex-end;">
+        <button onclick="document.getElementById('mailTmplEditModal').remove()" class="btn btn-outline">キャンセル</button>
+        <button onclick="saveEditMailTemplate('${t.id}')" class="btn btn-primary" style="padding:8px 24px;">💾 保存</button>
+      </div>
+    </div>
+  </div>`;
+  document.body.insertAdjacentHTML('beforeend', modal);
+}
+
+async function saveEditMailTemplate(id) {
+  const newName    = document.getElementById('tmplEditName')?.value.trim() || '';
+  const newSubject = document.getElementById('tmplEditSubject')?.value.trim() || '';
+  const newBody    = document.getElementById('tmplEditBody')?.value || '';
+  if (!newName)    { showToastTop('❌ テンプレート名を入力してください'); return; }
+  if (!newSubject) { showToastTop('❌ 件名を入力してください'); return; }
   showLoading(true);
   try {
     await sbFetch('mail_templates?id=eq.' + id, {
@@ -2309,9 +2338,11 @@ async function editMailTemplate(id) {
       body: JSON.stringify({ name: newName, subject: newSubject, body: newBody, updated_at: new Date().toISOString() })
     });
     showToast('✅ 更新しました', 'success');
+    document.getElementById('mailTmplEditModal')?.remove();
     await loadMailTemplates();
+    // テンプレ管理モーダルのリストを更新
     const list = document.getElementById('tmplMgrList');
-    if (list) list.innerHTML = _mailTemplates.map((t,i) => `
+    if (list) list.innerHTML = _mailTemplates.map(t => `
       <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--gray-100);font-size:12px;">
         <div style="flex:1;font-weight:600;color:var(--navy);">${esc(t.name)}</div>
         <div style="color:var(--gray-400);font-size:11px;">${esc((t.updated_at||'').slice(0,10))}</div>
