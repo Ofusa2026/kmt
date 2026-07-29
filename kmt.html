@@ -4565,8 +4565,13 @@ async function submitDecisionReport() {
     }
   }
   // 初期費用が入力されていれば売上管理に自動登録
+  // ただし【A区分】特定技能2号 または【B区分】更新 の場合は売上管理に反映しない
   if (sentOk) {
-    await saveDecisionInitialFeeToSales(data); // 初期費用未入力でも金額空欄で登録
+    if (data.visa_type === '特定技能2号' || data.app_type === '更新') {
+      showToast('ℹ️ 特定技能2号または更新のため売上管理には登録していません', 'success');
+    } else {
+      await saveDecisionInitialFeeToSales(data); // 初期費用未入力でも金額空欄で登録
+    }
   }
 }
 
