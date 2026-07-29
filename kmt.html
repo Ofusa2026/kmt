@@ -4520,22 +4520,34 @@ async function gotoDecisionWorkerChat() {
 
 function copyKmtReport() {
   const d = getDecisionData();
-  const g = id => document.getElementById(id)?.value || '';
-  const lines = [
+  const parts = [
     '決定報告（KMT案件）',
-    '2. 依頼受領日: ' + d.received_date,
-    '3. 大房担当MG: ' + d.ohfusa_mg,
-    '4. 登録支援機関名: ' + d.support_org,
-    '5. 【A区分】希望在留資格: ' + d.visa_type,
-    '6. 【B区分】認定・変更・更新: ' + d.app_type,
-    '7. 【C区分】特定技能受入経験: ' + d.experience,
-    '8. 【D区分】申請分野: ' + d.field,
-    '9. 案件名: ' + d.case_name,
-    '10. 人材名: ' + d.person_name,
-    '11. 企業名: ' + d.company_name,
-    '12. 在留期限: ' + d.expire_date,
-    '26. コメント: ' + d.comment,
-  ].filter(l => !l.endsWith(': ')).join('\n');
+    d.case_name,
+    d.received_date ? '依頼受領日: ' + d.received_date : null,
+    '',
+    '■区分情報',
+    'A: ' + d.visa_type,
+    'B: ' + d.app_type,
+    'C: ' + d.experience,
+    'D: ' + d.field,
+    '',
+    '■案件・人材情報',
+    '在留期限: ' + d.expire_date,
+    '',
+    '■請求条件',
+    d.initial_fee ? '初期費用: ' + d.initial_fee : null,
+    d.billing_timing ? '請求タイミング: ' + d.billing_timing : null,
+    d.support_fee ? '支援委託費: ' + d.support_fee : null,
+    '',
+    '■雇用条件',
+    '入社希望日: ' + getDecisionJoinDate(),
+    d.target_date ? '★目標申請日: ' + d.target_date : null,
+    d.delivery ? '配属予定: ' + d.delivery : null,
+    '',
+    '■その他',
+    'コメント: ' + d.comment,
+  ].filter(l => l !== null && !(typeof l === 'string' && l.endsWith(': ')));
+  const lines = parts.join('\n');
   navigator.clipboard.writeText(lines)
     .then(() => showToast('✅ コピーしました', 'success'))
     .catch(() => showToast('❌ コピー失敗', 'error'));
