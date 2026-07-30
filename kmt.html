@@ -4520,6 +4520,11 @@ async function gotoDecisionWorkerChat() {
 
 function copyKmtReport() {
   const d = getDecisionData();
+  const _joinDate = getDecisionJoinDate();
+  const _allowances = getDrAllowances().map(a => a.name && a.amt ? a.name + ': ' + a.amt + '円' : '').filter(Boolean);
+  const _deductions = getDrDeductions().map(d => d.name && d.amt ? '[控除]' + d.name + ': ' + d.amt + '円' : '').filter(Boolean);
+  const _empNote = document.getElementById('dr_employment_note')?.value || '';
+  const _baseSalary = document.getElementById('dr_base_salary')?.value || '';
   const parts = [
     '決定報告（KMT案件）',
     d.case_name,
@@ -4533,6 +4538,7 @@ function copyKmtReport() {
     '',
     '■案件・人材情報',
     '在留期限: ' + d.expire_date,
+    d.temp_return ? '一時帰国日: ' + d.temp_return : null,
     '',
     '■請求条件',
     d.initial_fee ? '初期費用: ' + d.initial_fee : null,
@@ -4540,12 +4546,18 @@ function copyKmtReport() {
     d.support_fee ? '支援委託費: ' + d.support_fee : null,
     '',
     '■雇用条件',
-    '入社希望日: ' + getDecisionJoinDate(),
+    _joinDate ? '入社希望日: ' + _joinDate : null,
     d.target_date ? '★目標申請日: ' + d.target_date : null,
-    d.delivery ? '配属予定: ' + d.delivery : null,
+    _baseSalary ? '基本給: ' + _baseSalary + '円' : null,
+    ..._allowances,
+    ..._deductions,
+    _empNote ? 'その他: ' + _empNote : null,
     '',
     '■その他',
-    'コメント: ' + d.comment,
+    [
+      document.getElementById('dr_comment')?.value || '',
+      d.contact_party ? '企業連絡担当: ' + d.contact_party : '',
+    ].filter(Boolean).join('\n'),
   ].filter(l => l !== null && !(typeof l === 'string' && l.endsWith(': ')));
   const lines = parts.join('\n');
   navigator.clipboard.writeText(lines)
@@ -9425,7 +9437,7 @@ function buildWorkersScreen() {
     </select>
     <select class="filter-select" id="wFilterApplyStatus" onchange="applyWorkerFilters()">
       <option value="">全申請ステータス</option>
-      <option>申請予定なし</option><option>申請準備中</option><option>審査中</option><option>申請済み・不足あり</option><option>審査完了</option><option>発行待ち</option><option>追完指示</option><option>発行完了</option><option>入国済み</option><option>取り下げ</option><option>不許可</option>
+      <option>申請予定なし</option><option>申請準備中</option><option>審査中</option><option>申請済み・不足あり</option><option>追完指示</option><option>審査完了</option><option>発行待ち</option><option>発行完了</option><option>入国済み</option><option>取り下げ</option><option>不許可</option>
     </select>
     <select class="filter-select" id="wFilterNationality" onchange="applyWorkerFilters()">
       <option value="">全国籍</option>
@@ -10774,7 +10786,7 @@ function buildWorkerModalBody(w) {
   <div class="form-grid" style="grid-template-columns:1fr;">
     <div class="form-group full"><label class="form-label">申請ステータス <span style="color:#ef4444;">*</span></label>
       <select class="form-select" id="wf_apply_status" onchange="onApplyStatusChange()" style="max-width:200px;">
-        ${['申請予定なし','申請準備中','審査中','申請済み・不足あり','審査完了','発行待ち','追完指示','発行完了','入国済み','取り下げ','不許可'].map(s=>`<option ${(w.apply_status||'申請予定なし')===s?'selected':''}>${s}</option>`).join('')}
+        ${['申請予定なし', '申請準備中', '審査中', '申請済み・不足あり', '追完指示', '審査完了', '発行待ち', '発行完了', '入国済み', '取り下げ', '不許可'].map(s=>`<option ${(w.apply_status||'申請予定なし')===s?'selected':''}>${s}</option>`).join('')}
       </select></div>
     <div class="form-group full"><label class="form-label">申請種別 <span style="color:#ef4444;">*</span><span style="font-size:10px;color:var(--gray-400);"> (申請予定なし以外は必須)</span></label>
       <select class="form-select" id="wf_apply_type" style="max-width:160px;">
