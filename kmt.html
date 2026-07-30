@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260729.02 -->
+<!-- KMT_VERSION ver.20260730.01 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -320,7 +320,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260729.02</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260730.01</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -912,10 +912,11 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
         <div id="coChangeLogList"><div style="text-align:center;padding:40px;color:var(--gray-400);font-size:13px;">「変更履歴」タブを開くと自動で読み込まれます</div></div>
       </div>
     </div>
-    <div class="modal-footer">
-      <button class="btn btn-primary" onclick="saveCompany()" style="padding:8px 28px;font-size:14px;">💾 保存</button>
+    <div class="modal-footer" style="justify-content:flex-start;gap:8px;">
       <button class="btn" id="coDeleteBtn" onclick="deleteCompany()" style="display:none;border:1px solid #dc2626;color:#dc2626;background:white;">🗑 削除</button>
+      <div style="flex:1;"></div>
       <button class="btn btn-outline" onclick="closeCompanyModal()">閉じる</button>
+      <button class="btn btn-primary" onclick="saveCompany()" style="padding:8px 28px;font-size:14px;">💾 保存</button>
     </div>
   </div>
 </div>
@@ -6096,6 +6097,42 @@ async function loadChatScreen() {
   showLoading(false);
 }
 
+
+// ===== 人材モーダル 未保存チェック =====
+let _workerSnapshot = {};
+
+function _takeWorkerSnapshot() {
+  const data = _getWorkerFormData();
+  _workerSnapshot = Object.assign({}, data);
+}
+
+function _getWorkerFormData() {
+  const skipKeys = new Set(['updated_at','created_at','deleted_at']);
+  const result = {};
+  document.querySelectorAll('#workerModal [id^="wf_"]').forEach(el => {
+    const key = el.id.replace('wf_', '');
+    if (skipKeys.has(key)) return;
+    if (el.type === 'checkbox') result[key] = el.checked;
+    else result[key] = el.value || '';
+  });
+  return result;
+}
+
+async function closeWorkerModalWithCheck() {
+  if (editingWorkerId) {
+    const current = _getWorkerFormData();
+    const skip = new Set(['updated_at','created_at','deleted_at']);
+    const changed = Object.keys(_workerSnapshot).some(k => {
+      if (skip.has(k)) return false;
+      return String(current[k] ?? '') !== String(_workerSnapshot[k] ?? '');
+    });
+    if (changed) {
+      const save = confirm('変更が保存されていません。\n\n【OK】保存して閉じる\n【キャンセル】保存せずに閉じる');
+      if (save) { await saveWorker(); return; }
+    }
+  }
+  closeGenModal('workerModal');
+}
 async function saveWorker(returnResult=false) {
   const g = id => document.getElementById(id)?.value || null;
   const name = (g('wf_name')||'').trim();
@@ -6140,6 +6177,8 @@ async function saveWorker(returnResult=false) {
     apply_date:       g('wf_apply_date'),
     apply_number:     g('wf_apply_number'),
     apply_memo:       g('wf_apply_memo') || null,
+    card_info_done:   document.getElementById('wf_card_info_done')?.checked || false,
+    jp_address_done:  document.getElementById('wf_jp_address_done')?.checked || false,
     status:           g('wf_status'),
     expected_leave_date: g('wf_expected_leave_date'),
     apply_status:     g('wf_apply_status'),
@@ -9994,6 +10033,7 @@ function renderWorkerAlerts() {
   const lumpSumAlert = [];        // 脱退一時金あり & 転出/転入手続き未完了
   const leaveOverdueAlert = [];   // 退職予定日超過 & ステータス未変更 & 退職日未記入
   const renewalDueAlert = [];     // 3か月以内×更新ステータス未入力 / 2か月以内×要確認
+  const cardInfoAlert = [];        // 発行完了・入国済みで在留情報未入力
   const isConstruction = (w) => /建設/.test(w.applicant_field || '');
   (filteredWorkers.length ? filteredWorkers : allWorkers).forEach(w => {
     // KMT支援外は全アラートから除外(支援対象外なので)
@@ -10030,6 +10070,10 @@ function renderWorkerAlerts() {
     const days = Math.floor((exp-today)/86400000);
     // 退職済は全アラート対象外(退職予定(更新なし決定)は期限アラートには残す)
     if (['退職済(帰国)','退職済(転職)'].includes(w.status)) return;
+    // 🔔 在留情報未入力アラート（発行完了・入国済みでcard_info_done=false）
+    if (['発行完了','入国済み'].includes(w.apply_status) && !w.card_info_done) {
+      cardInfoAlert.push(w);
+    }
     // 📋 更新リマインド: 3か月以内×更新ステータス未入力 / 2か月以内×要確認(退職予定は除外)
     if (w.status !== '退職予定(更新なし決定)') {
       if (days <= 91 && !w.renewal_status) renewalDueAlert.push({ w, days, reason:'no_status' });
@@ -10154,6 +10198,18 @@ function renderWorkerAlerts() {
   }
 
   // 📋 更新リマインド(3か月以内×未入力 / 2か月以内×要確認)
+  // 在留情報未入力アラートバナー
+  (() => {
+    let b = document.getElementById('cardInfoAlertBanner');
+    if (cardInfoAlert.length > 0) {
+      if (!b) { b = document.createElement('div'); b.id = 'cardInfoAlertBanner'; document.getElementById('workerListWrap')?.insertAdjacentElement('beforebegin', b); }
+      b.style.cssText = 'background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:10px 16px;margin-bottom:12px;cursor:pointer;';
+      b.innerHTML = '<div style="font-size:13px;font-weight:700;color:#dc2626;">🔔 在留情報の入力が必要な人材がいます（' + cardInfoAlert.length + '名）</div>' +
+        '<div style="font-size:11px;color:#b91c1c;margin-top:4px;">' + cardInfoAlert.map(w=>esc(w.name)).join('、') + '</div>';
+      b.onclick = () => { const f = cardInfoAlert[0]; if (f) openWorkerModal(f.id); };
+    } else { b?.remove(); }
+  })();
+
   if (renewalDueAlert.length) {
     renewalDueAlert.sort((a,b) => a.days - b.days);
     const noStatusN = renewalDueAlert.filter(x => x.reason==='no_status').length;
@@ -10594,6 +10650,9 @@ async function openWorkerModal(id) {
   }
   editingWorkerId = id;
   _savingWorkerNew = false;
+  // 発行完了・入国済みパネル用に企業住所をセット
+  const _wForAddr = id ? (allWorkers||[]).find(x=>x.id===id) : null;
+  if (_wForAddr?.company_id) { const _co = (allCompanies||[]).find(c=>c.id===_wForAddr.company_id); currentWorkerCompanyAddress = _co ? ((_co.pref||'')+(_co.address||'')) : ''; } else { currentWorkerCompanyAddress = ''; }
   // 候補者データがなければロード
   if (!allCandidates.length) {
     try {
@@ -10615,7 +10674,8 @@ async function openWorkerModal(id) {
     title = '👤 外国人材登録';
   }
   showGenModal('workerModal', title, buildWorkerModalBody(w));
-  setTimeout(() => { setupAutoSave(saveWorker); if (typeof updateWorkerPhotoPreview === 'function') updateWorkerPhotoPreview(); }, 100);
+  setTimeout(() => renderApplyStatusPanel((w||{}).apply_status||''), 100);
+  setTimeout(() => { _takeWorkerSnapshot(); if (typeof updateWorkerPhotoPreview === 'function') updateWorkerPhotoPreview(); }, 200);
 }
 let editingWorkerId = null;
 let _savingWorkerNew = false;
@@ -10734,11 +10794,160 @@ function onApplyStatusChange() {
       document.getElementById('wf_request_date').value = '';
       document.getElementById('wf_apply_date').value = '';
       document.getElementById('wf_apply_number').value = '';
-    } else if (!hasData) {
-      // データなし、何もしない
     }
   }
+  renderApplyStatusPanel(status);
 }
+
+function renderApplyStatusPanel(status) {
+  const panel = document.getElementById('wf_apply_status_panel');
+  if (!panel) return;
+  if (status !== '発行完了' && status !== '入国済み') {
+    panel.style.display = 'none';
+    panel.innerHTML = '';
+    return;
+  }
+  panel.style.display = '';
+
+  // 現在のwオブジェクトから値を取得
+  const cardInfoDone   = (window._cardInfoDoneTemp === true) || document.getElementById('wf_card_info_done')?.checked || false;
+  const jpAddressDone  = document.getElementById('wf_jp_address_done')?.checked || false;
+  const trackingNo     = document.getElementById('wf_card_tracking_no')?.value || '';
+  const mailingAddr    = document.getElementById('wf_card_mailing_address')?.value || '';
+
+  // 企業住所・本人住所の取得（モーダルのworkerデータから）
+  const companyAddr = currentWorkerCompanyAddress || '';
+  const jpAddr      = document.getElementById('wf_jp_address')?.value || '';
+
+  let html = '<div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;">';
+  html += '<div style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:4px;">' + (status === '発行完了' ? '📋 発行完了 チェックリスト' : '📋 入国済み チェックリスト') + '</div>';
+
+  // ① 在留情報入力（共通）
+  if (cardInfoDone) {
+    html += '<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;">'
+      + '<span style="font-size:12px;color:#166534;flex:1;">✅ 在留情報が入力されています</span>'
+      + '<button type="button" onclick="undoCardInfoDone()" class="btn btn-outline" style="font-size:11px;padding:2px 10px;white-space:nowrap;">修正する</button>'
+      + '</div>';
+  } else {
+    html += '<div style="padding:10px 12px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;">'
+      + '<div style="font-size:12px;color:#92400e;font-weight:700;margin-bottom:8px;">⚠️ 新しい在留情報を入力してください</div>'
+      + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;">'
+        + '<div><label style="font-size:11px;color:var(--gray-500);">在留資格</label>'
+        + '<select class="form-select" id="panel_new_visa_status" style="font-size:12px;">'
+        + ['','特定技能1号','特定技能2号','特定活動','技能実習2号','技能実習3号','家族滞在','技人国','その他'].map(s=>`<option value="${s}">${s||'─ 選択 ─'}</option>`).join('')
+        + '</select></div>'
+        + '<div><label style="font-size:11px;color:var(--gray-500);">在留期限</label>'
+        + '<input type="date" class="form-input" id="panel_new_visa_expiry" style="font-size:12px;"></div>'
+        + '<div><label style="font-size:11px;color:var(--gray-500);">在留カード番号</label>'
+        + '<input type="text" class="form-input" id="panel_new_residence_card" placeholder="例: AA12345678CD" style="font-size:12px;"></div>'
+      + '</div>'
+      + '<button type="button" onclick="applyNewResidenceInfo()" class="btn btn-primary" style="font-size:12px;padding:5px 16px;">入力完了 → 在留情報に転記</button>'
+      + '</div>';
+  }
+
+  if (status === '発行完了') {
+    // 郵送追跡番号
+    html += '<div class="form-group full" style="margin:0;"><label class="form-label" style="font-size:11px;">在留カード 郵送追跡番号</label>' +
+      '<input class="form-input" id="wf_card_tracking_no_panel" value="' + esc(trackingNo) + '" placeholder="例: 1234-5678-9012" oninput=\"syncCardTracking(this)\" style="max-width:240px;font-size:12px;"></div>';
+
+    // 郵送先選択
+    html += '<div class="form-group full" style="margin:0;"><label class="form-label" style="font-size:11px;">郵送先</label>';
+    html += '<div style="display:flex;flex-direction:column;gap:6px;">';
+    const isOther = mailingAddr && mailingAddr !== companyAddr && mailingAddr !== jpAddr;
+    const opts = [
+      {label: '所属機関住所', val: companyAddr},
+      {label: '本人の日本住所', val: jpAddr},
+      {label: 'その他（手入力）', val: 'other'},
+    ];
+    opts.forEach((o) => {
+      const isSelected = o.val === 'other' ? isOther : (o.val && mailingAddr === o.val);
+      html += '<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;">' +
+        '<input type="radio" name="wf_mailing_radio" value="' + esc(o.val) + '" ' + (isSelected ? 'checked' : '') + ' onchange="onMailingAddrChange(this)">' +
+        esc(o.label) + (o.val && o.val !== 'other' ? '<span style="color:var(--gray-400);font-size:11px;">（' + esc(o.val) + '）</span>' : '') +
+        '</label>';
+    });
+    html += '</div></div>';
+  }
+
+  if (status === '入国済み') {
+    // 日本住所アラート
+    html += '<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:' + (jpAddressDone ? '#f0fdf4' : '#fff7ed') + ';border:1px solid ' + (jpAddressDone ? '#86efac' : '#fed7aa') + ';border-radius:8px;">' +
+      
+      '<span style="font-size:12px;color:#92400e;flex:1;">⚠️ 人材の日本住所を入力してください</span>' +
+    '<label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;white-space:nowrap;color:var(--gray-600);"><input type="checkbox" id="wf_jp_address_done" ' + (jpAddressDone ? 'checked' : '') + ' onchange="renderApplyStatusPanel(document.getElementById(&quot;wf_apply_status&quot;).value)" style="width:15px;height:15px;cursor:pointer;"> 入力済み</label>' +
+      '</div>';
+  }
+
+  html += '</div>';
+  panel.innerHTML = html;
+}
+
+
+
+function applyNewResidenceInfo() {
+  const newVisa    = document.getElementById('panel_new_visa_status')?.value || '';
+  const newExpiry  = document.getElementById('panel_new_visa_expiry')?.value || '';
+  const newCard    = document.getElementById('panel_new_residence_card')?.value.trim() || '';
+
+  if (!newVisa && !newExpiry && !newCard) {
+    showToastTop('❌ 在留資格・在留期限・在留カード番号のいずれかを入力してください');
+    return;
+  }
+
+  // 現在の在留情報を在留カード履歴に転記
+  const curVisa   = document.getElementById('wf_visa_status')?.value || '';
+  const curExpiry = document.getElementById('wf_visa_expiry')?.value || '';
+  const curCard   = document.getElementById('wf_residence_card')?.value.trim() || '';
+
+  if (curVisa || curExpiry || curCard) {
+    const histEl = document.getElementById('wf_residence_card_history');
+    if (histEl) {
+      const today = new Date().toLocaleDateString('ja-JP', {year:'numeric',month:'2-digit',day:'2-digit'}).replace(/\//g,'/');
+      const histLine = today + ' ' + [curVisa, curExpiry ? '期限:'+curExpiry : '', curCard].filter(Boolean).join('  ');
+      histEl.value = (histEl.value ? histEl.value + '\n' : '') + histLine;
+    }
+  }
+
+  // 新しい在留情報をセット
+  if (newVisa)   { const el = document.getElementById('wf_visa_status');    if(el) el.value = newVisa; }
+  if (newExpiry) { const el = document.getElementById('wf_visa_expiry');    if(el) el.value = newExpiry; }
+  if (newCard)   { const el = document.getElementById('wf_residence_card'); if(el) el.value = newCard; }
+
+  // card_info_doneをtrue相当に（パネル再描画）
+  document.getElementById('wf_card_info_done') && (document.getElementById('wf_card_info_done').checked = true);
+  // 仮フラグをセット（チェックボックスが再描画前なのでフラグで管理）
+  window._cardInfoDoneTemp = true;
+  renderApplyStatusPanel(document.getElementById('wf_apply_status')?.value || '');
+  showToast('✅ 在留情報を転記しました', 'success');
+}
+
+function undoCardInfoDone() {
+  window._cardInfoDoneTemp = false;
+  const cb = document.getElementById('wf_card_info_done');
+  if (cb) cb.checked = false;
+  renderApplyStatusPanel(document.getElementById('wf_apply_status')?.value || '');
+}
+function syncCardTracking(el) {
+  const h = document.getElementById('wf_card_tracking_no');
+  if (h) h.value = el.value;
+}
+function syncCardMailing(el) {
+  const h = document.getElementById('wf_card_mailing_address');
+  if (h) h.value = el.value;
+}
+function onMailingAddrChange(radio) {
+  const val = radio.value;
+  const ta = document.getElementById('wf_card_mailing_address_panel');
+  const hidden = document.getElementById('wf_card_mailing_address');
+  if (val === 'other') {
+    if (ta) ta.style.display = '';
+  } else {
+    if (ta) ta.style.display = 'none';
+    if (hidden) hidden.value = val;
+  }
+}
+
+let currentWorkerCompanyAddress = '';
 
 function buildWorkerModalBody(w) {
   w = w||{};
@@ -10788,6 +10997,10 @@ function buildWorkerModalBody(w) {
       <select class="form-select" id="wf_apply_status" onchange="onApplyStatusChange()" style="max-width:200px;">
         ${['申請予定なし', '申請準備中', '審査中', '申請済み・不足あり', '追完指示', '審査完了', '発行待ち', '発行完了', '入国済み', '取り下げ', '不許可'].map(s=>`<option ${(w.apply_status||'申請予定なし')===s?'selected':''}>${s}</option>`).join('')}
       </select></div>
+
+    <!-- 発行完了・入国済み専用パネル -->
+    <div id="wf_apply_status_panel" class="form-group full" style="display:none;"></div>
+
     <div class="form-group full"><label class="form-label">申請種別 <span style="color:#ef4444;">*</span><span style="font-size:10px;color:var(--gray-400);"> (申請予定なし以外は必須)</span></label>
       <select class="form-select" id="wf_apply_type" style="max-width:160px;">
         ${['','認定','変更','更新','申請なし'].map(s=>`<option value="${s}" ${(w.apply_type||'')===s?'selected':''}>${s||'─ 選択 ─'}</option>`).join('')}
@@ -11138,10 +11351,12 @@ function buildWorkerModalBody(w) {
       </div>
     </div>
   </div>
-  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)">
-    <button class="btn btn-outline" onclick="closeGenModal('workerModal')">閉じる</button>
+  <div style="display:flex;gap:8px;align-items:center;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)">
     ${editingWorkerId ? '<button class="btn btn-outline" style="color:var(--red);border-color:var(--red);" onclick="deleteWorker()">🗑️ 削除</button>' : ''}
+    <div style="flex:1;"></div>
     <button class="btn btn-outline" style="color:#059669;border-color:#059669;" onclick="saveAndStartChat()">💬 チャット開始</button>
+    <button class="btn btn-outline" onclick="closeWorkerModalWithCheck()">閉じる</button>
+    <button class="btn btn-primary" onclick="saveWorker()" style="padding:8px 28px;font-size:14px;">💾 保存</button>
   </div>`;
 }
 
@@ -15544,7 +15759,7 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
-  { version:'ver.20260729.02', date:'2026-07-29', notify:true, items:[
+  { version:'ver.20260730.01', date:'2026-07-29', notify:true, items:[
     '売上管理：一覧の各行・詳細モーダルに削除ボタンを追加（手動削除が可能に）',
     '決定報告：【A区分】特定技能2号 または【B区分】更新 の場合は売上管理へ自動登録しないよう変更',
     '決定報告（KMT案件）：テキスト生成・コピーを見出し区切り＋簡略ラベル(A/B/C/D)形式に変更',
