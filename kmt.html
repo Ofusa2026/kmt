@@ -4198,7 +4198,7 @@ async function loadDecisionReport() {
     const sample = (allWorkers && allWorkers.length) ? allWorkers[0] : null;
     const needsFetch = !sample || !('visa_status' in sample) || !('visa_expiry' in sample) || !('tokurei_date' in sample);
     if (needsFetch) {
-      const w = await sbFetch('workers?select=id,name,management_no,nationality,visa_status,visa_expiry,tokurei_date,return_home_date,desired_visa,apply_type,staff,status,company_id,first_tokutei_date,companies(name)&status=in.(配属前,在職中,在職中(一時帰国中))&order=management_no.asc.nullslast,name.asc');
+      const w = await sbFetch('workers?select=id,name,management_no,nationality,visa_status,visa_expiry,tokurei_date,return_home_date,desired_visa,apply_type,staff,status,company_id,first_tokutei_date,companies(name)&status=in.(配属前,在職中,在職中(一時帰国中),在職中（支援なし）)&order=management_no.asc.nullslast,name.asc');
       allWorkers = w || [];
     }
     rebuildDecisionWorkerOptions();
@@ -4241,7 +4241,7 @@ function rebuildDecisionWorkerOptions() {
   const q = (document.getElementById('dr_worker_search')?.value || '').toLowerCase().trim();
   // 在職中/配属前のみ対象、退職済みは除外
   const active = (allWorkers || []).filter(w =>
-    w.status === '在職中' || w.status === '配属前' || w.status === '在職中(一時帰国中)'
+    w.status === '在職中' || w.status === '配属前' || w.status === '在職中(一時帰国中)' || w.status === '在職中（支援なし）'
   );
   const filtered = q ? active.filter(w =>
     (w.management_no||'').toLowerCase().includes(q) ||
@@ -9471,7 +9471,7 @@ function buildWorkersScreen() {
     <input class="search-input" id="wSearchInput" placeholder="氏名・国籍・企業名・管理番号で検索..." oninput="applyWorkerFilters()" style="flex:1;min-width:200px;">
     <select class="filter-select" id="wFilterStatus" onchange="applyWorkerFilters()">
       <option value="">全在職ステータス</option>
-      <option>配属前</option><option>在職中</option><option>在職中(一時帰国中)</option><option>退職予定(更新なし決定)</option>
+      <option>配属前</option><option>在職中</option><option>在職中(一時帰国中)</option><option>在職中（支援なし）</option><option>在職中（支援なし）</option><option>退職予定(更新なし決定)</option>
       <option>退職済(帰国)</option><option>退職済(転職)</option>
     </select>
     <select class="filter-select" id="wFilterApplyStatus" onchange="applyWorkerFilters()">
@@ -9586,6 +9586,7 @@ function _zaisekiBadge(s){
   let c='#334155';
   if(s==='退職予定(更新なし決定)') c='#dc2626';
   else if(s.indexOf('退職済')===0) c='#94a3b8';
+  else if(s === '在職中（支援なし）') c='#6b7280';
   else if(s.indexOf('在職中')===0) c='#059669';
   else if(s==='配属前') c='#0891b2';
   return '<span style="font-size:10px;font-weight:700;color:'+c+';white-space:normal;line-height:1.2;">'+esc(s)+'</span>';
@@ -9903,7 +9904,7 @@ function clearWorkerFilters() {
 }
 
 const STATUS_COLORS = {
-  '配属前':'st-submit','在職中':'st-active','在職中(一時帰国中)':'st-add','退職予定(更新なし決定)':'st-shortage',
+  '配属前':'st-submit','在職中':'st-active','在職中(一時帰国中)':'st-add','在職中（支援なし）':'st-none','退職予定(更新なし決定)':'st-shortage',
   '退職済(帰国)':'st-none','退職済(転職)':'st-none'
 };
 const APPLY_STATUS_COLORS = {
