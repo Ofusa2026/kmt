@@ -9425,7 +9425,7 @@ function buildWorkersScreen() {
     </select>
     <select class="filter-select" id="wFilterApplyStatus" onchange="applyWorkerFilters()">
       <option value="">全申請ステータス</option>
-      <option>申請予定なし</option><option>申請準備中</option><option>審査中</option><option>申請済み・不足あり</option><option>審査完了</option>
+      <option>申請予定なし</option><option>申請準備中</option><option>審査中</option><option>申請済み・不足あり</option><option>審査完了</option><option>発行待ち</option><option>追完指示</option><option>発行完了</option><option>入国済み</option><option>取り下げ</option><option>不許可</option>
     </select>
     <select class="filter-select" id="wFilterNationality" onchange="applyWorkerFilters()">
       <option value="">全国籍</option>
@@ -9510,7 +9510,7 @@ function buildWorkersScreen() {
       </select>
       <select id="renFilterMainStaff" onchange="renderRenewalList()" class="filter-select" style="min-width:110px;"><option value="">全メイン担当</option></select>
       <select id="renFilterSubStaff" onchange="renderRenewalList()" class="filter-select" style="min-width:120px;"><option value="">全サブ担当</option></select>
-      <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:#b45309;white-space:nowrap;cursor:pointer;padding:5px 9px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;"><input type="checkbox" id="renFilter4mo" onchange="renderRenewalList()">在留期限4か月以内</label>
+
       <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:var(--navy);white-space:nowrap;cursor:pointer;padding:5px 9px;background:#f1f5f9;border:1px solid var(--gray-200);border-radius:8px;"><input type="checkbox" id="renGroupMonth" onchange="renderRenewalList()">📅 月ごと表示</label>
       <div id="renResultCount" style="margin-left:auto;align-self:center;font-size:12px;color:var(--gray-500);font-weight:700;"></div>
     </div>
@@ -9623,7 +9623,6 @@ function renderRenewalList() {
   const visaFilter = document.getElementById('renFilterVisa')?.value || '';
   const msFilter = document.getElementById('renFilterMainStaff')?.value || '';
   const subFilter = document.getElementById('renFilterSubStaff')?.value || '';
-  const only4mo = !!document.getElementById('renFilter4mo')?.checked;
   const groupMonth = !!document.getElementById('renGroupMonth')?.checked;
 
   let list = (allWorkers || []).filter(w => {
@@ -9633,7 +9632,6 @@ function renderRenewalList() {
     if (visaFilter && (w.visa_status||'') !== visaFilter) return false;
     if (msFilter && (w.companies?.main_staff||'') !== msFilter) return false;
     if (subFilter && !(w.companies?.sub_staff||'').split(/[,、]/).map(s=>s.trim()).includes(subFilter)) return false;
-    if (only4mo) { const d=_renDaysLeft(w); if (d===null || d>122) return false; }
     if (stFilter === '__empty__') {
       if (w.renewal_status) return false;
     } else if (stFilter === '__only_filled__') {
@@ -9663,7 +9661,10 @@ function renderRenewalList() {
     const stg=w.renewal_stage||'', mem=w.renewal_memo||'', cnd=w.employment_condition||'';
     const photo=driveImageUrl(w.photo_url);
     const d=_renDaysLeft(w);
-    const near = (d!==null && d<=122);
+    const _rnToday = new Date(); _rnToday.setHours(0,0,0,0);
+    const _rnRef = new Date(_rnToday.getFullYear(), _rnToday.getMonth() + 5, 0);
+    const _rn4mEnd = Math.floor((_rnRef - _rnToday) / 86400000);
+    const near = (d!==null && d<=_rn4mEnd);
     const rowBg = near ? '#fff7ed' : 'white';
     const expStyle = near ? 'color:#ea580c;font-weight:800;' : 'color:var(--gray-600);';
     const expSub = (near && d>=0) ? '<br><span style="font-size:9px;">あと'+d+'日</span>' : (near && d<0 ? '<br><span style="font-size:9px;color:#dc2626;">期限切れ</span>' : '');
@@ -9855,7 +9856,8 @@ const STATUS_COLORS = {
   '退職済(帰国)':'st-none','退職済(転職)':'st-none'
 };
 const APPLY_STATUS_COLORS = {
-  '申請予定なし':'st-none','申請準備中':'st-docs','審査中':'st-review','申請済み・不足あり':'st-shortage','審査完了':'st-active'
+  '申請予定なし':'st-none','申請準備中':'st-docs','審査中':'st-review','申請済み・不足あり':'st-shortage','審査完了':'st-active',
+  '発行待ち':'st-active','追完指示':'st-shortage','発行完了':'st-active','入国済み':'st-active','取り下げ':'st-none','不許可':'st-none'
 };
 
 function sortWorkers(key) {
@@ -9886,16 +9888,20 @@ function renderWorkerTable() {
     const cls = STATUS_COLORS[w.status] || 'st-none';
     const applyCls = APPLY_STATUS_COLORS[w.apply_status] || 'st-none';
     const expiry = w.visa_expiry ? formatDate(w.visa_expiry) : '-';
-    // 在留期限の色分け: 90日以内=薄い赤、30日以内=濃い赤、特例期間中=赤太字
+    // 在留期限の色分け: 4か月先の月末まで=対象、30日以内=濃い赤、特例期間中=赤太字
     const today0 = new Date(); today0.setHours(0,0,0,0);
-    const dDay = w.visa_expiry ? Math.floor((new Date(w.visa_expiry) - today0)/86400000) : null;
+    const _vExp = w.visa_expiry ? new Date(w.visa_expiry + 'T00:00:00') : null;
+    const dDay = _vExp ? Math.floor((_vExp - today0)/86400000) : null;
     const tDay = w.tokurei_date ? Math.floor((new Date(w.tokurei_date) - today0)/86400000) : null;
+    // 4か月先の月末を計算（例：7/30→11/30、8/1→12/31）
+    const _ref = new Date(today0.getFullYear(), today0.getMonth() + 5, 0);
+    const daysTo4mEnd = Math.floor((_ref - today0) / 86400000);
     let expiryStyle = '';
     let expiryNote = '';
     if (dDay !== null) {
       if (dDay >= 0 && dDay <= 30) {
         expiryStyle = ' style="color:#dc2626;font-weight:800;background:#fef2f2;"';
-      } else if (dDay > 30 && dDay <= 90) {
+      } else if (dDay > 30 && dDay <= daysTo4mEnd + 1) {
         expiryStyle = ' style="color:#b91c1c;font-weight:700;background:#fef7f7;"';
       } else if (dDay < 0 && tDay !== null && tDay >= 0) {
         expiryStyle = ' style="color:#dc2626;font-weight:800;background:#fef2f2;"';
@@ -10373,6 +10379,12 @@ const APPLY_STATUS_STYLE = {
   '審査中':            { bg:'#84cc16', fg:'#1f2937' },  // 黄緑
   '申請済み・不足あり': { bg:'#ea580c', fg:'white' },    // オレンジ
   '審査完了':          { bg:'#2563eb', fg:'white' },    // 青
+  '発行待ち':          { bg:'#7c3aed', fg:'white' },    // 紫
+  '追完指示':          { bg:'#dc2626', fg:'white' },    // 赤
+  '発行完了':          { bg:'#059669', fg:'white' },    // 緑
+  '入国済み':          { bg:'#0891b2', fg:'white' },    // 水色
+  '取り下げ':          { bg:'#6b7280', fg:'white' },    // グレー
+  '不許可':            { bg:'#1f2937', fg:'white' },    // 黒
 };
 function _alertInfoBadges(w){
   const items = [];
@@ -10762,7 +10774,7 @@ function buildWorkerModalBody(w) {
   <div class="form-grid" style="grid-template-columns:1fr;">
     <div class="form-group full"><label class="form-label">申請ステータス <span style="color:#ef4444;">*</span></label>
       <select class="form-select" id="wf_apply_status" onchange="onApplyStatusChange()" style="max-width:200px;">
-        ${['申請予定なし','申請準備中','審査中','申請済み・不足あり','審査完了'].map(s=>`<option ${(w.apply_status||'申請予定なし')===s?'selected':''}>${s}</option>`).join('')}
+        ${['申請予定なし','申請準備中','審査中','申請済み・不足あり','審査完了','発行待ち','追完指示','発行完了','入国済み','取り下げ','不許可'].map(s=>`<option ${(w.apply_status||'申請予定なし')===s?'selected':''}>${s}</option>`).join('')}
       </select></div>
     <div class="form-group full"><label class="form-label">申請種別 <span style="color:#ef4444;">*</span><span style="font-size:10px;color:var(--gray-400);"> (申請予定なし以外は必須)</span></label>
       <select class="form-select" id="wf_apply_type" style="max-width:160px;">
