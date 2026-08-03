@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260802.06 -->
+<!-- KMT_VERSION ver.20260802.10 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -355,7 +355,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260802.06</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260802.10</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -727,7 +727,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
             <label class="form-label">請求方法</label>
             <select class="form-select" id="co_invoice_method">
               <option value="">選択</option>
-              <option>メール</option><option>郵送</option><option>FAX</option>
+              <option>メール</option><option>LINE</option><option>郵送</option><option>FAX</option>
             </select>
           </div>
           <div class="form-group full">
@@ -12786,17 +12786,27 @@ async function saveWorkerTaskField(taskId, fields, workerId, reload=true) {
 async function loadSales(page) {
   if (currentScreen !== 'sales') return;
   if (page) salePage = page;
+  // 請求情報タブ: 企業の請求情報一覧
+  if (saleActiveTab === 'billing') {
+    showLoading(true);
+    try {
+      if (!allCompanies || !allCompanies.length) { try { await loadCompanies(); } catch(e){} }
+      renderBillingInfo();
+    } catch(e) { showToast('❌ ' + e.message, 'error'); }
+    showLoading(false);
+    return;
+  }
   showLoading(true);
   try {
     let ym, q;
     if (saleActiveTab === 'pending') {
       ym = 'pending';
-      q = `select=*,companies(name,folder_no)&billing_month=is.null&order=created_at.desc&limit=3000`;
+      q = `select=*,companies(name,folder_no,payment_method,invoice_method,kmt_corp_type)&billing_month=is.null&order=created_at.desc&limit=3000`;
     } else {
       ym = `${saleYear}-${saleActiveTab}`;
       // 当月の支援委託費を自動登録・同期してから読み込み
       await syncShienFees(ym);
-      q = `select=*,companies(name,folder_no)&billing_month=eq.${encodeURIComponent(ym)}&limit=3000`;
+      q = `select=*,companies(name,folder_no,payment_method,invoice_method,kmt_corp_type)&billing_month=eq.${encodeURIComponent(ym)}&limit=3000`;
     }
     const data = await sbFetch('sales_forecast?' + q);
     allSales = data || [];
@@ -14438,6 +14448,10 @@ function buildSalesScreen() {
       style="padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;border-bottom:2px solid ${'pending'===saleActiveTab?'var(--blue)':'transparent'};color:${'pending'===saleActiveTab?'var(--blue)':'#f97316'};margin-bottom:-2px;transition:.15s;border-left:2px solid var(--gray-200);margin-left:4px;">
       📦 配属後請求
     </div>
+    <div class="sale-tab ${'billing'===saleActiveTab?' sale-tab-active':''}" id="saleTab_billing" onclick="switchSaleTab('billing')"
+      style="padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;border-bottom:2px solid ${'billing'===saleActiveTab?'var(--blue)':'transparent'};color:${'billing'===saleActiveTab?'var(--blue)':'var(--gray-400)'};margin-bottom:-2px;transition:.15s;border-left:2px solid var(--gray-200);margin-left:4px;">
+      🧾 請求情報
+    </div>
   </div>
 
   <!-- コンテンツ -->
@@ -15431,6 +15445,69 @@ async function toggleSaleDate(id, field, el){
   }catch(e){ showToast('❌ 保存失敗: '+e.message, 'error'); }
 }
 
+// 売上明細: 企業に紐づく 支払方法/請求方法/請求法人 の表示
+function saleCoPayBadge(m){ return m==='口振'?'<span class="pay-badge pay-koza">口振</span>':m==='振込'?'<span class="pay-badge pay-furikomi">振込</span>':m==='現金'?'<span class="pay-badge pay-cash">現金</span>':m?'<span class="pay-badge">'+esc(m)+'</span>':'<span style="color:var(--gray-400)">-</span>'; }
+// 請求方法バッジ: 郵送=青 / メール=オレンジ / LINE=緑 / FAX=紫
+function invMethodBadge(m){
+  if(!m) return '<span style="color:var(--gray-400)">-</span>';
+  const map={ '郵送':['#eff6ff','#2563eb'], 'メール':['#fff7ed','#ea580c'], 'LINE':['#dcfce7','#15803d'], 'FAX':['#f3e8ff','#7c3aed'] };
+  const c=map[m]||['var(--gray-100)','var(--gray-700)'];
+  return '<span style="padding:2px 8px;border-radius:8px;background:'+c[0]+';color:'+c[1]+';font-weight:700;font-size:11px;white-space:nowrap;">'+esc(m)+'</span>';
+}
+function saleCoInvBadge(m){ return invMethodBadge(m); }
+function saleCorpDisp(s){ const t=s.companies?.kmt_corp_type; if(t) return String(t).replace('請求',''); return s.kmt_entity||'-'; }
+
+// 売上明細フィルター（複数選択）
+let salePayFilter = new Set(), saleInvFilter = new Set(), saleCorpFilter = new Set();
+function toggleSaleFilter(kind, val){
+  const s = kind==='pay'?salePayFilter : kind==='inv'?saleInvFilter : saleCorpFilter;
+  if(s.has(val)) s.delete(val); else s.add(val);
+  renderSaleMonthTable(saleActiveTab==='pending' ? 'pending' : `${saleYear}-${saleActiveTab}`);
+}
+function clearSaleAttrFilters(){
+  salePayFilter.clear(); saleInvFilter.clear(); saleCorpFilter.clear();
+  renderSaleMonthTable(saleActiveTab==='pending' ? 'pending' : `${saleYear}-${saleActiveTab}`);
+}
+
+// 請求情報管理: 企業ごとの支払方法・送付方法(請求方法)一覧
+let billingInfoSearch = '';
+function applyBillingSearch(){ billingInfoSearch = (document.getElementById('billingSearch')?.value||'').toLowerCase(); renderBillingInfo(); }
+function renderBillingInfo(){
+  const area = document.getElementById('saleContentArea');
+  if (!area) return;
+  const payBadge = m => m==='口振'?'<span class="pay-badge pay-koza">口振</span>':m==='振込'?'<span class="pay-badge pay-furikomi">振込</span>':m==='現金'?'<span class="pay-badge pay-cash">現金</span>':m?`<span class="pay-badge">${esc(m)}</span>`:'<span style="color:var(--gray-400)">-</span>';
+  const invBadge = m => invMethodBadge(m);
+  const q = billingInfoSearch;
+  let list = (allCompanies||[]).slice();
+  if (q) list = list.filter(c => ((c.name||'').toLowerCase().includes(q) || String(c.folder_no||'').toLowerCase().includes(q)));
+  list = list.slice().sort(cmpFolderNo);
+  const setPay = list.filter(c=>c.payment_method).length;
+  const setInv = list.filter(c=>c.invoice_method).length;
+  area.innerHTML = `
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
+    <input id="billingSearch" class="filter-select" style="min-width:220px;font-size:12px;" placeholder="🔍 企業名・企業番号で検索" value="${esc(billingInfoSearch)}" oninput="applyBillingSearch()">
+    <div style="flex:1"></div>
+    <span style="font-size:11px;color:var(--gray-400)">支払方法 設定済 ${setPay} / ${list.length}　｜　送付方法 設定済 ${setInv} / ${list.length}</span>
+  </div>
+  <div class="table-wrap">
+    <table><thead><tr>
+      <th style="width:80px">企業番号</th><th>企業名</th><th style="width:120px">支払方法</th><th style="width:120px">送付方法</th>
+    </tr></thead>
+    <tbody>
+    ${list.length ? list.map(c=>`
+      <tr onclick="openCompanyModal('${c.id}')" style="cursor:pointer" title="クリックで所属機関を編集">
+        <td><span class="co-no">${esc(c.folder_no ?? '-')}</span></td>
+        <td style="font-weight:600">${esc(c.name||'-')}</td>
+        <td>${payBadge(c.payment_method)}</td>
+        <td>${invBadge(c.invoice_method)}</td>
+      </tr>`).join('') :
+      `<tr><td colspan="4" style="text-align:center;padding:40px;color:var(--gray-400)">該当する企業がありません</td></tr>`}
+    </tbody></table>
+    <div class="pagination-bar"><span class="page-info">${list.length}社</span></div>
+  </div>
+  <div style="margin-top:6px;font-size:11px;color:var(--gray-400)">※ 行をクリックすると所属機関の編集画面が開きます（支払方法・送付方法もそこで変更できます）。</div>`;
+}
+
 function renderSaleMonthTable(ym) {
   const area = document.getElementById('saleContentArea');
   if (!area) return;
@@ -15438,7 +15515,10 @@ function renderSaleMonthTable(ym) {
   const label = isPending ? '📦 配属後請求' : ym;
 
   const itemFilter = document.getElementById('saleItemFilter')?.value || '';
-  const rows = itemFilter ? allSales.filter(s => (s.item_name||'') === itemFilter) : allSales;
+  let rows = itemFilter ? allSales.filter(s => (s.item_name||'') === itemFilter) : allSales.slice();
+  if (salePayFilter.size)  rows = rows.filter(s => salePayFilter.has(s.companies?.payment_method));
+  if (saleInvFilter.size)  rows = rows.filter(s => saleInvFilter.has(s.companies?.invoice_method));
+  if (saleCorpFilter.size) rows = rows.filter(s => saleCorpFilter.has(saleCorpDisp(s)));
 
   const totalExcl = rows.reduce((s, f) => s + (f.amount_excl||0), 0);
   const totalIncl = rows.reduce((s, f) => s + (f.amount_incl||0), 0);
@@ -15470,13 +15550,26 @@ function renderSaleMonthTable(ym) {
     </div>
   </div>
 
+  <!-- 属性フィルター（複数選択・企業紐付け） -->
+  ${(() => {
+    const chip=(kind,val,set)=>`<span onclick="toggleSaleFilter('${kind}','${val}')" style="cursor:pointer;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:700;white-space:nowrap;border:1px solid ${set.has(val)?'var(--blue)':'var(--gray-200)'};background:${set.has(val)?'var(--blue-light)':'#fff'};color:${set.has(val)?'var(--blue)':'var(--gray-700)'};">${val}</span>`;
+    const grp=(label,kind,vals,set)=>`<div style="display:flex;gap:5px;align-items:center;"><span style="font-size:11px;font-weight:700;color:var(--gray-700)">${label}</span>${vals.map(v=>chip(kind,v,set)).join('')}</div>`;
+    const anySel = salePayFilter.size||saleInvFilter.size||saleCorpFilter.size;
+    return `<div style="display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin-bottom:10px;padding:8px 12px;background:var(--gray-100);border-radius:8px;">
+      ${grp('支払方法','pay',['口振','振込','現金'],salePayFilter)}
+      ${grp('請求方法','inv',['メール','郵送','LINE','FAX'],saleInvFilter)}
+      ${grp('請求法人','corp',['株式会社KMT','一般社団法人KMT'],saleCorpFilter)}
+      ${anySel?`<span onclick="clearSaleAttrFilters()" style="cursor:pointer;font-size:11px;color:var(--red);font-weight:700;">✕ フィルタ解除</span>`:''}
+    </div>`;
+  })()}
+
   <!-- 売上明細テーブル（初期費用・支援委託費・紹介費 一体／企業番号順） -->
   <div class="table-wrap">
     <table><thead><tr>
       <th>企業名</th><th>項目</th><th>単価</th><th>数量</th>
       <th>金額（税抜）</th><th>金額（税込）</th>
       <th style="text-align:center">作成</th><th style="text-align:center">請求</th><th style="text-align:center">入金</th>
-      <th>備考</th><th>請求法人</th><th></th>
+      <th>備考</th><th>支払方法</th><th>請求方法</th><th>請求法人</th><th></th>
     </tr></thead>
     <tbody>
     ${rows.length ? rows.map(s => {
@@ -15498,10 +15591,12 @@ function renderSaleMonthTable(ym) {
         <td>${s.amount_incl?Number(s.amount_incl).toLocaleString()+'円':'-'}</td>
         ${dateCell('made_date')}${dateCell('billed_date')}${dateCell('paid_date')}
         <td style="font-size:11px;color:var(--gray-700);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:text;" title="${esc(notesDisp)}" onclick="editSaleNote('${s.id}',this,event)">${notesDisp?esc(notesDisp):'<span style="color:#cbd5e1">（クリックで入力）</span>'}</td>
-        <td style="font-size:11px">${esc(s.kmt_entity||'-')}</td>
+        <td style="font-size:11px">${saleCoPayBadge(s.companies?.payment_method)}</td>
+        <td style="font-size:11px">${saleCoInvBadge(s.companies?.invoice_method)}</td>
+        <td style="font-size:11px">${esc(saleCorpDisp(s))}</td>
         <td style="text-align:center" onclick="event.stopPropagation();deleteSaleRow('${s.id}')"><span title="削除" style="cursor:pointer;color:#dc2626;font-size:14px;padding:2px 6px;">🗑</span></td>
       </tr>`;}).join('') :
-      `<tr><td colspan="12" style="text-align:center;padding:40px;color:var(--gray-400)">${label}${itemFilter?'（'+itemFilter+'）':''} のデータがありません</td></tr>`}
+      `<tr><td colspan="14" style="text-align:center;padding:40px;color:var(--gray-400)">${label}${itemFilter?'（'+itemFilter+'）':''} のデータがありません</td></tr>`}
     </tbody></table>
     <div class="pagination-bar" id="salePagination"><span class="page-info">${rows.length}件${itemFilter?' / 全'+allSales.length+'件':''}</span></div>
   </div>`;
@@ -16116,6 +16211,19 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260802.10', date:'2026-08-03', notify:true, items:[
+    '売上管理（月別）：請求方法を色分け表示（郵送=青／メール=オレンジ／LINE=緑／FAX=紫）。請求情報タブにも適用',
+    '売上管理（月別）：支払方法・請求方法・請求法人で絞り込めるフィルターを追加（複数選択可・グループ内OR／グループ間AND）',
+  ]},
+  { version:'ver.20260802.09', date:'2026-08-03', notify:true, items:[
+    '売上管理（月別）：明細の備考の右に「支払方法」「請求方法」列を追加（企業に紐づく情報を表示）。請求法人も企業の登録情報を表示するよう変更',
+  ]},
+  { version:'ver.20260802.08', date:'2026-08-03', notify:true, items:[
+    '売上管理：「🧾 請求情報」タブを追加。企業番号・企業名・支払方法・送付方法を企業番号順で一覧表示（検索付き・行クリックで所属機関を編集）',
+  ]},
+  { version:'ver.20260802.07', date:'2026-08-03', notify:true, items:[
+    '所属機関：請求情報（支払方法・請求方法・請求法人）をエクセルから一括初期設定（既存値は保持し空欄のみ補完・222社）。請求方法の選択肢にLINEを追加',
+  ]},
   { version:'ver.20260802.06', date:'2026-08-02', notify:true, items:[
     '売上管理：支援委託費を初期費用と同じ明細テーブルに一体化。月タブを開くと当月の支援委託費を1企業1行で自動登録・同期（項目=支援委託費／金額はマトリクス当月値）',
     '売上管理：支援委託費行にも作成・請求・入金チェックと備考を追加。備考は各行クリックでその場入力（空欄可）',
