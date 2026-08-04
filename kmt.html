@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260804.14 -->
+<!-- KMT_VERSION ver.20260804.15 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -355,7 +355,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260804.14</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260804.15</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <div id="sidebarAlerts" style="margin-top:6px;display:none;flex-direction:column;gap:3px;"></div>
   </div>
@@ -9997,8 +9997,29 @@ async function loadApplyRecords(force){
       return;
     }
   }
+  // 編集内容(DB)を取得
+  try{ const eds=await sbFetch('apply_record_edits?select=*'); _applyEditByWorker={}; (eds||[]).forEach(e=>{ _applyEditByWorker[e.worker_id]=e; }); }
+  catch(e){ if(!_applyEditByWorker) _applyEditByWorker={}; }
   _populateApplyFilters();
   renderApplyRecords();
+}
+const APPLY_RECEIVE_OPTS=['','窓口','メール','郵送'];
+const APPLY_CHAT_OPTS=['','LINE','Google','案シス','不明'];
+let _applyEditByWorker=null;
+function _fmtApplyMeta(iso){ try{ const d=new Date(iso); return d.toLocaleDateString('ja-JP',{month:'2-digit',day:'2-digit'})+' '+d.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}); }catch(e){ return ''; } }
+async function saveApplyRecord(workerId){
+  const g=id=>{ const el=document.getElementById(id); return el ? (el.value||'') : ''; };
+  const data={ worker_id:workerId,
+    receive_method:g('ar_receive_'+workerId), chat:g('ar_chat_'+workerId), custody:g('ar_custody_'+workerId),
+    zaikapa:g('ar_zaikapa_'+workerId), situation:g('ar_situation_'+workerId), handle_date:g('ar_handle_'+workerId), note:g('ar_note_'+workerId),
+    updated_at:new Date().toISOString(), updated_by:(typeof currentUser!=='undefined'&&currentUser&&currentUser.name)||'' };
+  try{
+    await sbFetch('apply_record_edits',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(data)});
+    (_applyEditByWorker=_applyEditByWorker||{})[workerId]=data;
+    const meta=document.getElementById('ar_meta_'+workerId);
+    if(meta) meta.innerHTML='✓ '+esc(_fmtApplyMeta(data.updated_at))+' '+esc(data.updated_by||'');
+    showToast('✅ 保存しました','success');
+  }catch(e){ showToast('❌ '+e.message,'error'); }
 }
 function _populateApplyFilters(){
   const list=(allWorkers||[]).filter(w=> w.apply_status && w.apply_status!=='申請予定なし');
@@ -10027,37 +10048,42 @@ function renderApplyRecords(){
   });
   const cnt=document.getElementById('applyResultCount'); if(cnt) cnt.textContent=filtered.length+' 件';
   const info=document.getElementById('applySheetInfo');
-  if(info) info.textContent='シート取得: '+(_applySheetFetchedAt? _applySheetFetchedAt.toLocaleString('ja-JP',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '-')+' ／ シート'+_applySheetLookup.count+'行 ／ 灰=シート由来';
-  const gridCols='64px 84px 92px 104px 128px minmax(120px,1fr) minmax(110px,1fr) 66px 88px 88px 64px 88px 88px minmax(96px,1fr) 66px minmax(140px,1.4fr)';
-  const S=(v)=>'<div style="background:#f1f5f9;color:#475569;">'+v+'</div>'; // ダミー(未使用)
-  const headLabels=['管理番号','申請日','申請種別','申請ステータス','申請番号','氏名','企業','受け取り方法','在留期限','特例期間','チャット','預かり証→企業','在カパ依頼','状況','対応日','備考'];
-  const sheetCols=new Set([7,10,11,12,13,14,15]); // シート由来列(0-based, 上のheadLabels基準)
-  const head='<div style="display:grid;grid-template-columns:'+gridCols+';gap:6px;padding:8px 10px;background:#0f2040;color:white;font-size:10px;font-weight:700;position:sticky;top:0;z-index:2;">'+
-    headLabels.map((l,idx)=>'<div style="'+(sheetCols.has(idx)?'color:#cbd5e1;':'')+'">'+l+'</div>').join('')+'</div>';
-  const cell=(v,isSheet)=>'<div style="'+(isSheet?'color:#64748b;background:#f8fafc;border-radius:4px;padding:1px 4px;':'color:var(--gray-700);')+'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;" title="'+esc(v||'')+'">'+(v?esc(v):'<span style="color:#cbd5e1;">─</span>')+'</div>';
+  if(info) info.textContent='シート取得: '+(_applySheetFetchedAt? _applySheetFetchedAt.toLocaleString('ja-JP',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '-')+' ／ シート'+_applySheetLookup.count+'行 ／ 灰=シート初期値(編集可)';
+  const gridCols='58px 78px 82px 96px 100px 118px minmax(120px,1fr) minmax(100px,1fr) 84px 84px 84px 84px 92px 92px 108px 72px minmax(140px,1.5fr) 104px';
+  const headLabels=['管理番号','申請日','申請種別','希望在留資格','申請ステータス','申請番号','氏名','企業','受け取り方法','在留期限','特例期間','チャット','預かり証→企業','在カパ依頼','状況','対応日','備考','保存/更新'];
+  const editCols=new Set([8,11,12,13,14,15,16]); // 編集可能列
+  const head='<div style="display:grid;grid-template-columns:'+gridCols+';gap:5px;padding:8px 10px;background:#0f2040;color:white;font-size:10px;font-weight:700;position:sticky;top:0;z-index:2;">'+
+    headLabels.map((l,idx)=>'<div style="'+(editCols.has(idx)?'color:#fde68a;':'')+'">'+l+'</div>').join('')+'</div>';
+  const cell=(v)=>'<div style="color:var(--gray-700);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;" title="'+esc(v||'')+'">'+(v?esc(v):'<span style="color:#cbd5e1;">─</span>')+'</div>';
+  const inp=(id,v)=>'<input id="'+id+'" value="'+esc(v||'')+'" style="width:100%;font-size:10px;padding:2px 4px;border:1px solid #cfd8e0;border-radius:4px;box-sizing:border-box;">';
+  const sel=(id,v,opts)=>{ const o=opts.slice(); if(v && o.indexOf(v)<0) o.push(v); return '<select id="'+id+'" style="width:100%;font-size:10px;padding:2px;border:1px solid #cfd8e0;border-radius:4px;box-sizing:border-box;">'+o.map(x=>'<option '+(x===v?'selected':'')+'>'+esc(x)+'</option>').join('')+'</select>'; };
   const rowsHtml=filtered.map(({w,rec})=>{
-    const r=rec||{};
-    const noMatch=!rec;
-    return '<div style="display:grid;grid-template-columns:'+gridCols+';gap:6px;padding:8px 10px;border-bottom:1px solid var(--gray-100);align-items:center;font-size:11px;cursor:pointer;background:'+(noMatch?'#fffdf5':'white')+';" onmouseover="this.style.background=\'#f1f5f9\'" onmouseout="this.style.background=\''+(noMatch?'#fffdf5':'white')+'\'" onclick="openWorkerModal(\''+w.id+'\')">'+
-      '<div style="font-weight:600;color:var(--gray-500);font-size:10px;">'+esc(w.management_no||'-')+'</div>'+
-      cell(w.apply_date,false)+
-      cell(w.apply_type,false)+
+    const r=rec||{}; const ed=(_applyEditByWorker||{})[w.id]; const noMatch=!rec && !ed;
+    const V=(edF,shF)=> ed ? (ed[edF]||'') : (r[shF]||'');
+    const wid=w.id;
+    const meta = ed && ed.updated_at ? '✓ '+esc(_fmtApplyMeta(ed.updated_at))+' '+esc(ed.updated_by||'') : '';
+    return '<div style="display:grid;grid-template-columns:'+gridCols+';gap:5px;padding:6px 10px;border-bottom:1px solid var(--gray-100);align-items:center;font-size:11px;background:'+(noMatch?'#fffdf5':'white')+';">'+
+      '<div style="font-weight:600;color:var(--blue);font-size:10px;cursor:pointer;text-decoration:underline dotted;" onclick="openWorkerModal(\''+wid+'\')" title="人材詳細を開く">'+esc(w.management_no||'-')+'</div>'+
+      cell(w.apply_date)+
+      cell(w.apply_type)+
+      cell(w.desired_visa)+
       '<div style="min-width:0;">'+_applyStatusBadge(w.apply_status)+(noMatch?'<span title="シート未照合" style="margin-left:3px;font-size:9px;color:#f59e0b;">⚠</span>':'')+'</div>'+
-      cell(w.apply_number,false)+
-      '<div style="font-weight:700;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;" title="'+esc(w.name||'')+'">'+natFlag(w.nationality||'')+' '+esc(w.name||'-')+'</div>'+
-      cell(w.companies?.name,false)+
-      cell(r.receive,true)+
-      cell(w.visa_expiry,false)+
-      cell(w.tokurei_date,false)+
-      cell(r.chat,true)+
-      cell(r.custody,true)+
-      cell(r.zaikapa,true)+
-      cell(r.situation,true)+
-      cell(r.handle_date,true)+
-      cell(r.note,true)+
+      cell(w.apply_number)+
+      '<div style="font-weight:700;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;cursor:pointer;" onclick="openWorkerModal(\''+wid+'\')" title="'+esc(w.name||'')+'">'+natFlag(w.nationality||'')+' '+esc(w.name||'-')+'</div>'+
+      cell(w.companies?.name)+
+      sel('ar_receive_'+wid, V('receive_method','receive'), APPLY_RECEIVE_OPTS)+
+      cell(w.visa_expiry)+
+      cell(w.tokurei_date)+
+      sel('ar_chat_'+wid, V('chat','chat'), APPLY_CHAT_OPTS)+
+      inp('ar_custody_'+wid, V('custody','custody'))+
+      inp('ar_zaikapa_'+wid, V('zaikapa','zaikapa'))+
+      inp('ar_situation_'+wid, V('situation','situation'))+
+      inp('ar_handle_'+wid, V('handle_date','handle_date'))+
+      inp('ar_note_'+wid, V('note','note'))+
+      '<div style="display:flex;flex-direction:column;gap:2px;align-items:stretch;"><button class="btn btn-primary" style="font-size:10px;padding:2px 6px;" onclick="saveApplyRecord(\''+wid+'\')">💾 保存</button><span id="ar_meta_'+wid+'" style="font-size:9px;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+meta+'</span></div>'+
     '</div>';
   }).join('');
-  area.innerHTML='<div style="overflow-x:auto;border:1px solid var(--gray-200);border-radius:8px;"><div style="min-width:1500px;">'+head+(rowsHtml||'<div style="padding:30px;text-align:center;color:var(--gray-400);">該当する人材がいません（申請ステータスが「申請予定なし」以外）</div>')+'</div></div>';
+  area.innerHTML='<div style="overflow-x:auto;border:1px solid var(--gray-200);border-radius:8px;"><div style="min-width:1750px;">'+head+(rowsHtml||'<div style="padding:30px;text-align:center;color:var(--gray-400);">該当する人材がいません（申請ステータスが「申請予定なし」以外）</div>')+'</div></div>';
 }
 
 function _populateRenewalFilters() {
@@ -17028,6 +17054,10 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260804.15', date:'2026-08-04', notify:true, items:[
+    '申請記録：編集可能に。受け取り方法（窓口/メール/郵送）とチャット（LINE/Google/案シス/不明）はドロップダウン、その他（預かり証・在カパ依頼・状況・対応日・備考）は自由記入。行ごとに「💾 保存」ボタンがあり、最終更新日時と更新ユーザーを表示（DBに保存、シート値は初期値）',
+    '申請記録：申請種別と申請ステータスの間に「希望在留資格」列を追加（人材情報から自動反映）',
+  ]},
   { version:'ver.20260804.14', date:'2026-08-04', notify:true, items:[
     '外国人材に「📄 申請記録」タブを追加（一覧・更新状況の隣）。申請ステータスが「申請予定なし」以外の人材を一覧表示',
     '申請記録：基本情報にある項目（申請日・申請種別・申請ステータス・申請番号・氏名・企業・在留期限・特例期間）は人材データから自動反映、無い項目（受け取り方法・チャット・預かり証・在カパ依頼・状況・対応日・備考）はスプレッドシートから直接読み込み（灰色表示）。申請番号優先・氏名フォールバックで照合、シート取得日時も表示',
