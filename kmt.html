@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260802.25 -->
+<!-- KMT_VERSION ver.20260802.26 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -355,7 +355,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260802.25</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260802.26</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -5154,7 +5154,11 @@ function buildJobFlyerScreen() {
         </div>
       </div>
     </div>
-    <div style="flex:1;overflow-y:auto;background:#525659;padding:20px;display:flex;flex-direction:column;align-items:center;gap:20px;">
+    <div style="flex:1;overflow-y:auto;background:#525659;padding:20px;display:flex;flex-direction:column;align-items:center;gap:12px;">
+      <div style="display:flex;gap:6px;">
+        <button id="flyerModeCand" class="btn btn-primary" style="font-size:12px;" onclick="setFlyerMode('candidate')">候補者向け求人票</button>
+        <button id="flyerModeOrder" class="btn btn-outline" style="font-size:12px;background:white;" onclick="setFlyerMode('order')">📋 求人オーダー票</button>
+      </div>
       <div id="jobFlyerPreview" style="width:210mm;min-height:297mm;background:white;border-radius:4px;box-shadow:0 4px 20px rgba(0,0,0,0.15);padding:14mm;box-sizing:border-box;font-family:'Noto Sans JP','Hiragino Sans','Noto Sans','Arial Unicode MS',sans-serif;">
         <div style="text-align:center;color:var(--gray-300);padding:60px 0;font-size:14px;">← 求人を選択してください</div>
       </div>
@@ -5209,7 +5213,141 @@ function onFlyerJobSelect() {
   g('ff_ideal',     j.ideal_candidate||'');
   g('ff_interview', [j.interview_schedule||'',j.interview_method||'',j.interview_tool?'('+j.interview_tool+')':'',j.interview_count?j.interview_count+'回':'',j.kmt_interview==='あり'?'KMT人材面接あり':''].filter(Boolean).join(' '));
   document.getElementById('flyerFormBody').style.display = 'flex';
-  previewFlyer();
+  flyerCurrentJob = j;
+  renderFlyerByMode();
+}
+
+// 求人票の表示モード（候補者向けフライヤー／求人オーダー票）
+let flyerViewMode = 'candidate';
+let flyerCurrentJob = null;
+function setFlyerMode(m){
+  flyerViewMode = m;
+  const bc=document.getElementById('flyerModeCand'), bo=document.getElementById('flyerModeOrder');
+  if(bc&&bo){ bc.className='btn '+(m==='candidate'?'btn-primary':'btn-outline'); bo.className='btn '+(m==='order'?'btn-primary':'btn-outline'); }
+  const fb=document.getElementById('flyerFormBody');
+  renderFlyerByMode();
+}
+function renderFlyerByMode(){
+  const prev=document.getElementById('jobFlyerPreview'); if(!prev) return;
+  if(flyerViewMode==='order'){
+    prev.innerHTML = flyerCurrentJob ? buildJobOrderSheet(flyerCurrentJob) : '<div style="text-align:center;color:var(--gray-300);padding:60px 0;font-size:14px;">← 求人を選択してください</div>';
+  } else {
+    previewFlyer();
+  }
+}
+
+// 求人オーダー票（内部フォーマット）のレイアウトを生成
+function buildJobOrderSheet(j){
+  j = j || {};
+  const co = j.companies || {};
+  const v = x => (x===null||x===undefined||x==='') ? '' : esc(String(x));
+  const yen = x => (x||x===0) && !isNaN(x) ? Number(x).toLocaleString()+'円' : v(x);
+  // 罫線セル: ラベル＋値
+  const cell = (label, val, opts={}) => `
+    <div style="border:1px solid #999;display:flex;min-height:${opts.h||22}px;${opts.full?'grid-column:1/-1;':''}">
+      <div style="width:${opts.lw||110}px;flex-shrink:0;background:#f1f5f9;border-right:1px solid #ccc;padding:3px 6px;font-size:10px;font-weight:700;color:#1e293b;display:flex;align-items:center;line-height:1.25;">${label}</div>
+      <div style="flex:1;padding:3px 6px;font-size:10.5px;white-space:pre-wrap;word-break:break-word;align-self:center;">${val||'&nbsp;'}</div>
+    </div>`;
+  const sec = (title) => `<div style="grid-column:1/-1;background:#1e3a5f;color:#fff;font-size:11px;font-weight:800;padding:4px 8px;margin-top:6px;border-radius:2px;">${title}</div>`;
+  const grid = (html, cols) => `<div style="display:grid;grid-template-columns:repeat(${cols||2},1fr);gap:4px;margin-top:4px;">${html}</div>`;
+
+  const bonus = [j.bonus==='有'||j.bonus_detail?'有':'', j.bonus_detail].filter(Boolean).join('：');
+  const overtime = [j.overtime?'有':'', j.overtime_detail].filter(Boolean).join('：');
+  const location = j.location || [co.pref,co.city,co.address].filter(Boolean).join('');
+
+  return `
+  <div style="font-size:11px;color:#111;">
+    <div style="text-align:center;font-size:16px;font-weight:900;letter-spacing:2px;border-bottom:2px solid #1e3a5f;padding-bottom:6px;margin-bottom:8px;">求 人 票（求人オーダー）</div>
+    ${grid(cell('求人コード', v(j.job_code), {lw:90}) + cell('作成日', v(j.reception_date), {lw:90}), 2)}
+
+    ${sec('(6) 受入れにあたって')}
+    ${grid(
+      cell('会社名', v(co.name)) +
+      cell('募集国籍 ＊', v(j.target_nationality)) +
+      cell('採用予定人数', v(j.target_count)) +
+      cell('HP（あれば）', v(j.stock_url)) +
+      cell('国内外', v(j.domestic_overseas)) +
+      cell('経験', v(j.experience_req)) +
+      cell('所在地', v(location)) +
+      cell('性別 ＊', v(j.gender_req)) +
+      cell('年齢 ＊', v(j.age_limit)) +
+      cell('業種（特定技能）', v(j.industry)) +
+      cell('日本語レベル', v(j.jp_level_req)) +
+      cell('必要な資格', v(j.required_license)) +
+      cell('事業内容', v(j.business_content), {full:true}) +
+      cell('理想の人材像（性別含）', v(j.ideal_candidate), {full:true}) +
+      cell('従業員数', v(j.employee_count)) +
+      cell('補助の有無', v(j.subsidy)) +
+      cell('外国籍従業員数', v(j.foreign_employee_count)) +
+      cell('従業員の国籍', v(j.employee_nationality)) +
+      cell('設立', v(j.established)) +
+      cell('資本金', v(j.capital))
+    , 2)}
+
+    ${sec('(7) 面接について')}
+    ${grid(
+      cell('面接可能日時（曜日・時間帯）', v(j.interview_schedule), {full:true}) +
+      cell('面接方法', v(j.interview_method)) +
+      cell('可能ツール', v(j.interview_tool)) +
+      cell('面接回数', v(j.interview_count)) +
+      cell('KMT人材面接', v(j.kmt_interview)) +
+      cell('アピールポイント', v(j.appeal), {full:true}) +
+      cell('募集経緯', v(j.recruit_reason), {full:true})
+    , 2)}
+
+    ${sec('(8) 人材紹介について')}
+    ${grid(
+      cell('紹介費用', yen(j.referral_fee)) +
+      cell('金銭貸借契約', v(j.loan_contract))
+    , 2)}
+
+    ${sec('⑴ 募集人材の仕事内容')}
+    ${cell('仕事内容', v(j.job_description), {full:true, h:56})}
+
+    ${sec('⑵ 勤務時間')}
+    ${grid(
+      cell('始業', v(j.start_time)) +
+      cell('終業', v(j.end_time)) +
+      cell('所定労働時間数', v(j.work_hours)) +
+      cell('休憩', j.break_minutes?v(j.break_minutes)+'分':'') +
+      cell('残業（所定時間外）', v(overtime)) +
+      cell('変形労働', v(j.flex_work)) +
+      cell('年間休日日数', (j.annual_holiday_days||j.holiday_days)?v(j.annual_holiday_days||j.holiday_days)+'日':'')
+    , 2)}
+
+    ${sec('⑶ 賃金・手当')}
+    ${grid(
+      cell('月給／時給', [v(j.salary_type), yen(j.salary_amount)].filter(Boolean).join(' ')) +
+      cell('手取り金額イメージ', yen(j.take_home)) +
+      cell('手当', v(j.allowances), {full:true}) +
+      cell('家賃手当・人材負担上限', [j.rent_allowance?'家賃手当あり':'', j.tenant_cap?'上限'+yen(j.tenant_cap):''].filter(Boolean).join(' / '), {full:true}) +
+      cell('賞与', v(bonus), {full:true})
+    , 2)}
+
+    ${sec('⑷ 控除額 ※税金・社会保険・雇用保険以外')}
+    ${grid(
+      cell('食費', yen(j.meal_cost)) +
+      cell('居住費', yen(j.housing_cost)) +
+      cell('水道光熱費', yen(j.utility_cost)) +
+      cell('その他', v(j.other_deduction))
+    , 2)}
+
+    ${sec('⑸ 寮について ※写真・間取り図があれば提出')}
+    ${grid(
+      cell('1部屋あたり', j.room_capacity?v(j.room_capacity)+'人':'') +
+      cell('間取り・人数', v(j.room_layout)) +
+      cell('家電・家具', v(j.furniture)) +
+      cell('会社までの距離', v(j.dorm_distance)) +
+      cell('WIFI', v(j.wifi)) +
+      cell('周辺環境（住所で調査可）', v(j.dorm_area), {full:true})
+    , 2)}
+
+    ${sec('(9) 確認事項・追加事項（メモ）')}
+    ${cell('メモ', v(j.progress_note||j.jinzai_comment), {full:true, h:44})}
+
+    ${sec('(10) 面接でよく聞かれる質問')}
+    ${cell('よくある質問', v(j.faq), {full:true, h:44})}
+  </div>`;
 }
 
 function previewFlyer() {
@@ -16338,6 +16476,9 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260802.26', date:'2026-08-04', notify:true, items:[
+    '求人票作成：「求人オーダー票」フォーマットを追加（(6)受入れ〜(10)面接質問、⑴〜⑸の詳細レイアウト）。求人票作成画面のトグルで切替・印刷可。※入力/DB保存は次段階で対応',
+  ]},
   { version:'ver.20260802.25', date:'2026-08-03', notify:true, items:[
     '外国人材：在職ステータスに「辞退/キャンセル」を追加（登録・フィルター対応、バッジはグレー表示。所属機関詳細の人材一覧・人材詳細でもグレー）',
   ]},
