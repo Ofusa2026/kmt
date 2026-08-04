@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260804.01 -->
+<!-- KMT_VERSION ver.20260804.02 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -355,7 +355,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260804.01</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260804.02</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -5253,9 +5253,40 @@ function buildJobOrderSheet(j){
 
   const overtime = j.overtime==='有' ? ('有'+(j.overtime_detail?'：'+v(j.overtime_detail):'')) : (j.overtime==='無'?'無':v(j.overtime));
   const flex = j.flex_work==='有' ? ('有'+(j.flex_work_detail?'：'+v(j.flex_work_detail):'')) : (j.flex_work||'');
-  const trial = j.trial_period==='有' ? ('有'+(j.trial_period_detail?'：'+v(j.trial_period_detail):'')) : (j.trial_period||'');
+  const _tp = (j.trial_period!=null&&j.trial_period!=='') ? j.trial_period : ((j.extra&&j.extra.trial_period)||'');
+  const _tpd = j.trial_period_detail || (j.extra&&j.extra.trial_period_detail) || '';
+  const trial = _tp==='有' ? ('有'+(_tpd?'：'+v(_tpd):'')) : (_tp||'');
   const bonus = j.bonus==='有' ? ('有'+(j.bonus_detail?'：'+v(j.bonus_detail):'')) : (j.bonus||'');
   const location = j.location || [co.pref,co.city,co.address].filter(Boolean).join('');
+
+  // ---- カラム名エイリアス（DB実カラム ⇔ 求人票読み取り名を吸収）----
+  const pick = (...xs)=>{ for(const x of xs){ if(x!==null&&x!==undefined&&x!=='') return x; } return ''; };
+  const allw = Array.isArray(j.allowances) ? j.allowances : [];
+  const dedO = Array.isArray(j.deduct_other) ? j.deduct_other : [];
+  const ex = j.extra || {};
+  const dedStr = d => !d ? '' : (typeof d==='object' ? [d.name,(d.amount||d.amount===0)?Number(d.amount).toLocaleString()+'円':'',d.cond].filter(Boolean).join(' ') : d);
+  const A = {
+    employee_count: pick(j.employee_count, j.employees),
+    foreign_employee_count: pick(j.foreign_employee_count, j.foreign_employees),
+    employee_nationality: pick(j.employee_nationality, j.employee_nationalities),
+    established: pick(j.established, j.founded_year),
+    work_hours: pick(j.work_hours, j.work_hours_per_day),
+    dorm_distance: pick(j.dorm_distance, j.dormitory_distance),
+    dorm_area: pick(j.dorm_area, j.dormitory_area),
+    subsidy_detail: pick(j.subsidy_detail, j.support_detail),
+    order_memo: pick(j.order_memo, j.confirmation_items, j.progress_note),
+    faq: pick(j.faq, j.interview_faq),
+    business_content: pick(j.business_content, ex.business_content),
+    smoking_policy: pick(j.smoking_policy, ex.smoking_policy),
+    allowance1_name: pick(j.allowance1_name, allw[0]&&allw[0].name),
+    allowance1_amount: pick(j.allowance1_amount, allw[0]&&allw[0].amount),
+    allowance1_cond: pick(j.allowance1_cond, allw[0]&&allw[0].cond),
+    allowance2_name: pick(j.allowance2_name, allw[1]&&allw[1].name),
+    allowance2_amount: pick(j.allowance2_amount, allw[1]&&allw[1].amount),
+    allowance2_cond: pick(j.allowance2_cond, allw[1]&&allw[1].cond),
+    other_deduction1: pick(j.other_deduction1, dedStr(dedO[0]), j.other_deduction),
+    other_deduction2: pick(j.other_deduction2, dedStr(dedO[1]))
+  };
 
   // ===== ページ1: 記入欄 =====
   const leftCol = 
@@ -5264,10 +5295,10 @@ function buildJobOrderSheet(j){
     cell('HP（あれば）', v(j.hp||j.stock_url)) +
     cell('所在地', v(location)) +
     cell('業種（特定技能）', v(j.industry)) +
-    cell('事業内容', v(j.business_content), {h:30}) +
-    grid(cell('従業員数', j.employee_count?v(j.employee_count)+' 名':'',{lw:70}) + cell('外国籍', j.foreign_employee_count?v(j.foreign_employee_count)+' 名':'',{lw:52}), 2) +
-    cell('従業員の国籍', v(j.employee_nationality)) +
-    grid(cell('設立', j.established?v(j.established)+' 年':'',{lw:70}) + cell('資本金', j.capital?v(j.capital)+' 万円':'',{lw:52}), 2) +
+    cell('事業内容', v(A.business_content), {h:30}) +
+    grid(cell('従業員数', A.employee_count?v(A.employee_count)+' 名':'',{lw:70}) + cell('外国籍', A.foreign_employee_count?v(A.foreign_employee_count)+' 名':'',{lw:52}), 2) +
+    cell('従業員の国籍', v(A.employee_nationality)) +
+    grid(cell('設立', A.established?v(A.established)+' 年':'',{lw:70}) + cell('資本金', j.capital?v(j.capital)+' 万円':'',{lw:52}), 2) +
     cell('アピールポイント', v(j.appeal), {h:28}) +
     cell('募集経緯', v(j.recruit_reason), {h:28}) +
     box('⑴ 募集人材の仕事内容', j.job_description, 40) +
@@ -5275,7 +5306,7 @@ function buildJobOrderSheet(j){
     grid(
       cell('試用期間', v(trial), {lw:70}) + cell('年間休日日数', (j.annual_holiday_days||j.holiday_days)?v(j.annual_holiday_days||j.holiday_days)+' 日':'', {lw:78}) +
       cell('始業', v(j.start_time), {lw:70}) + cell('終業', v(j.end_time), {lw:78}) +
-      cell('所定労働時間数', v(j.work_hours), {lw:70}) + cell('休憩', j.break_minutes?v(j.break_minutes)+' 分':'', {lw:78}) +
+      cell('所定労働時間数', A.work_hours?v(A.work_hours)+' 時間':'', {lw:70}) + cell('休憩', j.break_minutes?v(j.break_minutes)+' 分':'', {lw:78}) +
       cell('残業（所定外）', v(overtime), {lw:70, full:true}) +
       cell('変形労働', v(flex), {lw:70, full:true})
     , 2) +
@@ -5284,24 +5315,24 @@ function buildJobOrderSheet(j){
       cell('給与形態', v(j.salary_type||'月給'), {lw:70, hint:'月給/日給/時給'}) +
       cell('支給額', yen(j.salary_amount), {lw:78}) +
       cell('手取り金額イメージ', yen(j.take_home), {lw:70, full:true, hint:'税・保険控除後の目安'}) +
-      cell('手当① 名称', v(j.allowance1_name), {lw:70}) + cell('金額', yen(j.allowance1_amount), {lw:78}) +
-      cell('手当① 条件', v(j.allowance1_cond), {lw:70, full:true}) +
-      cell('手当② 名称', v(j.allowance2_name), {lw:70}) + cell('金額', yen(j.allowance2_amount), {lw:78}) +
-      cell('手当② 条件', v(j.allowance2_cond), {lw:70, full:true}) +
+      cell('手当① 名称', v(A.allowance1_name), {lw:70}) + cell('金額', yen(A.allowance1_amount), {lw:78}) +
+      cell('手当① 条件', v(A.allowance1_cond), {lw:70, full:true}) +
+      cell('手当② 名称', v(A.allowance2_name), {lw:70}) + cell('金額', yen(A.allowance2_amount), {lw:78}) +
+      cell('手当② 条件', v(A.allowance2_cond), {lw:70, full:true}) +
       cell('賞与', v(bonus), {lw:70, full:true, hint:'有/無・詳細'})
     , 2) +
     sec('⑷ 控除額（毎月の給与から天引きする金額）') +
     `<div style="grid-column:1/-1;font-size:8px;color:#8a97a5;margin-top:2px;">※税金・社会保険料・雇用保険料は除く。徴収しない項目は空欄。実費徴収は「実費」と記入。</div>` +
     grid(
       cell('食費', yen(j.meal_cost), {lw:70}) + cell('居住費（家賃）', yen(j.housing_cost), {lw:78}) +
-      cell('水道光熱費', v(j.utility_cost!=null && !isNaN(j.utility_cost)?yen(j.utility_cost):j.utility_cost), {lw:70}) + cell('その他①', v(j.other_deduction1), {lw:78}) +
-      cell('その他②', v(j.other_deduction2), {lw:70, full:true})
+      cell('水道光熱費', v(j.utility_cost!=null && !isNaN(j.utility_cost)?yen(j.utility_cost):j.utility_cost), {lw:70}) + cell('その他①', v(A.other_deduction1), {lw:78}) +
+      cell('その他②', v(A.other_deduction2), {lw:70, full:true})
     , 2) +
     sec('⑸ 寮について') +
     grid(
       cell('1部屋あたり', j.room_capacity?v(j.room_capacity)+' 人':'', {lw:70}) + cell('間取り・人数', v(j.room_layout), {lw:78}) +
-      cell('家電・家具', v(j.furniture), {lw:70}) + cell('会社までの距離', v(j.dorm_distance), {lw:78}) +
-      cell('WIFI', v(j.wifi), {lw:70}) + cell('周辺環境', v(j.dorm_area), {lw:78})
+      cell('家電・家具', v(j.furniture), {lw:70}) + cell('会社までの距離', v(A.dorm_distance), {lw:78}) +
+      cell('WIFI', v(j.wifi), {lw:70}) + cell('周辺環境', v(A.dorm_area), {lw:78})
     , 2);
 
   const rightCol =
@@ -5312,7 +5343,7 @@ function buildJobOrderSheet(j){
       cell('性別 ＊', v(j.gender_req), {lw:78}) + cell('年齢 ＊', v(j.age_limit), {lw:80}) +
       cell('日本語レベル', v(j.jp_level_req), {lw:78}) + cell('必要な資格', v(j.required_license), {lw:80}) +
       cell('理想の人材像', v(j.ideal_candidate), {lw:78, full:true, h:28, hint:'性別も含'}) +
-      cell('補助の有無', v(j.subsidy), {lw:78}) + cell('補助内容', v(j.subsidy_detail), {lw:80})
+      cell('補助の有無', v(pick(j.subsidy,j.support)), {lw:78}) + cell('補助内容', v(A.subsidy_detail), {lw:80})
     , 2) +
     sec('(7) 面接について') +
     grid(
@@ -5321,9 +5352,9 @@ function buildJobOrderSheet(j){
       cell('面接回数', v(j.interview_count), {lw:78}) + cell('KMT人材面接', v(j.kmt_interview), {lw:80})
     , 2) +
     sec('(8) 就業場所における受動喫煙防止処置の状況') +
-    cell('喫煙対策', v(j.smoking_policy||'室内原則禁煙'), {lw:78, full:true, hint:'喫煙室 あり/なし'}) +
-    box('(9) 確認事項・追加事項（メモ）', j.order_memo||j.progress_note, 70) +
-    box('(10) 面接でよく聞かれる質問', j.faq, 56) +
+    cell('喫煙対策', v(A.smoking_policy||'室内原則禁煙'), {lw:78, full:true, hint:'喫煙室 あり/なし'}) +
+    box('(9) 確認事項・追加事項（メモ）', A.order_memo, 70) +
+    box('(10) 面接でよく聞かれる質問', A.faq, 56) +
     box('写真（作業場・寮等）', '', 90);
 
   const page1 = `
@@ -16500,6 +16531,10 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260804.02', date:'2026-08-04', notify:true, items:[
+    '求人票作成：求人オーダー票の項目をDBの実カラムに対応（従業員数・設立年・所定労働時間・寮までの距離・確認事項・FAQ等）。手当・その他控除（JSON）や事業内容・試用期間・喫煙対策も表示対応',
+    'テスト用の求人「KMT003-TEST」（株式会社テスト農園）を登録。求人管理→求人票作成でサンプル表示を確認できます',
+  ]},
   { version:'ver.20260804.01', date:'2026-08-04', notify:true, items:[
     '求人票作成：求人オーダー票を公式エントリーシート（2026ver）の様式に刷新。①記入欄（(6)〜(10)・⑴〜⑸）＋②確認事項（よくある質問チェックリスト）の2ページ構成（印刷/PDFで1タブ=1ページ）',
     '求人票作成：⑶賃金・手当（給与形態/支給額/手取りイメージ/手当①②/賞与）と⑷控除額（食費/居住費/水道光熱費/その他）を分かりやすい項目に整理。試用期間・受動喫煙対策・写真欄も追加',
