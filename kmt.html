@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260804.12 -->
+<!-- KMT_VERSION ver.20260804.13 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -355,7 +355,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260804.12</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260804.13</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <div id="sidebarAlerts" style="margin-top:6px;display:none;flex-direction:column;gap:3px;"></div>
   </div>
@@ -6483,6 +6483,10 @@ async function saveWorker(returnResult=false) {
   if (_doRenewalChatPost) data.renewal_completion_chat_posted = true;
   if (_newExpiryEntered) { data.renewal_status = ''; data.renewal_completion_chat_posted = false; }
 
+  // 🔔 申請ステータスが「発行完了」「入国済み」に変わったら、記入内容を人材チャットに自動投稿
+  const _applyPrev = _origWorker ? (_origWorker.apply_status || '') : '';
+  const _doApplyChatPost = ['発行完了','入国済み'].includes(data.apply_status) && data.apply_status !== _applyPrev;
+
   const autoMode = returnResult; // 自動保存（モーダル開いたまま）モード
   // 新規作成の二重POSTガード
   if (!editingWorkerId) {
@@ -6502,6 +6506,7 @@ async function saveWorker(returnResult=false) {
     }
     if (!autoMode) closeGenModal('workerModal');
     if (_doRenewalChatPost && editingWorkerId) { _postRenewalCompletionToChat(editingWorkerId, data); }
+    if (_doApplyChatPost && editingWorkerId) { _postApplyStatusToChat(editingWorkerId, data, data.apply_status); }
     await loadWorkers();
     if (autoMode) { return true; }
   } catch(e) { _savingWorkerNew = false; showToast('❌ '+e.message,'error'); if(!autoMode) showLoading(false); return false; }
@@ -6525,6 +6530,29 @@ async function _postRenewalCompletionToChat(workerId, data) {
     if (data.card_mailing_address) lines.push('・郵送先: ' + data.card_mailing_address);
     await sbFetch('chat_messages', { method:'POST', body: JSON.stringify({ chat_room_id: roomId, room_id: roomId, sender_id: currentUser?.id||'', sender_name: currentUser?.name||'KMT', content: lines.join('\n'), created_at: new Date().toISOString() }) });
   } catch(e) { console.warn('renewal completion chat post failed', e); }
+}
+
+async function _postApplyStatusToChat(workerId, data, status) {
+  try {
+    let room = await sbFetch('chat_rooms?worker_id=eq.'+workerId+'&select=id&limit=1');
+    let roomId = room?.[0]?.id;
+    if (!roomId) {
+      const created = await sbFetch('chat_rooms', { method:'POST', headers:{'Prefer':'return=representation'}, body: JSON.stringify({ worker_id: workerId, created_by: currentUser?.name||'', status:'active' }) });
+      roomId = (Array.isArray(created)?created[0]:created)?.id;
+    }
+    if (!roomId) return;
+    const lines = ['📋 申請ステータス更新（自動投稿）: ' + status];
+    lines.push('・在留資格: ' + (data.visa_status || '-'));
+    lines.push('・新しい在留期限: ' + (data.visa_expiry || '-'));
+    if (data.residence_card) lines.push('・在留カード番号: ' + data.residence_card);
+    if (status === '発行完了') {
+      if (data.card_tracking_no) lines.push('・在留カード郵送追跡番号: ' + data.card_tracking_no);
+      if (data.card_mailing_address) lines.push('・郵送先: ' + data.card_mailing_address);
+    } else if (status === '入国済み') {
+      if (data.jp_address) lines.push('・日本住所: ' + data.jp_address);
+    }
+    await sbFetch('chat_messages', { method:'POST', body: JSON.stringify({ chat_room_id: roomId, room_id: roomId, sender_id: currentUser?.id||'', sender_name: currentUser?.name||'KMT', content: lines.join('\n'), created_at: new Date().toISOString() }) });
+  } catch(e) { console.warn('apply status chat post failed', e); }
 }
 
 // 人材モーダル: 緊急連絡先セクションの開閉
@@ -16863,6 +16891,10 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260804.13', date:'2026-08-04', notify:true, items:[
+    '申請ステータス「発行完了」「入国済み」：選択すると専用パネル（発行完了＝在留情報入力アラート＋済み・郵送追跡番号・郵送先／入国済み＝在留期限記入アラート・日本住所記入アラート）が表示され、済みにすると赤いアラートが消えます',
+    '「発行完了」「入国済み」に変更して保存すると、記入内容（在留資格・新しい在留期限・在留カード番号・郵送追跡番号/郵送先 or 日本住所）を人材チャットに自動投稿します',
+  ]},
   { version:'ver.20260804.12', date:'2026-08-04', notify:true, items:[
     '更新状況リスト：在籍ステータスと更新ステータスの間に「申請ステータス」列を追加（色付きバッジ表示）',
   ]},
