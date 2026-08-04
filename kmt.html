@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260804.03 -->
+<!-- KMT_VERSION ver.20260804.04 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -355,7 +355,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260804.03</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260804.04</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -13108,7 +13108,16 @@ async function saveCandidate() {
   try {
     if(editingCandidateId){await sbFetch('candidates?id=eq.'+editingCandidateId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新しました','success');}
     else{const _r=await sbFetch('candidates',{method:'POST',body:JSON.stringify(data),prefer:'return=representation'});if(_r&&_r[0]&&_r[0].id)editingCandidateId=_r[0].id;showToast('✅ 登録しました','success');}
+    const _linkJob = pendingLinkJobId, _newCand = editingCandidateId;
     closeGenModal('candidateModal'); await loadCandidates();
+    if(_linkJob && _newCand){
+      pendingLinkJobId = null;
+      try{
+        await sbFetch('candidate_job_openings',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({candidate_id:_newCand,job_opening_id:_linkJob,status:'提案中',proposal_date:new Date().toISOString().slice(0,10)})});
+        showToast('✅ 求人に追加しました','success');
+        loadJobCandidateList(_linkJob);
+      }catch(e){showToast('❌ 紐付け失敗: '+e.message,'error');}
+    }
   }catch(e){showToast('❌ '+e.message,'error');}
   showLoading(false);
 }
@@ -13176,6 +13185,9 @@ function buildCandidateModalBody(c) {
     <div class="form-group"><label class="form-label">人材担当</label><input class="form-input" id="cf_staff" value="${esc(c.staff||'')}"></div>
     <div class="form-group"><label class="form-label">担当者の感想</label><input class="form-input" id="cf_staff_impression" value="${esc(c.staff_impression||'')}"></div>
     <div class="form-group full"><label class="form-label">メモ</label><textarea class="form-textarea" id="cf_memo">${esc(c.memo||'')}</textarea></div>
+
+    <div class="section-title" style="color:#7c3aed;">🔗 求人への紐付け</div>
+    <div class="form-group full" id="candidateJobLinkWrap">${c.id ? '<div style="color:#94a3b8;font-size:12px;padding:8px;">読み込み中...</div>' : '<div style="color:#94a3b8;font-size:12px;padding:8px;">候補者を保存すると求人に紐付けできます</div>'}</div>
   </div>
   <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)">
     <button class="btn btn-outline" onclick="closeGenModal('candidateModal')">閉じる</button>
@@ -13905,10 +13917,12 @@ function previewResume() {
 }
 
 function openCandidateModal(id) {
+  pendingLinkJobId = null;
   const c=id?allCandidates.find(x=>x.id===id):null;
   editingCandidateId=id;
   showGenModal('candidateModal', id?'📋 候補者詳細':'📋 候補者登録', buildCandidateModalBody(c));
   setTimeout(() => setupAutoSave(saveCandidate), 100);
+  if(id) setTimeout(()=>loadCandidateJobLinks(id), 120);
 }
 
 function openJobModal(id) {
@@ -13916,6 +13930,142 @@ function openJobModal(id) {
   editingJobId=id;
   showGenModal('jobModal',id?'💼 求人詳細':'💼 求人登録',buildJobModalBody(j));
   setTimeout(() => setupAutoSave(saveJob), 100);
+  if(id) setTimeout(()=>loadJobCandidateList(id), 120);
+}
+
+// ===== 候補者リスト（求人×候補者の紐付け: candidate_job_openings） =====
+let pendingLinkJobId = null;
+const CJO_STATUSES = ['提案中','書類選考','面接調整中','面接済','内定','決定','見送り','辞退'];
+const CJO_STATUS_COLOR = {'提案中':'#1a73e8','書類選考':'#7c3aed','面接調整中':'#d97706','面接済':'#0891b2','内定':'#16a34a','決定':'#15803d','見送り':'#94a3b8','辞退':'#dc2626'};
+
+async function ensureCandidatesLoaded(){
+  if(!allCandidates.length){
+    try{ allCandidates = await sbFetch('candidates?select=id,name,nationality,status&order=name.asc') || []; }catch(e){}
+  }
+}
+async function ensureJobsLoaded(){
+  if(!allJobs.length){
+    try{ allJobs = await sbFetch('job_openings?select=*,companies(name,pref,city,address)&order=created_at.desc') || []; }catch(e){}
+  }
+}
+
+// --- 求人詳細側 ---
+async function loadJobCandidateList(jobId){
+  const wrap=document.getElementById('jobCandidateListWrap'); if(!wrap) return;
+  await ensureCandidatesLoaded();
+  let links=[];
+  try{ links = await sbFetch('candidate_job_openings?job_opening_id=eq.'+jobId+'&select=candidate_id,status,proposal_date,interview_date,result_date,notes,candidates(name,nationality)&order=created_at.asc') || []; }
+  catch(e){ wrap.innerHTML='<div style="color:#dc2626;font-size:12px;">読み込み失敗: '+esc(e.message)+'</div>'; return; }
+  renderJobCandidateList(jobId, links);
+}
+function renderJobCandidateList(jobId, links){
+  const wrap=document.getElementById('jobCandidateListWrap'); if(!wrap) return;
+  const linkedIds = new Set(links.map(l=>l.candidate_id));
+  const rows = links.map(l=>{
+    const c=l.candidates||{};
+    const stSel = `<select onchange="updateCjoField('${jobId}','${l.candidate_id}','status',this.value)" style="font-size:11px;padding:2px 4px;border:1px solid #cfd8e0;border-radius:4px;color:${CJO_STATUS_COLOR[l.status]||'#333'};font-weight:700;">${CJO_STATUSES.map(s=>`<option ${l.status===s?'selected':''}>${s}</option>`).join('')}</select>`;
+    const d=(f,v)=>`<input type="date" value="${v||''}" onchange="updateCjoField('${jobId}','${l.candidate_id}','${f}',this.value)" style="font-size:11px;padding:2px 4px;border:1px solid #cfd8e0;border-radius:4px;">`;
+    return `<tr>
+      <td style="padding:4px 6px;font-weight:700;">${natFlag(c.nationality||'')} ${esc(c.name||'(無名)')}</td>
+      <td style="padding:4px 6px;font-size:11px;">${esc(c.nationality||'-')}</td>
+      <td style="padding:4px 6px;">${stSel}</td>
+      <td style="padding:4px 6px;">${d('proposal_date',l.proposal_date)}</td>
+      <td style="padding:4px 6px;">${d('interview_date',l.interview_date)}</td>
+      <td style="padding:4px 6px;">${d('result_date',l.result_date)}</td>
+      <td style="padding:4px 6px;text-align:center;"><button class="btn btn-outline" style="font-size:10px;padding:2px 6px;color:#dc2626;" onclick="removeCandidateFromJob('${jobId}','${l.candidate_id}')">削除</button></td>
+    </tr>`;
+  }).join('');
+  const opts = allCandidates.filter(c=>!linkedIds.has(c.id)).map(c=>`<option value="${c.id}">${esc(c.name||'')}（${esc(c.nationality||'')}）</option>`).join('');
+  wrap.innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px;">
+      <thead><tr style="background:#f1f5f9;color:#475569;font-size:10px;">
+        <th style="padding:4px 6px;text-align:left;">氏名</th><th style="padding:4px 6px;text-align:left;">国籍</th><th style="padding:4px 6px;text-align:left;">ステータス</th><th style="padding:4px 6px;text-align:left;">提案日</th><th style="padding:4px 6px;text-align:left;">面接日</th><th style="padding:4px 6px;text-align:left;">結果日</th><th style="padding:4px 6px;"></th>
+      </tr></thead>
+      <tbody>${rows || '<tr><td colspan="7" style="padding:10px;text-align:center;color:#94a3b8;">候補者は未登録です</td></tr>'}</tbody>
+    </table>
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+      <select id="jcAddSelect" style="flex:1;min-width:180px;font-size:12px;padding:5px;border:1px solid #cfd8e0;border-radius:4px;"><option value="">── 既存の候補者を選択 ──</option>${opts}</select>
+      <button class="btn btn-primary" style="font-size:11px;padding:5px 10px;" onclick="addCandidateToJob('${jobId}')">＋ 追加</button>
+      <button class="btn btn-outline" style="font-size:11px;padding:5px 10px;" onclick="openNewCandidateForJob('${jobId}')">＋ 新規候補者を登録して追加</button>
+    </div>`;
+}
+async function addCandidateToJob(jobId){
+  const sel=document.getElementById('jcAddSelect'); const cid=sel&&sel.value; if(!cid){showToast('⚠️ 候補者を選択してください','error');return;}
+  const today=new Date().toISOString().slice(0,10);
+  try{
+    await sbFetch('candidate_job_openings',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({candidate_id:cid,job_opening_id:jobId,status:'提案中',proposal_date:today})});
+    showToast('✅ 候補者を追加しました','success');
+    loadJobCandidateList(jobId);
+  }catch(e){showToast('❌ '+e.message,'error');}
+}
+async function updateCjoField(jobId, candId, field, value){
+  try{
+    await sbFetch('candidate_job_openings?job_opening_id=eq.'+jobId+'&candidate_id=eq.'+candId,{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({[field]:value||null})});
+    showToast('✅ 更新しました','success');
+    if(field==='status') loadJobCandidateList(jobId);
+  }catch(e){showToast('❌ '+e.message,'error');}
+}
+async function removeCandidateFromJob(jobId, candId){
+  if(!confirm('この候補者を求人リストから外しますか？')) return;
+  try{
+    await sbFetch('candidate_job_openings?job_opening_id=eq.'+jobId+'&candidate_id=eq.'+candId,{method:'DELETE'});
+    showToast('✅ 削除しました','success');
+    loadJobCandidateList(jobId);
+  }catch(e){showToast('❌ '+e.message,'error');}
+}
+function openNewCandidateForJob(jobId){
+  openCandidateModal(null);
+  pendingLinkJobId = jobId;
+}
+
+// --- 候補者詳細側 ---
+async function loadCandidateJobLinks(candId){
+  const wrap=document.getElementById('candidateJobLinkWrap'); if(!wrap) return;
+  await ensureJobsLoaded();
+  let links=[];
+  try{ links = await sbFetch('candidate_job_openings?candidate_id=eq.'+candId+'&select=job_opening_id,status,proposal_date,job_openings(job_code,industry,companies(name))&order=created_at.asc') || []; }
+  catch(e){ wrap.innerHTML='<div style="color:#dc2626;font-size:12px;">読み込み失敗: '+esc(e.message)+'</div>'; return; }
+  renderCandidateJobLinks(candId, links);
+}
+function renderCandidateJobLinks(candId, links){
+  const wrap=document.getElementById('candidateJobLinkWrap'); if(!wrap) return;
+  const linkedIds=new Set(links.map(l=>l.job_opening_id));
+  const rows=links.map(l=>{
+    const j=l.job_openings||{}; const co=(j.companies||{});
+    return `<tr>
+      <td style="padding:4px 6px;font-weight:700;">${esc(j.job_code||'')} ${esc(co.name||'')}</td>
+      <td style="padding:4px 6px;font-size:11px;">${esc(j.industry||'-')}</td>
+      <td style="padding:4px 6px;"><span style="color:${CJO_STATUS_COLOR[l.status]||'#333'};font-weight:700;font-size:11px;">${esc(l.status||'-')}</span></td>
+      <td style="padding:4px 6px;text-align:center;"><button class="btn btn-outline" style="font-size:10px;padding:2px 6px;color:#dc2626;" onclick="removeJobFromCandidate('${candId}','${l.job_opening_id}')">削除</button></td>
+    </tr>`;
+  }).join('');
+  const opts=allJobs.filter(j=>!linkedIds.has(j.id)).map(j=>`<option value="${j.id}">${esc(j.job_code||'')} ${esc(j.companies?.name||'')}</option>`).join('');
+  wrap.innerHTML=`
+    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px;">
+      <thead><tr style="background:#f1f5f9;color:#475569;font-size:10px;"><th style="padding:4px 6px;text-align:left;">求人</th><th style="padding:4px 6px;text-align:left;">業種</th><th style="padding:4px 6px;text-align:left;">ステータス</th><th style="padding:4px 6px;"></th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="4" style="padding:10px;text-align:center;color:#94a3b8;">紐付いた求人はありません</td></tr>'}</tbody>
+    </table>
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+      <select id="cjAddSelect" style="flex:1;min-width:180px;font-size:12px;padding:5px;border:1px solid #cfd8e0;border-radius:4px;"><option value="">── 求人を選択 ──</option>${opts}</select>
+      <button class="btn btn-primary" style="font-size:11px;padding:5px 10px;" onclick="addJobToCandidate('${candId}')">＋ 求人に追加</button>
+    </div>`;
+}
+async function addJobToCandidate(candId){
+  const sel=document.getElementById('cjAddSelect'); const jid=sel&&sel.value; if(!jid){showToast('⚠️ 求人を選択してください','error');return;}
+  const today=new Date().toISOString().slice(0,10);
+  try{
+    await sbFetch('candidate_job_openings',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({candidate_id:candId,job_opening_id:jid,status:'提案中',proposal_date:today})});
+    showToast('✅ 求人に追加しました','success');
+    loadCandidateJobLinks(candId);
+  }catch(e){showToast('❌ '+e.message,'error');}
+}
+async function removeJobFromCandidate(candId, jobId){
+  if(!confirm('この求人との紐付けを外しますか？')) return;
+  try{
+    await sbFetch('candidate_job_openings?candidate_id=eq.'+candId+'&job_opening_id=eq.'+jobId,{method:'DELETE'});
+    showToast('✅ 削除しました','success');
+    loadCandidateJobLinks(candId);
+  }catch(e){showToast('❌ '+e.message,'error');}
 }
 
 function buildJobsScreen() {
@@ -14962,6 +15112,9 @@ function buildJobModalBody(j) {
     <div class="form-group full"><label class="form-label">案件担当のコメント（候補者の状況・進捗）</label><textarea class="form-textarea" id="jf_progress_note">${esc(j.progress_note||'')}</textarea></div>
     <div class="form-group full"><label class="form-label">人材担当のコメント</label><textarea class="form-textarea" id="jf_jinzai_comment">${esc(j.jinzai_comment||'')}</textarea></div>
     <div class="form-group full"><label class="form-label">仕事内容</label><textarea class="form-textarea" id="jf_job_description">${esc(j.job_description||'')}</textarea></div>
+
+    <div class="section-title" style="color:#7c3aed;">👥 候補者リスト</div>
+    <div class="form-group full" id="jobCandidateListWrap">${j.id ? '<div style="color:#94a3b8;font-size:12px;padding:8px;">読み込み中...</div>' : '<div style="color:#94a3b8;font-size:12px;padding:8px;">求人を保存すると候補者を追加できます</div>'}</div>
 
     <div class="section-title" style="color:#16a34a;">🌍 各国の応募状況</div>
     <div class="form-group full" id="jf_country_progress_wrap">${buildCountryProgressEditor(j)}</div>
@@ -16533,6 +16686,10 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260804.04', date:'2026-08-04', notify:true, items:[
+    '求人詳細に「👥 候補者リスト」を追加。氏名・国籍・ステータス（提案中〜決定/辞退）・提案日/面接日/結果日を管理でき、既存候補者の選択または新規登録でその求人に紐付けできます',
+    '候補者詳細に「🔗 求人への紐付け」を追加。候補者側から「求人に追加」で対象求人を選んで紐付け・解除できます（求人詳細の候補者リストと同期）',
+  ]},
   { version:'ver.20260804.03', date:'2026-08-04', notify:true, items:[
     '求人票作成：ページを開くと空の求人オーダー票フォーマットが最初から表示されるように変更（すぐ使える状態）',
     '求人票作成：メニューから開いたときに登録済み求人の選択リストが表示されない不具合を修正。リストから求人を選ぶと求人票に情報が自動で流し込まれます',
