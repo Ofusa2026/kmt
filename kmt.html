@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260804.06 -->
+<!-- KMT_VERSION ver.20260804.07 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -355,7 +355,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260804.06</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260804.07</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -9546,6 +9546,9 @@ let currentScreen = 'companies';
 
 function showScreen(name) {
   if (!SCREENS[name]) { kmtLog('🚫 画面', '不明な画面: ' + name, undefined, '#dc2626'); return; }
+  // 求人モーダルに未保存の変更がある場合はリマインド
+  const _jm=document.getElementById('jobModal');
+  if(_jm && _jm.classList.contains('show') && jobModalDirty){ promptSaveJob(()=>showScreen(name)); return; }
   kmtLog('📺 画面切替', name + ' (' + (SCREENS[name].title||'') + ')', undefined, '#7c3aed');
   currentScreen = name;
   document.getElementById('pageTitle').textContent = SCREENS[name].title;
@@ -13288,30 +13291,6 @@ async function saveJob() {
   const g=id=>document.getElementById(id)?.value||null;
   const intOrNull=id=>{const v=document.getElementById(id)?.value;return v?parseInt(v):null;};
 
-  // 各国の応募状況を組み立て
-  const countries = ['ベトナム','インドネシア','フィリピン','ミャンマー','ネパール','カンボジア','タイ','中国','モンゴル','スリランカ','ウズベキスタン','バングラデシュ'];
-  const country_progress = {};
-  const country_progress_updated_at = {};
-  // 既存の更新日を保持しつつ、変更されたフィールドだけ今日付に
-  const editing = editingJobId ? (allJobs||[]).find(x=>x.id===editingJobId) : null;
-  const prevCp = (editing?.country_progress && typeof editing.country_progress === 'object') ? editing.country_progress : {};
-  const prevCpUpd = (editing?.country_progress_updated_at && typeof editing.country_progress_updated_at === 'object') ? editing.country_progress_updated_at : {};
-  const todayStr = new Date().toISOString().slice(0,10);
-  countries.forEach(c => {
-    const statusEl = document.getElementById('cp_status_'+c);
-    const countEl = document.getElementById('cp_count_'+c);
-    const status = statusEl?.value || '';
-    const count = countEl?.value ? parseInt(countEl.value) : null;
-    const prev = prevCp[c] || {};
-    const hasNew = status || count !== null;
-    if (hasNew) {
-      country_progress[c] = { status, count };
-      // 値が変わったら今日付。同じなら従来の日付を維持
-      const changed = (prev.status||'') !== status || (prev.count != null ? prev.count : null) !== count;
-      country_progress_updated_at[c] = changed ? todayStr : (prevCpUpd[c] || todayStr);
-    }
-  });
-
   const data={
     // 労働局指定
     job_code:g('jf_code'),
@@ -13346,14 +13325,13 @@ async function saveJob() {
     progress_note:g('jf_progress_note'),
     jinzai_comment:g('jf_jinzai_comment'),
     job_description:g('jf_job_description'),
-    country_progress: Object.keys(country_progress).length ? country_progress : null,
-    country_progress_updated_at: Object.keys(country_progress_updated_at).length ? country_progress_updated_at : null,
     updated_at:new Date().toISOString()
   };
   showLoading(true);
   try {
     if(editingJobId){await sbFetch('job_openings?id=eq.'+editingJobId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新しました','success');}
     else{const _r=await sbFetch('job_openings',{method:'POST',body:JSON.stringify(data),prefer:'return=representation'});if(_r&&_r[0]&&_r[0].id)editingJobId=_r[0].id;showToast('✅ 登録しました','success');}
+    jobModalDirty=false;
     closeGenModal('jobModal'); await loadJobs();
   }catch(e){showToast('❌ '+e.message,'error');}
   showLoading(false);
@@ -13928,9 +13906,38 @@ function openCandidateModal(id) {
 function openJobModal(id) {
   const j=id?allJobs.find(x=>x.id===id):null;
   editingJobId=id;
+  jobModalDirty=false;
+  _jcFilterStatus=''; _jcFilterNat='';
   showGenModal('jobModal',id?'💼 求人詳細':'💼 求人登録',buildJobModalBody(j));
-  setTimeout(() => setupAutoSave(saveJob), 100);
+  setTimeout(bindJobDirtyTracking, 120);
   if(id){ setTimeout(()=>loadJobCandidateList(id), 120); setTimeout(()=>loadJobMemos(id), 140); }
+}
+
+// ===== 求人モーダルの手動保存・未保存リマインド =====
+let jobModalDirty = false;
+function bindJobDirtyTracking(){
+  const body=document.getElementById('jobModalBody'); if(!body) return;
+  if(body._jobDirtyBound) return;
+  body._jobDirtyBound = true;
+  const mark=e=>{ const t=e.target; if(t && typeof t.id==='string' && t.id.indexOf('jf_')===0) jobModalDirty=true; };
+  body.addEventListener('input', mark);
+  body.addEventListener('change', mark);
+}
+// 未保存リマインド: afterFn は選択確定後に実行（保存/破棄いずれもモーダルは閉じる）
+function promptSaveJob(afterFn){
+  let ov=document.getElementById('jobSavePrompt'); if(ov) ov.remove();
+  ov=document.createElement('div'); ov.id='jobSavePrompt';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:10001;display:flex;align-items:center;justify-content:center;';
+  ov.innerHTML=`<div style="background:white;border-radius:10px;padding:22px 24px;max-width:340px;box-shadow:0 10px 40px rgba(0,0,0,.25);">
+    <div style="font-size:15px;font-weight:700;color:#1e293b;margin-bottom:6px;">未保存の変更があります</div>
+    <div style="font-size:13px;color:#64748b;margin-bottom:18px;">変更を保存しますか？</div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn btn-outline" id="jspClose" style="font-size:13px;padding:6px 16px;">閉じる</button>
+      <button class="btn btn-primary" id="jspSave" style="font-size:13px;padding:6px 16px;">保存</button>
+    </div></div>`;
+  document.body.appendChild(ov);
+  document.getElementById('jspSave').onclick=async()=>{ ov.remove(); jobModalDirty=false; await saveJob(); if(afterFn) afterFn(); };
+  document.getElementById('jspClose').onclick=()=>{ ov.remove(); jobModalDirty=false; const m=document.getElementById('jobModal'); if(m)m.classList.remove('show'); if(afterFn) afterFn(); };
 }
 
 function jobModalJump(secId){
@@ -13940,7 +13947,7 @@ function jobModalJump(secId){
   setTimeout(()=>{ el.style.background=o||''; }, 900);
 }
 function switchJobTab(tab){
-  const tabs=['basic','joken','salary','kmt','candidates','memo','countries'];
+  const tabs=['basic','kmt','candidates'];
   const bar=document.getElementById('jobModalTabs');
   if(bar) bar.querySelectorAll('.modal-tab').forEach((t,i)=>t.classList.toggle('active',tabs[i]===tab));
   const modal=document.getElementById('jobModal');
@@ -14012,18 +14019,28 @@ async function ensureJobsLoaded(){
 }
 
 // --- 求人詳細側 ---
+let _jobCandLinks=[], _jobCandJobId=null, _jcFilterStatus='', _jcFilterNat='';
 async function loadJobCandidateList(jobId){
   const wrap=document.getElementById('jobCandidateListWrap'); if(!wrap) return;
   await ensureCandidatesLoaded();
   let links=[];
   try{ links = await sbFetch('candidate_job_openings?job_opening_id=eq.'+jobId+'&select=candidate_id,status,proposal_date,interview_date,result_date,notes,candidates(name,nationality)&order=created_at.asc') || []; }
   catch(e){ wrap.innerHTML='<div style="color:#dc2626;font-size:12px;">読み込み失敗: '+esc(e.message)+'</div>'; return; }
+  _jobCandLinks=links; _jobCandJobId=jobId;
   renderJobCandidateList(jobId, links);
 }
+function setJcFilter(type,val){ if(type==='status')_jcFilterStatus=val; else _jcFilterNat=val; renderJobCandidateList(_jobCandJobId,_jobCandLinks); }
+function clearJcFilter(){ _jcFilterStatus=''; _jcFilterNat=''; renderJobCandidateList(_jobCandJobId,_jobCandLinks); }
 function renderJobCandidateList(jobId, links){
   const wrap=document.getElementById('jobCandidateListWrap'); if(!wrap) return;
   const linkedIds = new Set(links.map(l=>l.candidate_id));
-  const rows = links.map(l=>{
+  const nats=[...new Set(links.map(l=>(l.candidates&&l.candidates.nationality)||'').filter(Boolean))];
+  const filtered = links.filter(l=>{
+    if(_jcFilterStatus && l.status!==_jcFilterStatus) return false;
+    if(_jcFilterNat && ((l.candidates&&l.candidates.nationality)||'')!==_jcFilterNat) return false;
+    return true;
+  });
+  const rows = filtered.map(l=>{
     const c=l.candidates||{};
     const stSel = `<select onchange="updateCjoField('${jobId}','${l.candidate_id}','status',this.value)" style="font-size:11px;padding:2px 4px;border:1px solid #cfd8e0;border-radius:4px;color:${CJO_STATUS_COLOR[l.status]||'#333'};font-weight:700;">${CJO_STATUSES.map(s=>`<option ${l.status===s?'selected':''}>${s}</option>`).join('')}</select>`;
     const d=(f,v)=>`<input type="date" value="${v||''}" onchange="updateCjoField('${jobId}','${l.candidate_id}','${f}',this.value)" style="font-size:11px;padding:2px 4px;border:1px solid #cfd8e0;border-radius:4px;">`;
@@ -14038,12 +14055,19 @@ function renderJobCandidateList(jobId, links){
     </tr>`;
   }).join('');
   const opts = allCandidates.filter(c=>!linkedIds.has(c.id)).map(c=>`<option value="${c.id}">${esc(c.name||'')}（${esc(c.nationality||'')}）</option>`).join('');
-  wrap.innerHTML = `
+  const filterBar = `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px;">
+      <span style="font-size:11px;color:#64748b;font-weight:700;">フィルター</span>
+      <select onchange="setJcFilter('status',this.value)" style="font-size:11px;padding:3px 6px;border:1px solid #cfd8e0;border-radius:4px;"><option value="">全ステータス</option>${CJO_STATUSES.map(s=>`<option ${_jcFilterStatus===s?'selected':''}>${s}</option>`).join('')}</select>
+      <select onchange="setJcFilter('nat',this.value)" style="font-size:11px;padding:3px 6px;border:1px solid #cfd8e0;border-radius:4px;"><option value="">全国籍</option>${nats.map(n=>`<option ${_jcFilterNat===n?'selected':''}>${esc(n)}</option>`).join('')}</select>
+      ${(_jcFilterStatus||_jcFilterNat)?`<button class="btn btn-outline" style="font-size:10px;padding:2px 8px;" onclick="clearJcFilter()">✕ クリア</button>`:''}
+      <span style="font-size:10px;color:#94a3b8;margin-left:auto;">${filtered.length}/${links.length}件</span>
+    </div>`;
+  wrap.innerHTML = filterBar + `
     <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px;">
       <thead><tr style="background:#f1f5f9;color:#475569;font-size:10px;">
         <th style="padding:4px 6px;text-align:left;">氏名</th><th style="padding:4px 6px;text-align:left;">国籍</th><th style="padding:4px 6px;text-align:left;">ステータス</th><th style="padding:4px 6px;text-align:left;">提案日</th><th style="padding:4px 6px;text-align:left;">面接日</th><th style="padding:4px 6px;text-align:left;">結果日</th><th style="padding:4px 6px;"></th>
       </tr></thead>
-      <tbody>${rows || '<tr><td colspan="7" style="padding:10px;text-align:center;color:#94a3b8;">候補者は未登録です</td></tr>'}</tbody>
+      <tbody>${rows || `<tr><td colspan="7" style="padding:10px;text-align:center;color:#94a3b8;">${links.length?'該当なし（フィルター）':'候補者は未登録です'}</td></tr>`}</tbody>
     </table>
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
       <select id="jcAddSelect" style="flex:1;min-width:180px;font-size:12px;padding:5px;border:1px solid #cfd8e0;border-radius:4px;"><option value="">── 既存の候補者を選択 ──</option>${opts}</select>
@@ -15126,12 +15150,8 @@ function buildJobModalBody(j) {
   return `
   <div class="modal-tabs" id="jobModalTabs" style="position:sticky;top:0;z-index:6;">
     <div class="modal-tab active" onclick="switchJobTab('basic')">基本情報</div>
-    <div class="modal-tab" onclick="switchJobTab('joken')">条件</div>
-    <div class="modal-tab" onclick="switchJobTab('salary')">給与・住居</div>
     <div class="modal-tab" onclick="switchJobTab('kmt')">📋 KMT管理</div>
     <div class="modal-tab" onclick="switchJobTab('candidates')">👥 候補者リスト</div>
-    <div class="modal-tab" onclick="switchJobTab('memo')">📝 社内メモ</div>
-    <div class="modal-tab" onclick="switchJobTab('countries')">🌍 応募状況</div>
   </div>
   <div class="tab-panel active" id="jtab-basic"><div class="form-grid">
     <div class="section-title" style="color:#dc2626;">⚖️ 労働局指定項目（求人受理票）</div>
@@ -15154,16 +15174,12 @@ function buildJobModalBody(j) {
     <div class="form-group"><label class="form-label">所属機関</label>
       <select class="form-select" id="jf_company_id"><option value="">選択...</option>${allCompanies.map(c=>`<option value="${c.id}" ${j.company_id===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div>
 
-  </div></div>
-  <div class="tab-panel" id="jtab-joken"><div class="form-grid">
     <div class="section-title">条件</div>
     <div class="form-group"><label class="form-label">募集国籍</label><input class="form-input" id="jf_target_nationality" value="${esc(j.target_nationality||'')}"></div>
     <div class="form-group"><label class="form-label">採用予定人数</label><input class="form-input" id="jf_target_count" type="number" value="${j.target_count??''}"></div>
     <div class="form-group"><label class="form-label">日本語レベル</label><input class="form-input" id="jf_jp_level_req" value="${esc(j.jp_level_req||'')}"></div>
     <div class="form-group"><label class="form-label">必要資格</label><input class="form-input" id="jf_required_license" value="${esc(j.required_license||'')}"></div>
 
-  </div></div>
-  <div class="tab-panel" id="jtab-salary"><div class="form-grid">
     <div class="section-title">給与・住居</div>
     <div class="form-group"><label class="form-label">給与種別</label>
       <select class="form-select" id="jf_salary_type">${['','月給','時給'].map(s=>`<option ${j.salary_type===s?'selected':''}>${s}</option>`).join('')}</select></div>
@@ -15171,7 +15187,6 @@ function buildJobModalBody(j) {
     <div class="form-group"><label class="form-label">寮</label>
       <select class="form-select" id="jf_dormitory">${['','あり','なし'].map(s=>`<option ${j.dormitory_available===s?'selected':''}>${s}</option>`).join('')}</select></div>
     <div class="form-group"><label class="form-label">年間休日</label><input class="form-input" id="jf_holiday_days" type="number" value="${j.annual_holiday_days??''}"></div>
-
   </div></div>
   <div class="tab-panel" id="jtab-kmt"><div class="form-grid">
     <div class="section-title" style="color:#1a73e8;">📋 KMT管理項目</div>
@@ -15190,24 +15205,16 @@ function buildJobModalBody(j) {
     <div class="form-group full"><label class="form-label">人材担当のコメント</label><textarea class="form-textarea" id="jf_jinzai_comment">${esc(j.jinzai_comment||'')}</textarea></div>
     <div class="form-group full"><label class="form-label">仕事内容</label><textarea class="form-textarea" id="jf_job_description">${esc(j.job_description||'')}</textarea></div>
 
+    <div class="section-title" style="color:#0891b2;" id="jobSecMemo">📝 社内メモ</div>
+    <div class="form-group full" id="jobMemoWrap">${j.id ? '<div style="color:#94a3b8;font-size:12px;padding:8px;">読み込み中...</div>' : '<div style="color:#94a3b8;font-size:12px;padding:8px;">求人を保存するとメモを追加できます</div>'}</div>
   </div></div>
   <div class="tab-panel" id="jtab-candidates"><div class="form-grid">
     <div class="section-title" style="color:#7c3aed;" id="jobSecCandidates">👥 候補者リスト</div>
     <div class="form-group full" id="jobCandidateListWrap">${j.id ? '<div style="color:#94a3b8;font-size:12px;padding:8px;">読み込み中...</div>' : '<div style="color:#94a3b8;font-size:12px;padding:8px;">求人を保存すると候補者を追加できます</div>'}</div>
-
-  </div></div>
-  <div class="tab-panel" id="jtab-memo"><div class="form-grid">
-    <div class="section-title" style="color:#0891b2;" id="jobSecMemo">📝 社内メモ</div>
-    <div class="form-group full" id="jobMemoWrap">${j.id ? '<div style="color:#94a3b8;font-size:12px;padding:8px;">読み込み中...</div>' : '<div style="color:#94a3b8;font-size:12px;padding:8px;">求人を保存するとメモを追加できます</div>'}</div>
-
-  </div></div>
-  <div class="tab-panel" id="jtab-countries"><div class="form-grid">
-    <div class="section-title" style="color:#16a34a;">🌍 各国の応募状況</div>
-    <div class="form-group full" id="jf_country_progress_wrap">${buildCountryProgressEditor(j)}</div>
   </div></div>
   <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)">
     <button class="btn btn-outline" onclick="closeGenModal('jobModal')">閉じる</button>
-    
+    <button class="btn btn-primary" onclick="saveJob()">💾 保存</button>
   </div>`;
 }
 
@@ -15446,7 +15453,11 @@ function clearSendingFilters(){const el=document.getElementById('sSearchInput');
 
 function clearUserFilters(){const el=document.getElementById('uSearchInput');if(el)el.value='';applyUserFilters();}
 
-function closeGenModal(id){if(_autoSaveActive)return;const modal=document.getElementById(id);if(modal)modal.classList.remove('show');}
+function closeGenModal(id){
+  if(_autoSaveActive)return;
+  if(id==='jobModal' && jobModalDirty){ const m=document.getElementById('jobModal'); if(m&&m.classList.contains('show')){ promptSaveJob(null); return; } }
+  const modal=document.getElementById(id);if(modal)modal.classList.remove('show');
+}
 
 function ensureModals(targetId) {
   // targetId指定があればそれだけ、無ければ既知の全モーダルを生成
@@ -16388,7 +16399,7 @@ async function deleteUser(){
 const _AUTOSAVE_MAP = {
   expenseModal: 'saveExpense', partnerModal: 'savePartner', feeModal: 'saveFee',
   saleModal: 'saveSale', userModal: 'saveUser', sendingModal: 'saveSending',
-  aiKnModal: 'saveAiKn', candidateModal: 'saveCandidate', jobModal: 'saveJob',
+  aiKnModal: 'saveAiKn', candidateModal: 'saveCandidate', jobModal: null /* 手動保存のため自動保存を無効化 */,
   introModal: 'saveIntro', scheduleModal: null /* 引数必須のため除外 */,
 };
 function showGenModal(id, title, bodyHtml) {
@@ -16772,6 +16783,11 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260804.07', date:'2026-08-04', notify:true, items:[
+    '求人詳細のタブを3つに集約：①基本情報（条件・給与住居も統合）②KMT管理（社内メモも統合）③候補者リスト。「応募状況」タブは削除',
+    '候補者リストにフィルターを追加（ステータス・国籍で絞り込み、件数表示・クリア対応）',
+    '求人詳細を手動保存に変更：右下に「💾 保存」ボタンを追加。未保存のまま閉じる/他ページへ移動しようとすると「保存しますか？」と表示し、［保存］／［閉じる］を選べます',
+  ]},
   { version:'ver.20260804.06', date:'2026-08-04', notify:true, items:[
     '求人詳細を所属機関詳細と同じタブ形式に変更。基本情報／条件／給与・住居／KMT管理／候補者リスト／社内メモ／応募状況を1タブ＝1ページで切り替えできるようにしました（1ページで縦に長かったのを解消）',
   ]},
