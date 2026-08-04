@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260802.23 -->
+<!-- KMT_VERSION ver.20260802.24 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -355,7 +355,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260802.23</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260802.24</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -9525,7 +9525,7 @@ function buildWorkersScreen() {
     <select class="filter-select" id="wFilterStatus" onchange="applyWorkerFilters()">
       <option value="">全在職ステータス</option>
       <option>配属前</option><option>在職中</option><option>在職中(一時帰国中)</option><option>在職中（支援なし）</option><option>退職予定(更新なし決定)</option>
-      <option>退職済(帰国)</option><option>退職済(転職)</option>
+      <option>退職済(帰国)</option><option>退職済(転職)</option><option>辞退/キャンセル</option>
     </select>
     <select class="filter-select" id="wFilterApplyStatus" onchange="applyWorkerFilters()">
       <option value="">全申請ステータス</option>
@@ -9639,6 +9639,7 @@ function _zaisekiBadge(s){
   let c='#334155';
   if(s==='退職予定(更新なし決定)') c='#dc2626';
   else if(s.indexOf('退職済')===0) c='#94a3b8';
+  else if(s==='辞退/キャンセル') c='#94a3b8';
   else if(s === '在職中（支援なし）') c='#6b7280';
   else if(s.indexOf('在職中')===0) c='#059669';
   else if(s==='配属前') c='#0891b2';
@@ -9958,7 +9959,7 @@ function clearWorkerFilters() {
 
 const STATUS_COLORS = {
   '配属前':'st-submit','在職中':'st-active','在職中(一時帰国中)':'st-add','在職中（支援なし）':'st-none','退職予定(更新なし決定)':'st-shortage',
-  '退職済(帰国)':'st-none','退職済(転職)':'st-none'
+  '退職済(帰国)':'st-none','退職済(転職)':'st-none','辞退/キャンセル':'st-none'
 };
 const APPLY_STATUS_COLORS = {
   '申請予定なし':'st-none','申請準備中':'st-docs','審査中':'st-review','申請済み・不足あり':'st-shortage','審査完了':'st-active',
@@ -11121,7 +11122,7 @@ function buildWorkerModalBody(w) {
   <div class="form-grid">
     <div class="form-group full"><label class="form-label">在職ステータス <span style="color:#ef4444;">*</span></label>
       <select class="form-select" id="wf_status" onchange="toggleExpectedLeaveField()">
-        ${['配属前','在職中','在職中(一時帰国中)','在職中（支援なし）','退職予定(更新なし決定)','退職済(帰国)','退職済(転職)'].map(s=>`<option ${w.status===s?'selected':''}>${s}</option>`).join('')}
+        ${['配属前','在職中','在職中(一時帰国中)','在職中（支援なし）','退職予定(更新なし決定)','退職済(帰国)','退職済(転職)','辞退/キャンセル'].map(s=>`<option ${w.status===s?'selected':''}>${s}</option>`).join('')}
       </select></div>
     <div class="form-group" id="wf_expected_leave_wrap" style="display:${w.status==='退職予定(更新なし決定)'?'':'none'};">
       <label class="form-label">退職予定日</label>
@@ -16337,6 +16338,9 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260802.24', date:'2026-08-03', notify:true, items:[
+    '外国人材：在職ステータスに「辞退/キャンセル」を追加（登録・フィルター対応）',
+  ]},
   { version:'ver.20260802.23', date:'2026-08-03', notify:true, items:[
     '株式会社ナチュラル：各月の支援委託費（実績）を 16,363円 → 16,364円 に修正',
   ]},
