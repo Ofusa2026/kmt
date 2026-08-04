@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260804.02 -->
+<!-- KMT_VERSION ver.20260804.03 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -355,7 +355,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260804.02</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260804.03</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -5156,11 +5156,11 @@ function buildJobFlyerScreen() {
     </div>
     <div style="flex:1;overflow-y:auto;background:#525659;padding:20px;display:flex;flex-direction:column;align-items:center;gap:12px;">
       <div style="display:flex;gap:6px;">
-        <button id="flyerModeCand" class="btn btn-primary" style="font-size:12px;" onclick="setFlyerMode('candidate')">候補者向け求人票</button>
-        <button id="flyerModeOrder" class="btn btn-outline" style="font-size:12px;background:white;" onclick="setFlyerMode('order')">📋 求人オーダー票</button>
+        <button id="flyerModeCand" class="btn btn-outline" style="font-size:12px;background:white;" onclick="setFlyerMode('candidate')">候補者向け求人票</button>
+        <button id="flyerModeOrder" class="btn btn-primary" style="font-size:12px;" onclick="setFlyerMode('order')">📋 求人オーダー票</button>
       </div>
       <div id="jobFlyerPreview" style="width:210mm;min-height:297mm;background:white;border-radius:4px;box-shadow:0 4px 20px rgba(0,0,0,0.15);padding:14mm;box-sizing:border-box;font-family:'Noto Sans JP','Hiragino Sans','Noto Sans','Arial Unicode MS',sans-serif;">
-        <div style="text-align:center;color:var(--gray-300);padding:60px 0;font-size:14px;">← 求人を選択してください</div>
+        ${buildJobOrderSheet({})}
       </div>
     </div>
   </div>`;
@@ -5187,7 +5187,8 @@ function onFlyerJobSelect() {
   const id = document.getElementById('flyerJobSelect')?.value;
   if (!id) {
     document.getElementById('flyerFormBody').style.display = 'none';
-    document.getElementById('jobFlyerPreview').innerHTML = '<div style="text-align:center;color:var(--gray-300);padding:60px 0;font-size:14px;">← 求人を選択してください</div>';
+    flyerCurrentJob = null;
+    renderFlyerByMode();
     return;
   }
   const j = allJobs.find(x=>x.id===id); if(!j) return;
@@ -5218,7 +5219,7 @@ function onFlyerJobSelect() {
 }
 
 // 求人票の表示モード（候補者向けフライヤー／求人オーダー票）
-let flyerViewMode = 'candidate';
+let flyerViewMode = 'order';
 let flyerCurrentJob = null;
 function setFlyerMode(m){
   flyerViewMode = m;
@@ -5230,7 +5231,7 @@ function setFlyerMode(m){
 function renderFlyerByMode(){
   const prev=document.getElementById('jobFlyerPreview'); if(!prev) return;
   if(flyerViewMode==='order'){
-    prev.innerHTML = flyerCurrentJob ? buildJobOrderSheet(flyerCurrentJob) : '<div style="text-align:center;color:var(--gray-300);padding:60px 0;font-size:14px;">← 求人を選択してください</div>';
+    prev.innerHTML = buildJobOrderSheet(flyerCurrentJob || {});
   } else {
     previewFlyer();
   }
@@ -9689,6 +9690,7 @@ function renderScreenContent(name) {
     filtersSection.style.display = 'none';
     contentWrap.style.padding = '0';
     contentWrap.innerHTML = buildJobFlyerScreen();
+    setTimeout(() => loadJobFlyer(), 30);
     return;
   }
   statsRow.style.display = 'none';
@@ -16531,6 +16533,10 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260804.03', date:'2026-08-04', notify:true, items:[
+    '求人票作成：ページを開くと空の求人オーダー票フォーマットが最初から表示されるように変更（すぐ使える状態）',
+    '求人票作成：メニューから開いたときに登録済み求人の選択リストが表示されない不具合を修正。リストから求人を選ぶと求人票に情報が自動で流し込まれます',
+  ]},
   { version:'ver.20260804.02', date:'2026-08-04', notify:true, items:[
     '求人票作成：求人オーダー票の項目をDBの実カラムに対応（従業員数・設立年・所定労働時間・寮までの距離・確認事項・FAQ等）。手当・その他控除（JSON）や事業内容・試用期間・喫煙対策も表示対応',
     'テスト用の求人「KMT003-TEST」（株式会社テスト農園）を登録。求人管理→求人票作成でサンプル表示を確認できます',
