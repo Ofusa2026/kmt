@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260804.15 -->
+<!-- KMT_VERSION ver.20260804.16 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -355,7 +355,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260804.15</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260804.16</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <div id="sidebarAlerts" style="margin-top:6px;display:none;flex-direction:column;gap:3px;"></div>
   </div>
@@ -374,6 +374,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="nav-item" onclick="showScreen('support_schedules')">📅 支援スケジュール <span id="supportScheduleBadge" style="display:none;background:#dc2626;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
   <div class="nav-item" onclick="showScreen('candidates')">📋 候補者</div>
   <div class="nav-item" onclick="showScreen('jobs')">💼 求人管理</div>
+  <div class="nav-item" onclick="showScreen('intro_reg_orgs')">🏢 登録支援機関一覧</div>
   <div class="nav-item" onclick="showScreen('introductions')">🤝 紹介案件</div>
   <div class="sidebar-section">マスタ</div>
   <div class="nav-item" onclick="showScreen('sending')">✈️ 送り出し機関</div>
@@ -5761,7 +5762,7 @@ async function changePinCode() {
 // ==============================
 const AUDIT_TABLE_LABELS = {
   companies:'所属機関', workers:'外国人材', candidates:'候補者', job_openings:'求人',
-  introductions:'紹介案件', sending_orgs:'送り出し機関', partner_support_orgs:'提携支援機関',
+  introductions:'紹介案件', sending_orgs:'送り出し機関', partner_support_orgs:'提携支援機関', intro_reg_orgs:'登録支援機関一覧',
   support_fees:'支援委託費', sales_forecast:'売上', expenses:'立替', users:'ユーザー',
   ai_knowledge:'AI記憶', task_requests:'タスク', support_schedules:'支援スケジュール',
   chat_messages:'チャット', chat_rooms:'チャットルーム', chat_groups:'チャットグループ',
@@ -9547,6 +9548,7 @@ const SCREENS = {
   workers:   { title: '👤 外国人材', init: loadWorkers },
   candidates:{ title: '📋 候補者',   init: loadCandidates },
   jobs:      { title: '💼 求人管理', init: loadJobs },
+  intro_reg_orgs:{ title: '🏢 登録支援機関一覧', init: loadIntroRegOrgs },
   introductions:{ title: '🤝 紹介案件', init: loadIntroductions },
   sending:   { title: '✈️ 送り出し機関', init: loadSending },
   partners:  { title: '🏛️ 提携登録支援機関', init: loadPartners },
@@ -9612,6 +9614,7 @@ function updateTopbarButtons(name) {
     workers:      `<button class="btn btn-outline" onclick="loadWorkers()">🔄 更新</button><button class="btn btn-primary" onclick="openWorkerModal(null)">＋ 人材登録</button>`,
     candidates:   `<button class="btn btn-outline" onclick="loadCandidates()">🔄 更新</button><button class="btn btn-primary" onclick="openCandidateModal(null)">＋ 候補者登録</button>`,
     jobs:         `<button class="btn btn-outline" onclick="showJobFlyer()">📄 求人票作成</button><button class="btn btn-outline" onclick="loadJobs()">🔄 更新</button><button class="btn btn-primary" onclick="openJobModal(null)">＋ 求人登録</button>`,
+    intro_reg_orgs: `<button class="btn btn-outline" onclick="loadIntroRegOrgs()">🔄 更新</button>`,
     job_flyer:    `<button class="btn btn-outline" onclick="showScreen('jobs')">← 求人一覧に戻る</button>`,
     introductions:`<button class="btn btn-outline" onclick="loadIntroductions()">🔄 更新</button><button class="btn btn-primary" onclick="openIntroModal(null)">＋ 紹介案件登録</button>`,
     sending:      `<button class="btn btn-outline" onclick="loadSending()">🔄 更新</button><button class="btn btn-primary" onclick="openSendingModal(null)">＋ 機関登録</button>`,
@@ -9641,6 +9644,7 @@ function renderScreenContent(name) {
     workers: buildWorkersScreen(),
     candidates: buildCandidatesScreen(),
     jobs: buildJobsScreen(),
+    intro_reg_orgs: buildIntroRegOrgsScreen(),
     introductions: buildIntroductionsScreen(),
     sending: buildSendingScreen(),
     partners: buildPartnersScreen(),
@@ -15168,6 +15172,78 @@ function buildCandidatesScreen() {
   </table><div class="pagination-bar" id="candidatePagination"></div></div>`;
 }
 
+// ===== 登録支援機関一覧（紹介案件） =====
+let allIntroRegOrgs=[];
+function buildIntroRegOrgsScreen(){
+  return `
+  <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;align-items:center;">
+    <input class="search-input" id="iroSearch" placeholder="企業名・コード・職種・担当で検索..." oninput="renderIntroRegOrgs()" style="flex:1;min-width:220px;">
+    <select class="filter-select" id="iroFilterType" onchange="renderIntroRegOrgs()"><option value="">全区分</option></select>
+    <select class="filter-select" id="iroFilterOfusa" onchange="renderIntroRegOrgs()"><option value="">全大房担当</option></select>
+    <select class="filter-select" id="iroFilterGlt" onchange="renderIntroRegOrgs()"><option value="">全GLT担当</option></select>
+    <button class="btn btn-outline" style="font-size:11px;padding:4px 10px" onclick="document.getElementById('iroSearch').value='';document.getElementById('iroFilterType').value='';document.getElementById('iroFilterOfusa').value='';document.getElementById('iroFilterGlt').value='';renderIntroRegOrgs();">✕</button>
+    <span id="iroCount" style="background:linear-gradient(135deg,#1a73e8,#7c3aed);color:white;padding:6px 14px;border-radius:8px;font-size:13px;font-weight:800;white-space:nowrap;">0 件</span>
+  </div>
+  <div id="introRegOrgArea"><div style="text-align:center;padding:40px;color:var(--gray-400);">読み込み中...</div></div>`;
+}
+async function loadIntroRegOrgs(){
+  showLoading(true);
+  try{ const d=await sbFetch('intro_reg_orgs?select=*&order=no.asc'); allIntroRegOrgs=d||[]; _populateIntroRegFilters(); renderIntroRegOrgs(); }
+  catch(e){ showToast('❌ '+e.message,'error'); const a=document.getElementById('introRegOrgArea'); if(a)a.innerHTML='<div style="padding:30px;text-align:center;color:#dc2626;">読み込み失敗: '+esc(e.message)+'</div>'; }
+  showLoading(false);
+}
+function _populateIntroRegFilters(){
+  const types=[...new Set(allIntroRegOrgs.map(o=>o.org_type).filter(Boolean))];
+  const ofusa=[...new Set(allIntroRegOrgs.map(o=>o.ofusa_staff).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ja'));
+  const glt=[...new Set(allIntroRegOrgs.map(o=>o.glt_staff).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ja'));
+  const set=(id,arr,label)=>{ const s=document.getElementById(id); if(!s)return; const cur=s.value; s.innerHTML='<option value="">'+label+'</option>'+arr.map(x=>`<option ${cur===x?'selected':''}>${esc(x)}</option>`).join(''); };
+  set('iroFilterType',types,'全区分'); set('iroFilterOfusa',ofusa,'全大房担当'); set('iroFilterGlt',glt,'全GLT担当');
+}
+function renderIntroRegOrgs(){
+  const area=document.getElementById('introRegOrgArea'); if(!area) return;
+  const q=(document.getElementById('iroSearch')?.value||'').toLowerCase().trim();
+  const fT=document.getElementById('iroFilterType')?.value||'';
+  const fO=document.getElementById('iroFilterOfusa')?.value||'';
+  const fG=document.getElementById('iroFilterGlt')?.value||'';
+  let list=allIntroRegOrgs.filter(o=>{
+    if(fT && o.org_type!==fT) return false;
+    if(fO && o.ofusa_staff!==fO) return false;
+    if(fG && o.glt_staff!==fG) return false;
+    if(q){ const hay=[o.company_name,o.code,o.main_industry,o.ofusa_staff,o.glt_staff,o.address].map(x=>(x||'').toLowerCase()).join(' '); if(!hay.includes(q)) return false; }
+    return true;
+  });
+  const cnt=document.getElementById('iroCount'); if(cnt) cnt.textContent=list.length+' 件';
+  const typeColor={'登録支援機関':'#2563eb','人材紹介会社＋登録支援機関':'#7c3aed','人材紹介会社':'#0891b2','営業代理店':'#d97706','その他':'#64748b'};
+  const gridCols='48px 88px minmax(160px,1.6fr) 150px minmax(90px,1fr) 84px 84px 64px minmax(110px,1.2fr) 92px';
+  const head='<div style="display:grid;grid-template-columns:'+gridCols+';gap:6px;padding:8px 10px;background:#0f2040;color:white;font-size:10px;font-weight:700;position:sticky;top:0;z-index:2;"><div>No</div><div>コード</div><div>提携先企業名</div><div>区分</div><div>主な職種</div><div>大房担当</div><div>GLT担当</div><div>案件数</div><div>請求合計</div><div>提携開始</div></div>';
+  const cell=(v)=>'<div style="color:var(--gray-700);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;" title="'+esc(v||'')+'">'+(v?esc(v):'<span style="color:#cbd5e1;">─</span>')+'</div>';
+  const rows=list.map(o=>{
+    const tc=typeColor[o.org_type]||'#64748b';
+    return '<div style="display:grid;grid-template-columns:'+gridCols+';gap:6px;padding:8px 10px;border-bottom:1px solid var(--gray-100);align-items:center;font-size:11px;cursor:pointer;background:white;" onmouseover="this.style.background=\'#f1f5f9\'" onmouseout="this.style.background=\'white\'" onclick="openIntroRegOrgDetail('+o.no+')">'+
+      '<div style="font-weight:700;color:var(--gray-500);">'+esc(String(o.no||''))+'</div>'+
+      '<div style="font-weight:800;color:var(--navy);">'+esc(o.code||'-')+'</div>'+
+      '<div style="font-weight:700;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;" title="'+esc(o.company_name||'')+'">'+esc(o.company_name||'-')+'</div>'+
+      '<div style="min-width:0;">'+(o.org_type?'<span style="background:'+tc+';color:white;font-size:9px;font-weight:700;padding:2px 6px;border-radius:8px;white-space:nowrap;">'+esc(o.org_type)+'</span>':'<span style="color:#cbd5e1;">─</span>')+'</div>'+
+      cell(o.main_industry)+cell(o.ofusa_staff)+cell(o.glt_staff)+cell(o.case_count)+cell(o.fee_total)+cell(o.partnership_start)+
+    '</div>';
+  }).join('');
+  area.innerHTML='<div style="overflow-x:auto;border:1px solid var(--gray-200);border-radius:8px;"><div style="min-width:1050px;">'+head+(rows||'<div style="padding:30px;text-align:center;color:var(--gray-400);">該当なし</div>')+'</div></div>';
+}
+function openIntroRegOrgDetail(no){
+  const o=allIntroRegOrgs.find(x=>x.no===no); if(!o) return;
+  const row=(label,val)=>'<div style="display:flex;border-bottom:1px solid var(--gray-100);padding:7px 4px;"><div style="width:130px;flex-shrink:0;font-size:11px;font-weight:700;color:var(--gray-500);">'+label+'</div><div style="flex:1;font-size:12px;color:var(--gray-800);white-space:pre-wrap;word-break:break-word;">'+(val?esc(val):'<span style="color:#cbd5e1;">─</span>')+'</div></div>';
+  const web=o.website?'<a href="'+esc(o.website)+'" target="_blank" style="color:var(--blue);">'+esc(o.website)+'</a>':'';
+  const body='<div style="max-height:70vh;overflow-y:auto;">'+
+    row('No / コード',(o.no||'')+' / '+(o.code||''))+row('提携先企業名',o.company_name)+row('区分',o.org_type)+row('住所',o.address)+row('主な職種',o.main_industry)+
+    row('担当者名',o.contact_name)+row('連絡先',o.contact)+row('外国籍スタッフ在籍',o.has_foreign_staff)+row('外国籍スタッフ情報',o.foreign_staff_info)+
+    row('KMT側請求',o.fee_kmt)+row('大房側請求',o.fee_ofusa)+row('請求合計',o.fee_total)+row('請求タイミング',o.billing_timing)+
+    row('大房担当',o.ofusa_staff)+row('GLT担当',o.glt_staff)+row('案件数',o.case_count)+row('最終求人番号',o.last_job_no)+
+    '<div style="display:flex;border-bottom:1px solid var(--gray-100);padding:7px 4px;"><div style="width:130px;flex-shrink:0;font-size:11px;font-weight:700;color:var(--gray-500);">ホームページ</div><div style="flex:1;font-size:12px;">'+(web||'<span style="color:#cbd5e1;">─</span>')+'</div></div>'+
+    row('提携開始日',o.partnership_start)+row('備考',o.notes)+
+    '</div><div style="display:flex;justify-content:flex-end;margin-top:12px;padding-top:10px;border-top:1px solid var(--gray-200);"><button class="btn btn-outline" onclick="closeGenModal(\'introRegOrgModal\')">閉じる</button></div>';
+  showGenModal('introRegOrgModal','🏢 '+(o.company_name||'登録支援機関'), body);
+}
+
 function buildIntroductionsScreen() {
   return `
   <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
@@ -17054,6 +17130,9 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260804.16', date:'2026-08-04', notify:true, items:[
+    '求人管理の隣に「🏢 登録支援機関一覧」ページを新規追加。GLT求人進捗管理シートの「紹介案件 登録支援機関一覧」53件を取り込み、企業名・区分・コード・主な職種・大房/GLT担当・請求・案件数・提携開始日などを一覧表示（検索・区分/担当フィルター・詳細表示対応）',
+  ]},
   { version:'ver.20260804.15', date:'2026-08-04', notify:true, items:[
     '申請記録：編集可能に。受け取り方法（窓口/メール/郵送）とチャット（LINE/Google/案シス/不明）はドロップダウン、その他（預かり証・在カパ依頼・状況・対応日・備考）は自由記入。行ごとに「💾 保存」ボタンがあり、最終更新日時と更新ユーザーを表示（DBに保存、シート値は初期値）',
     '申請記録：申請種別と申請ステータスの間に「希望在留資格」列を追加（人材情報から自動反映）',
