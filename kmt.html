@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260804.13 -->
+<!-- KMT_VERSION ver.20260804.14 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -355,7 +355,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260804.13</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260804.14</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <div id="sidebarAlerts" style="margin-top:6px;display:none;flex-direction:column;gap:3px;"></div>
   </div>
@@ -9747,6 +9747,19 @@ function buildWorkersScreen() {
       style="padding:10px 22px;font-size:13px;font-weight:700;border:none;background:none;cursor:pointer;color:var(--blue);border-bottom:2px solid var(--blue);">📋 一覧</button>
     <button id="wsTab_renewal" onclick="switchWorkersScreenTab('renewal')"
       style="padding:10px 22px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--gray-400);border-bottom:2px solid transparent;">📅 更新状況</button>
+    <button id="wsTab_apply" onclick="switchWorkersScreenTab('apply')"
+      style="padding:10px 22px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--gray-400);border-bottom:2px solid transparent;">📄 申請記録</button>
+  </div>
+  <div id="wsTab_apply_panel" style="display:none;">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+      <input type="text" id="applySearch" placeholder="🔍 氏名・企業・申請番号で検索" oninput="renderApplyRecords()" style="flex:1;min-width:240px;padding:7px 12px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:12px;">
+      <select id="applyFilterType" onchange="renderApplyRecords()" class="filter-select" style="min-width:120px;"><option value="">全申請種別</option></select>
+      <select id="applyFilterStatus" onchange="renderApplyRecords()" class="filter-select" style="min-width:120px;"><option value="">全申請ステータス</option></select>
+      <button class="btn btn-outline" style="font-size:11px;padding:5px 10px;" onclick="loadApplyRecords(true)">🔄 シート再取得</button>
+      <span id="applySheetInfo" style="font-size:11px;color:var(--gray-400);"></span>
+      <span id="applyResultCount" style="background:linear-gradient(135deg,#1a73e8,#7c3aed);color:white;padding:6px 14px;border-radius:8px;font-size:13px;font-weight:800;white-space:nowrap;">0 件</span>
+    </div>
+    <div id="applyRecordArea"><div style="text-align:center;padding:40px;color:var(--gray-400);">「申請記録」タブを開くと読み込みます</div></div>
   </div>
   <div id="wsTab_list_panel">
   <div id="workerAlertBanner"></div>
@@ -9893,7 +9906,7 @@ function _shortText(s, n) {
 }
 
 function switchWorkersScreenTab(name) {
-  ['list','renewal'].forEach(t => {
+  ['list','renewal','apply'].forEach(t => {
     const btn = document.getElementById('wsTab_'+t);
     const panel = document.getElementById('wsTab_'+t+'_panel');
     const active = t === name;
@@ -9910,6 +9923,9 @@ function switchWorkersScreenTab(name) {
       renderRenewalList();
     });
   }
+  if (name === 'apply') {
+    loadApplyRecords(false);
+  }
 }
 
 async function _ensureRenewalDataLoaded() {
@@ -9921,6 +9937,127 @@ async function _ensureRenewalDataLoaded() {
       allWorkers = d || [];
     } catch(e) { console.warn(e); }
   }
+}
+
+// ===== 申請記録タブ（スプレッドシートを直接読み込み） =====
+const APPLY_SHEET_ID = '1oNPeG3Vv-QU_I0NalnOu1Mpd1931hG10m_MfxsRGWMg';
+const APPLY_SHEET_GID = '0';
+function _applySheetCsvUrl(){ return 'https://docs.google.com/spreadsheets/d/'+APPLY_SHEET_ID+'/gviz/tq?tqx=out:csv&gid='+APPLY_SHEET_GID; }
+let _applySheetLookup = null, _applySheetFetchedAt = null;
+
+function _parseCSV(text){
+  const rows=[]; let row=[], field='', i=0, inQ=false;
+  while(i<text.length){
+    const c=text[i];
+    if(inQ){
+      if(c==='"'){ if(text[i+1]==='"'){field+='"';i+=2;continue;} inQ=false;i++;continue; }
+      field+=c;i++;continue;
+    } else {
+      if(c==='"'){inQ=true;i++;continue;}
+      if(c===','){row.push(field);field='';i++;continue;}
+      if(c==='\r'){i++;continue;}
+      if(c==='\n'){row.push(field);rows.push(row);row=[];field='';i++;continue;}
+      field+=c;i++;continue;
+    }
+  }
+  if(field!=='' || row.length){ row.push(field); rows.push(row); }
+  return rows;
+}
+function _normApplyNo(s){ if(!s) return ''; return String(s).replace(/[Ａ-Ｚａ-ｚ０-９]/g,ch=>String.fromCharCode(ch.charCodeAt(0)-0xFEE0)).replace(/\s+/g,'').toUpperCase(); }
+function _normName(s){ if(!s) return ''; return String(s).toUpperCase().replace(/\s+/g,' ').trim(); }
+
+async function loadApplyRecords(force){
+  const area=document.getElementById('applyRecordArea'); if(!area) return;
+  await _ensureRenewalDataLoaded();
+  if(force || !_applySheetLookup){
+    area.innerHTML='<div style="text-align:center;padding:40px;color:var(--gray-400);">📄 スプレッドシートを読み込み中...</div>';
+    try{
+      const res=await fetch(_applySheetCsvUrl(), {cache:'no-store'});
+      if(!res.ok) throw new Error('HTTP '+res.status);
+      const text=await res.text();
+      const rows=_parseCSV(text);
+      let hi=rows.findIndex(r=>r.some(c=>(c||'').trim()==='申請日'));
+      if(hi<0) hi=0;
+      const data=rows.slice(hi+1).filter(r=>r.some(c=>(c||'').trim()!==''));
+      const byNo={}, byName={};
+      data.forEach(r=>{
+        const rec={
+          apply_date:(r[0]||'').trim(), apply_type:(r[1]||'').trim(), status:(r[2]||'').trim(),
+          apply_no:(r[3]||'').trim(), name:(r[4]||'').trim(), case_name:(r[5]||'').trim(), company_no:(r[6]||'').trim(),
+          receive:(r[7]||'').trim(), visa_expiry:(r[8]||'').trim(), tokurei:(r[9]||'').trim(), chat:(r[10]||'').trim(),
+          custody:(r[11]||'').trim(), zaikapa:(r[12]||'').trim(), situation:(r[13]||'').trim(), handle_date:(r[14]||'').trim(), note:(r[15]||'').trim()
+        };
+        const kn=_normApplyNo(rec.apply_no); if(kn && !byNo[kn]) byNo[kn]=rec;
+        const nm=_normName(rec.name); if(nm && !byName[nm]) byName[nm]=rec;
+      });
+      _applySheetLookup={ byNo, byName, count:data.length };
+      _applySheetFetchedAt=new Date();
+    }catch(e){
+      area.innerHTML='<div style="padding:30px;text-align:center;color:#dc2626;font-size:13px;line-height:1.7;">❌ スプレッドシートを読み込めませんでした（'+esc(e.message)+'）<br><span style="color:var(--gray-500);font-size:12px;">シートの共有設定を「リンクを知っている全員（閲覧者）」または「ウェブに公開」にしてください。</span><br><button class="btn btn-outline" style="margin-top:10px;font-size:12px;" onclick="loadApplyRecords(true)">🔄 再試行</button></div>';
+      return;
+    }
+  }
+  _populateApplyFilters();
+  renderApplyRecords();
+}
+function _populateApplyFilters(){
+  const list=(allWorkers||[]).filter(w=> w.apply_status && w.apply_status!=='申請予定なし');
+  const types=[...new Set(list.map(w=>w.apply_type).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ja'));
+  const stats=[...new Set(list.map(w=>w.apply_status).filter(Boolean))];
+  const tSel=document.getElementById('applyFilterType'); const sSel=document.getElementById('applyFilterStatus');
+  if(tSel){ const cur=tSel.value; tSel.innerHTML='<option value="">全申請種別</option>'+types.map(t=>`<option ${cur===t?'selected':''}>${esc(t)}</option>`).join(''); }
+  if(sSel){ const cur=sSel.value; sSel.innerHTML='<option value="">全申請ステータス</option>'+stats.map(s=>`<option ${cur===s?'selected':''}>${esc(s)}</option>`).join(''); }
+}
+function renderApplyRecords(){
+  const area=document.getElementById('applyRecordArea'); if(!area||!_applySheetLookup) return;
+  const q=(document.getElementById('applySearch')?.value||'').toLowerCase().trim();
+  const fType=document.getElementById('applyFilterType')?.value||'';
+  const fStatus=document.getElementById('applyFilterStatus')?.value||'';
+  const list=(allWorkers||[]).filter(w=> w.apply_status && w.apply_status!=='申請予定なし');
+  const matched=list.map(w=>({ w, rec: _applySheetLookup.byNo[_normApplyNo(w.apply_number||'')] || _applySheetLookup.byName[_normName(w.name||'')] || null }));
+  const filtered=matched.filter(({w})=>{
+    if(fType && (w.apply_type||'')!==fType) return false;
+    if(fStatus && (w.apply_status||'')!==fStatus) return false;
+    if(q){ const hay=[w.name,w.companies?.name,w.apply_number,w.management_no].map(x=>(x||'').toLowerCase()).join(' '); if(!hay.includes(q)) return false; }
+    return true;
+  });
+  filtered.sort((a,b)=>{
+    const ad=a.w.apply_date||'', bd=b.w.apply_date||''; if(ad!==bd) return ad<bd?1:-1; // 新しい申請日順
+    return (a.w.name||'').localeCompare(b.w.name||'','ja');
+  });
+  const cnt=document.getElementById('applyResultCount'); if(cnt) cnt.textContent=filtered.length+' 件';
+  const info=document.getElementById('applySheetInfo');
+  if(info) info.textContent='シート取得: '+(_applySheetFetchedAt? _applySheetFetchedAt.toLocaleString('ja-JP',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '-')+' ／ シート'+_applySheetLookup.count+'行 ／ 灰=シート由来';
+  const gridCols='64px 84px 92px 104px 128px minmax(120px,1fr) minmax(110px,1fr) 66px 88px 88px 64px 88px 88px minmax(96px,1fr) 66px minmax(140px,1.4fr)';
+  const S=(v)=>'<div style="background:#f1f5f9;color:#475569;">'+v+'</div>'; // ダミー(未使用)
+  const headLabels=['管理番号','申請日','申請種別','申請ステータス','申請番号','氏名','企業','受け取り方法','在留期限','特例期間','チャット','預かり証→企業','在カパ依頼','状況','対応日','備考'];
+  const sheetCols=new Set([7,10,11,12,13,14,15]); // シート由来列(0-based, 上のheadLabels基準)
+  const head='<div style="display:grid;grid-template-columns:'+gridCols+';gap:6px;padding:8px 10px;background:#0f2040;color:white;font-size:10px;font-weight:700;position:sticky;top:0;z-index:2;">'+
+    headLabels.map((l,idx)=>'<div style="'+(sheetCols.has(idx)?'color:#cbd5e1;':'')+'">'+l+'</div>').join('')+'</div>';
+  const cell=(v,isSheet)=>'<div style="'+(isSheet?'color:#64748b;background:#f8fafc;border-radius:4px;padding:1px 4px;':'color:var(--gray-700);')+'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;" title="'+esc(v||'')+'">'+(v?esc(v):'<span style="color:#cbd5e1;">─</span>')+'</div>';
+  const rowsHtml=filtered.map(({w,rec})=>{
+    const r=rec||{};
+    const noMatch=!rec;
+    return '<div style="display:grid;grid-template-columns:'+gridCols+';gap:6px;padding:8px 10px;border-bottom:1px solid var(--gray-100);align-items:center;font-size:11px;cursor:pointer;background:'+(noMatch?'#fffdf5':'white')+';" onmouseover="this.style.background=\'#f1f5f9\'" onmouseout="this.style.background=\''+(noMatch?'#fffdf5':'white')+'\'" onclick="openWorkerModal(\''+w.id+'\')">'+
+      '<div style="font-weight:600;color:var(--gray-500);font-size:10px;">'+esc(w.management_no||'-')+'</div>'+
+      cell(w.apply_date,false)+
+      cell(w.apply_type,false)+
+      '<div style="min-width:0;">'+_applyStatusBadge(w.apply_status)+(noMatch?'<span title="シート未照合" style="margin-left:3px;font-size:9px;color:#f59e0b;">⚠</span>':'')+'</div>'+
+      cell(w.apply_number,false)+
+      '<div style="font-weight:700;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;" title="'+esc(w.name||'')+'">'+natFlag(w.nationality||'')+' '+esc(w.name||'-')+'</div>'+
+      cell(w.companies?.name,false)+
+      cell(r.receive,true)+
+      cell(w.visa_expiry,false)+
+      cell(w.tokurei_date,false)+
+      cell(r.chat,true)+
+      cell(r.custody,true)+
+      cell(r.zaikapa,true)+
+      cell(r.situation,true)+
+      cell(r.handle_date,true)+
+      cell(r.note,true)+
+    '</div>';
+  }).join('');
+  area.innerHTML='<div style="overflow-x:auto;border:1px solid var(--gray-200);border-radius:8px;"><div style="min-width:1500px;">'+head+(rowsHtml||'<div style="padding:30px;text-align:center;color:var(--gray-400);">該当する人材がいません（申請ステータスが「申請予定なし」以外）</div>')+'</div></div>';
 }
 
 function _populateRenewalFilters() {
@@ -16891,6 +17028,10 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260804.14', date:'2026-08-04', notify:true, items:[
+    '外国人材に「📄 申請記録」タブを追加（一覧・更新状況の隣）。申請ステータスが「申請予定なし」以外の人材を一覧表示',
+    '申請記録：基本情報にある項目（申請日・申請種別・申請ステータス・申請番号・氏名・企業・在留期限・特例期間）は人材データから自動反映、無い項目（受け取り方法・チャット・預かり証・在カパ依頼・状況・対応日・備考）はスプレッドシートから直接読み込み（灰色表示）。申請番号優先・氏名フォールバックで照合、シート取得日時も表示',
+  ]},
   { version:'ver.20260804.13', date:'2026-08-04', notify:true, items:[
     '申請ステータス「発行完了」「入国済み」：選択すると専用パネル（発行完了＝在留情報入力アラート＋済み・郵送追跡番号・郵送先／入国済み＝在留期限記入アラート・日本住所記入アラート）が表示され、済みにすると赤いアラートが消えます',
     '「発行完了」「入国済み」に変更して保存すると、記入内容（在留資格・新しい在留期限・在留カード番号・郵送追跡番号/郵送先 or 日本住所）を人材チャットに自動投稿します',
