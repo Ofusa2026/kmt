@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260804.08 -->
+<!-- KMT_VERSION ver.20260804.09 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -355,8 +355,9 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260804.08</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260804.09</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
+    <div id="sidebarAlerts" style="margin-top:6px;display:none;flex-direction:column;gap:3px;"></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
   <div style="height:1px;background:rgba(255,255,255,0.08);margin:4px 16px 8px;"></div>
@@ -6119,6 +6120,7 @@ function onLoginSuccess() {
   loadChatUnread();
   startPresenceHeartbeat();
   refreshSupportScheduleBadge();
+  refreshSidebarAlerts();
   updateNotifButton();
   // 大房さんだけ「🔒 システム管理」ナビ表示
   _refreshSysAdminNav();
@@ -10026,6 +10028,7 @@ async function loadWorkers() {
   try {
     const data = await sbFetch('workers?select=*,companies(name,main_staff,sub_staff,kokko_system_id,kokko_system_password,kokko_system_memo)&is_deleted=eq.false&order=joined_date.desc.nullslast,name.asc');
     allWorkers = data || [];
+    _sidebarAlertData = allWorkers; updateSidebarAlerts(allWorkers);
     refreshWorkerStaffFilters();
     applyWorkerFilters();
     // 企業一覧のヘッダ統計+在職中列を再計算(allWorkersが揃ったタイミング)
@@ -10272,9 +10275,56 @@ function toggleLumpSumFields() {
   if (d) d.style.display = (v === 'あり') ? '' : 'none';
 }
 
+// ===== サイドバー用アラート件数（外国人材のバナーと同じ判定を簡潔表示）=====
+let _sidebarAlertData = null;
+function computeSidebarAlertCounts(list){
+  list = list || [];
+  const today = new Date(); today.setHours(0,0,0,0);
+  let miss=0, renewal=0, kokko=0;
+  const isConstruction = w => /建設/.test(w.applicant_field || '');
+  list.forEach(w => {
+    if (w.kmt_support === 'KMT支援外') return;
+    if (isConstruction(w) && w.visa_status !== '特定活動') {
+      if (w.status === '在職中' && w.visa_status === '特定技能1号' && !w.placement_report_date) kokko++;
+      if (['退職済(帰国)','退職済(転職)'].includes(w.status) && !w.retire_report_date) kokko++;
+      if (w.desired_visa === '特定技能2号' && w.apply_status === '審査完了' && !w.tg2_change_report_date && w.status !== '退職予定(更新なし決定)') kokko++;
+    }
+    if (!w.visa_expiry) return;
+    const exp = new Date(w.visa_expiry); exp.setHours(0,0,0,0);
+    const days = Math.floor((exp - today)/86400000);
+    if (['退職済(帰国)','退職済(転職)'].includes(w.status)) return;
+    if (w.status !== '退職予定(更新なし決定)') {
+      if (days <= 91 && !w.renewal_status) renewal++;
+      else if (days <= 61 && w.renewal_status === '要確認') renewal++;
+    }
+    const applyStatus = w.apply_status || '申請予定なし';
+    const skipMiss = w.status === '退職予定(更新なし決定)' || w.support_type_2go === '2号企業単独';
+    if (days <= 90 && applyStatus === '申請予定なし' && !skipMiss) miss++;
+  });
+  return { miss, renewal, kokko };
+}
+function updateSidebarAlerts(list){
+  const el = document.getElementById('sidebarAlerts'); if(!el) return;
+  const src = (list && list.length) ? list : (_sidebarAlertData || (allWorkers && allWorkers.length ? allWorkers : []));
+  const { miss, renewal, kokko } = computeSidebarAlertCounts(src);
+  const mk = (cnt, icon, label, color) => cnt>0
+    ? `<div onclick="showScreen('workers')" title="外国人材で詳細を見る" style="cursor:pointer;display:flex;align-items:center;gap:5px;font-size:10px;color:${color};font-weight:700;background:rgba(255,255,255,.06);padding:3px 7px;border-radius:5px;">${icon} ${label}<span style="margin-left:auto;font-weight:800;">${cnt}件</span></div>`
+    : '';
+  const html = [ mk(miss,'🚨','申請忘れ警告','#fca5a5'), mk(renewal,'📋','更新リマインド','#93c5fd'), mk(kokko,'🏗️','就労管理システム','#fdba74') ].filter(Boolean).join('');
+  el.innerHTML = html;
+  el.style.display = html ? 'flex' : 'none';
+}
+async function refreshSidebarAlerts(){
+  try{
+    const d = await sbFetch('workers?select=status,visa_expiry,apply_status,renewal_status,applicant_field,visa_status,desired_visa,kmt_support,support_type_2go,placement_report_date,retire_report_date,tg2_change_report_date&is_deleted=eq.false');
+    _sidebarAlertData = d || [];
+    updateSidebarAlerts(_sidebarAlertData);
+  }catch(e){}
+}
+
 function renderWorkerAlerts() {
   const banner = document.getElementById('workerAlertBanner');
-  if (!banner) return;
+  if (!banner) { updateSidebarAlerts(); return; }
   const today = new Date(); today.setHours(0,0,0,0);
   const alerts = { 0:[], 1:[], 2:[], 3:[] };
   // 🚨 申請忘れ警告: 90日以内 かつ 申請予定なし(または未設定)
@@ -10361,6 +10411,8 @@ function renderWorkerAlerts() {
   });
   const total = alerts[0].length + alerts[1].length + alerts[2].length + alerts[3].length;
   const kokkoTotal = kokkoPlacementAlert.length + kokkoRetireAlert.length + kokkoTg2Alert.length;
+  // サイドバーの件数は全体（フィルター非適用）で表示
+  _sidebarAlertData = allWorkers; updateSidebarAlerts(allWorkers);
   if (!total && !missAlert.length && !shortageAlert.length && !kokkoTotal && !lumpSumAlert.length && !leaveOverdueAlert.length && !renewalDueAlert.length) { banner.innerHTML=''; return; }
   // 残り日数で昇順ソート(期限切れも含めて期日が近い順)
   missAlert.sort((a,b) => a.days - b.days);
@@ -16817,6 +16869,9 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260804.09', date:'2026-08-04', notify:true, items:[
+    'サイドバーのユーザー名下に、外国人材のアラート件数を簡潔表示（🚨申請忘れ警告／📋更新リマインド／🏗️就労管理システム）。クリックで外国人材へ。全ページで確認できます',
+  ]},
   { version:'ver.20260804.08', date:'2026-08-04', notify:true, items:[
     '労働局指定項目を必須化。求人：求人受理番号／案件名／所属機関(所在地)／担当者電話／受付年月日／有効期間／職種・分野／就業場所／雇用期間／採用予定人数／賃金。候補者：氏名／住所／生年月日／希望職種／受付年月日／有効期間。未入力で保存するとアラート表示（赤い＊が必須項目）',
     '候補者フォームも求人と同じ手動保存に統一（自動保存を廃止）。「💾 保存」ボタン追加、未保存のまま閉じる/画面移動で「保存しますか？」リマインド',
