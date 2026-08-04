@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260804.10 -->
+<!-- KMT_VERSION ver.20260804.11 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -355,7 +355,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260804.10</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260804.11</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <div id="sidebarAlerts" style="margin-top:6px;display:none;flex-direction:column;gap:3px;"></div>
   </div>
@@ -11342,21 +11342,7 @@ function buildWorkerModalBody(w) {
   <!-- 3. 更新状況（更新状況タブから移設）-->
   <div class="section-title" id="wf_renewal_section">3. 更新状況</div>
 
-    <div style="background:#ede9fe;border-left:4px solid #7c3aed;border-radius:0 8px 8px 0;padding:12px 16px;margin-bottom:16px;font-size:12px;color:#5b21b6;line-height:1.6;">
-      <strong>📅 更新状況</strong><br>
-      在留期限の更新申請に関する進捗状況・申請メモ・確定雇用条件を記録します。「KMT側 申請状況管理スプレッドシート」の更新状況シートから取り込み済み。
-    </div>
     <div class="form-grid" style="grid-template-columns:1fr;">
-      <div class="section-title">ステータス・進捗</div>
-      <div class="form-group full">
-        <div style="background:#f8fafc;border:1px solid var(--gray-200);border-radius:8px;padding:10px 12px;font-size:11px;color:var(--gray-700);display:flex;flex-wrap:wrap;gap:14px;align-items:center;">
-          <span style="opacity:.7;font-weight:700;">人材情報から自動反映:</span>
-          <span>申請種別: <strong>${esc(w.apply_type||'-')}</strong></span>
-          <span>申請ステータス: <strong>${esc(w.apply_status||'-')}</strong></span>
-          <span>一時帰国日: <strong>${w.return_home_date||'-'}</strong></span>
-          <span>再入国日: <strong>${w.return_jp_date||'-'}</strong></span>
-        </div>
-      </div>
       <div class="form-group">
         <label class="form-label">更新状況ステータス</label>
         <select class="form-select" id="wf_renewal_status" onchange="toggleRenewalCompletionFields()">
@@ -11663,9 +11649,9 @@ function buildWorkerModalBody(w) {
   <div style="display:flex;gap:8px;align-items:center;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)">
     ${editingWorkerId ? '<button class="btn btn-outline" style="color:var(--red);border-color:var(--red);" onclick="deleteWorker()">🗑️ 削除</button>' : ''}
     <div style="flex:1;"></div>
+    <button class="btn btn-primary" onclick="saveWorker()" style="padding:8px 28px;font-size:14px;">💾 保存</button>
     <button class="btn btn-outline" style="color:#059669;border-color:#059669;" onclick="saveAndStartChat()">💬 チャット開始</button>
     <button class="btn btn-outline" onclick="closeWorkerModalWithCheck()">閉じる</button>
-    <button class="btn btn-primary" onclick="saveWorker()" style="padding:8px 28px;font-size:14px;">💾 保存</button>
   </div>`;
 }
 
@@ -16871,6 +16857,10 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260804.11', date:'2026-08-04', notify:true, items:[
+    '人材詳細：保存ボタンの並びを「保存 → チャット開始 → 閉じる」に変更（機能は変更なし）',
+    '人材詳細 更新状況：不要な説明バナー・「ステータス・進捗」見出し・「人材情報から自動反映」ボックスを削除して簡潔化。更新完了情報（完了で保存→チャット自動投稿／新在留期限で次サイクル初期化）は従来どおり動作します',
+  ]},
   { version:'ver.20260804.10', date:'2026-08-04', notify:true, items:[
     '人材詳細：独立していた「更新状況」タブを廃止し、内容と機能をそのまま基本情報タブ内に移設（左カラムの3番目）。項目順＝申請情報/在留情報/更新状況/ドライブリンク/メモ、右＝人材情報/所属機関・受け入れ情報/支援情報/連絡先。更新状況リストから開くと該当セクションへ自動スクロール',
   ]},
