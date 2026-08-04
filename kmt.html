@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260804.05 -->
+<!-- KMT_VERSION ver.20260804.06 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -355,7 +355,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260804.05</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260804.06</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
   </div>
   <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
@@ -13939,6 +13939,13 @@ function jobModalJump(secId){
   const o=el.style.background; el.style.transition='background .3s'; el.style.background='#fef9c3';
   setTimeout(()=>{ el.style.background=o||''; }, 900);
 }
+function switchJobTab(tab){
+  const tabs=['basic','joken','salary','kmt','candidates','memo','countries'];
+  const bar=document.getElementById('jobModalTabs');
+  if(bar) bar.querySelectorAll('.modal-tab').forEach((t,i)=>t.classList.toggle('active',tabs[i]===tab));
+  const modal=document.getElementById('jobModal');
+  if(modal) modal.querySelectorAll('.tab-panel').forEach(p=>p.classList.toggle('active',p.id==='jtab-'+tab));
+}
 
 // ===== 社内メモ（求人ごとの自由メモ: job_openings.internal_memos jsonb） =====
 async function loadJobMemos(jobId){
@@ -15117,11 +15124,16 @@ function buildIntroModalBody(i) {
 function buildJobModalBody(j) {
   j=j||{};
   return `
-  <div class="form-grid">
-    <div class="form-group full" style="display:flex;gap:8px;position:sticky;top:0;background:white;z-index:5;padding:6px 0;border-bottom:1px solid var(--gray-200);margin-bottom:2px;">
-      <button type="button" class="btn btn-outline" style="font-size:12px;padding:5px 14px;border-color:#7c3aed;color:#7c3aed;font-weight:700;" onclick="jobModalJump('jobSecCandidates')">👥 候補者リスト</button>
-      <button type="button" class="btn btn-outline" style="font-size:12px;padding:5px 14px;border-color:#0891b2;color:#0891b2;font-weight:700;" onclick="jobModalJump('jobSecMemo')">📝 社内メモ</button>
-    </div>
+  <div class="modal-tabs" id="jobModalTabs" style="position:sticky;top:0;z-index:6;">
+    <div class="modal-tab active" onclick="switchJobTab('basic')">基本情報</div>
+    <div class="modal-tab" onclick="switchJobTab('joken')">条件</div>
+    <div class="modal-tab" onclick="switchJobTab('salary')">給与・住居</div>
+    <div class="modal-tab" onclick="switchJobTab('kmt')">📋 KMT管理</div>
+    <div class="modal-tab" onclick="switchJobTab('candidates')">👥 候補者リスト</div>
+    <div class="modal-tab" onclick="switchJobTab('memo')">📝 社内メモ</div>
+    <div class="modal-tab" onclick="switchJobTab('countries')">🌍 応募状況</div>
+  </div>
+  <div class="tab-panel active" id="jtab-basic"><div class="form-grid">
     <div class="section-title" style="color:#dc2626;">⚖️ 労働局指定項目（求人受理票）</div>
     <div class="form-group"><label class="form-label">求人受理番号（求人コード）</label><input class="form-input" id="jf_code" value="${esc(j.job_code||'')}"></div>
     <div class="form-group"><label class="form-label">担当者連絡先電話番号</label><input class="form-input" id="jf_contact_phone" type="tel" value="${esc(j.contact_phone||'')}" placeholder="03-1234-5678"></div>
@@ -15142,12 +15154,16 @@ function buildJobModalBody(j) {
     <div class="form-group"><label class="form-label">所属機関</label>
       <select class="form-select" id="jf_company_id"><option value="">選択...</option>${allCompanies.map(c=>`<option value="${c.id}" ${j.company_id===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div>
 
+  </div></div>
+  <div class="tab-panel" id="jtab-joken"><div class="form-grid">
     <div class="section-title">条件</div>
     <div class="form-group"><label class="form-label">募集国籍</label><input class="form-input" id="jf_target_nationality" value="${esc(j.target_nationality||'')}"></div>
     <div class="form-group"><label class="form-label">採用予定人数</label><input class="form-input" id="jf_target_count" type="number" value="${j.target_count??''}"></div>
     <div class="form-group"><label class="form-label">日本語レベル</label><input class="form-input" id="jf_jp_level_req" value="${esc(j.jp_level_req||'')}"></div>
     <div class="form-group"><label class="form-label">必要資格</label><input class="form-input" id="jf_required_license" value="${esc(j.required_license||'')}"></div>
 
+  </div></div>
+  <div class="tab-panel" id="jtab-salary"><div class="form-grid">
     <div class="section-title">給与・住居</div>
     <div class="form-group"><label class="form-label">給与種別</label>
       <select class="form-select" id="jf_salary_type">${['','月給','時給'].map(s=>`<option ${j.salary_type===s?'selected':''}>${s}</option>`).join('')}</select></div>
@@ -15156,6 +15172,8 @@ function buildJobModalBody(j) {
       <select class="form-select" id="jf_dormitory">${['','あり','なし'].map(s=>`<option ${j.dormitory_available===s?'selected':''}>${s}</option>`).join('')}</select></div>
     <div class="form-group"><label class="form-label">年間休日</label><input class="form-input" id="jf_holiday_days" type="number" value="${j.annual_holiday_days??''}"></div>
 
+  </div></div>
+  <div class="tab-panel" id="jtab-kmt"><div class="form-grid">
     <div class="section-title" style="color:#1a73e8;">📋 KMT管理項目</div>
     <div class="form-group"><label class="form-label">国内/国外</label>
       <select class="form-select" id="jf_domestic_overseas">${['','国内','国外','国内/外'].map(s=>`<option ${j.domestic_overseas===s||(!j.domestic_overseas&&j.location_domestic===s)?'selected':''}>${s}</option>`).join('')}</select></div>
@@ -15172,15 +15190,21 @@ function buildJobModalBody(j) {
     <div class="form-group full"><label class="form-label">人材担当のコメント</label><textarea class="form-textarea" id="jf_jinzai_comment">${esc(j.jinzai_comment||'')}</textarea></div>
     <div class="form-group full"><label class="form-label">仕事内容</label><textarea class="form-textarea" id="jf_job_description">${esc(j.job_description||'')}</textarea></div>
 
+  </div></div>
+  <div class="tab-panel" id="jtab-candidates"><div class="form-grid">
     <div class="section-title" style="color:#7c3aed;" id="jobSecCandidates">👥 候補者リスト</div>
     <div class="form-group full" id="jobCandidateListWrap">${j.id ? '<div style="color:#94a3b8;font-size:12px;padding:8px;">読み込み中...</div>' : '<div style="color:#94a3b8;font-size:12px;padding:8px;">求人を保存すると候補者を追加できます</div>'}</div>
 
+  </div></div>
+  <div class="tab-panel" id="jtab-memo"><div class="form-grid">
     <div class="section-title" style="color:#0891b2;" id="jobSecMemo">📝 社内メモ</div>
     <div class="form-group full" id="jobMemoWrap">${j.id ? '<div style="color:#94a3b8;font-size:12px;padding:8px;">読み込み中...</div>' : '<div style="color:#94a3b8;font-size:12px;padding:8px;">求人を保存するとメモを追加できます</div>'}</div>
 
+  </div></div>
+  <div class="tab-panel" id="jtab-countries"><div class="form-grid">
     <div class="section-title" style="color:#16a34a;">🌍 各国の応募状況</div>
     <div class="form-group full" id="jf_country_progress_wrap">${buildCountryProgressEditor(j)}</div>
-  </div>
+  </div></div>
   <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)">
     <button class="btn btn-outline" onclick="closeGenModal('jobModal')">閉じる</button>
     
@@ -16748,6 +16772,9 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260804.06', date:'2026-08-04', notify:true, items:[
+    '求人詳細を所属機関詳細と同じタブ形式に変更。基本情報／条件／給与・住居／KMT管理／候補者リスト／社内メモ／応募状況を1タブ＝1ページで切り替えできるようにしました（1ページで縦に長かったのを解消）',
+  ]},
   { version:'ver.20260804.05', date:'2026-08-04', notify:true, items:[
     '求人詳細の上部に「👥 候補者リスト」「📝 社内メモ」ボタンを追加。クリックで各セクションへジャンプできます',
     '求人詳細に「📝 社内メモ」を追加。自由メモを何件でも追加でき（作成者・日付付き）、個別に削除も可能です',
