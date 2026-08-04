@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260804.09 -->
+<!-- KMT_VERSION ver.20260804.10 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -355,7 +355,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260804.09</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260804.10</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <div id="sidebarAlerts" style="margin-top:6px;display:none;flex-direction:column;gap:3px;"></div>
   </div>
@@ -10020,7 +10020,12 @@ function renderRenewalList() {
 function _openWorkerRenewalDetail(workerId) {
   if (!workerId) return;
   openWorkerModal(workerId);
-  setTimeout(() => { try { switchWorkerTab('renewal'); } catch(e) {} }, 200);
+  // 更新状況は基本情報タブ内に移設されたため、基本情報を開いて該当セクションへスクロール
+  setTimeout(() => { try {
+    switchWorkerTab('basic');
+    const sec=document.getElementById('wf_renewal_section');
+    if(sec) sec.scrollIntoView({behavior:'smooth',block:'start'});
+  } catch(e) {} }, 250);
 }
 
 async function loadWorkers() {
@@ -10988,7 +10993,7 @@ let editingWorkerId = null;
 let _savingWorkerNew = false;
 
 function switchWorkerTab(tab) {
-  const tabs = ['basic','note','tasks','schedules','kokko','renewal'];
+  const tabs = ['basic','note','tasks','schedules','kokko'];
   tabs.forEach(t => {
     const btn = document.getElementById('wtab_'+t);
     const panel = document.getElementById('wtab_'+t+'_panel');
@@ -11285,10 +11290,6 @@ function buildWorkerModalBody(w) {
       style="padding:8px 18px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--gray-400);border-bottom:2px solid transparent;">
       🏗️ 就労管理システムの報告【建設業のみ】
     </button>
-    <button id="wtab_renewal" onclick="switchWorkerTab('renewal')"
-      style="padding:8px 18px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--gray-400);border-bottom:2px solid transparent;">
-      📅 更新状況
-    </button>
   </div>
   <!-- 基本情報タブ -->
   <div id="wtab_basic_panel">
@@ -11338,8 +11339,90 @@ function buildWorkerModalBody(w) {
     </div>
   </div>
 
-  <!-- 3. ドライブリンク -->
-  <div class="section-title">3. ドライブリンク</div>
+  <!-- 3. 更新状況（更新状況タブから移設）-->
+  <div class="section-title" id="wf_renewal_section">3. 更新状況</div>
+
+    <div style="background:#ede9fe;border-left:4px solid #7c3aed;border-radius:0 8px 8px 0;padding:12px 16px;margin-bottom:16px;font-size:12px;color:#5b21b6;line-height:1.6;">
+      <strong>📅 更新状況</strong><br>
+      在留期限の更新申請に関する進捗状況・申請メモ・確定雇用条件を記録します。「KMT側 申請状況管理スプレッドシート」の更新状況シートから取り込み済み。
+    </div>
+    <div class="form-grid" style="grid-template-columns:1fr;">
+      <div class="section-title">ステータス・進捗</div>
+      <div class="form-group full">
+        <div style="background:#f8fafc;border:1px solid var(--gray-200);border-radius:8px;padding:10px 12px;font-size:11px;color:var(--gray-700);display:flex;flex-wrap:wrap;gap:14px;align-items:center;">
+          <span style="opacity:.7;font-weight:700;">人材情報から自動反映:</span>
+          <span>申請種別: <strong>${esc(w.apply_type||'-')}</strong></span>
+          <span>申請ステータス: <strong>${esc(w.apply_status||'-')}</strong></span>
+          <span>一時帰国日: <strong>${w.return_home_date||'-'}</strong></span>
+          <span>再入国日: <strong>${w.return_jp_date||'-'}</strong></span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">更新状況ステータス</label>
+        <select class="form-select" id="wf_renewal_status" onchange="toggleRenewalCompletionFields()">
+          ${(() => {
+            const opts = ['','更新決定','更新なし','優先度高め','要確認','申請依頼済み','完了'];
+            const cur = w.renewal_status || '';
+            if (cur && !opts.includes(cur)) opts.push(cur);
+            return opts.map(s=>`<option value="${s}" ${cur===s?'selected':''}>${s||'─ 選択 ─'}</option>`).join('');
+          })()}
+        </select>
+        <div style="font-size:10px;color:var(--gray-400);margin-top:3px;line-height:1.5;">
+          <strong>更新決定</strong>: 更新方針確定 / <strong>更新なし</strong>: 本帰国・転職等で更新しない / <strong>優先度高め</strong>: 急ぎ対応 / <strong>要確認</strong>: 状況確認中 / <strong>申請依頼済み</strong>: 申請を依頼済み / <strong>完了</strong>: 更新完了
+        </div>
+      </div>
+      <div class="form-group full" id="wf_renewal_completion_box" style="display:${w.renewal_status==='完了'?'':'none'};">
+        <div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;padding:12px;">
+          <div style="font-size:11px;color:#047857;font-weight:700;margin-bottom:8px;">✅ 更新完了情報</div>
+          <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#047857;cursor:pointer;margin-bottom:10px;"><input type="checkbox" id="wf_residence_card_issued" ${w.residence_card_issued?'checked':''}>在留カードの情報 発行済み</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+            <div>
+              <label class="form-label" style="font-size:11px;">新しい在留期限 <span style="font-size:9px;color:var(--gray-400);">— 基本情報の在留期限と連動</span></label>
+              <input class="form-input" id="wf_renewal_visa_expiry" type="date" value="${w.visa_expiry||''}" onchange="syncRenewalVisaExpiry()">
+            </div>
+            <div>
+              <label class="form-label" style="font-size:11px;">在留カード 郵送追跡番号（在カパ）</label>
+              <input class="form-input" id="wf_card_tracking_no" value="${esc(w.card_tracking_no||'')}" placeholder="例: 1234-5678-9012">
+            </div>
+          </div>
+          <div>
+            <label class="form-label" style="font-size:11px;">郵送先</label>
+            <textarea class="form-textarea" id="wf_card_mailing_address" rows="2" placeholder="〒... 住所 / 宛名">${esc(w.card_mailing_address||'')}</textarea>
+          </div>
+          <div style="font-size:10px;color:#047857;margin-top:8px;line-height:1.5;">※「完了」で保存すると、上記の完了情報が人材チャットに自動投稿されます。<br>※ 新しい在留期限を入力して保存すると、次サイクルのため更新ステータスは空欄に初期化されます。</div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">企業確認担当KMTスタッフ</label>
+        <select class="form-select" id="wf_renewal_check_staff">
+          ${(() => {
+            const fixed = ['神出','新宅','高橋','柿沼'];
+            const others = [...new Set((allUsers||[]).map(u=>u.name).filter(Boolean))].filter(n=>!fixed.includes(n)).sort((a,b)=>a.localeCompare(b,'ja'));
+            const cur = w.renewal_check_staff || '';
+            const all = [...fixed, ...others];
+            if (cur && !all.includes(cur)) all.push(cur);
+            return '<option value="">─ 選択 ─</option>' + all.map(n=>`<option ${cur===n?'selected':''}>${esc(n)}</option>`).join('');
+          })()}
+        </select>
+      </div>
+      <div class="form-group full">
+        <label class="form-label">現在の段階</label>
+        <textarea class="form-textarea" id="wf_renewal_stage" rows="3" placeholder="例: 11/17 申請済み(不足無し) / 1-6押印サイン待ち / 雇用条件変更あり…">${esc(w.renewal_stage||'')}</textarea>
+      </div>
+      <div class="section-title">メモ</div>
+      <div class="form-group full">
+        <label class="form-label">申請メモ</label>
+        <textarea class="form-textarea" id="wf_renewal_memo" rows="4" placeholder="例: 課税・納税・源泉➡ストックにあり / 一時帰国中受け取り待ち …">${esc(w.renewal_memo||'')}</textarea>
+      </div>
+      <div class="section-title">確定雇用条件</div>
+      <div class="form-group full">
+        <label class="form-label">確定雇用条件</label>
+        <textarea class="form-textarea" id="wf_employment_condition" rows="5" placeholder="例: 月給220,000円　2026年4月1日適用　他は現行通り …">${esc(w.employment_condition||'')}</textarea>
+      </div>
+    </div>
+
+  <!-- 4. ドライブリンク -->
+  <div class="section-title">4. ドライブリンク</div>
   <div class="form-grid">
     <div class="form-group full"><label class="form-label">大房側ドライブURL</label>
       <div style="display:flex;gap:6px;align-items:center;">
@@ -11360,8 +11443,8 @@ function buildWorkerModalBody(w) {
     </div>
   </div>
 
-  <!-- 4. メモ -->
-  <div class="section-title">4. メモ</div>
+  <!-- 5. メモ -->
+  <div class="section-title">5. メモ</div>
   <div class="form-group full"><label class="form-label">備考</label><textarea class="form-textarea" id="wf_memo">${esc(w.memo||'')}</textarea></div>
 
   </div><!-- end 左カラム -->
@@ -11369,8 +11452,8 @@ function buildWorkerModalBody(w) {
   <!-- ===== 右カラム ===== -->
   <div style="background:#f8faf8;border-radius:0 8px 8px 0;padding:12px 14px;">
 
-  <!-- 5. 人材情報 -->
-  <div class="section-title">5. 人材情報</div>
+  <!-- 6. 人材情報 -->
+  <div class="section-title">6. 人材情報</div>
   <div class="form-grid">
     <div class="form-group full"><label class="form-label">在職ステータス <span style="color:#ef4444;">*</span></label>
       <select class="form-select" id="wf_status" onchange="toggleExpectedLeaveField()">
@@ -11413,8 +11496,8 @@ function buildWorkerModalBody(w) {
     </div>
   </div>
 
-  <!-- 6. 所属機関・受け入れ情報 -->
-  <div class="section-title">6. 所属機関・受け入れ情報</div>
+  <!-- 7. 所属機関・受け入れ情報 -->
+  <div class="section-title">7. 所属機関・受け入れ情報</div>
   <div class="form-grid">
     <div class="form-group full"><label class="form-label">所属機関 <span style="color:#ef4444;">*</span></label>
       <select class="form-select" id="wf_company_id" onchange="onWorkerCompanyChange()">
@@ -11436,8 +11519,8 @@ function buildWorkerModalBody(w) {
     <div class="form-group"><label class="form-label">退職日</label><input class="form-input" id="wf_left_date" type="date" value="${w.left_date||''}"></div>
   </div>
 
-  <!-- 7. 支援情報 -->
-  <div class="section-title">7. 支援情報</div>
+  <!-- 8. 支援情報 -->
+  <div class="section-title">8. 支援情報</div>
   <div class="form-grid">
     <div class="form-group full"><label class="form-label">KMT支援区分 <span style="color:#ef4444;">*</span></label>
       <select class="form-select" id="wf_kmt_support">
@@ -11485,8 +11568,8 @@ function buildWorkerModalBody(w) {
     <div class="form-group"><label class="form-label">5年満了状況</label><input class="form-input" id="wf_tg2_status" value="${esc(w.tg2_status||'')}"></div>
   </div>
 
-  <!-- 8. 連絡先 -->
-  <div class="section-title">8. 連絡先</div>
+  <!-- 9. 連絡先 -->
+  <div class="section-title">9. 連絡先</div>
   <div class="form-grid">
     <div class="form-group"><label class="form-label">メール <span style="color:#ef4444;">*</span></label><input class="form-input" id="wf_email" value="${esc(w.email||'')}"></div>
     <div class="form-group"><label class="form-label">電話番号</label><input class="form-input" id="wf_phone" value="${esc(w.phone||'')}"></div>
@@ -11574,87 +11657,6 @@ function buildWorkerModalBody(w) {
       <div class="form-group full">
         <label class="form-label">2号変更報告日 <span style="font-size:10px;color:var(--gray-400);font-weight:400;">— 希望在留資格が「特定技能2号」かつ申請ステータスが「審査完了」になったタイミングで実施</span></label>
         <input class="form-input" id="wf_tg2_change_report_date" type="date" value="${w.tg2_change_report_date||''}">
-      </div>
-    </div>
-  </div>
-  <!-- 更新状況タブ -->
-  <div id="wtab_renewal_panel" style="display:none;">
-    <div style="background:#ede9fe;border-left:4px solid #7c3aed;border-radius:0 8px 8px 0;padding:12px 16px;margin-bottom:16px;font-size:12px;color:#5b21b6;line-height:1.6;">
-      <strong>📅 更新状況</strong><br>
-      在留期限の更新申請に関する進捗状況・申請メモ・確定雇用条件を記録します。「KMT側 申請状況管理スプレッドシート」の更新状況シートから取り込み済み。
-    </div>
-    <div class="form-grid">
-      <div class="section-title">ステータス・進捗</div>
-      <div class="form-group full">
-        <div style="background:#f8fafc;border:1px solid var(--gray-200);border-radius:8px;padding:10px 12px;font-size:11px;color:var(--gray-700);display:flex;flex-wrap:wrap;gap:14px;align-items:center;">
-          <span style="opacity:.7;font-weight:700;">人材情報から自動反映:</span>
-          <span>申請種別: <strong>${esc(w.apply_type||'-')}</strong></span>
-          <span>申請ステータス: <strong>${esc(w.apply_status||'-')}</strong></span>
-          <span>一時帰国日: <strong>${w.return_home_date||'-'}</strong></span>
-          <span>再入国日: <strong>${w.return_jp_date||'-'}</strong></span>
-        </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">更新状況ステータス</label>
-        <select class="form-select" id="wf_renewal_status" onchange="toggleRenewalCompletionFields()">
-          ${(() => {
-            const opts = ['','更新決定','更新なし','優先度高め','要確認','申請依頼済み','完了'];
-            const cur = w.renewal_status || '';
-            if (cur && !opts.includes(cur)) opts.push(cur);
-            return opts.map(s=>`<option value="${s}" ${cur===s?'selected':''}>${s||'─ 選択 ─'}</option>`).join('');
-          })()}
-        </select>
-        <div style="font-size:10px;color:var(--gray-400);margin-top:3px;line-height:1.5;">
-          <strong>更新決定</strong>: 更新方針確定 / <strong>更新なし</strong>: 本帰国・転職等で更新しない / <strong>優先度高め</strong>: 急ぎ対応 / <strong>要確認</strong>: 状況確認中 / <strong>申請依頼済み</strong>: 申請を依頼済み / <strong>完了</strong>: 更新完了
-        </div>
-      </div>
-      <div class="form-group full" id="wf_renewal_completion_box" style="display:${w.renewal_status==='完了'?'':'none'};">
-        <div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;padding:12px;">
-          <div style="font-size:11px;color:#047857;font-weight:700;margin-bottom:8px;">✅ 更新完了情報</div>
-          <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#047857;cursor:pointer;margin-bottom:10px;"><input type="checkbox" id="wf_residence_card_issued" ${w.residence_card_issued?'checked':''}>在留カードの情報 発行済み</label>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
-            <div>
-              <label class="form-label" style="font-size:11px;">新しい在留期限 <span style="font-size:9px;color:var(--gray-400);">— 基本情報の在留期限と連動</span></label>
-              <input class="form-input" id="wf_renewal_visa_expiry" type="date" value="${w.visa_expiry||''}" onchange="syncRenewalVisaExpiry()">
-            </div>
-            <div>
-              <label class="form-label" style="font-size:11px;">在留カード 郵送追跡番号（在カパ）</label>
-              <input class="form-input" id="wf_card_tracking_no" value="${esc(w.card_tracking_no||'')}" placeholder="例: 1234-5678-9012">
-            </div>
-          </div>
-          <div>
-            <label class="form-label" style="font-size:11px;">郵送先</label>
-            <textarea class="form-textarea" id="wf_card_mailing_address" rows="2" placeholder="〒... 住所 / 宛名">${esc(w.card_mailing_address||'')}</textarea>
-          </div>
-          <div style="font-size:10px;color:#047857;margin-top:8px;line-height:1.5;">※「完了」で保存すると、上記の完了情報が人材チャットに自動投稿されます。<br>※ 新しい在留期限を入力して保存すると、次サイクルのため更新ステータスは空欄に初期化されます。</div>
-        </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">企業確認担当KMTスタッフ</label>
-        <select class="form-select" id="wf_renewal_check_staff">
-          ${(() => {
-            const fixed = ['神出','新宅','高橋','柿沼'];
-            const others = [...new Set((allUsers||[]).map(u=>u.name).filter(Boolean))].filter(n=>!fixed.includes(n)).sort((a,b)=>a.localeCompare(b,'ja'));
-            const cur = w.renewal_check_staff || '';
-            const all = [...fixed, ...others];
-            if (cur && !all.includes(cur)) all.push(cur);
-            return '<option value="">─ 選択 ─</option>' + all.map(n=>`<option ${cur===n?'selected':''}>${esc(n)}</option>`).join('');
-          })()}
-        </select>
-      </div>
-      <div class="form-group full">
-        <label class="form-label">現在の段階</label>
-        <textarea class="form-textarea" id="wf_renewal_stage" rows="3" placeholder="例: 11/17 申請済み(不足無し) / 1-6押印サイン待ち / 雇用条件変更あり…">${esc(w.renewal_stage||'')}</textarea>
-      </div>
-      <div class="section-title">メモ</div>
-      <div class="form-group full">
-        <label class="form-label">申請メモ</label>
-        <textarea class="form-textarea" id="wf_renewal_memo" rows="4" placeholder="例: 課税・納税・源泉➡ストックにあり / 一時帰国中受け取り待ち …">${esc(w.renewal_memo||'')}</textarea>
-      </div>
-      <div class="section-title">確定雇用条件</div>
-      <div class="form-group full">
-        <label class="form-label">確定雇用条件</label>
-        <textarea class="form-textarea" id="wf_employment_condition" rows="5" placeholder="例: 月給220,000円　2026年4月1日適用　他は現行通り …">${esc(w.employment_condition||'')}</textarea>
       </div>
     </div>
   </div>
@@ -16869,6 +16871,9 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260804.10', date:'2026-08-04', notify:true, items:[
+    '人材詳細：独立していた「更新状況」タブを廃止し、内容と機能をそのまま基本情報タブ内に移設（左カラムの3番目）。項目順＝申請情報/在留情報/更新状況/ドライブリンク/メモ、右＝人材情報/所属機関・受け入れ情報/支援情報/連絡先。更新状況リストから開くと該当セクションへ自動スクロール',
+  ]},
   { version:'ver.20260804.09', date:'2026-08-04', notify:true, items:[
     'サイドバーのユーザー名下に、外国人材のアラート件数を簡潔表示（🚨申請忘れ警告／📋更新リマインド／🏗️就労管理システム）。クリックで外国人材へ。全ページで確認できます',
   ]},
