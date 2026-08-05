@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260805.24 -->
+<!-- KMT_VERSION ver.20260805.25 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -367,7 +367,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.24</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.25</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <div id="sidebarAlerts" style="margin-top:6px;display:none;flex-direction:column;gap:3px;"></div>
   </div>
@@ -12150,12 +12150,12 @@ function buildWorkerModalBody(w) {
     </div>
   </div>
   <div style="display:flex;gap:8px;align-items:center;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)">
-    ${editingWorkerId ? '<button class="btn btn-outline" style="color:var(--red);border-color:var(--red);" onclick="deleteWorker()">🗑️ 削除</button>' : ''}
-    <div style="flex:1;"></div>
     <span id="sm_worker" style="font-size:11px;color:#94a3b8;white-space:nowrap;margin-right:4px;"></span>
     <button class="btn btn-primary" onclick="saveWorker()" style="padding:8px 28px;font-size:14px;">💾 保存</button>
     <button class="btn btn-outline" style="color:#059669;border-color:#059669;" onclick="saveAndStartChat()">💬 チャット開始</button>
     <button class="btn btn-outline" onclick="closeWorkerModalWithCheck()">閉じる</button>
+    <div style="flex:1;"></div>
+    ${editingWorkerId ? '<button class="btn btn-outline" style="color:var(--red);border-color:var(--red);" onclick="deleteWorker()">🗑️ 削除</button>' : ''}
   </div>`;
 }
 
@@ -17804,6 +17804,9 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260805.25', date:'2026-08-05', notify:true, items:[
+    '人材詳細の下部ボタンの配置を左右入れ替え。最終更新／💾保存／💬チャット開始／閉じる を左側に、🗑️削除を右側に移動しました（機能は変更なし）',
+  ]},
   { version:'ver.20260805.24', date:'2026-08-05', notify:true, items:[
     '未保存リマインドを全フォームに拡大。外国人材・所属機関・求人・候補者・履歴書で、記入や変更をしたまま ✕ボタン／［閉じる］／モーダル外クリック／別画面への移動 をすると「未保存の変更があります　保存しますか？」と表示されます（これまで外国人材はブラウザ標準の確認しか出ず、✕ボタンや画面移動では何も出ませんでした）',
     '保存ボタンの隣に「✓ 最終更新 2026/08/05 15:30（担当者名）」を表示。編集を始めると「● 未保存の変更があります」に変わり、保存すると最終更新の表示に戻ります',
