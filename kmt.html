@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260805.26 -->
+<!-- KMT_VERSION ver.20260805.27 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -367,7 +367,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.26</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.27</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <div id="sidebarAlerts" style="margin-top:6px;display:none;flex-direction:column;gap:3px;"></div>
   </div>
@@ -1755,33 +1755,18 @@ async function openWorkerChatFromCompany(workerId) {
   if (!workerId) return;
   showLoading(true);
   try {
-    // 既存ルームを探す（DBに直接問い合わせ。チャット未ロード時にも対応）
-    let existing = (chatRooms || []).find(r => r.worker_id === workerId);
-    let roomId = existing?.id;
-    if (!roomId) {
-      // DBから直接検索
-      const found = await sbFetch('chat_rooms?worker_id=eq.'+workerId+'&select=id&limit=1');
-      if (found && found[0]) {
-        roomId = found[0].id;
-      } else {
-        // 新規作成
-        const created = await sbFetch('chat_rooms', {
-          method:'POST',
-          body: JSON.stringify({ worker_id: workerId, created_by: currentUser?.name || '', status:'active' }),
-          prefer:'return=representation'
-        });
-        if (created && created[0]) roomId = created[0].id;
-      }
-    }
+    const roomId = await _ensureWorkerRoomId(workerId);
     if (!roomId) { showToast('❌ チャットルームを作成できませんでした','error'); showLoading(false); return; }
-    // 企業モーダルを閉じてチャット画面へ
-    if (typeof closeCompanyModal === 'function') closeCompanyModal();
-    // チャット画面へ切替
-    if (typeof showScreen === 'function') showScreen('chat');
-    // loadChatScreenはshowScreen内のSCREENS[name].init()で走るが念のため待機してから開く
-    setTimeout(async () => {
-      if (typeof openChatRoom === 'function') await openChatRoom(roomId);
-    }, 300);
+    // 企業モーダルが開いていれば閉じる（未保存チェックはスキップ）
+    if (typeof forceCloseModal === 'function') forceCloseModal('companyModal');
+    if (typeof currentScreen !== 'undefined' && currentScreen === 'chat') {
+      // すでにチャット画面ならそのまま開く
+      await openChatRoom(roomId);
+    } else {
+      // 画面切替 → loadChatScreen 完了後に自動で開く（showScreen 側が _pendingChatRoomId を処理）
+      _pendingChatRoomId = roomId;
+      showScreen('chat');
+    }
   } catch(e) {
     showToast('❌ '+e.message, 'error');
   }
@@ -4115,6 +4100,18 @@ function buildDecisionReportScreen() {
           <div class="form-group"><label class="form-label">8. 【D区分】申請分野</label>
             <select class="form-select" id="dr_field"><option value="">選択</option><option>農業</option><option>漁業</option><option>建設</option><option>製造業</option><option>飲食料品製造業</option><option>外食業</option><option>介護</option><option>ビルクリーニング</option><option>宿泊</option><option>自動車整備</option><option>自動車運送</option><option>航空</option><option>造船・船用工業</option></select></div>
           <div class="section-title">案件・人材情報</div>
+          <div class="form-group full" style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;padding:10px 12px;">
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:#5b21b6;cursor:pointer;margin:0;">
+              <input type="checkbox" id="dr_org_change" onchange="toggleDrOrgChange()" style="margin:0;cursor:pointer;">登録支援機関変更案件
+            </label>
+            <div id="dr_org_change_opts" style="display:none;margin-top:8px;padding-left:24px;">
+              <div style="font-size:11px;font-weight:700;color:#6d28d9;margin-bottom:4px;">在留資格申請依頼</div>
+              <div style="display:flex;gap:14px;flex-wrap:wrap;">
+                <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin:0;"><input type="radio" name="dr_org_change_apply" value="あり" style="margin:0;cursor:pointer;" checked>在留資格申請依頼：あり</label>
+                <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin:0;"><input type="radio" name="dr_org_change_apply" value="なし" style="margin:0;cursor:pointer;">在留資格申請依頼：なし</label>
+              </div>
+            </div>
+          </div>
           <div class="form-group full"><label class="form-label">9. 案件名 <span style="font-size:10px;color:var(--gray-400);font-weight:400;">（自動生成：B区分 + 企業名 + 人材名 ／ 必要なら手動修正可）</span></label><input class="form-input" id="dr_case_name" placeholder="自動生成されます（例: 【変更】株式会社○○ NGUYEN VAN A）"></div>
           <div class="form-group"><label class="form-label">10. 人材名</label><input class="form-input" id="dr_person_name" placeholder="例: NGUYEN VAN A" oninput="updateDrCaseName()"></div>
           <div class="form-group full"><label class="form-label">11. 企業名</label>
@@ -4207,9 +4204,9 @@ function buildDecisionReportScreen() {
           </div>
         </div>
         <div style="display:flex;gap:10px;justify-content:space-between;align-items:center;margin-top:20px;padding-top:16px;border-top:1px solid var(--gray-200);flex-wrap:wrap;">
-          <button class="btn" onclick="gotoDecisionWorkerChat()" style="background:#7c3aed;color:white;border:none;font-weight:700;">💬 この人材のチャットへ移動</button>
+          <button class="btn" onclick="gotoDecisionWorkerChat()" style="background:#7c3aed;color:white;border:none;font-weight:700;">💬 チャット移動</button>
           <div style="display:flex;gap:10px;">
-            <button class="btn btn-outline" onclick="copyKmtReport()">📋 テキストコピー</button>
+            <button class="btn btn-outline" onclick="copyKmtReport()">📋 テキストコピー＆チャット送信</button>
             <button class="btn btn-primary" onclick="submitDecisionReport()">📤 スプレッドシートに送信</button>
           </div>
         </div>
@@ -4526,6 +4523,10 @@ function clearDecisionForm() {
   const joinTypeDefault = document.querySelector('input[name="dr_join_type"][value="許可おり次第"]');
   if (joinTypeDefault) joinTypeDefault.checked = true;
   document.querySelectorAll('input[name="dr_contact_party"]').forEach(r => r.checked = false);
+  // 登録支援機関変更案件
+  const orgChk = document.getElementById('dr_org_change'); if (orgChk) orgChk.checked = false;
+  const orgAri = document.querySelector('input[name="dr_org_change_apply"][value="あり"]'); if (orgAri) orgAri.checked = true;
+  if (typeof toggleDrOrgChange === 'function') toggleDrOrgChange();
   const drJoinDate = document.getElementById('dr_join_date'); if (drJoinDate) drJoinDate.style.display = 'none';
   rebuildDecisionWorkerOptions();
   showToast('✅ フォームをクリアしました', 'success');
@@ -4662,7 +4663,20 @@ function getDecisionData() {
   };
 }
 
-// KMT案件：テキストコピー
+// 登録支援機関変更案件チェックの開閉
+function toggleDrOrgChange() {
+  const on = document.getElementById('dr_org_change')?.checked;
+  const box = document.getElementById('dr_org_change_opts');
+  if (box) box.style.display = on ? '' : 'none';
+}
+// 登録支援機関変更案件の設定を取得
+function getDrOrgChange() {
+  const on = !!document.getElementById('dr_org_change')?.checked;
+  const apply = document.querySelector('input[name="dr_org_change_apply"]:checked')?.value || 'あり';
+  // 「変更案件 かつ 在留資格申請依頼なし」のときは区分情報・雇用条件の中身を出さない
+  return { on, apply, hideDetail: on && apply === 'なし' };
+}
+
 // 決定報告画面から、選択中の人材のチャットに遷移
 async function gotoDecisionWorkerChat() {
   const workerId = document.getElementById('dr_existing_worker')?.value;
@@ -4670,40 +4684,46 @@ async function gotoDecisionWorkerChat() {
     showToast('⚠️ 先に「⚡既存人材から自動入力」で人材を選択してください', 'error');
     return;
   }
-  const w = (allWorkers || []).find(x => x.id === workerId);
-  if (!w) {
-    showToast('❌ 人材データが見つかりません', 'error');
-    return;
-  }
-  // チャット画面に遷移してから、その人材のチャットを開く
-  try {
-    showScreen('chat');
-    // 少し遅延を入れてチャット画面の初期化を待つ
-    setTimeout(() => { openWorkerChatFromCompany(workerId); }, 250);
-  } catch(e) {
-    showToast('❌ ' + e.message, 'error');
-  }
+  // ルーム解決 → チャット画面初期化完了後にその人材のルームを開く（openWorkerChatFromCompany が担当）
+  await openWorkerChatFromCompany(workerId);
 }
 
-function copyKmtReport() {
+// KMT案件：報告テキストを生成
+function buildKmtReportText() {
   const d = getDecisionData();
+  const oc = getDrOrgChange();
   const _joinDate = getDecisionJoinDate();
   const _allowances = getDrAllowances().map(a => a.name && a.amt ? a.name + ': ' + a.amt + '円' : '').filter(Boolean);
   const _deductions = getDrDeductions().map(d => d.name && d.amt ? '[控除]' + d.name + ': ' + d.amt + '円' : '').filter(Boolean);
   const _empNote = document.getElementById('dr_employment_note')?.value || '';
   const _baseSalary = document.getElementById('dr_base_salary')?.value || '';
+  // ■区分情報（変更案件・申請依頼なしのときは見出しのみ）
+  const _kubun = oc.hideDetail ? [] : [
+    'A: ' + d.visa_type,
+    'B: ' + d.app_type,
+    'C: ' + d.experience,
+    'D: ' + d.field,
+  ];
+  // ■雇用条件（同上）
+  const _koyou = oc.hideDetail ? [] : [
+    _joinDate ? '入社希望日: ' + _joinDate : null,
+    d.target_date ? '★目標申請日: ' + d.target_date : null,
+    _baseSalary ? '基本給: ' + _baseSalary + '円' : null,
+    ..._allowances,
+    ..._deductions,
+    _empNote ? 'その他: ' + _empNote : null,
+  ];
   const parts = [
     '決定報告（KMT案件）',
     d.case_name,
     d.received_date ? '依頼受領日: ' + d.received_date : null,
     '',
     '■区分情報',
-    'A: ' + d.visa_type,
-    'B: ' + d.app_type,
-    'C: ' + d.experience,
-    'D: ' + d.field,
+    ..._kubun,
     '',
     '■案件・人材情報',
+    oc.on ? '登録支援機関変更案件' : null,
+    oc.on ? '在留資格申請依頼：' + oc.apply : null,
     '在留期限: ' + d.expire_date,
     d.temp_return ? '一時帰国日: ' + d.temp_return : null,
     '',
@@ -4713,12 +4733,7 @@ function copyKmtReport() {
     d.support_fee ? '支援委託費: ' + d.support_fee : null,
     '',
     '■雇用条件',
-    _joinDate ? '入社希望日: ' + _joinDate : null,
-    d.target_date ? '★目標申請日: ' + d.target_date : null,
-    _baseSalary ? '基本給: ' + _baseSalary + '円' : null,
-    ..._allowances,
-    ..._deductions,
-    _empNote ? 'その他: ' + _empNote : null,
+    ..._koyou,
     '',
     '■その他',
     [
@@ -4726,10 +4741,70 @@ function copyKmtReport() {
       d.contact_party ? '企業連絡担当: ' + d.contact_party : '',
     ].filter(Boolean).join('\n'),
   ].filter(l => l !== null && !(typeof l === 'string' && l.endsWith(': ')));
-  const lines = parts.join('\n');
-  navigator.clipboard.writeText(lines)
-    .then(() => showToast('✅ コピーしました', 'success'))
-    .catch(() => showToast('❌ コピー失敗', 'error'));
+  return parts.join('\n');
+}
+
+// KMT案件：テキストコピー＆チャット送信
+// 同じ内容は2回以上送らない（チャット履歴に同一本文があればスキップ）
+async function copyKmtReport() {
+  const text = buildKmtReportText();
+  // 1) クリップボードへコピー
+  let copied = false;
+  try { await navigator.clipboard.writeText(text); copied = true; } catch(e) { copied = false; }
+
+  // 2) 人材のチャットへ送信
+  const workerId = document.getElementById('dr_existing_worker')?.value;
+  if (!workerId) {
+    showToast(copied
+      ? '✅ コピーしました（人材未選択のためチャット送信はスキップ）'
+      : '❌ コピー失敗（人材未選択のためチャット送信もスキップ）', copied ? 'success' : 'error');
+    return;
+  }
+  showLoading(true);
+  try {
+    const roomId = await _ensureWorkerRoomId(workerId);
+    if (!roomId) { showToast('❌ チャットルームを作成できませんでした', 'error'); showLoading(false); return; }
+    // 同一本文の重複チェック（直近200件）
+    const recent = await sbFetch('chat_messages?room_id=eq.' + roomId + '&select=content&order=created_at.desc&limit=200');
+    const norm = s => String(s || '').replace(/\r\n/g, '\n').trim();
+    const already = (recent || []).some(m => norm(m.content) === norm(text));
+    if (already) {
+      showToast(copied
+        ? '✅ コピーしました（同じ内容は送信済みのためチャット送信はスキップ）'
+        : 'ℹ️ 同じ内容は送信済みのためチャット送信はスキップしました', 'success');
+      showLoading(false);
+      return;
+    }
+    await sbFetch('chat_messages', { method:'POST', body: JSON.stringify({
+      room_id: roomId, chat_room_id: roomId,
+      sender_id: currentUser?.id || null, sender_name: currentUser?.name || 'KMT',
+      content: text, created_at: new Date().toISOString()
+    }) });
+    // 開いているチャットが同じルームなら即反映
+    if (typeof currentRoom !== 'undefined' && currentRoom && currentRoom.id === roomId && typeof loadChatMessages === 'function') {
+      try { await loadChatMessages(roomId); } catch(e) {}
+    }
+    showToast(copied ? '✅ コピーしてチャットに送信しました' : '✅ チャットに送信しました（コピーは失敗）', 'success');
+  } catch(e) {
+    showToast('❌ チャット送信エラー: ' + e.message, 'error');
+  }
+  showLoading(false);
+}
+
+// 画面切替後に自動で開くチャットルーム（他画面からの遷移用）
+let _pendingChatRoomId = null;
+// 人材のチャットルームIDを取得（なければ作成）
+async function _ensureWorkerRoomId(workerId) {
+  let roomId = (chatRooms || []).find(r => r.worker_id === workerId)?.id;
+  if (roomId) return roomId;
+  const found = await sbFetch('chat_rooms?worker_id=eq.' + workerId + '&select=id&limit=1');
+  if (found && found[0]) return found[0].id;
+  const created = await sbFetch('chat_rooms', {
+    method:'POST',
+    body: JSON.stringify({ worker_id: workerId, created_by: currentUser?.name || '', status:'active' }),
+    prefer:'return=representation'
+  });
+  return (Array.isArray(created) ? created[0] : created)?.id || null;
 }
 
 // KMT案件：スプレッドシート送信
@@ -9720,7 +9795,16 @@ function showScreen(name) {
   renderScreenContent(name);
 
   // データ読み込み
-  Promise.resolve(SCREENS[name].init()).then(() => { if (name === 'chat') renderGroupList(); });
+  Promise.resolve(SCREENS[name].init()).then(() => {
+    if (name === 'chat') {
+      renderGroupList();
+      // 他画面から「この人材のチャットへ」で来た場合、初期化完了後に該当ルームを開く
+      if (_pendingChatRoomId) {
+        const _rid = _pendingChatRoomId; _pendingChatRoomId = null;
+        setTimeout(() => { try { openChatRoom(_rid); } catch(e) {} }, 0);
+      }
+    }
+  });
 
   // モバイルはサイドバー閉じる
   document.getElementById('sidebar').classList.remove('mobile-open');
@@ -17804,6 +17888,11 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260805.27', date:'2026-08-05', notify:true, items:[
+    '決定報告（KMT案件）に「登録支援機関変更案件」チェックを追加（9.案件名の上）。チェックすると「在留資格申請依頼：あり／なし」を選べます。テキスト出力の ■案件・人材情報 の先頭に2行が入り、「なし」の場合は ■区分情報 と ■雇用条件 は見出しのみ（中身なし）で出力されます',
+    '「💬 この人材のチャットへ移動」→「💬 チャット移動」に名称変更。チャット画面には移動するのに該当人材のチャットが開かない不具合を修正しました（画面の初期化完了を待ってからルームを開くように変更）',
+    '「📋 テキストコピー」→「📋 テキストコピー＆チャット送信」に変更。押すとコピーと同時に、その人材のチャットに同じ本文を自動送信します。まったく同じ本文が既に送信済みの場合は二重送信されません（内容を変えて押せば送信されます）',
+  ]},
   { version:'ver.20260805.26', date:'2026-08-05', notify:true, items:[
     '所属機関詳細の下部ボタンも人材詳細と同じ配置に。最終更新／💾保存／閉じる を左側に、🗑削除を右側に移動しました（機能は変更なし）',
   ]},
