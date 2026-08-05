@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260804.21 -->
+<!-- KMT_VERSION ver.20260804.22 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -355,7 +355,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260804.21</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260804.22</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <div id="sidebarAlerts" style="margin-top:6px;display:none;flex-direction:column;gap:3px;"></div>
   </div>
@@ -10139,6 +10139,7 @@ function _applyVal(item, edF, shF){
 }
 // 列の定義(headLabelsと同じ並び)。k=null は並べ替え対象外
 const APPLY_COLS=[
+  {k:null},
   {k:'management_no', v:x=>x.w.management_no},
   {k:'apply_date',    v:x=>x.w.apply_date},
   {k:'apply_type',    v:x=>x.w.apply_type},
@@ -10155,8 +10156,7 @@ const APPLY_COLS=[
   {k:'zaikapa',       v:x=>_applyVal(x,'zaikapa','zaikapa')},
   {k:'situation',     v:x=>_applyVal(x,'situation','situation')},
   {k:'handle_date',   v:x=>_applyVal(x,'handle_date','handle_date')},
-  {k:'note',          v:x=>_applyVal(x,'note','note')},
-  {k:null}
+  {k:'note',          v:x=>_applyVal(x,'note','note')}
 ];
 // 数字も文字も自然順で比較。空欄は常に最後
 function _applyCmp(av,bv,dir){
@@ -10209,9 +10209,9 @@ function renderApplyRecords(){
   const cnt=document.getElementById('applyResultCount'); if(cnt) cnt.textContent=filtered.length+' 件';
   const info=document.getElementById('applySheetInfo');
   if(info) info.textContent='シート取得: '+(_applySheetFetchedAt? _applySheetFetchedAt.toLocaleString('ja-JP',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '-')+' ／ 申請日 '+(_dMin||'-')+'〜'+(_dMax||'-')+' ／ 灰=シート初期値(編集可)';
-  const gridCols='58px 78px 82px 96px 100px 118px minmax(120px,1fr) minmax(100px,1fr) 84px 84px 84px 84px 92px 92px 108px 72px minmax(140px,1.5fr) 104px';
-  const headLabels=['管理番号','申請日','申請種別','希望在留資格','申請ステータス','申請番号','氏名','企業','受け取り方法','在留期限','特例期間','チャット','預かり証→企業','在カパ依頼','状況','対応日','備考','保存/更新'];
-  const editCols=new Set([8,11,12,13,14,15,16]); // 編集可能列
+  const gridCols='104px 58px 78px 82px 96px 100px 118px minmax(120px,1fr) minmax(100px,1fr) 84px 84px 84px 84px 92px 92px 108px 72px minmax(140px,1.5fr)';
+  const headLabels=['保存/更新','管理番号','申請日','申請種別','希望在留資格','申請ステータス','申請番号','氏名','企業','受け取り方法','在留期限','特例期間','チャット','預かり証→企業','在カパ依頼','状況','対応日','備考'];
+  const editCols=new Set([9,12,13,14,15,16,17]); // 編集可能列
   const head='<div style="display:grid;grid-template-columns:'+gridCols+';gap:5px;padding:8px 10px;background:#0f2040;color:white;font-size:10px;font-weight:700;position:sticky;top:0;z-index:2;">'+
     headLabels.map((l,idx)=>{
       const key=(APPLY_COLS[idx]||{}).k;
@@ -10233,6 +10233,7 @@ function renderApplyRecords(){
     const wid=w.id;
     const meta = _applyDirty.has(w.id) ? '<span style="color:#ea580c;font-weight:700;">● 未保存</span>' : (ed && ed.updated_at ? '✓ '+esc(_fmtApplyMeta(ed.updated_at))+' '+esc(ed.updated_by||'') : '');
     return '<div style="display:grid;grid-template-columns:'+gridCols+';gap:5px;padding:6px 10px;border-bottom:1px solid var(--gray-100);align-items:center;font-size:11px;background:'+(noMatch?'#fffdf5':'white')+';">'+
+      '<div style="display:flex;flex-direction:column;gap:2px;align-items:stretch;"><button class="btn btn-primary" style="font-size:10px;padding:2px 6px;" onclick="saveApplyRecord(\''+wid+'\')">💾 保存</button><span id="ar_meta_'+wid+'" style="font-size:9px;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+meta+'</span></div>'+
       '<div style="font-weight:600;color:var(--blue);font-size:10px;cursor:pointer;text-decoration:underline dotted;" onclick="openWorkerModal(\''+wid+'\')" title="人材詳細を開く">'+esc(w.management_no||'-')+'</div>'+
       cell(w.apply_date)+
       cell(w.apply_type)+
@@ -10250,7 +10251,6 @@ function renderApplyRecords(){
       sel('ar_situation_'+wid, V('situation','situation'), APPLY_SITUATION_OPTS)+
       inp('ar_handle_'+wid, V('handle_date','handle_date'))+
       inp('ar_note_'+wid, V('note','note'))+
-      '<div style="display:flex;flex-direction:column;gap:2px;align-items:stretch;"><button class="btn btn-primary" style="font-size:10px;padding:2px 6px;" onclick="saveApplyRecord(\''+wid+'\')">💾 保存</button><span id="ar_meta_'+wid+'" style="font-size:9px;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+meta+'</span></div>'+
     '</div>';
   }).join('');
   area.innerHTML='<div style="overflow-x:auto;border:1px solid var(--gray-200);border-radius:8px;"><div style="min-width:1750px;">'+head+(rowsHtml||'<div style="padding:30px;text-align:center;color:var(--gray-400);">該当する人材がいません（申請ステータスが「申請予定なし」以外）</div>')+'</div></div>';
@@ -17571,6 +17571,9 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260804.22', date:'2026-08-05', notify:true, items:[
+    '申請記録：「保存/更新」列を一番左（管理番号の左）へ移動。横スクロールしなくても保存ボタンと最終更新日時／更新者が見えるように。機能・並べ替え・未保存アラートは従来どおり',
+  ]},
   { version:'ver.20260804.21', date:'2026-08-05', notify:true, items:[
     '申請記録：見出しをクリックすると並べ替えできるように（管理番号・申請日・氏名・企業・状況など17列すべて対応）。数字は自然順（006-012→017-010→104-002）、文字はあいうえお/アルファベット順。クリックのたびに 昇順▲→降順▼→解除 と切り替わり、空欄は常に最後。未保存の編集内容は並べ替えても保持されます',
   ]},
