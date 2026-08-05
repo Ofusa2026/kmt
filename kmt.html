@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260804.17 -->
+<!-- KMT_VERSION ver.20260804.19 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -355,7 +355,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260804.17</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260804.19</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <div id="sidebarAlerts" style="margin-top:6px;display:none;flex-direction:column;gap:3px;"></div>
   </div>
@@ -998,6 +998,7 @@ let saleActiveTab = '01';
 // ===== SUPABASE CONFIG =====
 const SB_URL = 'https://oyblvyocvdnhcxeeokuw.supabase.co';
 const SB_KEY = 'sb_publishable_4eI_7HdWRTnYaUpm7-mlRQ_4P3ialza';
+const JOB_PROGRESS_SEED = [{"src_row":8,"progress":"保留","org_code":null,"kmt_flag":true,"sales_staff":null,"glt_staff":"ニサ","code":"KM168","company_name":"(株)ペアウェル","folder_no":"119","domestic":null,"job_type":null,"industry":"介護","recruit_start":"2024-12-24","priority":false,"candidate_status":"2025-06-25","unit_price":null,"expected_count":null,"amount":0,"comment":"5/19イ：アパートがなくてアパート手当もないですから、候補者が難しそうです。 ／ 5/19ミャ：対面面接があるのと社宅がないことで集まらないのです！","nationalities":[]},{"src_row":9,"progress":"募集中","org_code":null,"kmt_flag":true,"sales_staff":null,"glt_staff":"ニサ","code":"KS10","company_name":"（株）トライアングル","folder_no":null,"domestic":"国内/外","job_type":"電気工事（ライフライン）","industry":"建設","recruit_start":"2024-12-24","priority":false,"candidate_status":"7/29 イ：募集中 ／ 6/17ミャ：募集中","unit_price":null,"expected_count":null,"amount":0,"comment":"5/27イ：現在２名応募者がいる。ライフラインの人材は少ないです。 ／ 4/28ミャ：資格を持っている人が少ない ／ 5/27 カ：無し ／ 5/19タイ： ／ 5/19べ：募集中⇒難しい","nationalities":["インドネシア","ミャンマー"]},{"src_row":10,"progress":"結果待ち","org_code":null,"kmt_flag":true,"sales_staff":"高村","glt_staff":"ソマッド","code":"KM81","company_name":"本繁型枠","folder_no":null,"domestic":"国内","job_type":"型枠施工","industry":null,"recruit_start":null,"priority":true,"candidate_status":"7/29イ：募集中(SP,RE,AS) ／ 7/29 べ：募集中 ／ 7/22カ：募集中 ／ 4/8 タ：募集中　 ／ 6/17ミャ：募集中","unit_price":null,"expected_count":null,"amount":null,"comment":"8/6イ： ／ 8/6べ： ／ 5/27カ：日本語問題と資格で見つからない ／ 8/6タイ： ／ 4/28ミャ：","nationalities":["インドネシア","ベトナム","カンボジア","タイ","ミャンマー"]},{"src_row":11,"progress":"募集中","org_code":null,"kmt_flag":true,"sales_staff":null,"glt_staff":"ニサ","code":"KM02","company_name":"Shiraishi有限会社","folder_no":null,"domestic":"国内","job_type":null,"industry":"外食","recruit_start":null,"priority":false,"candidate_status":"7/1ミャ ：募集中 ／ 7/29 イ : 募集中 ／ 4/17タイ：募集中 ／ 7/29  ベ：募集中","unit_price":null,"expected_count":1,"amount":0,"comment":null,"nationalities":["インドネシア","ベトナム","タイ","ミャンマー"]},{"src_row":12,"progress":"募集中","org_code":null,"kmt_flag":true,"sales_staff":"亀谷","glt_staff":"ナディ","code":"KS24","company_name":"KS24  株式会社ラポール （外食・ラーメン屋）","folder_no":null,"domestic":"国内","job_type":null,"industry":"外食","recruit_start":null,"priority":false,"candidate_status":"7/1ミャ ：募集中 ／ 7/29 イ : 1名採用決定、募集中（SP), 募集中(AS) ／ 7/15タイ：募集中 ／ 7/29  ベ：募集中","unit_price":200000,"expected_count":1,"amount":200000,"comment":"5/27イ：募集中 ／ 5/19タイ： ／ 5/19ミャ：","nationalities":["インドネシア","ベトナム","タイ","ミャンマー"]},{"src_row":13,"progress":"保留","org_code":null,"kmt_flag":true,"sales_staff":"蛭田","glt_staff":null,"code":"KS34","company_name":"KS34. 信川さん 【建設・とび】","folder_no":null,"domestic":"国内","job_type":"とび","industry":"建設","recruit_start":null,"priority":false,"candidate_status":"7/29ベ：候補者1名がいます。提案待ち、続けて募集中 ／ 4/17タイ：2名　提案待ち","unit_price":250000,"expected_count":3,"amount":750000,"comment":null,"nationalities":["インドネシア","ベトナム","タイ"]},{"src_row":14,"progress":"募集中","org_code":null,"kmt_flag":true,"sales_staff":"蛭田","glt_staff":null,"code":"KM64","company_name":"牧添業務店","folder_no":null,"domestic":"国内/外","job_type":"左官","industry":"建設","recruit_start":null,"priority":false,"candidate_status":"6/17ミャ：募集中 ／ 7/22 タイ：募集中","unit_price":250000,"expected_count":3,"amount":750000,"comment":null,"nationalities":["インドネシア","タイ","ミャンマー"]},{"src_row":15,"progress":"募集中","org_code":"ガイ","kmt_flag":true,"sales_staff":"蛭田","glt_staff":"ガイ","code":"KM91-1","company_name":"YSK佐賀工場","folder_no":null,"domestic":"国内/外","job_type":null,"industry":"製造業","recruit_start":null,"priority":true,"candidate_status":"7/29 ベ：募集中 ／ 7/15タイ：募集中","unit_price":200000,"expected_count":1,"amount":200000,"comment":null,"nationalities":["インドネシア","ベトナム","タイ"]},{"src_row":16,"progress":"募集中","org_code":"ガイ","kmt_flag":true,"sales_staff":"蛭田","glt_staff":"ガイ","code":"KM91-2","company_name":"YSK福島工場","folder_no":null,"domestic":"国内/外","job_type":null,"industry":"製造業","recruit_start":null,"priority":true,"candidate_status":"7/29 ベ：募集中 ／ 7/15タイ：1名　企業面接（7/23）","unit_price":200000,"expected_count":1,"amount":200000,"comment":null,"nationalities":["インドネシア","ベトナム","タイ"]},{"src_row":18,"progress":"停止","org_code":null,"kmt_flag":true,"sales_staff":null,"glt_staff":null,"code":"KM0","company_name":"WORKS","folder_no":"82","domestic":null,"job_type":null,"industry":"農業","recruit_start":"2025-02-07","priority":false,"candidate_status":"4/21  イ：募集中 ／ 3/31カ：募集中 ／ 3/31 タイ：募集中 ／ 4/14 べ：募集中","unit_price":null,"expected_count":null,"amount":null,"comment":"イ： ／ ミャ： ／ カ： ／ タイ ／ べ：","nationalities":["インドネシア","ベトナム","カンボジア","タイ"]},{"src_row":20,"progress":"募集中","org_code":"ELN","kmt_flag":false,"sales_staff":"7.5万円","glt_staff":"ナディ","code":"ELN04","company_name":"ELN04 有料老人ホームわかぐり ／ 茨城県稲敷郡 ／ 24万・社宅無し（女性のみ） ／ ボーナス50万","folder_no":null,"domestic":"国内","job_type":null,"industry":"介護","recruit_start":"2024-09-26","priority":false,"candidate_status":"7/29 イ：：募集中・問い合わせあったが、寮か社宅がないですから応募しないです。（RE,US,SP） ／ 7/22  ベ：募集中 ⇒難しい ／ 4/17タイ：募集中4/8カ：募集中（問い合わせ無） ／ 6/17ミャ：募集中","unit_price":75000,"expected_count":null,"amount":0,"comment":"5/22 イ：アパートか寮がないので、中々集まらないです。―＞寮が準備するか、住宅手当が出せるかなど ／ 5/19ミャ： ／ 5/27カ：手取りが18万円以上でしたら集まるかも！ ／ 5/19タイ： ／ 5/19べ：国内のみ,月給19万⇒難しい","nationalities":["インドネシア","ベトナム","カンボジア","タイ","ミャンマー"]},{"src_row":21,"progress":"停止","org_code":"ELN","kmt_flag":false,"sales_staff":"宮澤","glt_staff":"１０万円","code":"ELN02","company_name":"ELN02西部総合病院（株）","folder_no":null,"domestic":null,"job_type":null,"industry":"介護","recruit_start":"2024-12-27","priority":false,"candidate_status":"4/21  　イ：募集中　（RE, SP,）１名提案したが、他の登録支援機関様経由で採用が決まったため、見送り (HM) ／ 4/7ミャ：募集停止 ／ 4/1 タ：募集無し ／ 04/21 べ：募集中【送り出し：ファム、ヒラ】","unit_price":75000,"expected_count":null,"amount":0,"comment":"イ： ／ ミャ： ／ カ： ／ タイ ／ べ：国内のみ、月給231630、自宅手当あり⇒難しい","nationalities":["インドネシア","ベトナム","タイ","ミャンマー"]},{"src_row":22,"progress":"募集中","org_code":"YBS","kmt_flag":false,"sales_staff":"８万円","glt_staff":"ナディ","code":"YBS02","company_name":"医療法人英和会","folder_no":null,"domestic":"国内","job_type":null,"industry":"介護","recruit_start":"2024-10-21","priority":false,"candidate_status":"6/17ミャ ：募集中　（現在の条件では国内は難しい） ／ 7/29 ベ：募集中 （現在の条件では難しい）","unit_price":100000,"expected_count":null,"amount":0,"comment":"ベトナム・ミャンマー ／ 国内のみ ／ 19万～ ／ 未経験Ok ／ 5/19ミャ： ／ 5/19べ：国内のみ⇒難しい","nationalities":["ベトナム","ミャンマー"]},{"src_row":23,"progress":"募集中","org_code":"AJ","kmt_flag":false,"sales_staff":"坂齊","glt_staff":"ナディ","code":"AJ01","company_name":"特別養護老人ホームベテラン館ヴィラ（ユニット型） ／ 埼玉県所沢市 ／ 181,500 円～406,100 円 ／ 社宅無し、N3以上 ／ （初任者研修）","folder_no":null,"domestic":"国内","job_type":null,"industry":"介護","recruit_start":"2025-05-02","priority":false,"candidate_status":"7/29 イ：募集中(US,RE,SP,AS) ／ 7/29   べ：募集中 ／ 7/22カ：募集中（問い合わせ無） ／ 4/17タイ：募集中 ／ 6/17ミャ：募集中","unit_price":null,"expected_count":null,"amount":0,"comment":"2/12 イ：社宅がないですから、候補者が集まってない状況 ／ 5/19べ： ／ 5/27カ：候補者がなかなか見つからない！ ／ 5/19タ： ／ 5/19ミャ：","nationalities":["インドネシア","ベトナム","カンボジア","タイ","ミャンマー"]},{"src_row":24,"progress":"募集中","org_code":"ARCJOB","kmt_flag":false,"sales_staff":null,"glt_staff":"ナデイ","code":"AJ02","company_name":"AJ02 社会福祉法人敬寿会 埼玉さくらんぼ１番館 ／ 寮なし ／ 特別養護老人ホーム ／ (埼玉県さいたま市）25万～","folder_no":null,"domestic":"国内","job_type":null,"industry":"介護","recruit_start":"2025-06-06","priority":false,"candidate_status":"7/29 イ：募集中 (SP,RE) ／ 7/29   ベ：募集中 ／ 7/22カ：募集中（問い合わせ無） ／ 4/17 タ：募集中 ／ 6/17ミャ：募集中","unit_price":null,"expected_count":null,"amount":0,"comment":"6/6イ： ／ 6/6 ベ： ／ 6/6タ： ／ 6/6カ： ／ 6/6ミ ：","nationalities":["インドネシア","ベトナム","カンボジア","タイ","ミャンマー"]},{"src_row":25,"progress":"停止","org_code":"CCN","kmt_flag":false,"sales_staff":"８万円","glt_staff":"ナディ","code":"CCN07","company_name":"株式会社グラヴス（ラーメン店）","folder_no":null,"domestic":null,"job_type":null,"industry":"外食","recruit_start":null,"priority":false,"candidate_status":"4/21 イ：1名提案中(HM) ／ 4/21ミャ：募集停止 ／ 3/10 タ：1名　提案済み、　1名　履歴書作成中 ／ 4/21　カ：募集中 ／ 04/21　べ：2名面接結果待ち⇒1名不採用、1名検討。","unit_price":null,"expected_count":null,"amount":0,"comment":"対象：全国籍・男女5人（男性優先）・早く入れる人・日本語重視（N3以上） ／ 年齢：　 ／ イ：　1/8　未経験がおおくて、N4レベル ／ ミャ： ／ カ： ／ タイ ／ べ：3/18　（２名提案中　ベトナム）：面接候補日調整中（企業回答待ち）","nationalities":["インドネシア","ベトナム","カンボジア","タイ","ミャンマー"]},{"src_row":26,"progress":"停止","org_code":"CCN","kmt_flag":false,"sales_staff":"８万円","glt_staff":"紹介7.5万円+申請費用","code":"CCN08","company_name":"株式会社グラヴス （寿司屋）","folder_no":null,"domestic":null,"job_type":null,"industry":"外食","recruit_start":"2024-12-24","priority":false,"candidate_status":"4/21 イ：1名国外提案待ち(SP), 募集中　（国内優先、男性N3以上の方が難しいです。） ／ 4/21ミャ：募集停止 ／ 3/13 タイ：2名　提案する ／ 4/21　カ：募集中 ／ 04/15　べ：2名面接結果待ち⇒1名不採用、1名検討中","unit_price":null,"expected_count":null,"amount":0,"comment":"対象：全国籍　男女5人（男性優先）・早く入れる人・日本語重視（N3以上） ／ 年齢：　 ／ イ：1/8　未経験がおおくて、N4レベル ／ ミャ： ／ カ： ／ タイ：01/10　女性１名国外　N4 ／ べ：","nationalities":["インドネシア","ベトナム","カンボジア","タイ","ミャンマー"]},{"src_row":27,"progress":"停止","org_code":"CCN","kmt_flag":false,"sales_staff":"８万円","glt_staff":"紹介7.5万円+申請費用","code":"CCN10","company_name":"株式会社ブライト","folder_no":null,"domestic":null,"job_type":null,"industry":"外食","recruit_start":"2024-12-25","priority":false,"candidate_status":"5/23 : 2名　企業面接 （6/5 13.00)","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":28,"progress":"募集中","org_code":"AHC","kmt_flag":false,"sales_staff":"大房","glt_staff":"ナディ","code":"AHC02","company_name":"AHCグループ株式会社（外食） ／ （国内優先） ／ 27万＋家賃手当～3万 ／ N3以上","folder_no":null,"domestic":"国内","job_type":null,"industry":"外食","recruit_start":"2025-05-27","priority":false,"candidate_status":"7/29 イ：募集中（レ,SP) ／ 7/29  べ：募集中 ／ 7/22カ：募集中（問い合わせ無） ／ 4/17 タ：募集なし ／ 6/17ミャ：募集中","unit_price":100000,"expected_count":null,"amount":0,"comment":null,"nationalities":["インドネシア","ベトナム","カンボジア","タイ","ミャンマー"]},{"src_row":29,"progress":"提案中","org_code":"BW","kmt_flag":false,"sales_staff":null,"glt_staff":null,"code":"BW02","company_name":"株式会社 フジオフードグループ ／ N2以上～ ／ 未経験：253000円・国内経験者1年以上27万 ／ （ハードル高い！）","folder_no":null,"domestic":"国内","job_type":null,"industry":"外食","recruit_start":"2025-09-09","priority":false,"candidate_status":"7/29 イ：　募集中　（RE,SP,）　条件は難しい ／ 4/17 タ：募集中 ／  カ：募集無し ／ 7/29 ベ：募集中 ／                                                                                                                                                                                                                                                                                                                                                                         6/17ミャ：募集中","unit_price":75000,"expected_count":null,"amount":0,"comment":null,"nationalities":["インドネシア","ベトナム","カンボジア","タイ","ミャンマー"]},{"src_row":30,"progress":"募集中","org_code":null,"kmt_flag":false,"sales_staff":null,"glt_staff":null,"code":"CCN 23","company_name":"株式会社アリギス (特定技能溶接・全国籍）","folder_no":null,"domestic":"国内","job_type":"溶接","industry":null,"recruit_start":"2026-07-09","priority":false,"candidate_status":"7/9：募集中","unit_price":null,"expected_count":null,"amount":null,"comment":"溶接経験者,全国,男性（2）名","nationalities":[]},{"src_row":31,"progress":"募集中","org_code":"BUDC08","kmt_flag":false,"sales_staff":null,"glt_staff":"ナデイ","code":"ABT01","company_name":"株式会社エンビト ／ 札幌市 ／ （初任者研修・ホームヘルパー２級）","folder_no":null,"domestic":"国内/外","job_type":"介護","industry":"介護","recruit_start":"2025-06-12","priority":false,"candidate_status":"7/29 イ：募集中 (SP,RE) ／ 7/29   ベ：募集中 ／ 4/17タ：募集なし ／ カ：募集無し ／ 6/17ミャ ：募集中","unit_price":75000,"expected_count":null,"amount":0,"comment":"6/6イ： ／ 6/6 ベ： ／ 6/6タ： ／ 7/8カ： ／ 6/6ミ ：","nationalities":["インドネシア","ベトナム","カンボジア","タイ","ミャンマー"]},{"src_row":32,"progress":"募集中","org_code":"BUDC09","kmt_flag":false,"sales_staff":null,"glt_staff":"ナデイ","code":"KN01","company_name":"訪問介護えがお ／ 大阪市 ／ （・初任者研修修了者（ヘルパー2級） ／ または、介護福祉士）","folder_no":null,"domestic":"国内","job_type":"介護","industry":"介護","recruit_start":"2025-07-14","priority":false,"candidate_status":"7/29 イ：募集中 (SP,RE) ／ 7/29 ベ：募集中 ／ 4/17タ：募集中 ／ カ：募集中無し ／ 6/17ミャ：募集中","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":["インドネシア","ベトナム","カンボジア","タイ","ミャンマー"]},{"src_row":33,"progress":"募集中","org_code":null,"kmt_flag":false,"sales_staff":null,"glt_staff":"シスカ","code":"RPJ23","company_name":"株式会社おもてなし ／ （(インドネシアとミャンマーのみ)　 ／ 国外内OK ／ ※介護経験1年間経験者のみ、初任者研修優先 ／ 福岡県（25～26万）","folder_no":null,"domestic":"国内","job_type":null,"industry":"介護","recruit_start":"2026-01-26","priority":false,"candidate_status":"7/29  イ： 1名採用決定、再度募集中 ／ 6/17ミャ：募集中","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":["インドネシア","ミャンマー"]},{"src_row":34,"progress":"募集中","org_code":null,"kmt_flag":false,"sales_staff":null,"glt_staff":"シスカ","code":"RPJ25","company_name":"有限会社ナイスケア ／ (インドネシアとミャンマーのみ)","folder_no":null,"domestic":"国内","job_type":null,"industry":"介護","recruit_start":"2026-01-13","priority":false,"candidate_status":"7/29 イ： 1名7/28企業面接予定(SP) ／ 6/17ミャ：募集再開","unit_price":75000,"expected_count":null,"amount":0,"comment":null,"nationalities":["インドネシア","ミャンマー"]},{"src_row":35,"progress":"停止","org_code":null,"kmt_flag":false,"sales_staff":null,"glt_staff":"シスカ","code":"RPJ30","company_name":"㈲黒川温泉農園 ／ (インドネシアのみ・ミャンマー応募可能なのか確認中）","folder_no":null,"domestic":"国内","job_type":null,"industry":"宿泊","recruit_start":"2026-01-26","priority":false,"candidate_status":"7/29 イ：1名決定、1名不合格(SP) ／ 7/02ミャ：結果待ち","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":["インドネシア","ミャンマー"]},{"src_row":36,"progress":"募集中","org_code":null,"kmt_flag":false,"sales_staff":"中林・宮澤","glt_staff":"ファウザン","code":"STG01~07","company_name":"ファイズトランスポートサービス株式会社 ／ 01 東東京営業所（2t) ／ 02 横浜営業所（4t） ／ 03 京阪営業所（6t） ／ 04 海老名営業所（10t） ／ 05 厚木営業所（10t） ／ 06 東海営業所（10t） ／ 07 南大阪営業所（10t）","folder_no":null,"domestic":"国内","job_type":"ドライバー","industry":"自動車運送業","recruit_start":"2025-10-08","priority":false,"candidate_status":"7/29 イ：1名提案待ち(FA) ／ 7/29 ベ：募集中 ／ 4/8 タ：募集中 ／ 7/22カ：募集中 ／ 6/17ミャ：募集中","unit_price":null,"expected_count":1,"amount":null,"comment":"10/22 イ：","nationalities":["インドネシア","ベトナム","カンボジア","タイ","ミャンマー"]},{"src_row":37,"progress":"募集中","org_code":null,"kmt_flag":false,"sales_staff":"神出","glt_staff":"ノイ","code":"EMT07","company_name":"外装サイデング工事（全国籍）","folder_no":null,"domestic":"国内/外","job_type":"外装工事","industry":"建設","recruit_start":"2025-12-09","priority":false,"candidate_status":"7/29   イ：募集中　 ／ 7/29 ベ：募集中 ／ 日付 タ： ／ 7/22カ:：募集中 ／  6/17ミャ：募集中","unit_price":null,"expected_count":null,"amount":null,"comment":null,"nationalities":["インドネシア","ベトナム","カンボジア","タイ","ミャンマー"]},{"src_row":38,"progress":"募集中","org_code":null,"kmt_flag":false,"sales_staff":"神出","glt_staff":"ノイ","code":"EMT09","company_name":"㈱磯田土建","folder_no":null,"domestic":"国内/外","job_type":"土工","industry":"建設","recruit_start":"2026-02-05","priority":false,"candidate_status":"7/29 イ：１名決定、1名一次面接予定(US) ／ 7/29   ベ：募集中 ／ 4/8 タ：募集中 ／ 7/8カ：募集中  ／ 6/17ミャ ：募集中","unit_price":60000,"expected_count":null,"amount":0,"comment":null,"nationalities":["インドネシア","ベトナム","カンボジア","タイ","ミャンマー"]},{"src_row":39,"progress":"募集中","org_code":null,"kmt_flag":false,"sales_staff":"みなみ","glt_staff":"チュオン","code":"BMC02","company_name":"株式会社グローリーワン様","folder_no":null,"domestic":"国内/外","job_type":"土工, とび","industry":"建設","recruit_start":null,"priority":false,"candidate_status":"7/29 イ : 募集中 ／ 7/29   ベ：募集中 ／ 4/8 タ：募集中 ／ 7/22カ：募集中 ／ 6/17ミャ：募集開始","unit_price":60000,"expected_count":null,"amount":0,"comment":null,"nationalities":["インドネシア","ベトナム","カンボジア","タイ","ミャンマー"]},{"src_row":40,"progress":"募集中","org_code":null,"kmt_flag":false,"sales_staff":"ヒルタ","glt_staff":"ナデイ","code":"JS01","company_name":"住宅型有料老人ホーム みらいふ福田","folder_no":null,"domestic":"国内","job_type":"介護","industry":"介護","recruit_start":"2026-05-26","priority":false,"candidate_status":"7/29  イ :　募集中 (AS) ／ 6/17 ミヤ :　募集中","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":["インドネシア"]},{"src_row":41,"progress":"新着","org_code":null,"kmt_flag":false,"sales_staff":"亀谷","glt_staff":"ナディ","code":"SKL01","company_name":"株式会社H・プロダクト","folder_no":null,"domestic":"国内","job_type":"外食","industry":null,"recruit_start":"2026-07-24","priority":false,"candidate_status":"日付イ： ／ 日付 ベ： ／ 日付 タ： ／ 日付カ:： ／ 日付 ミ ：","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":["インドネシア","ベトナム","カンボジア","タイ","ミャンマー"]},{"src_row":42,"progress":"新着","org_code":null,"kmt_flag":false,"sales_staff":"亀谷","glt_staff":"ナディ","code":"FSC０１","company_name":"株式会社H・プロダクト","folder_no":null,"domestic":"国内","job_type":"木材産業","industry":null,"recruit_start":"2026-07-28","priority":false,"candidate_status":"日付イ： ／ 日付 ベ： ／ 日付 タ： ／ 日付カ:： ／ 日付 ミ ：","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":["インドネシア","ベトナム","カンボジア","タイ","ミャンマー"]},{"src_row":43,"progress":"新着","org_code":null,"kmt_flag":false,"sales_staff":"亀谷","glt_staff":"ウスマン","code":"LB02","company_name":"茨城_特定技能工業製品製造業（機械金属加工）","folder_no":null,"domestic":"国内","job_type":"機械加工","industry":"製造業","recruit_start":"2026-06-03","priority":false,"candidate_status":"全国籍","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":44,"progress":"新着","org_code":null,"kmt_flag":false,"sales_staff":"亀谷","glt_staff":"ウスマン","code":"LB03","company_name":"（株）GFF （ゼンショー）","folder_no":null,"domestic":"国内","job_type":"飲食製造業","industry":"食品製造","recruit_start":"2026-06-03","priority":false,"candidate_status":"7/29イ：提案中 3名 (AS)、2名提案中、1名人財面接予定(SP) ／ 6/17ミャ　（3）名履歴書作成中 ／ 7/29 ベ：説明会と試験を ／ 実施しに行かなければならないため、応募者がいないです。","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":["インドネシア","ベトナム"]},{"src_row":45,"progress":"新着","org_code":null,"kmt_flag":false,"sales_staff":"亀谷","glt_staff":"ウスマン","code":"LB05","company_name":"(株）ジョイマート（ゼンショー）","folder_no":null,"domestic":"国内","job_type":"飲食製造業","industry":"食品製造","recruit_start":"2026-06-03","priority":false,"candidate_status":"6/17ミャ：お問い合わせが多いですが説明会と試験を ／ 実施しに行かなければならないため、応募者がなかなか集まりません。 ／ 7/29 ベ：説明会と試験を実施しに行かなければならないため、応募者がいないです。","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":["ベトナム","ミャンマー"]},{"src_row":46,"progress":"新着","org_code":null,"kmt_flag":false,"sales_staff":"亀谷","glt_staff":"ウスマン","code":"LB10","company_name":"シューワキャリアパワー株式会社","folder_no":null,"domestic":"国内","job_type":"トラック","industry":null,"recruit_start":"2026-06-23","priority":false,"candidate_status":"7/29 イ：募集中 ／ 7/22 ベ：募集中 ／ 日付 タ： ／ 7/22カ:：募集中 ／ 日付 ミ ：","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":["インドネシア","ベトナム","カンボジア","タイ","ミャンマー"]},{"src_row":47,"progress":"新着","org_code":null,"kmt_flag":false,"sales_staff":"亀谷","glt_staff":"ウスマン","code":"LB11","company_name":"福岡/デジタルマーケティング","folder_no":null,"domestic":"国内","job_type":"飲食製造業","industry":"食品製造","recruit_start":"2026-06-23","priority":false,"candidate_status":"7/29 イ：募集中 ／ 7/22 ベ：募集中 ／ 日付 タ： ／ 7/22カ：募集中 ／ 日付 ミ ：","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":["インドネシア","ベトナム","カンボジア","タイ","ミャンマー"]},{"src_row":48,"progress":"新着","org_code":null,"kmt_flag":false,"sales_staff":"亀谷","glt_staff":"ウスマン","code":"LB12","company_name":"株式会社　中市大福堂","folder_no":null,"domestic":"国内","job_type":"飲食製造業","industry":"食品製造","recruit_start":"2026-06-23","priority":false,"candidate_status":"7/15  イ：募集中 ／ 7/22 ベ：募集中","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":["インドネシア","ベトナム"]},{"src_row":49,"progress":"新着","org_code":null,"kmt_flag":false,"sales_staff":null,"glt_staff":"アウン","code":"CCN24","company_name":"株式会社ブライト","folder_no":null,"domestic":"国内","job_type":"外食","industry":"外食","recruit_start":"2026-07-13","priority":false,"candidate_status":"7/13 ミヤ :　募集中 ／ 7/22カ：募集中","unit_price":null,"expected_count":null,"amount":null,"comment":"https://www.facebook.com/share/p/14hGTBgzYZC/","nationalities":["カンボジア"]},{"src_row":50,"progress":"新着","org_code":null,"kmt_flag":false,"sales_staff":"亀谷","glt_staff":"ウスマン","code":"LB13","company_name":"富士産業株式会社（自動車部品製造）","folder_no":null,"domestic":"国内","job_type":null,"industry":null,"recruit_start":"2026-06-23","priority":false,"candidate_status":"7/15 イ：募集中 ／ 7/22 ベ：募集中","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":["インドネシア","ベトナム"]},{"src_row":63,"progress":"募集中","org_code":null,"kmt_flag":true,"sales_staff":"二サ","glt_staff":"ニサ","code":"KM02","company_name":"Shiraishi 有限会社","folder_no":null,"domestic":"国内","job_type":"外食","industry":"外食","recruit_start":"2025-12-02","priority":false,"candidate_status":"7/29 再募集　(RE)","unit_price":null,"expected_count":null,"amount":0,"comment":"問い合わせがありますが、イスラム教の候補者です。","nationalities":[]},{"src_row":64,"progress":"停止","org_code":null,"kmt_flag":true,"sales_staff":"蛭田　ニサ","glt_staff":"ニサ","code":"KS25","company_name":"株式会社マルセイ","folder_no":null,"domestic":"国内/外","job_type":null,"industry":"製造業","recruit_start":"2025-12-12","priority":false,"candidate_status":"7/29 募集中(SP), 募集中 (AS)","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":65,"progress":"停止","org_code":null,"kmt_flag":true,"sales_staff":"蛭田","glt_staff":"ファウザン","code":"KM41","company_name":"菊地さん","folder_no":null,"domestic":"国内","job_type":"畜産","industry":"農業","recruit_start":"2025-12-01","priority":false,"candidate_status":"7/22  1募集中 (SP, AS)、1名決定(AS)","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":66,"progress":"新着","org_code":null,"kmt_flag":true,"sales_staff":"蛭田","glt_staff":"ファウザン","code":"KS36A","company_name":"田辺さん（（株）クレス）KS36A","folder_no":null,"domestic":"国内","job_type":"トラック","industry":"自動車運送業","recruit_start":"2026-05-13","priority":false,"candidate_status":"7/29  募集中","unit_price":null,"expected_count":null,"amount":null,"comment":null,"nationalities":[]},{"src_row":67,"progress":"新着","org_code":null,"kmt_flag":true,"sales_staff":"蛭田","glt_staff":"ファウザン","code":"KS36B","company_name":"田辺さん（（株）クレス）KS36B","folder_no":null,"domestic":"国内","job_type":"とび","industry":"建設","recruit_start":"2026-05-13","priority":false,"candidate_status":"7/29 1名提案待ち(SP)","unit_price":null,"expected_count":null,"amount":null,"comment":null,"nationalities":[]},{"src_row":68,"progress":"停止","org_code":null,"kmt_flag":true,"sales_staff":"白井","glt_staff":null,"code":"KM142","company_name":"株式会社グリーンポートリー","folder_no":null,"domestic":"国内","job_type":"畜産","industry":"農業","recruit_start":"2026-05-11","priority":false,"candidate_status":"6/10　5名決定採用 (AS,SP)","unit_price":null,"expected_count":null,"amount":null,"comment":null,"nationalities":[]},{"src_row":69,"progress":"募集中","org_code":null,"kmt_flag":true,"sales_staff":"蛭田","glt_staff":"ファウザン","code":"KM45","company_name":"北原製作所","folder_no":null,"domestic":"国内","job_type":"機械加工、機械検査","industry":"製造業","recruit_start":"2026-05-22","priority":false,"candidate_status":"7/29一名辞退ですから再度募集中","unit_price":null,"expected_count":null,"amount":null,"comment":null,"nationalities":[]},{"src_row":70,"progress":"停止","org_code":null,"kmt_flag":true,"sales_staff":"蛭田","glt_staff":"ファウザン","code":"KM137","company_name":"三浦 暁","folder_no":null,"domestic":"国内","job_type":"農業","industry":"農業","recruit_start":"2026-05-27","priority":false,"candidate_status":"7/29　1名採用決定、2名再募集","unit_price":null,"expected_count":null,"amount":null,"comment":null,"nationalities":[]},{"src_row":73,"progress":"新着","org_code":null,"kmt_flag":true,"sales_staff":null,"glt_staff":"ウスマン","code":"KM222","company_name":"AGLEED","folder_no":null,"domestic":"国内","job_type":"農業","industry":"農業","recruit_start":"2026-07-28","priority":false,"candidate_status":"7/29　募集中","unit_price":null,"expected_count":null,"amount":null,"comment":null,"nationalities":[]},{"src_row":74,"progress":"新着","org_code":null,"kmt_flag":true,"sales_staff":null,"glt_staff":"ウスマン","code":"KM75","company_name":"小山猛","folder_no":null,"domestic":"国内","job_type":"農業","industry":"農業","recruit_start":"2026-07-28","priority":false,"candidate_status":"7/29　募集中","unit_price":null,"expected_count":null,"amount":null,"comment":null,"nationalities":[]},{"src_row":77,"progress":"停止","org_code":null,"kmt_flag":false,"sales_staff":"亀谷","glt_staff":"シスカ","code":"RPJ05","company_name":"貴建設株式会社","folder_no":null,"domestic":"国内","job_type":null,"industry":"建設","recruit_start":"2025-07-24","priority":false,"candidate_status":"7/1　募集中","unit_price":75000,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":78,"progress":"停止","org_code":null,"kmt_flag":false,"sales_staff":"亀谷","glt_staff":"シスカ","code":"RPJ06","company_name":"株式会社 サイタ工業","folder_no":null,"domestic":"国内","job_type":null,"industry":"建設","recruit_start":"2025-08-05","priority":false,"candidate_status":"7/1　募集中","unit_price":75000,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":79,"progress":"停止","org_code":null,"kmt_flag":false,"sales_staff":"亀谷","glt_staff":"シスカ","code":"RPJ07","company_name":"株式会社 颯建","folder_no":null,"domestic":"国内","job_type":null,"industry":"建設","recruit_start":"2025-08-05","priority":false,"candidate_status":"7/1　募集中","unit_price":75000,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":80,"progress":"募集中","org_code":null,"kmt_flag":false,"sales_staff":"亀谷","glt_staff":"シスカ","code":"RPJ08","company_name":"立川工業","folder_no":null,"domestic":"国内","job_type":"鉄筋施工","industry":"建設","recruit_start":"2026-07-06","priority":false,"candidate_status":"7/29　募集中","unit_price":75000,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":81,"progress":"停止","org_code":null,"kmt_flag":false,"sales_staff":"亀谷","glt_staff":"シスカ","code":"RPJ15","company_name":"澄川工業 株式会社","folder_no":null,"domestic":"国内","job_type":"溶接","industry":"建設","recruit_start":"2025-10-27","priority":false,"candidate_status":"7/1　募集中","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":82,"progress":"停止","org_code":null,"kmt_flag":false,"sales_staff":"亀谷","glt_staff":"シスカ","code":"RPJ21","company_name":"株式会社 田中建塗","folder_no":null,"domestic":"国内","job_type":"左官","industry":"建設","recruit_start":"2025-11-27","priority":false,"candidate_status":"7/1　1名採用決定","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":83,"progress":"募集中","org_code":null,"kmt_flag":false,"sales_staff":"亀谷","glt_staff":"シスカ","code":"RPJ24","company_name":"株式会社清松興業","folder_no":null,"domestic":"国内","job_type":"溶接","industry":"製造業","recruit_start":"2026-07-06","priority":false,"candidate_status":"7/29　募集中","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":84,"progress":"募集中","org_code":null,"kmt_flag":false,"sales_staff":"亀谷","glt_staff":"シスカ","code":"RPJ26","company_name":"恭井建設株式会社","folder_no":null,"domestic":"国内","job_type":"左官","industry":"建設","recruit_start":"2026-01-13","priority":false,"candidate_status":"7/29　募集中","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":85,"progress":"停止","org_code":null,"kmt_flag":false,"sales_staff":"亀谷","glt_staff":"シスカ","code":"RPJ27","company_name":"株式会社宮地鐵工所","folder_no":null,"domestic":"国内","job_type":"半自動溶接","industry":"製造業","recruit_start":"2026-01-15","priority":false,"candidate_status":"7/1　2名一次面接済み、1名辞退(SP)","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":86,"progress":"停止","org_code":null,"kmt_flag":false,"sales_staff":"亀谷","glt_staff":"シスカ","code":"RPJ29","company_name":"井上鉄工株式会社","folder_no":null,"domestic":"国内","job_type":"半自動溶接","industry":"製造業","recruit_start":"2026-01-15","priority":false,"candidate_status":"7/1　募集中","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":87,"progress":"停止","org_code":null,"kmt_flag":false,"sales_staff":"亀谷","glt_staff":"シスカ","code":"RPJ32","company_name":"住吉工業株式会社","folder_no":null,"domestic":"国内","job_type":"造船所での溶接","industry":"製造業","recruit_start":"2026-01-15","priority":false,"candidate_status":"7/1　募集中","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":88,"progress":"停止","org_code":null,"kmt_flag":false,"sales_staff":"亀谷","glt_staff":"シスカ","code":"RPJ33","company_name":"株式会社アロイ","folder_no":null,"domestic":"国内","job_type":"溶接・機械加工","industry":"製造業","recruit_start":"2026-02-12","priority":false,"candidate_status":"7/1　募集中","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":89,"progress":"募集中","org_code":null,"kmt_flag":false,"sales_staff":"亀谷","glt_staff":"シスカ","code":"RPJ36","company_name":"清水築炉株式会社","folder_no":null,"domestic":"国内","job_type":null,"industry":"建設","recruit_start":"2026-02-12","priority":false,"candidate_status":"7/15　結果待ち(SP)","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":90,"progress":"募集中","org_code":null,"kmt_flag":false,"sales_staff":"亀谷","glt_staff":"シスカ","code":"RPJ37","company_name":"株式会社　古川製作所","folder_no":null,"domestic":"国内","job_type":null,"industry":"製造業","recruit_start":"2026-07-06","priority":false,"candidate_status":"7/29　募集中","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":91,"progress":"停止","org_code":null,"kmt_flag":false,"sales_staff":"亀谷","glt_staff":"シスカ","code":"RPJ38","company_name":"株式会社 広伸","folder_no":null,"domestic":"国内","job_type":"土木","industry":"製造業","recruit_start":"2026-02-25","priority":false,"candidate_status":"7/1　募集中","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":92,"progress":"募集中","org_code":null,"kmt_flag":false,"sales_staff":"亀谷","glt_staff":"シスカ","code":"RPJ41","company_name":"筑紫自動車工業有限会社","folder_no":null,"domestic":"国内","job_type":null,"industry":"自動車整備","recruit_start":"2026-07-06","priority":false,"candidate_status":"7/29　募集中","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":93,"progress":"停止","org_code":null,"kmt_flag":false,"sales_staff":"亀谷","glt_staff":"シスカ","code":"RPJ42","company_name":"こめだ自動車","folder_no":null,"domestic":"国内","job_type":null,"industry":"自動車整備","recruit_start":"2026-02-25","priority":false,"candidate_status":"7/1　1名企業面接調整中(SP)","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":94,"progress":"募集中","org_code":null,"kmt_flag":false,"sales_staff":"亀谷","glt_staff":"シスカ","code":"RPJ43","company_name":"株式会社松永建設","folder_no":null,"domestic":"国内","job_type":null,"industry":"建設","recruit_start":"2026-02-25","priority":false,"candidate_status":"7/29　募集中","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":95,"progress":"募集中","org_code":null,"kmt_flag":false,"sales_staff":"亀谷","glt_staff":"シスカ","code":"RPJ49","company_name":"株式会社共栄製作所","folder_no":null,"domestic":"国内","job_type":null,"industry":"製造業","recruit_start":"2026-02-25","priority":false,"candidate_status":"7/29　募集中","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":96,"progress":"募集中","org_code":null,"kmt_flag":false,"sales_staff":"亀谷","glt_staff":"シスカ","code":"RPJ50","company_name":"合同会社ウイング","folder_no":null,"domestic":"国内","job_type":"建築","industry":"建設","recruit_start":"2026-06-16","priority":false,"candidate_status":"7/29　募集中","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":97,"progress":"募集中","org_code":null,"kmt_flag":false,"sales_staff":"亀谷","glt_staff":"シスカ","code":"RPJ51","company_name":"ソルト","folder_no":null,"domestic":"国内","job_type":"ライフライン","industry":"建設","recruit_start":"2026-06-16","priority":false,"candidate_status":"7/29　募集中","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":98,"progress":"募集中","org_code":null,"kmt_flag":false,"sales_staff":"亀谷","glt_staff":"シスカ","code":"RPJ52","company_name":"スエナガ株式会社","folder_no":null,"domestic":"国内","job_type":"建築区分【塗装工事業】","industry":"建設","recruit_start":"2026-06-16","priority":false,"candidate_status":"7/29　募集中","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":99,"progress":"募集中","org_code":null,"kmt_flag":false,"sales_staff":"ゆや","glt_staff":"ファウザン","code":"PW05","company_name":"株式会社エイダッシュ","folder_no":null,"domestic":"国内","job_type":"電子機器組み立て","industry":"自動車整備","recruit_start":"2026-03-13","priority":false,"candidate_status":"7/29　募集中","unit_price":null,"expected_count":null,"amount":null,"comment":null,"nationalities":[]},{"src_row":100,"progress":"募集中","org_code":null,"kmt_flag":false,"sales_staff":"ゆや","glt_staff":"ファウザン","code":"PW06","company_name":"有限会社 福田工業","folder_no":null,"domestic":"国内","job_type":"DGM MORI、またOKUMAマシニングセンタ使用経験がある方","industry":"製造業","recruit_start":"2026-03-13","priority":false,"candidate_status":"7/29　募集中","unit_price":null,"expected_count":null,"amount":null,"comment":null,"nationalities":[]},{"src_row":101,"progress":"募集中","org_code":null,"kmt_flag":false,"sales_staff":"林裕也","glt_staff":"ウスマン","code":"82WKS","company_name":"株式会社82works","folder_no":null,"domestic":null,"job_type":"農業","industry":"農業","recruit_start":"2025-11-20","priority":false,"candidate_status":"7/29　募集中","unit_price":null,"expected_count":4,"amount":0,"comment":"問い合わせがありましたが、普通免許持ってない方です。 ／ 5/1：インドネシア女性 ／ 5/1：インドネシア女性 ／ 5/4：インドネシア女性  ／ 5/4：インドネシア女性  ／ 5/4：インドネシア女性  ／ 5/7：インドネシア女性 ／ 5/7：インドネシア女性","nationalities":[]},{"src_row":102,"progress":"募集再開","org_code":null,"kmt_flag":false,"sales_staff":"二サ","glt_staff":"ニサ","code":"BW 01","company_name":"株式会社新興総合商会","folder_no":null,"domestic":null,"job_type":"鉄工、溶接","industry":"建設","recruit_start":"2025-12-02","priority":false,"candidate_status":"7/29　募集中","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":103,"progress":"募集再開","org_code":null,"kmt_flag":false,"sales_staff":"坂齊","glt_staff":"ナディ","code":"CCN15","company_name":"アースケア豊川 ／ （国内・国外ok）","folder_no":null,"domestic":null,"job_type":null,"industry":"介護","recruit_start":null,"priority":false,"candidate_status":"7/29　募集中","unit_price":75000,"expected_count":null,"amount":null,"comment":null,"nationalities":[]},{"src_row":104,"progress":"募集中","org_code":null,"kmt_flag":false,"sales_staff":"金丸","glt_staff":"ウスマン","code":"FC81","company_name":"株式会社光興業","folder_no":null,"domestic":"国内/外","job_type":"とび","industry":"建設","recruit_start":"2026-05-28","priority":true,"candidate_status":"7/15　募集中","unit_price":60000,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":105,"progress":"募集中","org_code":null,"kmt_flag":false,"sales_staff":"金丸","glt_staff":"ウスマン","code":"FC42","company_name":"有限会社笹沼工業","folder_no":null,"domestic":"国内","job_type":"建設機械施工","industry":"建設","recruit_start":"2026-05-28","priority":true,"candidate_status":"7/15　7/221名企業面接予定(SP)","unit_price":60000,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":106,"progress":"新着","org_code":null,"kmt_flag":false,"sales_staff":"亀谷","glt_staff":"ウスマン","code":"AB1","company_name":"アビリティ株式会社","folder_no":null,"domestic":"国内","job_type":null,"industry":"製造業","recruit_start":"2026-06-23","priority":false,"candidate_status":"7/29　2名辞退(SP)、TSKと面接 (AS)","unit_price":null,"expected_count":2,"amount":0,"comment":null,"nationalities":[]},{"src_row":107,"progress":"新着","org_code":null,"kmt_flag":false,"sales_staff":"亀谷","glt_staff":"ウスマン","code":"AB2","company_name":"アビリティ株式会社","folder_no":null,"domestic":"国内","job_type":null,"industry":"自動車運送業","recruit_start":"2026-06-23","priority":false,"candidate_status":"7/29　募集中","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":108,"progress":"新着","org_code":null,"kmt_flag":false,"sales_staff":"亀谷","glt_staff":null,"code":"MRN01","company_name":"株式会社マルノウチディーエス","folder_no":null,"domestic":"国内","job_type":null,"industry":"自動車運送業","recruit_start":"2026-07-07","priority":false,"candidate_status":"7/29　募集中","unit_price":null,"expected_count":2,"amount":0,"comment":null,"nationalities":[]},{"src_row":118,"progress":"募集中","org_code":null,"kmt_flag":true,"sales_staff":"ナム","glt_staff":"ナム","code":"KM00","company_name":"元技能実習","folder_no":null,"domestic":"国内/外","job_type":null,"industry":"全職","recruit_start":null,"priority":false,"candidate_status":"広告を出しても、戻りたい人が少ない","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":119,"progress":"停止","org_code":null,"kmt_flag":true,"sales_staff":"高村","glt_staff":"ナム","code":"KM67","company_name":"内村組","folder_no":null,"domestic":null,"job_type":"鉄筋施工","industry":"建設","recruit_start":"2023-09-01","priority":false,"candidate_status":"12/25募集中、","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":120,"progress":"停止","org_code":null,"kmt_flag":true,"sales_staff":"高村","glt_staff":"ナム","code":"KM63","company_name":"石橋　豊","folder_no":null,"domestic":null,"job_type":"農業","industry":"農業","recruit_start":"2025-10-09","priority":false,"candidate_status":"12/251名採用決定、","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":122,"progress":"募集中","org_code":null,"kmt_flag":true,"sales_staff":"蛭田","glt_staff":"ナム","code":"KM913","company_name":"YSK福島工場","folder_no":null,"domestic":"国内","job_type":"機械加工","industry":"製造業","recruit_start":"2025-12-03","priority":false,"candidate_status":"7/29　募集中","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":123,"progress":"募集中","org_code":null,"kmt_flag":true,"sales_staff":"蛭田","glt_staff":"ナム","code":"KM913","company_name":"YSK佐賀","folder_no":null,"domestic":"国内","job_type":"機械加工","industry":"製造業","recruit_start":"2025-12-24","priority":false,"candidate_status":"7/29 　募集中","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":124,"progress":"停止","org_code":null,"kmt_flag":true,"sales_staff":"高村","glt_staff":"ナム","code":"KM183","company_name":"株式会社大真","folder_no":null,"domestic":"国内","job_type":"内緒仕上","industry":"建設","recruit_start":"2026-04-24","priority":false,"candidate_status":"7/8  2名採用決定、","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":125,"progress":"保留","org_code":null,"kmt_flag":true,"sales_staff":"蛭田","glt_staff":"ナム","code":"KS30","company_name":"未築建設株式会社","folder_no":null,"domestic":"国内","job_type":"土木","industry":"建設","recruit_start":"2025-02-06","priority":false,"candidate_status":"7/29　募集中","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":126,"progress":"募集中","org_code":null,"kmt_flag":true,"sales_staff":"蛭田","glt_staff":"ナム","code":"KM913","company_name":"隆盛","folder_no":null,"domestic":"国内/外","job_type":"土木区分","industry":"建設","recruit_start":"2026-02-26","priority":false,"candidate_status":"7/29　募集中。募集条件が難しい。","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":127,"progress":"募集中","org_code":null,"kmt_flag":true,"sales_staff":"蛭田","glt_staff":"ナム","code":"KM11","company_name":"モスニック(株)　京都工場","folder_no":null,"domestic":"国内","job_type":"機械加工","industry":"製造業","recruit_start":"2026-02-26","priority":false,"candidate_status":"7/29　募集中","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":128,"progress":"新着","org_code":null,"kmt_flag":true,"sales_staff":"蛭田","glt_staff":"ナム","code":"KS37","company_name":"ラーメン花月","folder_no":null,"domestic":"国内","job_type":null,"industry":"外食","recruit_start":null,"priority":false,"candidate_status":"7/29　募集中","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":129,"progress":"新着","org_code":null,"kmt_flag":true,"sales_staff":"高村","glt_staff":"ナム","code":"KM67","company_name":"内村組","folder_no":null,"domestic":"国内","job_type":"土木区分, 鉄筋施工","industry":"建設","recruit_start":null,"priority":false,"candidate_status":"7/29　募集中","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":130,"progress":"新着","org_code":null,"kmt_flag":true,"sales_staff":"亀谷","glt_staff":"ウスマン","code":"LB14","company_name":"企業名不明　（機械加工・ベトナム）","folder_no":null,"domestic":"国内","job_type":null,"industry":"製造業","recruit_start":null,"priority":false,"candidate_status":"7/29　募集中","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":132,"progress":"停止","org_code":null,"kmt_flag":true,"sales_staff":"高村","glt_staff":"ナム","code":"KM33","company_name":"境田","folder_no":null,"domestic":null,"job_type":null,"industry":"漁業","recruit_start":"2024-07-22","priority":false,"candidate_status":"12/23 1/9 候補者1名　企業面接予定です。 ／ 11/25 国内候補者1名がいます。提案済み","unit_price":null,"expected_count":null,"amount":null,"comment":null,"nationalities":[]},{"src_row":133,"progress":"停止","org_code":null,"kmt_flag":true,"sales_staff":"高村","glt_staff":"ナム","code":"KM31","company_name":"松浦工務店","folder_no":null,"domestic":null,"job_type":"建設業","industry":"建設","recruit_start":"2024-08-01","priority":false,"candidate_status":"12/9 国外候補者1名提案済み、中々面接日程調整してくれない ／ 01/06 停止","unit_price":null,"expected_count":null,"amount":null,"comment":null,"nationalities":[]},{"src_row":134,"progress":"停止","org_code":null,"kmt_flag":true,"sales_staff":"永田","glt_staff":"ナム","code":"KM1801","company_name":"大一産業　溶接・愛媛県／大分県","folder_no":null,"domestic":null,"job_type":"溶接","industry":"製造業","recruit_start":"2024-10-22","priority":false,"candidate_status":"11/19 国内候補者5名がいます。提案中 ／ 01/06 停止","unit_price":null,"expected_count":null,"amount":null,"comment":null,"nationalities":[]},{"src_row":135,"progress":"停止","org_code":null,"kmt_flag":true,"sales_staff":"永田","glt_staff":"ナム","code":"KM1802","company_name":"大一産業　機械加工・愛媛県","folder_no":null,"domestic":null,"job_type":"機械加工","industry":"製造業","recruit_start":"2024-10-23","priority":false,"candidate_status":"11/19 国内候補者２名がいます。11/20 企業面接待ち ／ 01/06 停止","unit_price":null,"expected_count":null,"amount":null,"comment":null,"nationalities":[]},{"src_row":136,"progress":"停止","org_code":null,"kmt_flag":true,"sales_staff":"ナム","glt_staff":"ナム","code":"KMT","company_name":"PLANT-A","folder_no":null,"domestic":null,"job_type":"溶接","industry":"製造業","recruit_start":"2024-12-05","priority":false,"candidate_status":"3/24 PLANT-A 国籍問わず. 募集中 ／ 4/04 何回か提案したが、全員見送り、求めてるレベルが高い","unit_price":null,"expected_count":null,"amount":null,"comment":"基本給23～25万円、半自動溶接、TIG ⇒ 募集中","nationalities":[]},{"src_row":137,"progress":"停止","org_code":null,"kmt_flag":true,"sales_staff":"亀谷","glt_staff":"ナム","code":"KMT","company_name":"隆盛","folder_no":null,"domestic":null,"job_type":"土木","industry":"建設","recruit_start":"2025-03-05","priority":false,"candidate_status":"3/24　国内候補者3名、3/25 企業面接予定です。","unit_price":null,"expected_count":null,"amount":null,"comment":"と合わせが結構いますので今週中に提案できると思います。","nationalities":[]},{"src_row":140,"progress":"募集中","org_code":"FC","kmt_flag":false,"sales_staff":"6万円","glt_staff":"チュオン","code":"FC85","company_name":"有限会社 熊谷綜建","folder_no":null,"domestic":"国内","job_type":"とび","industry":"建設","recruit_start":"2025-09-20","priority":false,"candidate_status":"7/22　募集中。募集条件が難しい","unit_price":60000,"expected_count":null,"amount":0,"comment":"特定技能2号、","nationalities":[]},{"src_row":141,"progress":"停止","org_code":"ELN","kmt_flag":false,"sales_staff":"7.5万円","glt_staff":"チュオン","code":"FC86","company_name":"株式会社寿建工","folder_no":null,"domestic":null,"job_type":"とび","industry":"建設","recruit_start":"2025-09-21","priority":false,"candidate_status":"1/21　募集中","unit_price":75000,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":142,"progress":"停止","org_code":"FC","kmt_flag":false,"sales_staff":"6万円","glt_staff":"チュオン","code":"FC56","company_name":"FC56 クレア株式会社","folder_no":null,"domestic":null,"job_type":"土木","industry":"建設","recruit_start":"2025-03-05","priority":false,"candidate_status":"1/21　募集中","unit_price":60000,"expected_count":null,"amount":0,"comment":"ALCパネル経験が必要","nationalities":[]},{"src_row":143,"progress":"決定","org_code":"CCN","kmt_flag":false,"sales_staff":null,"glt_staff":null,"code":"CCN04","company_name":"新川屋","folder_no":null,"domestic":null,"job_type":null,"industry":"食品加工","recruit_start":"2025-03-19","priority":false,"candidate_status":"4/14 5名採用","unit_price":null,"expected_count":null,"amount":null,"comment":null,"nationalities":[]},{"src_row":144,"progress":"募集中","org_code":null,"kmt_flag":false,"sales_staff":"坂齊","glt_staff":"チュオン","code":"BMC01","company_name":"渡新工業  ／ (「ベトナム」国籍限定で再募集依頼)","folder_no":null,"domestic":null,"job_type":"土木","industry":"建設","recruit_start":"2025-09-24","priority":false,"candidate_status":"7/22  ベ：募集中。募集条件が難しい","unit_price":null,"expected_count":null,"amount":0,"comment":"5/19イ： ／ 5/19べ： ／ 5/19カ： ／ 5/19タイ： ／ 5/19ミャ：","nationalities":["ベトナム"]},{"src_row":145,"progress":"新着","org_code":null,"kmt_flag":false,"sales_staff":"亀谷","glt_staff":"ウスマン","code":"LB04","company_name":"（株）TRファクトリー（ゼンショー）","folder_no":null,"domestic":"国内","job_type":"飲食製造業","industry":"食品製造","recruit_start":"2026-06-03","priority":false,"candidate_status":"7/22  ベ：募集中","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":["ベトナム"]},{"src_row":146,"progress":"新着","org_code":null,"kmt_flag":false,"sales_staff":"亀谷","glt_staff":"ウスマン","code":"LB06","company_name":"（株）日本アグリネットワーク（ゼンショー）","folder_no":null,"domestic":"国内","job_type":"飲食製造業","industry":"食品製造","recruit_start":"2026-06-03","priority":false,"candidate_status":"7/22 ベ：募集中","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":["ベトナム"]},{"src_row":147,"progress":"募集中","org_code":null,"kmt_flag":false,"sales_staff":"マッタ","glt_staff":"ナデイ","code":"CCN 22","company_name":"東邦工業株式会社(ベトナム・女性のみ10名）","folder_no":null,"domestic":"国内","job_type":null,"industry":null,"recruit_start":null,"priority":false,"candidate_status":"7/22：お問い合わせが多いですが給料が低いという事でまだ集めていないです。","unit_price":null,"expected_count":null,"amount":null,"comment":"溶接経験者,全国,男性（2）名","nationalities":[]},{"src_row":160,"progress":"募集中","org_code":null,"kmt_flag":true,"sales_staff":"ガイ","glt_staff":"ガイ","code":"KM00","company_name":"元技能実習","folder_no":null,"domestic":null,"job_type":null,"industry":"全職","recruit_start":null,"priority":false,"candidate_status":null,"unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":161,"progress":"停止","org_code":null,"kmt_flag":true,"sales_staff":"高村","glt_staff":"ガイ","code":"KM86","company_name":"有馬七郎","folder_no":null,"domestic":"国内","job_type":"農業","industry":"農業","recruit_start":"2026-03-06","priority":false,"candidate_status":"4/13　1名　採用決定","unit_price":null,"expected_count":null,"amount":null,"comment":null,"nationalities":[]},{"src_row":162,"progress":"停止","org_code":null,"kmt_flag":true,"sales_staff":"ガイ","glt_staff":"ガイ","code":"KM133","company_name":"株式会社Greeland保泉（和佐田農園）","folder_no":null,"domestic":"国外","job_type":"農業","industry":"農業","recruit_start":"2026-04-13","priority":false,"candidate_status":"5/21　1名　採用決定","unit_price":null,"expected_count":null,"amount":null,"comment":null,"nationalities":[]},{"src_row":165,"progress":"募集中","org_code":null,"kmt_flag":false,"sales_staff":"ナディ","glt_staff":"ガイ","code":"INGS002","company_name":"INGS002. 合同会社SOLEX","folder_no":null,"domestic":"国内/外","job_type":null,"industry":"宿泊","recruit_start":"2026-04-24","priority":false,"candidate_status":"5/22　1名　提案済み","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":180,"progress":"停止","org_code":null,"kmt_flag":true,"sales_staff":null,"glt_staff":null,"code":"KS13","company_name":"株式会社千葉蟹商","folder_no":null,"domestic":null,"job_type":null,"industry":"食品加工","recruit_start":"2025-07-09","priority":false,"candidate_status":"8/7　募集中","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":184,"progress":"停止","org_code":"SW","kmt_flag":false,"sales_staff":null,"glt_staff":"ワンナー","code":"SW01","company_name":"株式会社絆","folder_no":null,"domestic":null,"job_type":"塗装","industry":"製造業","recruit_start":"2024-04-17","priority":false,"candidate_status":"8/5　 3名結果待ち→連絡が取れない為","unit_price":80000,"expected_count":null,"amount":0,"comment":"7/8   募集ストップ","nationalities":[]},{"src_row":185,"progress":"募集中","org_code":null,"kmt_flag":false,"sales_staff":null,"glt_staff":"ワンナー","code":"FC40","company_name":"株式会社北生","folder_no":null,"domestic":null,"job_type":"とび","industry":"建設","recruit_start":null,"priority":false,"candidate_status":"7/23      1名採用済","unit_price":60000,"expected_count":null,"amount":0,"comment":"7/8   募集継続するか確認中","nationalities":[]},{"src_row":186,"progress":"募集中","org_code":null,"kmt_flag":false,"sales_staff":"宮澤","glt_staff":"ウスマン","code":"FC50","company_name":"有限会社佐久間防水工業","folder_no":null,"domestic":"国内","job_type":"防水工事","industry":"建設","recruit_start":"2026-05-13","priority":false,"candidate_status":"２名提案中（返事なし）","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":187,"progress":"募集中","org_code":null,"kmt_flag":false,"sales_staff":"宮澤","glt_staff":"ウスマン","code":"FC79","company_name":"日本防水工業株式会社","folder_no":null,"domestic":"国内/外","job_type":"防水工事","industry":"建設","recruit_start":null,"priority":false,"candidate_status":null,"unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":200,"progress":"新着","org_code":null,"kmt_flag":true,"sales_staff":"亀谷","glt_staff":"ナディ","code":"KS24","company_name":"株式会社ラポール （外食・ラーメン屋）（ミャンマー限定）","folder_no":null,"domestic":"国内","job_type":null,"industry":"外食","recruit_start":"2025-12-09","priority":true,"candidate_status":"5/27ミャ： 3/261名企業面接・   16日ベトナム（1）名      ７/ 28一名採用  7/29募集中","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":["ミャンマー"]},{"src_row":204,"progress":"新着","org_code":null,"kmt_flag":false,"sales_staff":null,"glt_staff":null,"code":"CCN24","company_name":"株式会社ブライト　全国籍","folder_no":null,"domestic":"国内","job_type":"外食","industry":"外食","recruit_start":"2026-07-13","priority":false,"candidate_status":"7/13 ミヤ :　7/29　(1)名提案中","unit_price":null,"expected_count":null,"amount":null,"comment":"https://www.facebook.com/share/p/14hGTBgzYZC/","nationalities":[]},{"src_row":205,"progress":"募集中","org_code":null,"kmt_flag":false,"sales_staff":null,"glt_staff":null,"code":"CCN 23","company_name":"株式会社アリギス (特定技能溶接・全国籍）","folder_no":null,"domestic":"国内","job_type":"溶接","industry":null,"recruit_start":"2026-07-09","priority":false,"candidate_status":"7/29：募集中","unit_price":null,"expected_count":null,"amount":null,"comment":"溶接経験者,全国,男性（2）名","nationalities":[]},{"src_row":206,"progress":"保留","org_code":"HSR","kmt_flag":false,"sales_staff":"亀谷","glt_staff":null,"code":"HSR01","company_name":"石川県（配管施工）1名","folder_no":null,"domestic":"国内","job_type":"配管","industry":"建設","recruit_start":"2024-12-04","priority":false,"candidate_status":"7/29：募集中","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":207,"progress":"募集中","org_code":null,"kmt_flag":false,"sales_staff":null,"glt_staff":null,"code":"ELN13","company_name":"ELN13 水口病院（介護）","folder_no":null,"domestic":"国内","job_type":null,"industry":"介護","recruit_start":"2025-07-30","priority":false,"candidate_status":"7/29　募集中　スマートカード必須","unit_price":75000,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":208,"progress":"募集中","org_code":null,"kmt_flag":false,"sales_staff":null,"glt_staff":null,"code":"LNL 16","company_name":"社会福祉法人福寿会","folder_no":null,"domestic":"国内","job_type":null,"industry":"介護","recruit_start":null,"priority":false,"candidate_status":"7/29　募集","unit_price":null,"expected_count":null,"amount":null,"comment":null,"nationalities":[]},{"src_row":209,"progress":"募集中","org_code":null,"kmt_flag":false,"sales_staff":null,"glt_staff":"ナディ","code":"ELN20","company_name":"株式会社アンリ","folder_no":null,"domestic":"国内","job_type":"介護","industry":"介護","recruit_start":"2026-03-03","priority":false,"candidate_status":"7/29　募集中","unit_price":75000,"expected_count":null,"amount":null,"comment":null,"nationalities":[]},{"src_row":210,"progress":"新着","org_code":null,"kmt_flag":false,"sales_staff":"亀谷","glt_staff":"ウスマン","code":"LB01","company_name":"株式会社スーパーホテル","folder_no":null,"domestic":"国内","job_type":null,"industry":"技人国ビザ","recruit_start":"2026-06-03","priority":false,"candidate_status":"7/29　募集中　1名提案中","unit_price":null,"expected_count":null,"amount":0,"comment":null,"nationalities":[]},{"src_row":211,"progress":"新着","org_code":null,"kmt_flag":false,"sales_staff":"亀谷","glt_staff":"ウスマン","code":"LB07","company_name":"株式会社アイメディケア （ゼンショー）","folder_no":null,"domestic":"国内","job_type":"介護","industry":"介護","recruit_start":"2026-06-03","priority":false,"candidate_status":"7/29：募集中","unit_price":null,"expected_count":null,"amount":0,"comment":"https://www.facebook.com/photo?fbid=122237955854123737&set=pcb.122237956262123737 ／ https://www.facebook.com/photo?fbid=122237955854123737&set=pcb.122237956262123737","nationalities":[]},{"src_row":212,"progress":"新着","org_code":null,"kmt_flag":false,"sales_staff":"亀谷","glt_staff":"ウスマン","code":"LB08","company_name":"シニアライフサポート株式会社（ゼンショー）","folder_no":null,"domestic":"国内","job_type":"介護","industry":"介護","recruit_start":"2026-06-03","priority":false,"candidate_status":"7/29：募集中","unit_price":null,"expected_count":null,"amount":0,"comment":"https://www.facebook.com/photo?fbid=122237955890123737&set=pcb.122237956262123737","nationalities":[]},{"src_row":213,"progress":null,"org_code":null,"kmt_flag":false,"sales_staff":null,"glt_staff":null,"code":"NSSK01","company_name":"株式会社日昇設計(プラント設計技術者・技人国・全国籍）","folder_no":null,"domestic":"国内","job_type":"プラント設計技術者","industry":"プラント設計技術者","recruit_start":"2026-07-01","priority":false,"candidate_status":"7/29：募集中","unit_price":null,"expected_count":null,"amount":null,"comment":"https://www.facebook.com/share/p/1C2Ukg9UXv/","nationalities":[]},{"src_row":214,"progress":"新着","org_code":null,"kmt_flag":false,"sales_staff":"亀谷","glt_staff":"ウスマン","code":"LB09","company_name":"株式会社ロイヤルハウス石岡（ゼンショー）","folder_no":null,"domestic":"国内","job_type":"介護","industry":"介護","recruit_start":"2026-06-03","priority":false,"candidate_status":"7/29：募集中","unit_price":null,"expected_count":null,"amount":0,"comment":"https://www.facebook.com/photo?fbid=122237955944123737&set=pcb.122237956262123737","nationalities":[]}];
 const KMT_REQUEST_GAS_URL = 'https://script.google.com/macros/s/AKfycbx5aKU_kjfJjl08yeLo62TcV7hNyut_ORXLuDx8ksbGlZEoMbBzj6t_eL7XfEmBBkIw/exec';
 
 const KMT_DEBUG = true; // コンソール詳細ログのON/OFF
@@ -6387,6 +6388,13 @@ async function saveWorker(returnResult=false) {
   const g = id => document.getElementById(id)?.value || null;
   const name = (g('wf_name')||'').trim();
   if (!name) { showToastTop('❌ 氏名は必須です'); return false; }
+  // 申請記録連動フィールド: モーダルを閉じる前に値を確保
+  const _arVals = document.getElementById('wf_ar_receive') ? {
+    present:true,
+    receive: document.getElementById('wf_ar_receive')?.value||'',
+    chat: document.getElementById('wf_ar_chat')?.value||'',
+    situation: document.getElementById('wf_ar_situation')?.value||''
+  } : { present:false };
   const applyStatus = g('wf_apply_status') || '';
   if (applyStatus && applyStatus !== '申請予定なし') {
     if (!g('wf_apply_type')) { showToastTop('❌ 申請種別は必須です'); return false; }
@@ -6508,6 +6516,7 @@ async function saveWorker(returnResult=false) {
     if (!autoMode) closeGenModal('workerModal');
     if (_doRenewalChatPost && editingWorkerId) { _postRenewalCompletionToChat(editingWorkerId, data); }
     if (_doApplyChatPost && editingWorkerId) { _postApplyStatusToChat(editingWorkerId, data, data.apply_status); }
+    if (editingWorkerId && _arVals.present) { await _saveWorkerApplyFields(editingWorkerId, _arVals); }
     await loadWorkers();
     if (autoMode) { return true; }
   } catch(e) { _savingWorkerNew = false; showToast('❌ '+e.message,'error'); if(!autoMode) showLoading(false); return false; }
@@ -9547,7 +9556,7 @@ const SCREENS = {
   companies: { title: '🏢 所属機関', init: loadCompanies },
   workers:   { title: '👤 外国人材', init: loadWorkers },
   candidates:{ title: '📋 候補者',   init: loadCandidates },
-  jobs:      { title: '💼 求人管理', init: loadJobs },
+  jobs:      { title: '💼 求人管理', init: loadJobProgress },
   intro_reg_orgs:{ title: '🏢 登録支援機関一覧', init: loadIntroRegOrgs },
   introductions:{ title: '🤝 紹介案件', init: loadIntroductions },
   sending:   { title: '✈️ 送り出し機関', init: loadSending },
@@ -10023,6 +10032,53 @@ const APPLY_SITUATION_OPTS=['','新規・不明','stock対応確認中','在カ�
 let _applyEditByWorker=null;
 let _applyDirty=new Set();
 let _applyPending={};
+
+// 人材モーダルの「受け取り方法/チャット/状況」を申請記録(apply_record_edits)と連動
+function _fillApplySelect(id, v, opts){
+  const el=document.getElementById(id); if(!el) return;
+  const o=opts.slice(); if(v && o.indexOf(v)<0) o.push(v);
+  el.innerHTML=o.map(x=>'<option '+(x===v?'selected':'')+'>'+esc(x)+'</option>').join('');
+}
+// モーダル表示時: 現在値(DB編集 > シート初期値 > 空)を3つのセレクトに反映
+async function _syncWorkerApplyToForm(w){
+  if(!document.getElementById('wf_ar_receive')) return;
+  if(!w || !w.id){
+    _fillApplySelect('wf_ar_receive','',APPLY_RECEIVE_OPTS);
+    _fillApplySelect('wf_ar_chat','',APPLY_CHAT_OPTS);
+    _fillApplySelect('wf_ar_situation','',APPLY_SITUATION_OPTS);
+    return;
+  }
+  let ed=(_applyEditByWorker||{})[w.id];
+  // 未ロードならこの人材の編集行だけ取得（custody等も含めキャッシュ→保存時の上書き防止）
+  if(!ed){
+    try{ const d=await sbFetch('apply_record_edits?worker_id=eq.'+encodeURIComponent(w.id)+'&select=*&limit=1'); if(d&&d.length){ ed=d[0]; (_applyEditByWorker=_applyEditByWorker||{})[w.id]=ed; } }catch(e){}
+  }
+  let rec=null;
+  if(typeof _applySheetLookup!=='undefined' && _applySheetLookup){
+    rec=_applySheetLookup.byNo[_normApplyNo(w.apply_number||'')]||_applySheetLookup.byName[_normName(w.name||'')]||null;
+  }
+  const val=(edF,shF)=> ed?(ed[edF]||''):(rec?(rec[shF]||''):'');
+  _fillApplySelect('wf_ar_receive', val('receive_method','receive'), APPLY_RECEIVE_OPTS);
+  _fillApplySelect('wf_ar_chat', val('chat','chat'), APPLY_CHAT_OPTS);
+  _fillApplySelect('wf_ar_situation', val('situation','situation'), APPLY_SITUATION_OPTS);
+}
+// 保存時: 3項目をapply_record_editsへupsert（他項目custody/zaikapa/note等は保持）
+// vals={receive,chat,situation} をモーダルを閉じる前に取得して渡す
+async function _saveWorkerApplyFields(workerId, vals){
+  if(!workerId || !vals) return;
+  const rv=vals.receive||'', cv=vals.chat||'', sv=vals.situation||'';
+  const prev=(_applyEditByWorker||{})[workerId]||{};
+  // 変更が無ければスキップ（無駄な上書き回避）
+  if((prev.receive_method||'')===rv && (prev.chat||'')===cv && (prev.situation||'')===sv && prev.updated_at) return;
+  const ar={ worker_id:workerId, receive_method:rv, chat:cv, situation:sv,
+    updated_at:new Date().toISOString(), updated_by:(typeof currentUser!=='undefined'&&currentUser&&currentUser.name)||'' };
+  // 申請記録タブ専用の他項目は既存値があれば維持（上書きしない）
+  ['custody','zaikapa','handle_date','note'].forEach(k=>{ if(prev[k]!=null && prev[k]!=='') ar[k]=prev[k]; });
+  try{
+    await sbFetch('apply_record_edits',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(ar)});
+    (_applyEditByWorker=_applyEditByWorker||{})[workerId]=Object.assign({},prev,ar);
+  }catch(e){}
+}
 function _fmtApplyMeta(iso){ try{ const d=new Date(iso); return d.toLocaleDateString('ja-JP',{month:'2-digit',day:'2-digit'})+' '+d.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}); }catch(e){ return ''; } }
 function _markApplyRowDirty(wid){ const m=document.getElementById('ar_meta_'+wid); if(m) m.innerHTML='<span style="color:#ea580c;font-weight:700;">● 未保存</span>'; }
 async function saveApplyRecord(workerId){
@@ -11242,6 +11298,7 @@ async function openWorkerModal(id) {
   }
   showGenModal('workerModal', title, buildWorkerModalBody(w));
   setTimeout(() => renderApplyStatusPanel((w||{}).apply_status||''), 100);
+  setTimeout(() => { _syncWorkerApplyToForm(w); }, 130);
   setTimeout(() => { _takeWorkerSnapshot(); if (typeof updateWorkerPhotoPreview === 'function') updateWorkerPhotoPreview(); }, 200);
 }
 let editingWorkerId = null;
@@ -11576,6 +11633,21 @@ function buildWorkerModalBody(w) {
     <div class="form-group full"><label class="form-label">申請日</label><input class="form-input" id="wf_apply_date" type="date" value="${w.apply_date||''}" style="max-width:180px;"></div>
     <div class="form-group full"><label class="form-label">申請番号</label><input class="form-input" id="wf_apply_number" value="${esc(w.apply_number||'')}" placeholder="例: 2024-T-001"></div>
     <div class="form-group full"><label class="form-label">申請メモ</label><textarea class="form-textarea" id="wf_apply_memo" rows="3" placeholder="特定技能通算・技能実習修了日・申請目標日など">${esc(w.apply_memo||'')}</textarea></div>
+
+    <!-- 申請記録と連動: 受け取り方法 / チャット / 状況 -->
+    <div class="form-group full" style="margin-top:4px;">
+      <div style="background:#eef6ff;border:1px solid #cfe0f5;border-radius:8px;padding:10px 12px;max-width:560px;">
+        <div style="font-size:11px;font-weight:800;color:#1e40af;margin-bottom:8px;">📥 受け取り・チャット・状況 <span style="font-weight:500;color:#64748b;font-size:10px;">（申請記録タブと連動）</span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+          <div><label class="form-label" style="font-size:11px;">受け取り方法</label>
+            <select class="form-select" id="wf_ar_receive" style="font-size:12px;">${APPLY_RECEIVE_OPTS.map(x=>`<option>${esc(x)}</option>`).join('')}</select></div>
+          <div><label class="form-label" style="font-size:11px;">チャット</label>
+            <select class="form-select" id="wf_ar_chat" style="font-size:12px;">${APPLY_CHAT_OPTS.map(x=>`<option>${esc(x)}</option>`).join('')}</select></div>
+          <div><label class="form-label" style="font-size:11px;">状況</label>
+            <select class="form-select" id="wf_ar_situation" style="font-size:12px;">${APPLY_SITUATION_OPTS.map(x=>`<option>${esc(x)}</option>`).join('')}</select></div>
+        </div>
+      </div>
+    </div>
 
   </div>
 
@@ -14482,26 +14554,280 @@ async function removeJobFromCandidate(candId, jobId){
   }catch(e){showToast('❌ '+e.message,'error');}
 }
 
+// ============================================================
+// 💼 求人管理（求人進捗：階層グループ表示 + 売上見込み）
+// ============================================================
+let allJobProg = [], _jpGroupBy = 'nationality', _jpSeeding = false;
+const JP_NAT_ORDER = ['インドネシア','ベトナム','タイ','カンボジア','ミャンマー','バングラデシュ','スリランカ','フィリピン','中国','ネパール'];
+const JP_STATUSES = ['募集中','新着','提案中','結果待ち','保留','停止','決定','募集再開'];
+const JP_STATUS_COLOR = {
+  '募集中':'#16a34a','新着':'#2563eb','提案中':'#7c3aed','結果待ち':'#0891b2',
+  '保留':'#d97706','停止':'#dc2626','決定':'#059669','募集再開':'#16a34a'
+};
+
 function buildJobsScreen() {
   return `
+  <div id="jpForecast" style="margin-bottom:12px;"></div>
   <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
-    <input class="search-input" id="jSearchInput" placeholder="求人コード・会社名で検索..." oninput="applyJobFilters()" style="flex:1;min-width:200px;">
-    <select class="filter-select" id="jFilterStatus" onchange="applyJobFilters()">
-      <option value="">全ステータス</option>
-      <option>募集中</option><option>新着</option><option>提案中</option><option>保留</option><option>停止</option><option>決定</option><option>募集再開</option>
+    <input class="search-input" id="jpSearch" placeholder="コード・会社名・担当で検索..." oninput="renderJobProgress()" style="flex:1;min-width:200px;">
+    <select class="filter-select" id="jpFilterKmt" onchange="renderJobProgress()">
+      <option value="">KMT/紹介：全て</option><option value="kmt">KMT案件のみ</option><option value="intro">紹介案件のみ</option>
     </select>
-    <select class="filter-select" id="jFilterIndustry" onchange="applyJobFilters()">
-      <option value="">全業種</option>
-      <option>農業</option><option>建設</option><option>製造業</option><option>外食</option><option>介護</option><option>宿泊</option><option>その他</option>
+    <select class="filter-select" id="jpFilterStatus" onchange="renderJobProgress()">
+      <option value="">全ステータス</option>${JP_STATUSES.map(s=>`<option>${s}</option>`).join('')}
     </select>
-    <button class="btn btn-outline" style="font-size:11px;padding:4px 10px" onclick="clearJobFilters()">✕</button>
+    <span style="font-size:11px;color:var(--gray-400);font-weight:700;">グループ:</span>
+    <select class="filter-select" id="jpGroupBy" onchange="_jpGroupBy=this.value;renderJobProgress()">
+      <option value="nationality">国籍ごと</option>
+      <option value="kmt">KMT・紹介ごと</option>
+      <option value="org">登録支援機関コードごと</option>
+      <option value="industry">分野ごと</option>
+    </select>
+    <button class="btn btn-outline" style="font-size:11px;padding:4px 10px" onclick="jpClearFilters()">✕ クリア</button>
+    <button class="btn btn-outline" style="font-size:11px;padding:4px 10px" onclick="loadJobProgress()">🔄 更新</button>
   </div>
-  <div class="table-wrap"><table><thead><tr>
-    <th>求人コード</th><th>会社名</th><th>業種/職種</th><th>国内外</th>
-    <th>紹介費</th><th>優先度</th><th>GLT担当</th><th>募集開始日</th><th>ステータス</th><th>⚠️</th>
-  </tr></thead>
-  <tbody id="jobTbody"><tr><td colspan="10" style="text-align:center;padding:40px;color:var(--gray-400)">読み込み中...</td></tr></tbody>
-  </table><div class="pagination-bar" id="jobPagination"></div></div>`;
+  <div id="jpGroupArea"><div style="text-align:center;padding:40px;color:var(--gray-400)">読み込み中...</div></div>`;
+}
+
+async function loadJobProgress() {
+  showLoading(true);
+  try {
+    let data = await sbFetch('job_progress?select=*&order=src_row.asc');
+    if ((!data || !data.length) && typeof JOB_PROGRESS_SEED !== 'undefined' && JOB_PROGRESS_SEED.length) {
+      await seedJobProgress();
+      data = await sbFetch('job_progress?select=*&order=src_row.asc');
+    }
+    allJobProg = data || [];
+  } catch(e) {
+    // DB未接続でも埋め込みデータで表示できるようにフォールバック
+    allJobProg = (typeof JOB_PROGRESS_SEED !== 'undefined') ? JOB_PROGRESS_SEED.slice() : [];
+    showToast('⚠️ DB接続不可のため埋め込みデータを表示中', 'warn');
+  }
+  renderJobProgress();
+  showLoading(false);
+}
+
+// 埋め込みシード（JOB_PROGRESS_SEED）をDBへ初回投入
+async function seedJobProgress() {
+  if (_jpSeeding) return;
+  _jpSeeding = true;
+  try {
+    const rows = JOB_PROGRESS_SEED;
+    const CH = 40;
+    for (let i=0; i<rows.length; i+=CH) {
+      await sbFetch('job_progress', { method:'POST', prefer:'return=minimal', body: JSON.stringify(rows.slice(i,i+CH)) });
+    }
+    showToast('✅ 求人進捗データをDBに取り込みました（' + rows.length + '件）', 'success');
+  } finally { _jpSeeding = false; }
+}
+
+function jpClearFilters() {
+  ['jpSearch','jpFilterKmt','jpFilterStatus'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  renderJobProgress();
+}
+
+function _jpYen(n){ return '¥' + Number(n||0).toLocaleString('ja-JP'); }
+function _jpNum(n){ return Number(n||0).toLocaleString('ja-JP'); }
+
+// フィルタ適用後の行を返す
+function _jpFiltered() {
+  const q = (document.getElementById('jpSearch')?.value||'').toLowerCase();
+  const kmt = document.getElementById('jpFilterKmt')?.value||'';
+  const st = document.getElementById('jpFilterStatus')?.value||'';
+  return (allJobProg||[]).filter(r=>{
+    if (q) {
+      const hay = [r.code,r.company_name,r.sales_staff,r.glt_staff,r.org_code].map(x=>(x||'').toLowerCase()).join(' ');
+      if (!hay.includes(q)) return false;
+    }
+    if (kmt==='kmt' && !r.kmt_flag) return false;
+    if (kmt==='intro' && r.kmt_flag) return false;
+    if (st && r.progress!==st) return false;
+    return true;
+  });
+}
+
+// 売上見込みヘッダ（KMT案件 ◯人 ◯円 / 紹介案件 ◯人 ◯円）
+function _jpRenderForecast(rows) {
+  const f = { kmt:{c:0,n:0,y:0}, intro:{c:0,n:0,y:0} };
+  rows.forEach(r=>{
+    const t = r.kmt_flag ? f.kmt : f.intro;
+    t.c += 1; t.n += Number(r.expected_count||0); t.y += Number(r.amount||0);
+  });
+  const tot = { c:f.kmt.c+f.intro.c, n:f.kmt.n+f.intro.n, y:f.kmt.y+f.intro.y };
+  const card = (label,d,color) => `
+    <div style="flex:1;min-width:180px;background:white;border:1px solid var(--gray-200);border-left:4px solid ${color};border-radius:10px;padding:10px 14px;">
+      <div style="font-size:12px;font-weight:800;color:${color};margin-bottom:4px;">${label}</div>
+      <div style="font-size:12px;color:var(--gray-500);">${d.c}件</div>
+      <div style="font-size:20px;font-weight:800;color:var(--navy);line-height:1.2;">${_jpNum(d.n)}<span style="font-size:12px;font-weight:600;color:var(--gray-400);"> 人</span></div>
+      <div style="font-size:15px;font-weight:800;color:${color};">${_jpYen(d.y)}</div>
+    </div>`;
+  const el = document.getElementById('jpForecast');
+  if (!el) return;
+  el.innerHTML = `
+    <div style="font-size:13px;font-weight:800;color:var(--navy);margin-bottom:6px;">📊 売上見込み</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      ${card('🔵 KMT案件', f.kmt, '#2563eb')}
+      ${card('🟣 紹介案件', f.intro, '#7c3aed')}
+      ${card('合計', tot, '#0f766e')}
+    </div>`;
+}
+
+// グループ化: {key,label,rows[]} の配列を返す
+function _jpBuildGroups(rows, by) {
+  const map = new Map();
+  const push = (k,r)=>{ if(!map.has(k)) map.set(k,[]); map.get(k).push(r); };
+  if (by==='nationality') {
+    rows.forEach(r=>{
+      const nats = (r.nationalities && r.nationalities.length) ? r.nationalities : ['（国籍指定なし）'];
+      nats.forEach(n=>push(n,r));
+    });
+  } else if (by==='kmt') {
+    rows.forEach(r=>push(r.kmt_flag?'KMT案件':'紹介案件', r));
+  } else if (by==='org') {
+    rows.forEach(r=>push(r.org_code||'（コードなし）', r));
+  } else { // industry
+    rows.forEach(r=>push(r.industry||'（分野なし）', r));
+  }
+  let keys = [...map.keys()];
+  if (by==='nationality') {
+    keys.sort((a,b)=>{
+      const ia=JP_NAT_ORDER.indexOf(a), ib=JP_NAT_ORDER.indexOf(b);
+      return (ia<0?98:ia)-(ib<0?98:ib) || a.localeCompare(b,'ja');
+    });
+  } else if (by==='kmt') {
+    keys.sort((a,b)=> (a==='KMT案件'?0:1)-(b==='KMT案件'?0:1));
+  } else {
+    keys.sort((a,b)=> a.localeCompare(b,'ja'));
+  }
+  return keys.map(k=>({ key:k, label:k, rows:map.get(k) }));
+}
+
+function _jpStatusBadge(s) {
+  const c = JP_STATUS_COLOR[s] || '#64748b';
+  return s ? `<span style="display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;font-weight:700;background:${c}18;color:${c};">${esc(s)}</span>` : '';
+}
+function _jpNatChips(arr) {
+  if (!arr || !arr.length) return '<span style="color:var(--gray-300);font-size:11px;">―</span>';
+  return arr.map(n=>`<span style="display:inline-block;font-size:10px;background:var(--gray-100);color:var(--gray-600);border-radius:4px;padding:0 4px;margin:1px;">${typeof natFlag==='function'?natFlag(n):''}${esc(n)}</span>`).join('');
+}
+
+function renderJobProgress() {
+  if (currentScreen!=='jobs') return;
+  const rows = _jpFiltered();
+  _jpRenderForecast(rows);
+  const area = document.getElementById('jpGroupArea');
+  if (!area) return;
+  if (!rows.length) { area.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray-400)">該当する求人がありません</div>'; return; }
+  const groups = _jpBuildGroups(rows, _jpGroupBy);
+  const colHead = `<tr>
+    <th style="width:70px;">進捗</th><th style="width:80px;">コード</th><th>会社名</th>
+    <th style="width:70px;">分野</th><th style="width:90px;">職種</th><th style="width:60px;">国内外</th>
+    <th style="width:130px;">国籍</th><th style="width:50px;">見込</th><th style="width:90px;">金額</th>
+    <th style="width:70px;">担当</th><th>状況</th></tr>`;
+  const rowHtml = r => `
+    <tr style="cursor:pointer;" onclick="openJobProgressDetail(${r.src_row})">
+      <td>${_jpStatusBadge(r.progress)}${r.priority?' <span title="優先" style="color:#dc2626;">★</span>':''}</td>
+      <td style="font-weight:700;font-size:11px;">${esc(r.code||'')}</td>
+      <td style="font-size:12px;">${esc(r.company_name||'')}</td>
+      <td style="font-size:11px;">${esc(r.industry||'')}</td>
+      <td style="font-size:11px;">${esc(r.job_type||'')}</td>
+      <td style="font-size:11px;">${esc(r.domestic||'')}</td>
+      <td>${_jpNatChips(r.nationalities)}</td>
+      <td style="text-align:right;font-weight:700;">${r.expected_count!=null?_jpNum(r.expected_count):''}</td>
+      <td style="text-align:right;font-size:11px;">${r.amount!=null?_jpYen(r.amount):''}</td>
+      <td style="font-size:11px;">${esc(r.glt_staff||r.sales_staff||'')}</td>
+      <td style="font-size:11px;color:var(--gray-500);max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${esc(r.candidate_status||'')}">${esc(r.candidate_status||'')}</td>
+    </tr>`;
+  const groupHtml = g => {
+    const cnt = g.rows.length;
+    const sumN = g.rows.reduce((s,r)=>s+Number(r.expected_count||0),0);
+    const sumY = g.rows.reduce((s,r)=>s+Number(r.amount||0),0);
+    const kmtC = g.rows.filter(r=>r.kmt_flag).length;
+    return `
+    <div style="margin-bottom:16px;">
+      <div style="display:flex;align-items:center;gap:12px;background:var(--navy);color:white;border-radius:8px 8px 0 0;padding:8px 14px;font-weight:800;font-size:13px;">
+        <span>🏷️ ${esc(g.label)}</span>
+        <span style="font-size:12px;font-weight:600;opacity:.9;">${cnt}件（KMT ${kmtC}・紹介 ${cnt-kmtC}）</span>
+        <span style="margin-left:auto;font-size:12px;font-weight:700;">見込 ${_jpNum(sumN)}人 ・ ${_jpYen(sumY)}</span>
+      </div>
+      <div class="table-wrap" style="border-radius:0 0 8px 8px;">
+        <table><thead>${colHead}</thead><tbody>${g.rows.map(rowHtml).join('')}</tbody></table>
+      </div>
+    </div>`;
+  };
+  area.innerHTML = `<div style="font-size:12px;color:var(--gray-400);margin-bottom:8px;">合計 ${rows.length}件 ・ 見込 ${_jpNum(rows.reduce((s,r)=>s+Number(r.expected_count||0),0))}人 ・ ${_jpYen(rows.reduce((s,r)=>s+Number(r.amount||0),0))}</div>` + groups.map(groupHtml).join('');
+}
+
+// 求人進捗 詳細/編集モーダル
+function openJobProgressDetail(srcRow) {
+  const r = (allJobProg||[]).find(x=>x.src_row===srcRow);
+  if (!r) return;
+  const natOpts = JP_NAT_ORDER;
+  const chk = n => (r.nationalities||[]).includes(n)?'checked':'';
+  const body = `
+  <div class="form-grid">
+    <div class="section-title">求人進捗 情報</div>
+    <div class="form-group"><label class="form-label">進捗ステータス</label>
+      <select class="form-select" id="jpf_progress">${['',...JP_STATUSES].map(s=>`<option ${r.progress===s?'selected':''}>${s}</option>`).join('')}</select></div>
+    <div class="form-group"><label class="form-label">区分</label>
+      <select class="form-select" id="jpf_kmt"><option value="true" ${r.kmt_flag?'selected':''}>KMT案件</option><option value="false" ${!r.kmt_flag?'selected':''}>紹介案件</option></select></div>
+    <div class="form-group"><label class="form-label">求人コード</label><input class="form-input" id="jpf_code" value="${esc(r.code||'')}"></div>
+    <div class="form-group"><label class="form-label">登録支援機関コード</label><input class="form-input" id="jpf_org_code" value="${esc(r.org_code||'')}"></div>
+    <div class="form-group full"><label class="form-label">会社名・案件名</label><input class="form-input" id="jpf_company_name" value="${esc(r.company_name||'')}"></div>
+    <div class="form-group"><label class="form-label">分野</label><input class="form-input" id="jpf_industry" value="${esc(r.industry||'')}"></div>
+    <div class="form-group"><label class="form-label">職種</label><input class="form-input" id="jpf_job_type" value="${esc(r.job_type||'')}"></div>
+    <div class="form-group"><label class="form-label">国内/外</label><input class="form-input" id="jpf_domestic" value="${esc(r.domestic||'')}"></div>
+    <div class="form-group"><label class="form-label">優先度</label>
+      <select class="form-select" id="jpf_priority"><option value="false" ${!r.priority?'selected':''}>通常</option><option value="true" ${r.priority?'selected':''}>★ 優先</option></select></div>
+    <div class="form-group"><label class="form-label">営業担当</label><input class="form-input" id="jpf_sales_staff" value="${esc(r.sales_staff||'')}"></div>
+    <div class="form-group"><label class="form-label">GLT担当</label><input class="form-input" id="jpf_glt_staff" value="${esc(r.glt_staff||'')}"></div>
+    <div class="form-group"><label class="form-label">見込み人数</label><input class="form-input" id="jpf_expected_count" type="number" value="${r.expected_count??''}"></div>
+    <div class="form-group"><label class="form-label">見込み金額（円）</label><input class="form-input" id="jpf_amount" type="number" value="${r.amount??''}"></div>
+    <div class="form-group full"><label class="form-label">対象国籍</label>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;padding:6px 0;">
+        ${natOpts.map(n=>`<label style="font-size:12px;display:inline-flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" class="jpf_nat" value="${n}" ${chk(n)}>${n}</label>`).join('')}
+      </div></div>
+    <div class="form-group full"><label class="form-label">候補者の状況</label><textarea class="form-textarea" id="jpf_candidate_status" rows="4">${esc(r.candidate_status||'')}</textarea></div>
+    <div class="form-group full"><label class="form-label">コメント</label><textarea class="form-textarea" id="jpf_comment" rows="3">${esc(r.comment||'')}</textarea></div>
+  </div>
+  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)">
+    <button class="btn btn-primary" onclick="saveJobProgress(${r.src_row})">💾 保存</button>
+    <button class="btn btn-outline" onclick="closeGenModal('jobProgModal')">閉じる</button>
+  </div>`;
+  showGenModal('jobProgModal', '💼 ' + (r.code?r.code+' / ':'') + (r.company_name||'求人進捗'), body);
+}
+
+async function saveJobProgress(srcRow) {
+  const v = id => document.getElementById(id)?.value;
+  const nats = Array.from(document.querySelectorAll('.jpf_nat')).filter(c=>c.checked).map(c=>c.value);
+  const numOrNull = x => (x===''||x==null)?null:Number(x);
+  const payload = {
+    progress: v('jpf_progress')||null,
+    kmt_flag: v('jpf_kmt')==='true',
+    code: v('jpf_code')||null,
+    org_code: v('jpf_org_code')||null,
+    company_name: v('jpf_company_name')||null,
+    industry: v('jpf_industry')||null,
+    job_type: v('jpf_job_type')||null,
+    domestic: v('jpf_domestic')||null,
+    priority: v('jpf_priority')==='true',
+    sales_staff: v('jpf_sales_staff')||null,
+    glt_staff: v('jpf_glt_staff')||null,
+    expected_count: numOrNull(v('jpf_expected_count')),
+    amount: numOrNull(v('jpf_amount')),
+    nationalities: nats,
+    candidate_status: v('jpf_candidate_status')||null,
+    comment: v('jpf_comment')||null
+  };
+  try {
+    await sbFetch('job_progress?src_row=eq.'+srcRow, { method:'PATCH', prefer:'return=minimal', body: JSON.stringify(payload) });
+    // ローカルにも反映
+    const r = (allJobProg||[]).find(x=>x.src_row===srcRow);
+    if (r) Object.assign(r, payload);
+    showToast('✅ 保存しました','success');
+    closeGenModal('jobProgModal');
+    renderJobProgress();
+  } catch(e) { showToast('❌ 保存失敗: '+e.message,'error'); }
 }
 
 // ==============================
@@ -17184,6 +17510,14 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260804.19', date:'2026-08-05', notify:true, items:[
+    '人材詳細の「1.申請情報」に、申請記録タブと同じ「受け取り方法／チャット／状況」のドロップダウンを追加。人材モーダルで編集して保存すると申請記録タブに反映され、申請記録タブで編集した内容も人材モーダルに反映（双方向連動）。既存の預かり証・在カパ依頼・対応日・備考などは上書きせず保持',
+  ]},
+  { version:'ver.20260804.18', date:'2026-08-04', notify:true, items:[
+    '求人管理を「求人進捗」の階層グループ表示に刷新。GLT求人進捗管理シートの求人130件（KMT43・紹介87）を取り込み。一番上に売上見込み（KMT案件◯件◯人◯円／紹介案件◯件◯人◯円／合計）を表示',
+    '求人管理：グループ切替（国籍ごと／KMT・紹介ごと／登録支援機関コードごと／分野ごと）。各グループにスプレッドシート同様の小計（件数・KMT/紹介内訳・見込人数・見込金額）を表示',
+    '求人管理：検索（コード・会社名・担当）、KMT/紹介フィルター、進捗ステータスフィルターに対応。各行クリックで詳細を編集（進捗・区分・国籍・見込人数/金額・状況・コメント等）してDBに保存',
+  ]},
   { version:'ver.20260804.17', date:'2026-08-04', notify:true, items:[
     '申請記録：「状況」列をドロップダウン化（新規・不明／stock対応確認中／在カパ待ち(本人・会社)／在カパ届いた／郵送交付済／窓口受け取り／配属済／郵送済(会社・本人)／一時帰国中／その他）。シート値も反映',
     '申請記録：申請日で絞り込む期間フィルターを追加（開始〜終了。最古〜最新の日付も表示）',
