@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260804.19 -->
+<!-- KMT_VERSION ver.20260804.20 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -355,7 +355,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260804.19</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260804.20</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <div id="sidebarAlerts" style="margin-top:6px;display:none;flex-direction:column;gap:3px;"></div>
   </div>
@@ -11612,7 +11612,7 @@ function buildWorkerModalBody(w) {
 
   <!-- 1. 申請 -->
   <div class="section-title">1. 申請情報</div>
-  <div class="form-grid" style="grid-template-columns:1fr;">
+  <div class="form-grid">
     <div class="form-group full"><label class="form-label">申請ステータス <span style="color:#ef4444;">*</span></label>
       <select class="form-select" id="wf_apply_status" onchange="onApplyStatusChange()" style="max-width:200px;">
         ${['申請予定なし', '申請準備中', '審査中', '申請済み・不足あり', '追完指示', '審査完了', '発行待ち', '発行完了', '入国済み', '取り下げ', '不許可'].map(s=>`<option ${(w.apply_status||'申請予定なし')===s?'selected':''}>${s}</option>`).join('')}
@@ -11621,33 +11621,30 @@ function buildWorkerModalBody(w) {
     <!-- 発行完了・入国済み専用パネル -->
     <div id="wf_apply_status_panel" class="form-group full" style="display:none;"></div>
 
-    <div class="form-group full"><label class="form-label">申請種別 <span style="color:#ef4444;">*</span><span style="font-size:10px;color:var(--gray-400);"> (申請予定なし以外は必須)</span></label>
+    <!-- 左：申請種別 ／ 右：受け取り方法（申請記録タブと連動） -->
+    <div class="form-group"><label class="form-label">申請種別 <span style="color:#ef4444;">*</span><span style="font-size:10px;color:var(--gray-400);"> (申請予定なし以外は必須)</span></label>
       <select class="form-select" id="wf_apply_type" style="max-width:160px;">
         ${['','認定','変更','更新','申請なし'].map(s=>`<option value="${s}" ${(w.apply_type||'')===s?'selected':''}>${s||'─ 選択 ─'}</option>`).join('')}
       </select></div>
-    <div class="form-group full"><label class="form-label">希望在留資格 <span style="color:#ef4444;">*</span><span style="font-size:10px;color:var(--gray-400);"> (申請予定なし以外は必須)</span></label>
+    <div class="form-group"><label class="form-label">受け取り方法 <span style="font-size:10px;color:#2563eb;font-weight:600;">（申請記録と連動）</span></label>
+      <select class="form-select" id="wf_ar_receive" style="max-width:180px;">${APPLY_RECEIVE_OPTS.map(x=>`<option>${esc(x)}</option>`).join('')}</select></div>
+
+    <!-- 左：希望在留資格 ／ 右：チャット（申請記録タブと連動） -->
+    <div class="form-group"><label class="form-label">希望在留資格 <span style="color:#ef4444;">*</span><span style="font-size:10px;color:var(--gray-400);"> (申請予定なし以外は必須)</span></label>
       <select class="form-select" id="wf_desired_visa" style="max-width:180px;">
         ${['','特定技能1号','特定技能2号','特定活動','技人国','家族滞在'].map(s=>`<option value="${s}" ${(w.desired_visa||'')===s?'selected':''}>${s||'─ 選択 ─'}</option>`).join('')}
       </select></div>
-    <div class="form-group full"><label class="form-label">申請依頼日</label><input class="form-input" id="wf_request_date" type="date" value="${w.request_date||''}" style="max-width:180px;"></div>
+    <div class="form-group"><label class="form-label">チャット <span style="font-size:10px;color:#2563eb;font-weight:600;">（申請記録と連動）</span></label>
+      <select class="form-select" id="wf_ar_chat" style="max-width:180px;">${APPLY_CHAT_OPTS.map(x=>`<option>${esc(x)}</option>`).join('')}</select></div>
+
+    <!-- 左：申請依頼日 ／ 右：状況（申請記録タブと連動） -->
+    <div class="form-group"><label class="form-label">申請依頼日</label><input class="form-input" id="wf_request_date" type="date" value="${w.request_date||''}" style="max-width:180px;"></div>
+    <div class="form-group"><label class="form-label">状況 <span style="font-size:10px;color:#2563eb;font-weight:600;">（申請記録と連動）</span></label>
+      <select class="form-select" id="wf_ar_situation" style="max-width:200px;">${APPLY_SITUATION_OPTS.map(x=>`<option>${esc(x)}</option>`).join('')}</select></div>
+
     <div class="form-group full"><label class="form-label">申請日</label><input class="form-input" id="wf_apply_date" type="date" value="${w.apply_date||''}" style="max-width:180px;"></div>
     <div class="form-group full"><label class="form-label">申請番号</label><input class="form-input" id="wf_apply_number" value="${esc(w.apply_number||'')}" placeholder="例: 2024-T-001"></div>
     <div class="form-group full"><label class="form-label">申請メモ</label><textarea class="form-textarea" id="wf_apply_memo" rows="3" placeholder="特定技能通算・技能実習修了日・申請目標日など">${esc(w.apply_memo||'')}</textarea></div>
-
-    <!-- 申請記録と連動: 受け取り方法 / チャット / 状況 -->
-    <div class="form-group full" style="margin-top:4px;">
-      <div style="background:#eef6ff;border:1px solid #cfe0f5;border-radius:8px;padding:10px 12px;max-width:560px;">
-        <div style="font-size:11px;font-weight:800;color:#1e40af;margin-bottom:8px;">📥 受け取り・チャット・状況 <span style="font-weight:500;color:#64748b;font-size:10px;">（申請記録タブと連動）</span></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
-          <div><label class="form-label" style="font-size:11px;">受け取り方法</label>
-            <select class="form-select" id="wf_ar_receive" style="font-size:12px;">${APPLY_RECEIVE_OPTS.map(x=>`<option>${esc(x)}</option>`).join('')}</select></div>
-          <div><label class="form-label" style="font-size:11px;">チャット</label>
-            <select class="form-select" id="wf_ar_chat" style="font-size:12px;">${APPLY_CHAT_OPTS.map(x=>`<option>${esc(x)}</option>`).join('')}</select></div>
-          <div><label class="form-label" style="font-size:11px;">状況</label>
-            <select class="form-select" id="wf_ar_situation" style="font-size:12px;">${APPLY_SITUATION_OPTS.map(x=>`<option>${esc(x)}</option>`).join('')}</select></div>
-        </div>
-      </div>
-    </div>
 
   </div>
 
@@ -17510,6 +17507,9 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260804.20', date:'2026-08-05', notify:true, items:[
+    '人材詳細「1.申請情報」を2列レイアウトに変更。受け取り方法＝申請種別の右、チャット＝希望在留資格の右、状況＝申請依頼日の右に配置し、青枠を廃止して空白スペースを有効活用（申請記録タブとの連動はそのまま）',
+  ]},
   { version:'ver.20260804.19', date:'2026-08-05', notify:true, items:[
     '人材詳細の「1.申請情報」に、申請記録タブと同じ「受け取り方法／チャット／状況」のドロップダウンを追加。人材モーダルで編集して保存すると申請記録タブに反映され、申請記録タブで編集した内容も人材モーダルに反映（双方向連動）。既存の預かり証・在カパ依頼・対応日・備考などは上書きせず保持',
   ]},
