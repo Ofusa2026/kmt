@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260804.20 -->
+<!-- KMT_VERSION ver.20260804.21 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -355,7 +355,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260804.20</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260804.21</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <div id="sidebarAlerts" style="margin-top:6px;display:none;flex-direction:column;gap:3px;"></div>
   </div>
@@ -10127,6 +10127,55 @@ function _populateApplyFilters(){
   if(tSel){ const cur=tSel.value; tSel.innerHTML='<option value="">全申請種別</option>'+types.map(t=>`<option ${cur===t?'selected':''}>${esc(t)}</option>`).join(''); }
   if(sSel){ const cur=sSel.value; sSel.innerHTML='<option value="">全申請ステータス</option>'+stats.map(s=>`<option ${cur===s?'selected':''}>${esc(s)}</option>`).join(''); }
 }
+// ===== 申請記録: 見出しクリックで並べ替え =====
+let _applySort={key:'',dir:1};
+// 編集値(未保存 > DB保存値 > シート初期値)を取得
+function _applyVal(item, edF, shF){
+  const w=item.w, r=item.rec||{};
+  const ed=(_applyEditByWorker||{})[w.id];
+  const pend=_applyPending[w.id];
+  if(pend && pend[edF]!==undefined) return pend[edF];
+  return ed ? (ed[edF]||'') : (r[shF]||'');
+}
+// 列の定義(headLabelsと同じ並び)。k=null は並べ替え対象外
+const APPLY_COLS=[
+  {k:'management_no', v:x=>x.w.management_no},
+  {k:'apply_date',    v:x=>x.w.apply_date},
+  {k:'apply_type',    v:x=>x.w.apply_type},
+  {k:'desired_visa',  v:x=>x.w.desired_visa},
+  {k:'apply_status',  v:x=>x.w.apply_status},
+  {k:'apply_number',  v:x=>x.w.apply_number},
+  {k:'name',          v:x=>x.w.name},
+  {k:'company',       v:x=>x.w.companies&&x.w.companies.name},
+  {k:'receive_method',v:x=>_applyVal(x,'receive_method','receive')},
+  {k:'visa_expiry',   v:x=>x.w.visa_expiry},
+  {k:'tokurei_date',  v:x=>x.w.tokurei_date},
+  {k:'chat',          v:x=>_applyVal(x,'chat','chat')},
+  {k:'custody',       v:x=>_applyVal(x,'custody','custody')},
+  {k:'zaikapa',       v:x=>_applyVal(x,'zaikapa','zaikapa')},
+  {k:'situation',     v:x=>_applyVal(x,'situation','situation')},
+  {k:'handle_date',   v:x=>_applyVal(x,'handle_date','handle_date')},
+  {k:'note',          v:x=>_applyVal(x,'note','note')},
+  {k:null}
+];
+// 数字も文字も自然順で比較。空欄は常に最後
+function _applyCmp(av,bv,dir){
+  const a=(av==null?'':String(av)).trim(), b=(bv==null?'':String(bv)).trim();
+  if(!a && !b) return 0;
+  if(!a) return 1;
+  if(!b) return -1;
+  return String(a).localeCompare(String(b),'ja',{numeric:true,sensitivity:'base'})*dir;
+}
+// 昇順 → 降順 → 解除(既定の申請日順) を繰り返す
+function sortApplyRecords(key){
+  if(!key) return;
+  if(_applySort.key===key){
+    if(_applySort.dir===1) _applySort.dir=-1;
+    else { _applySort.key=''; _applySort.dir=1; }
+  } else { _applySort.key=key; _applySort.dir=1; }
+  renderApplyRecords();
+}
+
 function renderApplyRecords(){
   const area=document.getElementById('applyRecordArea'); if(!area||!_applySheetLookup) return;
   const q=(document.getElementById('applySearch')?.value||'').toLowerCase().trim();
@@ -10147,10 +10196,16 @@ function renderApplyRecords(){
     if(q){ const hay=[w.name,w.companies?.name,w.apply_number,w.management_no].map(x=>(x||'').toLowerCase()).join(' '); if(!hay.includes(q)) return false; }
     return true;
   });
-  filtered.sort((a,b)=>{
-    const ad=a.w.apply_date||'', bd=b.w.apply_date||''; if(ad!==bd) return ad<bd?1:-1; // 新しい申請日順
-    return (a.w.name||'').localeCompare(b.w.name||'','ja');
-  });
+  const _sortCol = _applySort.key ? APPLY_COLS.find(c=>c.k===_applySort.key) : null;
+  if(_sortCol && _sortCol.v){
+    // 見出しクリックによる並べ替え(同値は氏名順)
+    filtered.sort((a,b)=> _applyCmp(_sortCol.v(a), _sortCol.v(b), _applySort.dir) || (a.w.name||'').localeCompare(b.w.name||'','ja'));
+  } else {
+    filtered.sort((a,b)=>{
+      const ad=a.w.apply_date||'', bd=b.w.apply_date||''; if(ad!==bd) return ad<bd?1:-1; // 新しい申請日順
+      return (a.w.name||'').localeCompare(b.w.name||'','ja');
+    });
+  }
   const cnt=document.getElementById('applyResultCount'); if(cnt) cnt.textContent=filtered.length+' 件';
   const info=document.getElementById('applySheetInfo');
   if(info) info.textContent='シート取得: '+(_applySheetFetchedAt? _applySheetFetchedAt.toLocaleString('ja-JP',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '-')+' ／ 申請日 '+(_dMin||'-')+'〜'+(_dMax||'-')+' ／ 灰=シート初期値(編集可)';
@@ -10158,7 +10213,16 @@ function renderApplyRecords(){
   const headLabels=['管理番号','申請日','申請種別','希望在留資格','申請ステータス','申請番号','氏名','企業','受け取り方法','在留期限','特例期間','チャット','預かり証→企業','在カパ依頼','状況','対応日','備考','保存/更新'];
   const editCols=new Set([8,11,12,13,14,15,16]); // 編集可能列
   const head='<div style="display:grid;grid-template-columns:'+gridCols+';gap:5px;padding:8px 10px;background:#0f2040;color:white;font-size:10px;font-weight:700;position:sticky;top:0;z-index:2;">'+
-    headLabels.map((l,idx)=>'<div style="'+(editCols.has(idx)?'color:#fde68a;':'')+'">'+l+'</div>').join('')+'</div>';
+    headLabels.map((l,idx)=>{
+      const key=(APPLY_COLS[idx]||{}).k;
+      const base=(editCols.has(idx)?'color:#fde68a;':'');
+      if(!key) return '<div style="'+base+'">'+l+'</div>';
+      const active=(_applySort.key===key);
+      const mark=active ? (_applySort.dir===1?'▲':'▼') : '<span style="opacity:.35;">⇅</span>';
+      return '<div onclick="sortApplyRecords(\''+key+'\')" title="クリックで並べ替え（昇順→降順→解除）" '+
+        'style="'+base+'cursor:pointer;user-select:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'+(active?'background:#1e3a6d;border-radius:4px;padding:0 3px;margin:0 -3px;':'')+'">'+
+        l+' <span style="font-size:9px;">'+mark+'</span></div>';
+    }).join('')+'</div>';
   const cell=(v)=>'<div style="color:var(--gray-700);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;" title="'+esc(v||'')+'">'+(v?esc(v):'<span style="color:#cbd5e1;">─</span>')+'</div>';
   const inp=(id,v)=>'<input id="'+id+'" value="'+esc(v||'')+'" style="width:100%;font-size:10px;padding:2px 4px;border:1px solid #cfd8e0;border-radius:4px;box-sizing:border-box;">';
   const sel=(id,v,opts)=>{ const o=opts.slice(); if(v && o.indexOf(v)<0) o.push(v); return '<select id="'+id+'" style="width:100%;font-size:10px;padding:2px;border:1px solid #cfd8e0;border-radius:4px;box-sizing:border-box;">'+o.map(x=>'<option '+(x===v?'selected':'')+'>'+esc(x)+'</option>').join('')+'</select>'; };
@@ -17507,6 +17571,9 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260804.21', date:'2026-08-05', notify:true, items:[
+    '申請記録：見出しをクリックすると並べ替えできるように（管理番号・申請日・氏名・企業・状況など17列すべて対応）。数字は自然順（006-012→017-010→104-002）、文字はあいうえお/アルファベット順。クリックのたびに 昇順▲→降順▼→解除 と切り替わり、空欄は常に最後。未保存の編集内容は並べ替えても保持されます',
+  ]},
   { version:'ver.20260804.20', date:'2026-08-05', notify:true, items:[
     '人材詳細「1.申請情報」を2列レイアウトに変更。受け取り方法＝申請種別の右、チャット＝希望在留資格の右、状況＝申請依頼日の右に配置し、青枠を廃止して空白スペースを有効活用（申請記録タブとの連動はそのまま）',
   ]},
