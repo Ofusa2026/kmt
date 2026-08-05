@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260805.28 -->
+<!-- KMT_VERSION ver.20260805.29 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -367,7 +367,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.28</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.29</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <div id="sidebarAlerts" style="margin-top:6px;display:none;flex-direction:column;gap:3px;"></div>
   </div>
@@ -17149,7 +17149,13 @@ function renderSaleMonthTable(ym) {
   const totalExcl = rows.reduce((s, f) => s + (f.amount_excl||0), 0);
   const totalIncl = rows.reduce((s, f) => s + (f.amount_incl||0), 0);
   const shienCount = allSales.filter(s => s.item_name === '支援委託費').length;
-  const ketteiCount = allSales.filter(s => s.item_name === '初期費用').length;
+  // 新規決定数: 項目「初期費用」の数量を合計（数量未入力の行は1件として数える）
+  const ketteiCount = allSales
+    .filter(s => s.item_name === '初期費用')
+    .reduce((sum, s) => {
+      if (s.quantity === null || s.quantity === undefined || s.quantity === '') return sum + 1;
+      return sum + (Number(s.quantity) || 0);
+    }, 0);
   const shokaiCount = allSales.filter(s => s.item_name === '人材紹介料').length;
 
   // 売上内訳: 項目(4分類) × 請求法人(株式会社KMT/一般社団法人KMT)
@@ -17889,6 +17895,9 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260805.29', date:'2026-08-05', notify:true, items:[
+    '売上管理の「新規決定数」を、項目「初期費用」の行数ではなく数量の合計に変更。1行で複数名まとめて登録している場合も正しい人数になります（数量が未入力の行は従来どおり1件として数えます）',
+  ]},
   { version:'ver.20260805.28', date:'2026-08-05', notify:true, items:[
     '売上管理の売上登録／売上詳細を自動保存から手動保存に変更。「💾 保存」ボタンを追加し、未保存のまま ✕／［閉じる］／別画面へ移動すると「保存しますか？」とリマインドが出ます',
     '保存ボタンの左に「✓ 最終更新 日時（担当者名）」を表示。編集を始めると「● 未保存の変更があります」に変わります',
