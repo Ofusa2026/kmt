@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260805.23 -->
+<!-- KMT_VERSION ver.20260805.24 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -367,7 +367,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.23</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.24</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <div id="sidebarAlerts" style="margin-top:6px;display:none;flex-direction:column;gap:3px;"></div>
   </div>
@@ -977,6 +977,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
     <div class="modal-footer" style="justify-content:flex-start;gap:8px;">
       <button class="btn" id="coDeleteBtn" onclick="deleteCompany()" style="display:none;border:1px solid #dc2626;color:#dc2626;background:white;">🗑 削除</button>
       <div style="flex:1;"></div>
+      <span id="sm_company" style="font-size:11px;color:#94a3b8;white-space:nowrap;margin-right:4px;"></span>
       <button class="btn btn-outline" onclick="closeCompanyModal()">閉じる</button>
       <button class="btn btn-primary" onclick="saveCompany()" style="padding:8px 28px;font-size:14px;">💾 保存</button>
     </div>
@@ -1380,7 +1381,12 @@ function openCompanyModal(id) {
   document.getElementById('companyModal').classList.add('show');
   // フォーム描画完了後にスナップショット（100ms待機）
   console.log('[openCompanyModal] id:', id, '→ takeCoSnapshot予約');
-  if (id) setTimeout(() => { console.log('[openCompanyModal] takeCoSnapshot実行'); takeCoSnapshot(); }, 100);
+  setTimeout(() => {
+    takeCoSnapshot();
+    bindDirtyTracking('companyModal');
+    const _co = id ? allCompanies.find(c => c.id === id) : null;
+    renderSaveMeta('sm_company', _co?.updated_at, _co?.updated_by);
+  }, 100);
 }
 
 // ==============================
@@ -1508,7 +1514,7 @@ async function saveMeeting() {
     contact_name: document.getElementById('mf_contact').value.trim() || null,
     memo: document.getElementById('mf_memo').value.trim() || null,
     worker_ids: getMeetingWorkerIds(),
-    updated_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(), updated_by: _curUserName(),
   };
   showLoading(true);
   try {
@@ -1546,33 +1552,17 @@ async function deleteMeeting(id) {
 
 async function closeCompanyModal(force=false) {
   if (_autoSaveActive) return;
-  console.log('[closeCompanyModal] editingCoId:', editingCoId, 'force:', force, 'snapshotKeys:', Object.keys(_coSnapshotBefore).length);
-  // 既存企業編集中の場合、未保存変更があれば確認
-  if (!force && editingCoId) {
-    const current = getCoFormData();
-    const snapshot = _coSnapshotBefore;
-    // タイムスタンプ系は比較対象外
-    const skipKeys = new Set(['updated_at','created_at','deleted_at']);
-    const diffKeys = Object.keys(snapshot).filter(k => {
-      if (skipKeys.has(k)) return false;
-      const a = String(current[k] ?? '');
-      const b = String(snapshot[k] ?? '');
-      return a !== b && !(a === 'null' && b === '') && !(a === '' && b === 'null');
-    });
-    if (diffKeys.length > 0) {
-      console.log('[closeCompanyModal] 変更検知:', diffKeys.map(k => k+': ['+String(snapshot[k])+'] → ['+String(current[k])+']'));
-      // 保存して閉じる or 保存せずに閉じる
-      const save = confirm('変更が保存されていません。\n\n【OK】保存して閉じる\n【キャンセル】保存せずに閉じる');
-      if (save) {
-        // saveCompany内でcloseCompanyModal(true)とloadCompaniesが呼ばれるので
-        // ここでは保存するだけでOK（closeは saveCompany内で行われる）
-        const ok = await saveCompany();
-        return; // saveCompany内でモーダルが閉じられる
-      }
-    }
+  const _hide = () => {
+    const m = document.getElementById('companyModal');
+    if (m) m.classList.remove('show');
+    editingCoId = null;
+  };
+  // 未保存の変更があれば「保存しますか？」リマインド（共通UI）
+  if (!force && _manualSave.companyModal.dirty) {
+    promptSaveModal('companyModal', _hide);
+    return;
   }
-  document.getElementById('companyModal').classList.remove('show');
-  editingCoId = null;
+  _hide();
 }
 
 async function deleteCompany() {
@@ -1933,7 +1923,7 @@ function getCoFormData() {
     insurance_premium_by: document.getElementById('co_insurance_premium_by')?.value || null,
     insurance_note: document.getElementById('co_insurance_note')?.value || null,
     last_visit: document.getElementById('co_last_visit').value || null,
-    updated_at: new Date().toISOString()
+    updated_at: new Date().toISOString(), updated_by: _curUserName()
   };
 }
 
@@ -2253,7 +2243,7 @@ async function saveCompany(autoMode=false) {
       _savingCompanyNew = false;
       if (!autoMode) showToast('✅ 企業を登録しました', 'success');
     }
-    if (!autoMode) closeCompanyModal(true); // force=trueで確認ダイアログをスキップ
+    if (!autoMode) afterManualSave('companyModal'); // モーダルは開いたまま・最終更新を表示
     if (!autoMode) await loadCompanies();
     if (autoMode) return true;
   } catch(e) {
@@ -6494,19 +6484,9 @@ function _getWorkerFormData() {
   return result;
 }
 
+// 未保存チェックは closeGenModal（_manualSave.workerModal）に一本化。
+// ✕ボタン・オーバーレイクリック・［閉じる］・画面移動のどれでもリマインドが出る。
 async function closeWorkerModalWithCheck() {
-  if (editingWorkerId) {
-    const current = _getWorkerFormData();
-    const skip = new Set(['updated_at','created_at','deleted_at']);
-    const changed = Object.keys(_workerSnapshot).some(k => {
-      if (skip.has(k)) return false;
-      return String(current[k] ?? '') !== String(_workerSnapshot[k] ?? '');
-    });
-    if (changed) {
-      const save = confirm('変更が保存されていません。\n\n【OK】保存して閉じる\n【キャンセル】保存せずに閉じる');
-      if (save) { await saveWorker(); return; }
-    }
-  }
   closeGenModal('workerModal');
 }
 async function saveWorker(returnResult=false) {
@@ -6606,6 +6586,8 @@ async function saveWorker(returnResult=false) {
     workplace_name:   workplaceName,
     memo:             g('wf_memo'),
     notes:            g('wf_notes'),
+    updated_at:       new Date().toISOString(),
+    updated_by:       _curUserName(),
   };
 
   // 🔁 更新完了の特別処理: チャット自動投稿 / 新在留期限でステータス初期化
@@ -6638,7 +6620,8 @@ async function saveWorker(returnResult=false) {
       _savingWorkerNew = false;
       if (!autoMode) showToast('✅ 登録しました', 'success');
     }
-    if (!autoMode) closeGenModal('workerModal');
+    // 保存後もモーダルは開いたまま。保存ボタンの隣に最終更新（日時＋ユーザー名）を表示する
+    if (!autoMode) afterManualSave('workerModal');
     if (_doRenewalChatPost && editingWorkerId) { _postRenewalCompletionToChat(editingWorkerId, data); }
     if (_doApplyChatPost && editingWorkerId) { _postApplyStatusToChat(editingWorkerId, data, data.apply_status); }
     if (editingWorkerId && _arVals.present) { await _saveWorkerApplyFields(editingWorkerId, _arVals); }
@@ -6767,7 +6750,7 @@ async function deleteWorker() {
     const who = currentUser?.name || '';
     await sbFetch('workers?id=eq.'+editingWorkerId, { method:'PATCH', body: JSON.stringify({ is_deleted: true, deleted_at: now, deleted_by: who }) });
     showToast('✅ 削除しました（復元可能）', 'success');
-    closeGenModal('workerModal');
+    forceCloseModal('workerModal');
     editingWorkerId = null;
     await loadWorkers();
   } catch(e) { showToast('❌ '+e.message,'error'); }
@@ -6782,7 +6765,7 @@ async function saveAndStartChat() {
 
 async function startWorkerChat(workerId) {
   if (!workerId) return;
-  closeGenModal('workerModal');
+  forceCloseModal('workerModal');
   showLoading(true);
   try {
     // 既存ルームがなければ作成。メモリ上のchatRoomsは未ロードのことがあるため必ずDBで確認する(重複ルーム防止)
@@ -9717,6 +9700,8 @@ function showScreen(name) {
     const _mm=document.getElementById(_mid);
     if(_mm && _mm.classList.contains('show') && _manualSave[_mid].dirty){ promptSaveModal(_mid, ()=>showScreen(name)); return; }
   }
+  // 履歴書作成画面（モーダルではない）の未保存チェック
+  if(currentScreen==='resume' && name!=='resume' && _manualSave.resumeModal.dirty){ promptSaveModal('resumeModal', ()=>showScreen(name)); return; }
   // 申請記録タブに未保存の変更がある場合はリマインド
   if(currentScreen==='workers' && name!=='workers' && typeof _applyDirty!=='undefined' && _applyDirty.size>0){ _applyUnsavedPrompt(()=>showScreen(name)); return; }
   kmtLog('📺 画面切替', name + ' (' + (SCREENS[name].title||'') + ')', undefined, '#7c3aed');
@@ -11488,7 +11473,12 @@ async function openWorkerModal(id) {
   showGenModal('workerModal', title, buildWorkerModalBody(w));
   setTimeout(() => renderApplyStatusPanel((w||{}).apply_status||''), 100);
   setTimeout(() => { _syncWorkerApplyToForm(w); }, 130);
-  setTimeout(() => { _takeWorkerSnapshot(); if (typeof updateWorkerPhotoPreview === 'function') updateWorkerPhotoPreview(); }, 200);
+  setTimeout(() => {
+    _takeWorkerSnapshot();
+    if (typeof updateWorkerPhotoPreview === 'function') updateWorkerPhotoPreview();
+    bindDirtyTracking('workerModal');
+    renderSaveMeta('sm_worker', (w||{}).updated_at, (w||{}).updated_by);
+  }, 200);
 }
 let editingWorkerId = null;
 let _savingWorkerNew = false;
@@ -12162,6 +12152,7 @@ function buildWorkerModalBody(w) {
   <div style="display:flex;gap:8px;align-items:center;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)">
     ${editingWorkerId ? '<button class="btn btn-outline" style="color:var(--red);border-color:var(--red);" onclick="deleteWorker()">🗑️ 削除</button>' : ''}
     <div style="flex:1;"></div>
+    <span id="sm_worker" style="font-size:11px;color:#94a3b8;white-space:nowrap;margin-right:4px;"></span>
     <button class="btn btn-primary" onclick="saveWorker()" style="padding:8px 28px;font-size:14px;">💾 保存</button>
     <button class="btn btn-outline" style="color:#059669;border-color:#059669;" onclick="saveAndStartChat()">💬 チャット開始</button>
     <button class="btn btn-outline" onclick="closeWorkerModalWithCheck()">閉じる</button>
@@ -13041,7 +13032,7 @@ async function saveSchedule(scheduleId) {
     completed_at,
     status,
     notes,
-    updated_at: new Date().toISOString()
+    updated_at: new Date().toISOString(), updated_by: _curUserName()
   };
 
   try {
@@ -13659,7 +13650,7 @@ async function saveCandidate() {
     motivation:g('cf_motivation'), health_status:g('cf_health_status'),
     status:g('cf_status')||'選考中', staff:g('cf_staff'),
     staff_impression:g('cf_staff_impression'), memo:g('cf_memo'),
-    updated_at:new Date().toISOString()
+    updated_at: new Date().toISOString(), updated_by: _curUserName()
   };
   // 労働局指定項目（必須チェック）
   const REQ_C=[['cf_name','氏名'],['cf_birthdate','生年月日'],['cf_job_category','希望職種'],['cf_reception_date','受付年月日'],['cf_valid_until','有効期間']];
@@ -13673,7 +13664,7 @@ async function saveCandidate() {
     else{const _r=await sbFetch('candidates',{method:'POST',body:JSON.stringify(data),prefer:'return=representation'});if(_r&&_r[0]&&_r[0].id)editingCandidateId=_r[0].id;showToast('✅ 登録しました','success');}
     _manualSave.candidateModal.dirty=false;
     const _linkJob = pendingLinkJobId, _newCand = editingCandidateId;
-    closeGenModal('candidateModal'); await loadCandidates();
+    afterManualSave('candidateModal'); await loadCandidates();
     if(_linkJob && _newCand){
       pendingLinkJobId = null;
       try{
@@ -13687,7 +13678,7 @@ async function saveCandidate() {
   }catch(e){showToast('❌ '+e.message,'error'); showLoading(false); return false;}
 }
 
-async function saveSending(){const g=id=>document.getElementById(id)?.value||null;const data={name:g('sf_name'),country:g('sf_country'),contact_name:g('sf_contact'),email:g('sf_email'),tel:g('sf_tel'),address:g('sf_address'),notes:g('sf_notes'),updated_at:new Date().toISOString()};if(!data.name){showToast('❌ 機関名は必須','error');return;}showLoading(true);try{if(editingSendingId){await sbFetch('sending_orgs?id=eq.'+editingSendingId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新','success');}else{const _r=await sbFetch('sending_orgs',{method:'POST',body:JSON.stringify(data),prefer:'return=representation'});if(_r&&_r[0]&&_r[0].id)editingSendingId=_r[0].id;showToast('✅ 登録','success');}closeGenModal('sendingModal');await loadSending();}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
+async function saveSending(){const g=id=>document.getElementById(id)?.value||null;const data={name:g('sf_name'),country:g('sf_country'),contact_name:g('sf_contact'),email:g('sf_email'),tel:g('sf_tel'),address:g('sf_address'),notes:g('sf_notes'),updated_at: new Date().toISOString(), updated_by: _curUserName()};if(!data.name){showToast('❌ 機関名は必須','error');return;}showLoading(true);try{if(editingSendingId){await sbFetch('sending_orgs?id=eq.'+editingSendingId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新','success');}else{const _r=await sbFetch('sending_orgs',{method:'POST',body:JSON.stringify(data),prefer:'return=representation'});if(_r&&_r[0]&&_r[0].id)editingSendingId=_r[0].id;showToast('✅ 登録','success');}closeGenModal('sendingModal');await loadSending();}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
 
 function buildCandidateModalBody(c) {
   c=c||{};
@@ -13755,6 +13746,7 @@ function buildCandidateModalBody(c) {
     <div class="form-group full" id="candidateJobLinkWrap">${c.id ? '<div style="color:#94a3b8;font-size:12px;padding:8px;">読み込み中...</div>' : '<div style="color:#94a3b8;font-size:12px;padding:8px;">候補者を保存すると求人に紐付けできます</div>'}</div>
   </div>
   <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)">
+    <span id="sm_candidate" style="font-size:11px;color:#94a3b8;white-space:nowrap;margin-right:auto;"></span>
     <button class="btn btn-outline" onclick="closeGenModal('candidateModal')">閉じる</button>
     <button class="btn btn-primary" onclick="saveCandidate()">💾 保存</button>
     
@@ -13763,9 +13755,9 @@ function buildCandidateModalBody(c) {
 
 function buildExpenseModalBody(e){e=e||{};return `<div class="form-grid"><div class="section-title">立替情報</div><div class="form-group"><label class="form-label">日付</label><input class="form-input" id="ef_date" type="date" value="${e.expense_date||''}"></div><div class="form-group"><label class="form-label">ステータス</label><select class="form-select" id="ef_status">${['未請求','請求済','入金済'].map(s=>`<option ${e.status===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group full"><label class="form-label">人材</label><select class="form-select" id="ef_worker_id"><option value="">選択...</option>${allWorkers.map(w=>`<option value="${w.id}" ${e.worker_id===w.id?'selected':''}>${esc(w.name)}</option>`).join('')}</select></div><div class="form-group full"><label class="form-label">企業</label><select class="form-select" id="ef_company_id"><option value="">選択...</option>${allCompanies.map(c=>`<option value="${c.id}" ${e.company_id===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div><div class="form-group full"><label class="form-label">名目（航空券等）</label><input class="form-input" id="ef_item_name" value="${esc(e.item_name||'')}"></div><div class="form-group"><label class="form-label">金額（円）</label><input class="form-input" id="ef_amount" type="number" value="${e.amount??''}"></div><div class="form-group"><label class="form-label">支払方法</label><select class="form-select" id="ef_payment_method">${['','立替','クレカ'].map(s=>`<option ${e.payment_method===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">請求先</label><select class="form-select" id="ef_billed_to">${['','企業','本人'].map(s=>`<option ${e.billed_to===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">担当者</label><input class="form-input" id="ef_staff" value="${esc(e.staff||'')}"></div><div class="form-group full"><label class="form-label">備考</label><textarea class="form-textarea" id="ef_notes">${esc(e.notes||'')}</textarea></div></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)"><button class="btn btn-outline" onclick="closeGenModal('expenseModal')">閉じる</button></div>`;}
 
-async function savePartner(){const g=id=>document.getElementById(id)?.value||null;const ni=id=>document.getElementById(id)?.value?parseInt(document.getElementById(id).value):null;const data={name:g('pf_name'),org_type:g('pf_org_type'),job_code:g('pf_job_code'),main_industry:g('pf_industry'),contact_name:g('pf_contact'),email:g('pf_email'),fee_kmt:ni('pf_fee_kmt'),fee_ofusa:ni('pf_fee_ofusa'),billing_timing:g('pf_billing_timing'),glt_staff:g('pf_glt_staff'),ofusa_staff:g('pf_ofusa_staff'),partnership_start:g('pf_start_date'),website:g('pf_website'),notes:g('pf_notes'),updated_at:new Date().toISOString()};if(!data.name){showToast('❌ 機関名は必須','error');return;}showLoading(true);try{if(editingPartnerId){await sbFetch('partner_support_orgs?id=eq.'+editingPartnerId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新','success');}else{const _r=await sbFetch('partner_support_orgs',{method:'POST',body:JSON.stringify(data),prefer:'return=representation'});if(_r&&_r[0]&&_r[0].id)editingPartnerId=_r[0].id;showToast('✅ 登録','success');}closeGenModal('partnerModal');await loadPartners();}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
+async function savePartner(){const g=id=>document.getElementById(id)?.value||null;const ni=id=>document.getElementById(id)?.value?parseInt(document.getElementById(id).value):null;const data={name:g('pf_name'),org_type:g('pf_org_type'),job_code:g('pf_job_code'),main_industry:g('pf_industry'),contact_name:g('pf_contact'),email:g('pf_email'),fee_kmt:ni('pf_fee_kmt'),fee_ofusa:ni('pf_fee_ofusa'),billing_timing:g('pf_billing_timing'),glt_staff:g('pf_glt_staff'),ofusa_staff:g('pf_ofusa_staff'),partnership_start:g('pf_start_date'),website:g('pf_website'),notes:g('pf_notes'),updated_at: new Date().toISOString(), updated_by: _curUserName()};if(!data.name){showToast('❌ 機関名は必須','error');return;}showLoading(true);try{if(editingPartnerId){await sbFetch('partner_support_orgs?id=eq.'+editingPartnerId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新','success');}else{const _r=await sbFetch('partner_support_orgs',{method:'POST',body:JSON.stringify(data),prefer:'return=representation'});if(_r&&_r[0]&&_r[0].id)editingPartnerId=_r[0].id;showToast('✅ 登録','success');}closeGenModal('partnerModal');await loadPartners();}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
 
-async function saveExpense(){const g=id=>document.getElementById(id)?.value||null;const data={expense_date:g('ef_date'),status:g('ef_status')||'未請求',worker_id:g('ef_worker_id'),company_id:g('ef_company_id'),item_name:g('ef_item_name'),amount:document.getElementById('ef_amount')?.value?parseInt(document.getElementById('ef_amount').value):null,payment_method:g('ef_payment_method'),billed_to:g('ef_billed_to'),staff:g('ef_staff'),notes:g('ef_notes'),updated_at:new Date().toISOString()};showLoading(true);try{if(editingExpenseId){await sbFetch('expenses?id=eq.'+editingExpenseId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新','success');}else{const _r=await sbFetch('expenses',{method:'POST',body:JSON.stringify(data),prefer:'return=representation'});if(_r&&_r[0]&&_r[0].id)editingExpenseId=_r[0].id;showToast('✅ 登録','success');}closeGenModal('expenseModal');await loadExpenses();}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
+async function saveExpense(){const g=id=>document.getElementById(id)?.value||null;const data={expense_date:g('ef_date'),status:g('ef_status')||'未請求',worker_id:g('ef_worker_id'),company_id:g('ef_company_id'),item_name:g('ef_item_name'),amount:document.getElementById('ef_amount')?.value?parseInt(document.getElementById('ef_amount').value):null,payment_method:g('ef_payment_method'),billed_to:g('ef_billed_to'),staff:g('ef_staff'),notes:g('ef_notes'),updated_at: new Date().toISOString(), updated_by: _curUserName()};showLoading(true);try{if(editingExpenseId){await sbFetch('expenses?id=eq.'+editingExpenseId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新','success');}else{const _r=await sbFetch('expenses',{method:'POST',body:JSON.stringify(data),prefer:'return=representation'});if(_r&&_r[0]&&_r[0].id)editingExpenseId=_r[0].id;showToast('✅ 登録','success');}closeGenModal('expenseModal');await loadExpenses();}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
 
 async function loadFees(page) {
   if (currentScreen !== 'fees') return;
@@ -13898,14 +13890,14 @@ async function saveJob() {
     progress_note:g('jf_progress_note'),
     jinzai_comment:g('jf_jinzai_comment'),
     job_description:g('jf_job_description'),
-    updated_at:new Date().toISOString()
+    updated_at: new Date().toISOString(), updated_by: _curUserName()
   };
   showLoading(true);
   try {
     if(editingJobId){await sbFetch('job_openings?id=eq.'+editingJobId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新しました','success');}
     else{const _r=await sbFetch('job_openings',{method:'POST',body:JSON.stringify(data),prefer:'return=representation'});if(_r&&_r[0]&&_r[0].id)editingJobId=_r[0].id;showToast('✅ 登録しました','success');}
     _manualSave.jobModal.dirty=false;
-    closeGenModal('jobModal'); await loadJobs();
+    afterManualSave('jobModal'); await loadJobs();
     showLoading(false);
     return true;
   }catch(e){showToast('❌ '+e.message,'error'); showLoading(false); return false;}
@@ -14302,7 +14294,7 @@ function buildResumeScreen() {
     <div id="resumeEditPanel" style="width:340px;flex-shrink:0;overflow-y:auto;border-right:1px solid var(--gray-200);padding:14px;background:white;display:flex;flex-direction:column;gap:10px;">
       <div>
         <label class="form-label" style="margin-bottom:4px;display:block;">候補者を選択</label>
-        <select id="resumeCandidateSelect" class="form-select" onchange="loadResume()" style="width:100%;font-size:13px;">
+        <select id="resumeCandidateSelect" class="form-select" onchange="onResumeCandidateChange()" style="width:100%;font-size:13px;">
           <option value="">── 候補者を選択 ──</option>
         </select>
       </div>
@@ -14442,7 +14434,8 @@ function buildResumeScreen() {
         <div class="form-group" style="margin-bottom:8px"><label class="form-label">企業面接メモ</label><textarea class="form-textarea" id="rf_interview_memo" rows="2" oninput="previewResume()"></textarea></div>
 
         <!-- 保存ボタン -->
-        <div style="padding:12px 0;border-top:1px solid var(--gray-200);display:flex;gap:8px;margin-top:8px">
+        <div style="padding:12px 0;border-top:1px solid var(--gray-200);display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap;">
+          <span id="sm_resume" style="font-size:11px;color:#94a3b8;white-space:nowrap;width:100%;"></span>
           <button class="btn btn-primary" style="flex:1" onclick="saveResume()">💾 保存</button>
           <button class="btn btn-outline" onclick="printResume()">🖨️ 印刷</button>
         </div>
@@ -14474,7 +14467,7 @@ function openCandidateModal(id) {
   const c=id?allCandidates.find(x=>x.id===id):null;
   editingCandidateId=id;
   showGenModal('candidateModal', id?'📋 候補者詳細':'📋 候補者登録', buildCandidateModalBody(c));
-  setTimeout(()=>bindDirtyTracking('candidateModal'), 120);
+  setTimeout(()=>{ bindDirtyTracking('candidateModal'); renderSaveMeta('sm_candidate', c?.updated_at, c?.updated_by); }, 120);
   if(id) setTimeout(()=>loadCandidateJobLinks(id), 120);
 }
 
@@ -14484,25 +14477,118 @@ function openJobModal(id) {
   _manualSave.jobModal.dirty=false;
   _jcFilterStatus=''; _jcFilterNat='';
   showGenModal('jobModal',id?'💼 求人詳細':'💼 求人登録',buildJobModalBody(j));
-  setTimeout(()=>bindDirtyTracking('jobModal'), 120);
+  setTimeout(()=>{ bindDirtyTracking('jobModal'); renderSaveMeta('sm_job', j?.updated_at, j?.updated_by); }, 120);
   if(id){ setTimeout(()=>loadJobCandidateList(id), 120); setTimeout(()=>loadJobMemos(id), 140); }
 }
 
 // ===== 手動保存・未保存リマインド（求人／候補者モーダル共通） =====
 const _manualSave = {
-  jobModal:      { dirty:false, prefix:'jf_', save:()=>saveJob() },
-  candidateModal:{ dirty:false, prefix:'cf_', save:()=>saveCandidate() },
+  jobModal:      { dirty:false, prefix:'jf_', save:()=>saveJob(),       metaSlot:'sm_job',       label:'求人' },
+  candidateModal:{ dirty:false, prefix:'cf_', save:()=>saveCandidate(), metaSlot:'sm_candidate', label:'候補者' },
+  workerModal:   { dirty:false, prefix:'wf_', save:()=>saveWorker(),    metaSlot:'sm_worker',    label:'外国人材' },
+  companyModal:  { dirty:false, prefix:'co_', save:()=>saveCompany(),   metaSlot:'sm_company',   label:'所属機関' },
+  resumeModal:   { dirty:false, prefix:'rf_', save:()=>saveResume(),    metaSlot:'sm_resume',    label:'履歴書' },
 };
+// 外国人材・所属機関はスナップショット比較を dirty の正とする（実際に値が変わった時だけリマインド）
+Object.defineProperty(_manualSave.workerModal, 'dirty', {
+  get(){ return _snapshotDirty('workerModal'); },
+  set(v){ if(v===false && typeof _takeWorkerSnapshot==='function') _takeWorkerSnapshot(); },
+  configurable:true
+});
+Object.defineProperty(_manualSave.companyModal, 'dirty', {
+  get(){ return _snapshotDirty('companyModal'); },
+  set(v){ if(v===false && typeof takeCoSnapshot==='function') takeCoSnapshot(); },
+  configurable:true
+});
+// 未保存チェックを飛ばして強制的に閉じる（削除直後・チャット遷移など）
+function forceCloseModal(id){
+  const cfg=_manualSave[id]; if(cfg) cfg.dirty=false;
+  const m=document.getElementById(id); if(m) m.classList.remove('show');
+}
+// 履歴書は画面（モーダルではない）なので専用のスナップショット判定
+let _resumeSnapshot = null;
+function _resumeSig(){ const d=getResumeFormData()||{}; delete d.updated_at; delete d.updated_by; return JSON.stringify(d); }
+function _takeResumeSnapshot(){ try{ _resumeSnapshot=_resumeSig(); }catch(e){ _resumeSnapshot=null; } }
+function _resumeFormDirty(){
+  if(typeof currentScreen==='undefined' || currentScreen!=='resume') return false;
+  if(!_editingResumeCandidateId || !_resumeSnapshot) return false;
+  if(!document.getElementById('rf_name')) return false;
+  try{ return _resumeSig()!==_resumeSnapshot; }catch(e){ return false; }
+}
+Object.defineProperty(_manualSave.resumeModal, 'dirty', {
+  get(){ return _resumeFormDirty(); },
+  set(v){ if(v===false) _takeResumeSnapshot(); },
+  configurable:true
+});
+// スナップショットとの差分判定（モーダルが開いている時だけ有効）
+function _snapshotDirty(modalId){
+  const m=document.getElementById(modalId);
+  if(!m || !m.classList.contains('show')) return false;
+  let cur, snap;
+  try {
+    if(modalId==='workerModal'){ cur=_getWorkerFormData(); snap=_workerSnapshot; }
+    else { cur=getCoFormData(); snap=_coSnapshotBefore; }
+  } catch(e) { return false; }
+  if(!snap || !Object.keys(snap).length) return false;
+  const skip=new Set(['updated_at','created_at','deleted_at','updated_by','company_notes','workplaces_extra','industries']);
+  return Object.keys(snap).some(k=>{
+    if(skip.has(k)) return false;
+    const a=String(cur[k] ?? ''), b=String(snap[k] ?? '');
+    if(a===b) return false;
+    if((a==='null'&&b==='')||(a===''&&b==='null')) return false;
+    return true;
+  });
+}
 // 後方互換の別名（既存参照用）
 Object.defineProperty(window,'jobModalDirty',{get:()=>_manualSave.jobModal.dirty,set:v=>{_manualSave.jobModal.dirty=v;},configurable:true});
 function bindDirtyTracking(modalId){
   const cfg=_manualSave[modalId]; if(!cfg) return;
-  const body=document.getElementById(modalId+'Body'); if(!body) return;
+  const body=document.getElementById(modalId+'Body') || document.getElementById(modalId); if(!body) return;
   if(body._dirtyBound) return;
   body._dirtyBound = true;
-  const mark=e=>{ const t=e.target; if(t && typeof t.id==='string' && t.id.indexOf(cfg.prefix)===0) cfg.dirty=true; };
+  const mark=e=>{
+    const t=e.target;
+    if(t && typeof t.id==='string' && t.id.indexOf(cfg.prefix)===0){
+      cfg.dirty=true;
+      if(cfg.metaSlot) markSaveMetaDirty(cfg.metaSlot);
+    }
+  };
   body.addEventListener('input', mark);
   body.addEventListener('change', mark);
+}
+
+// ===== 保存ボタン横の「最終更新日時＋ユーザー名」表示 =====
+function _curUserName(){ return (typeof currentUser!=='undefined' && currentUser && currentUser.name) || ''; }
+// 保存データに最終更新（日時＋更新者）を付与
+function stampUpdated(data){
+  data.updated_at = new Date().toISOString();
+  data.updated_by = _curUserName();
+  return data;
+}
+function _fmtUpdatedAt(iso){
+  try{
+    const d=new Date(iso);
+    return d.toLocaleDateString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit'})+' '+d.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
+  }catch(e){ return ''; }
+}
+// 保存ボタンの隣に置くプレースホルダー
+function saveMetaHtml(slotId){
+  return '<span id="'+slotId+'" style="font-size:11px;color:#94a3b8;margin-right:auto;white-space:nowrap;"></span>';
+}
+function renderSaveMeta(slotId, iso, by){
+  const el=document.getElementById(slotId); if(!el) return;
+  if(!iso){ el.innerHTML='<span style="color:#cbd5e1;">未保存（新規）</span>'; return; }
+  el.innerHTML='<span style="color:#64748b;">✓ 最終更新 '+esc(_fmtUpdatedAt(iso))+(by?'（'+esc(by)+'）':'')+'</span>';
+}
+function markSaveMetaDirty(slotId){
+  const el=document.getElementById(slotId); if(!el) return;
+  el.innerHTML='<span style="color:#ea580c;font-weight:700;">● 未保存の変更があります</span>';
+}
+// 保存成功時に呼ぶ: メタ表示を「今・自分」に更新して dirty を解除
+function afterManualSave(modalId){
+  const cfg=_manualSave[modalId]; if(!cfg) return;
+  cfg.dirty=false;
+  if(cfg.metaSlot) renderSaveMeta(cfg.metaSlot, new Date().toISOString(), _curUserName());
 }
 // 未保存リマインド: 保存が成功したら（保存を押した場合）afterFn実行しモーダルを閉じる。
 // 保存が必須エラーで失敗した場合はモーダルを開いたまま（afterFn実行しない）。
@@ -14512,14 +14598,21 @@ function promptSaveModal(modalId, afterFn){
   ov=document.createElement('div'); ov.id='genSavePrompt';
   ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:10001;display:flex;align-items:center;justify-content:center;';
   ov.innerHTML=`<div style="background:white;border-radius:10px;padding:22px 24px;max-width:340px;box-shadow:0 10px 40px rgba(0,0,0,.25);">
-    <div style="font-size:15px;font-weight:700;color:#1e293b;margin-bottom:6px;">未保存の変更があります</div>
-    <div style="font-size:13px;color:#64748b;margin-bottom:18px;">変更を保存しますか？</div>
+    <div style="font-size:15px;font-weight:700;color:#1e293b;margin-bottom:6px;">⚠️ ${cfg.label?esc(cfg.label)+'に':''}未保存の変更があります</div>
+    <div style="font-size:13px;color:#64748b;margin-bottom:18px;">変更を保存しますか？<br><span style="font-size:11px;color:#94a3b8;">［閉じる］を押すと変更は破棄されます</span></div>
     <div style="display:flex;gap:8px;justify-content:flex-end;">
-      <button class="btn btn-outline" id="gspClose" style="font-size:13px;padding:6px 16px;">閉じる</button>
+      <button class="btn btn-outline" id="gspClose" style="font-size:13px;padding:6px 16px;">保存せず閉じる</button>
       <button class="btn btn-primary" id="gspSave" style="font-size:13px;padding:6px 16px;">保存</button>
     </div></div>`;
   document.body.appendChild(ov);
-  document.getElementById('gspSave').onclick=async()=>{ const ok=await cfg.save(); ov.remove(); if(ok!==false){ cfg.dirty=false; if(afterFn) afterFn(); } };
+  document.getElementById('gspSave').onclick=async()=>{
+    const ok=await cfg.save(); ov.remove();
+    if(ok!==false){
+      cfg.dirty=false;
+      if(afterFn) afterFn();
+      else { const m=document.getElementById(modalId); if(m) m.classList.remove('show'); }
+    }
+  };
   document.getElementById('gspClose').onclick=()=>{ ov.remove(); cfg.dirty=false; const m=document.getElementById(modalId); if(m)m.classList.remove('show'); if(afterFn) afterFn(); };
 }
 // 旧名の互換ラッパ
@@ -16125,6 +16218,7 @@ function buildJobModalBody(j) {
     <div class="form-group full" id="jobCandidateListWrap">${j.id ? '<div style="color:#94a3b8;font-size:12px;padding:8px;">読み込み中...</div>' : '<div style="color:#94a3b8;font-size:12px;padding:8px;">求人を保存すると候補者を追加できます</div>'}</div>
   </div></div>
   <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)">
+    <span id="sm_job" style="font-size:11px;color:#94a3b8;white-space:nowrap;margin-right:auto;"></span>
     <button class="btn btn-outline" onclick="closeGenModal('jobModal')">閉じる</button>
     <button class="btn btn-primary" onclick="saveJob()">💾 保存</button>
   </div>`;
@@ -16427,6 +16521,11 @@ function fillResumeForm(c) {
 // 候補者を選択 → DBから取得してフォーム反映＋プレビュー
 let _editingResumeCandidateId = null;
 let _workHistory = [];
+// 候補者を切り替える前に未保存チェック
+function onResumeCandidateChange() {
+  if (_manualSave.resumeModal.dirty) { promptSaveModal('resumeModal', () => loadResume()); return; }
+  loadResume();
+}
 async function loadResume() {
   const sel = document.getElementById('resumeCandidateSelect');
   const id = sel?.value;
@@ -16450,6 +16549,14 @@ async function loadResume() {
     if (formBody) formBody.style.display = '';
     fillResumeForm(c);
     previewResume();
+    renderSaveMeta('sm_resume', c.updated_at, c.updated_by);
+    _takeResumeSnapshot();
+    if (formBody && !formBody._resumeDirtyBound) {
+      formBody._resumeDirtyBound = true;
+      const mk = e => { const t=e.target; if(t && typeof t.id==='string' && t.id.indexOf('rf_')===0) markSaveMetaDirty('sm_resume'); };
+      formBody.addEventListener('input', mk);
+      formBody.addEventListener('change', mk);
+    }
   } catch(e) { showToast('❌ ' + e.message, 'error'); }
   showLoading(false);
 }
@@ -16496,7 +16603,7 @@ function getResumeFormData() {
     candidate_questions: g('rf_candidate_questions'),
     staff_impression: g('rf_staff_impression'), interview_memo: g('rf_interview_memo'),
     licenses: lic,
-    updated_at: new Date().toISOString()
+    updated_at: new Date().toISOString(), updated_by: _curUserName()
   };
 }
 
@@ -17213,7 +17320,7 @@ function saveApiKey() {
   loadUsers();
 }
 
-async function saveFee(){const g=id=>document.getElementById(id)?.value||null;const ni=id=>document.getElementById(id)?.value?parseInt(document.getElementById(id).value):null;const chkIds=Array.from(document.querySelectorAll('.ff_worker_chk')).filter(c=>c.checked).map(c=>c.value);const data={company_id:g('ff_company_id'),billing_month:g('ff_billing_month'),fee_type:g('ff_fee_type'),worker_count:ni('ff_worker_count'),unit_price:ni('ff_unit_price'),amount_excl:ni('ff_amount_excl'),amount_incl:ni('ff_amount_incl'),status:g('ff_status')||'未請求',billed_date:g('ff_billed_date'),paid_date:g('ff_paid_date'),notes:g('ff_notes'),worker_ids:chkIds.length?chkIds:null,updated_at:new Date().toISOString()};if(!data.billing_month){showToast('❌ 請求月は必須','error');return;}showLoading(true);try{if(editingFeeId){await sbFetch('support_fees?id=eq.'+editingFeeId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新','success');}else{const _r=await sbFetch('support_fees',{method:'POST',body:JSON.stringify(data),prefer:'return=representation'});if(_r&&_r[0]&&_r[0].id)editingFeeId=_r[0].id;showToast('✅ 登録','success');}closeGenModal('feeModal');await loadFees(feePage);}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
+async function saveFee(){const g=id=>document.getElementById(id)?.value||null;const ni=id=>document.getElementById(id)?.value?parseInt(document.getElementById(id).value):null;const chkIds=Array.from(document.querySelectorAll('.ff_worker_chk')).filter(c=>c.checked).map(c=>c.value);const data={company_id:g('ff_company_id'),billing_month:g('ff_billing_month'),fee_type:g('ff_fee_type'),worker_count:ni('ff_worker_count'),unit_price:ni('ff_unit_price'),amount_excl:ni('ff_amount_excl'),amount_incl:ni('ff_amount_incl'),status:g('ff_status')||'未請求',billed_date:g('ff_billed_date'),paid_date:g('ff_paid_date'),notes:g('ff_notes'),worker_ids:chkIds.length?chkIds:null,updated_at: new Date().toISOString(), updated_by: _curUserName()};if(!data.billing_month){showToast('❌ 請求月は必須','error');return;}showLoading(true);try{if(editingFeeId){await sbFetch('support_fees?id=eq.'+editingFeeId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新','success');}else{const _r=await sbFetch('support_fees',{method:'POST',body:JSON.stringify(data),prefer:'return=representation'});if(_r&&_r[0]&&_r[0].id)editingFeeId=_r[0].id;showToast('✅ 登録','success');}closeGenModal('feeModal');await loadFees(feePage);}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
 
 async function saveIntro() {
   const g=id=>document.getElementById(id)?.value||null;
@@ -17226,7 +17333,7 @@ async function saveIntro() {
     referral_fee:document.getElementById('if_referral_fee')?.value?parseInt(document.getElementById('if_referral_fee').value):null,
     doc_staff:g('if_doc_staff'), worker_staff:g('if_worker_staff'),
     assignment_date:g('if_assignment_date'), join_date:g('if_join_date'),
-    notes:g('if_notes'), updated_at:new Date().toISOString()
+    notes:g('if_notes'), updated_at: new Date().toISOString(), updated_by: _curUserName()
   };
   showLoading(true);
   try {
@@ -17245,6 +17352,7 @@ async function saveResume() {
   try {
     await sbFetch('candidates?id=eq.' + id, { method:'PATCH', body: JSON.stringify(data) });
     showToast('✅ 保存しました', 'success');
+    afterManualSave('resumeModal');
     // 候補者一覧も更新
     const idx = allCandidates.findIndex(c => c.id === id);
     if (idx >= 0) allCandidates[idx] = { ...allCandidates[idx], ...data };
@@ -17259,7 +17367,7 @@ function toggleSaleBillingMonth() {
   if (!input) return;
   input.style.display = type === 'pending' ? 'none' : '';
 }
-async function saveSale(){const g=id=>document.getElementById(id)?.value||null;const ni=id=>document.getElementById(id)?.value?parseInt(document.getElementById(id).value):null;const _coInput=(g('saf_company_input')||'').trim();const _coMatch=_coInput?(allCompanies||[]).find(c=>c.name===_coInput):null;const _itemName=g('saf_item_name');const _soshiki=g('saf_soshiki');if(_itemName==='人材紹介料'&&!_soshiki){showToast('❌ 人材紹介料の場合、登録支援機関は必須です','error');return;}const data={company_id:_coMatch?_coMatch.id:null,company_name_custom:(_coInput&&!_coMatch)?_coInput:null,worker_name:g('saf_worker_name'),billing_month:(document.getElementById('saf_billing_month_type')?.value==='pending'?null:g('saf_billing_month')),kmt_entity:g('saf_kmt_entity'),item_name:_itemName,soshiki:_itemName==='人材紹介料'?_soshiki:null,unit_price:ni('saf_unit_price'),app_fee:ni('saf_app_fee'),quantity:ni('saf_quantity'),amount_excl:ni('saf_amount_excl'),amount_incl:ni('saf_amount_incl'),notes:g('saf_notes'),updated_at:new Date().toISOString()};if(!data.billing_month && document.getElementById('saf_billing_month_type')?.value!=='pending'){showToast('❌ 請求月は必須','error');return;}showLoading(true);try{if(editingSaleId){await sbFetch('sales_forecast?id=eq.'+editingSaleId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新','success');}else{const _r=await sbFetch('sales_forecast',{method:'POST',body:JSON.stringify(data),prefer:'return=representation'});if(_r&&_r[0]&&_r[0].id)editingSaleId=_r[0].id;showToast('✅ 登録','success');}closeGenModal('saleModal');await loadSales(salePage);}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
+async function saveSale(){const g=id=>document.getElementById(id)?.value||null;const ni=id=>document.getElementById(id)?.value?parseInt(document.getElementById(id).value):null;const _coInput=(g('saf_company_input')||'').trim();const _coMatch=_coInput?(allCompanies||[]).find(c=>c.name===_coInput):null;const _itemName=g('saf_item_name');const _soshiki=g('saf_soshiki');if(_itemName==='人材紹介料'&&!_soshiki){showToast('❌ 人材紹介料の場合、登録支援機関は必須です','error');return;}const data={company_id:_coMatch?_coMatch.id:null,company_name_custom:(_coInput&&!_coMatch)?_coInput:null,worker_name:g('saf_worker_name'),billing_month:(document.getElementById('saf_billing_month_type')?.value==='pending'?null:g('saf_billing_month')),kmt_entity:g('saf_kmt_entity'),item_name:_itemName,soshiki:_itemName==='人材紹介料'?_soshiki:null,unit_price:ni('saf_unit_price'),app_fee:ni('saf_app_fee'),quantity:ni('saf_quantity'),amount_excl:ni('saf_amount_excl'),amount_incl:ni('saf_amount_incl'),notes:g('saf_notes'),updated_at: new Date().toISOString(), updated_by: _curUserName()};if(!data.billing_month && document.getElementById('saf_billing_month_type')?.value!=='pending'){showToast('❌ 請求月は必須','error');return;}showLoading(true);try{if(editingSaleId){await sbFetch('sales_forecast?id=eq.'+editingSaleId,{method:'PATCH',body:JSON.stringify(data)});showToast('✅ 更新','success');}else{const _r=await sbFetch('sales_forecast',{method:'POST',body:JSON.stringify(data),prefer:'return=representation'});if(_r&&_r[0]&&_r[0].id)editingSaleId=_r[0].id;showToast('✅ 登録','success');}closeGenModal('saleModal');await loadSales(salePage);}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
 
 // 売上詳細モーダルからの削除
 async function deleteSale(){
@@ -17292,7 +17400,7 @@ async function deleteSaleRow(id){
   showLoading(false);
 }
 
-async function saveUser(){const g=id=>document.getElementById(id)?.value||null;const data={name:g('uf_name'),name_kana:g('uf_name_kana'),email:g('uf_email'),role:g('uf_role'),team:g('uf_team'),position:g('uf_position'),is_active:document.getElementById('uf_active')?.value!=='false',updated_at:new Date().toISOString()};const pinVal=(document.getElementById('uf_pin')?.value||'').trim();if(pinVal){if(!/^\d{4}$/.test(pinVal)){showToast('❌ 暗証番号は4桁の数字で入力してください','error');return;}data.pin_code=pinVal;}if(!data.name){showToast('❌ 名前は必須','error');return;}showLoading(true);try{if(editingUserId){await sbFetch('users?id=eq.'+editingUserId,{method:'PATCH',body:JSON.stringify(data)});showToast(pinVal?'✅ 更新（暗証番号も変更）':'✅ 更新','success');}else{if(!data.pin_code)data.pin_code='0000';const _r=await sbFetch('users',{method:'POST',body:JSON.stringify(data),prefer:'return=representation'});if(_r&&_r[0]&&_r[0].id)editingUserId=_r[0].id;showToast('✅ 登録','success');}closeGenModal('userModal');await loadUsers();}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
+async function saveUser(){const g=id=>document.getElementById(id)?.value||null;const data={name:g('uf_name'),name_kana:g('uf_name_kana'),email:g('uf_email'),role:g('uf_role'),team:g('uf_team'),position:g('uf_position'),is_active:document.getElementById('uf_active')?.value!=='false',updated_at: new Date().toISOString(), updated_by: _curUserName()};const pinVal=(document.getElementById('uf_pin')?.value||'').trim();if(pinVal){if(!/^\d{4}$/.test(pinVal)){showToast('❌ 暗証番号は4桁の数字で入力してください','error');return;}data.pin_code=pinVal;}if(!data.name){showToast('❌ 名前は必須','error');return;}showLoading(true);try{if(editingUserId){await sbFetch('users?id=eq.'+editingUserId,{method:'PATCH',body:JSON.stringify(data)});showToast(pinVal?'✅ 更新（暗証番号も変更）':'✅ 更新','success');}else{if(!data.pin_code)data.pin_code='0000';const _r=await sbFetch('users',{method:'POST',body:JSON.stringify(data),prefer:'return=representation'});if(_r&&_r[0]&&_r[0].id)editingUserId=_r[0].id;showToast('✅ 登録','success');}closeGenModal('userModal');await loadUsers();}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
 
 async function deleteUser(){
   if(!editingUserId)return;
@@ -17696,6 +17804,12 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260805.24', date:'2026-08-05', notify:true, items:[
+    '未保存リマインドを全フォームに拡大。外国人材・所属機関・求人・候補者・履歴書で、記入や変更をしたまま ✕ボタン／［閉じる］／モーダル外クリック／別画面への移動 をすると「未保存の変更があります　保存しますか？」と表示されます（これまで外国人材はブラウザ標準の確認しか出ず、✕ボタンや画面移動では何も出ませんでした）',
+    '保存ボタンの隣に「✓ 最終更新 2026/08/05 15:30（担当者名）」を表示。編集を始めると「● 未保存の変更があります」に変わり、保存すると最終更新の表示に戻ります',
+    '💾保存を押してもモーダルは閉じないように変更（最終更新の表示をその場で確認できるようにするため）。閉じるときは［閉じる］または✕を押してください',
+    '誰が更新したかをDBに記録するようにしました（外国人材・所属機関・求人・候補者・売上・委託費・立替・提携機関・送り出し機関・ユーザー・紹介案件・面談・支援スケジュールなど）',
+  ]},
   { version:'ver.20260805.23', date:'2026-08-05', notify:true, items:[
     '所属機関の基本情報「業種（特定技能分野）」を複数選択に対応。「＋業種を選んで追加」で何個でも登録でき、選択肢にない業種は「＋新規業種を追加」から登録すると以降どの企業でも選べるようになります（登録した業種は全員で共有）',
     '同じ場所に「業種に関する詳細」フリー入力欄を追加。取扱品目・作業内容・分野に関する補足などを自由に記入できます',
