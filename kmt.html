@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260804.22 -->
+<!-- KMT_VERSION ver.20260805.23 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -116,6 +116,18 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
 .co-name{font-weight:700;color:var(--navy);}
 .co-no{font-size:11px;color:var(--gray-400);}
 .co-industry{font-size:11px;color:var(--gray-700);}
+
+/* ===== 業種（特定技能分野）複数選択 ===== */
+.ind-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;min-height:26px;align-items:center;}
+.ind-chip{display:inline-flex;align-items:center;gap:4px;background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe;border-radius:14px;padding:3px 5px 3px 10px;font-size:12px;font-weight:700;}
+.ind-chip button{border:none;background:transparent;color:#6366f1;cursor:pointer;font-size:13px;line-height:1;padding:1px 5px;border-radius:50%;}
+.ind-chip button:hover{background:#c7d2fe;color:#312e81;}
+.ind-chips-empty{font-size:12px;color:var(--gray-400);}
+.ind-add-row,.ind-new-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+.ind-new-row{margin-top:6px;}
+.ind-add-select{max-width:240px;}
+.ind-new-input{max-width:220px;}
+.ind-hint{margin-left:6px;font-size:10px;font-weight:600;color:var(--gray-400);}
 .worker-count{font-weight:700;color:var(--blue);font-size:15px;}
 .fee-text{font-size:12px;color:var(--gray-700);}
 
@@ -355,7 +367,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260804.22</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.23</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <div id="sidebarAlerts" style="margin-top:6px;display:none;flex-direction:column;gap:3px;"></div>
   </div>
@@ -568,22 +580,32 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
             </select>
           </div>
           <div class="form-group">
-            <label class="form-label">業種（特定技能分野）</label>
-            <select class="form-select" id="co_industry">
-              <option value="">選択</option>
-              <option>農業</option><option>漁業</option><option>建設</option>
-              <option>製造業</option><option>飲食料品製造業</option><option>外食業</option>
-              <option>介護</option><option>ビルクリーニング</option><option>宿泊</option>
-              <option>自動車整備</option><option>自動車運送</option><option>航空</option><option>造船・船用工業</option>
-            </select>
-          </div>
-          <div class="form-group">
             <label class="form-label">法人番号</label>
             <input class="form-input" id="co_corp_no" placeholder="13桁">
           </div>
           <div class="form-group">
             <label class="form-label">電話番号</label>
             <input class="form-input" id="co_tel" placeholder="03-xxxx-xxxx">
+          </div>
+          <div class="form-group full">
+            <label class="form-label">業種（特定技能分野）<span class="ind-hint">複数選択可</span></label>
+            <input type="hidden" id="co_industry">
+            <div class="ind-chips" id="co_industry_chips"></div>
+            <div class="ind-add-row">
+              <select class="form-select ind-add-select" id="co_industry_add" onchange="addIndustryFromSelect()">
+                <option value="">＋ 業種を選んで追加</option>
+              </select>
+              <button type="button" class="btn btn-outline" style="font-size:11px;padding:5px 12px;" onclick="toggleNewIndustryInput(true)">＋ 新規業種を追加</button>
+            </div>
+            <div class="ind-new-row" id="co_industry_new_row" style="display:none;">
+              <input class="form-input ind-new-input" id="co_industry_new" placeholder="例: 林業" onkeydown="if(event.key==='Enter'){event.preventDefault();commitNewIndustry();}">
+              <button type="button" class="btn btn-primary" style="font-size:11px;padding:5px 12px;" onclick="commitNewIndustry()">登録</button>
+              <button type="button" class="btn btn-outline" style="font-size:11px;padding:5px 12px;" onclick="toggleNewIndustryInput(false)">キャンセル</button>
+            </div>
+          </div>
+          <div class="form-group full">
+            <label class="form-label">業種に関する詳細</label>
+            <textarea class="form-textarea" id="co_industry_note" rows="3" placeholder="取扱品目・作業内容・分野に関する補足など"></textarea>
           </div>
 
           <div class="section-title">📍 本社所在地</div>
@@ -1124,6 +1146,7 @@ async function loadCompanies() {
   try {
     const data = await sbFetch('companies?select=*&is_deleted=eq.false&order=name.asc');
     allCompanies = data || [];
+    await loadIndustryOptions();
     // folder_no でソート: 数値部分を優先、'0'と'00'は長さで区別、枝番(11-1等)は本体の直後
     allCompanies.sort((a, b) => {
       const af = (a.folder_no || '').toString();
@@ -1174,6 +1197,13 @@ async function loadCompanies() {
 function buildFilterOptions() {
   const prefSel = document.getElementById('filterPref');
   if (!prefSel) return; // 所属機関画面以外では何もしない
+  // 業種(標準 + 新規追加分 + 実データで使われている値)
+  const indSel = document.getElementById('filterIndustry');
+  if (indSel) {
+    const indVal = indSel.value;
+    indSel.innerHTML = '<option value="">すべて</option>' + industryOptionList().map(n => `<option>${esc(n)}</option>`).join('');
+    indSel.value = indVal;
+  }
   // 都道府県
   const prefs = [...new Set(allCompanies.map(c => c.pref).filter(Boolean))].sort();
   const prefVal = prefSel.value;
@@ -1244,7 +1274,7 @@ function applyFilters() {
     if (statFilter === 'active' && c.status === 'past') return false;
     if (statFilter === 'past' && c.status !== 'past') return false;
     if (q && !((c.name||'').toLowerCase().includes(q) || (c.pref||'').toLowerCase().includes(q) || (c.city||'').toLowerCase().includes(q) || (c.address||'').toLowerCase().includes(q))) return false;
-    if (industry && c.industry !== industry) return false;
+    if (industry && !getCompanyIndustries(c).includes(industry)) return false;
     if (pref && c.pref !== pref) return false;
     if (payment && c.payment_method !== payment) return false;
     if (staff && c.main_staff !== staff) return false;
@@ -1293,8 +1323,8 @@ function renderTable() {
       : `<span class="worker-count" style="color:#cbd5e1;">-</span>`;
     return `<tr onclick="openCompanyModal('${c.id}')">
       <td><span class="co-no">${esc(c.folder_no ?? '-')}</span></td>
-      <td><div class="co-name">${esc(c.name)}</div><div class="co-industry">${esc(c.industry||'')}</div></td>
-      <td class="co-industry">${esc(c.industry||'-')}</td>
+      <td><div class="co-name">${esc(c.name)}</div><div class="co-industry">${esc(getCompanyIndustries(c).join(' / '))}</div></td>
+      <td class="co-industry">${esc(getCompanyIndustries(c).join(' / ') || '-')}</td>
       <td>${esc(c.pref||'-')}</td>
       <td>${esc(c.main_staff||'-')}</td>
       <td style="font-size:11px;color:var(--gray-600);">${esc(c.sub_staff||'-')}</td>
@@ -1769,7 +1799,7 @@ async function openWorkerChatFromCompany(workerId) {
 }
 
 const CO_FIELDS = [
-  'no','status','name','corp_type','industry','corp_no','tel',
+  'no','status','name','corp_type','industry','industry_note','corp_no','tel',
   'zip','pref','city','address',
   'workplace_name','workplace_zip','workplace_pref','workplace_city','workplace_address','workplace_tel',
   'rep_name','rep_title','contact_name','contact_tel','contact_email','main_staff','sub_staff','drive_url','drive_url_kmt',
@@ -1782,11 +1812,11 @@ const CO_FIELDS = [
   'insurance_guidance_date','insurance_guidance_staff','insurance_name','insurance_start_date','insurance_end_date','insurance_procedure_by','insurance_premium_by','insurance_note'
 ];
 
-function clearCoForm() { CO_FIELDS.forEach(f => { const el = document.getElementById('co_'+f); if(el) el.value=''; }); renderContactEmailRows(''); const _cne = document.getElementById('co_contact_note'); if(_cne) _cne.value = ''; renderExtraWorkplaces([]); document.querySelectorAll('.co-offt').forEach(cb=>cb.checked=false); document.querySelectorAll('.co-substaff').forEach(cb=>cb.checked=false); if(typeof toggleOtherForeignTypes==='function')toggleOtherForeignTypes(); if(typeof toggleOtherSupportOrg==='function')toggleOtherSupportOrg(); _coNotes = []; renderCompanyNotes(); }
+function clearCoForm() { CO_FIELDS.forEach(f => { const el = document.getElementById('co_'+f); if(el) el.value=''; }); renderContactEmailRows(''); const _cne = document.getElementById('co_contact_note'); if(_cne) _cne.value = ''; renderExtraWorkplaces([]); document.querySelectorAll('.co-offt').forEach(cb=>cb.checked=false); document.querySelectorAll('.co-substaff').forEach(cb=>cb.checked=false); if(typeof toggleOtherForeignTypes==='function')toggleOtherForeignTypes(); if(typeof toggleOtherSupportOrg==='function')toggleOtherSupportOrg(); _coNotes = []; renderCompanyNotes(); _coIndustries = []; renderIndustryChips(); toggleNewIndustryInput(false); }
 
 function fillCoForm(co) {
   const map = {
-    no:'folder_no', status:'status', name:'name', corp_type:'corp_type', industry:'industry',
+    no:'folder_no', status:'status', name:'name', corp_type:'corp_type', industry:'industry', industry_note:'industry_note',
     corp_no:'corp_no', tel:'tel', zip:'zip', pref:'pref', city:'city', address:'address',
     rep_name:'rep_name', rep_title:'rep_title', main_staff:'main_staff', sub_staff:'sub_staff',
     workplace_name:'workplace_name', workplace_zip:'workplace_zip',
@@ -1822,6 +1852,9 @@ function fillCoForm(co) {
   if (typeof toggleOtherSupportOrg === 'function') toggleOtherSupportOrg();
   _coNotes = Array.isArray(co.company_notes) ? co.company_notes.slice() : [];
   renderCompanyNotes();
+  _coIndustries = getCompanyIndustries(co);
+  renderIndustryChips();
+  toggleNewIndustryInput(false);
 }
 
 function getCoFormData() {
@@ -1830,7 +1863,9 @@ function getCoFormData() {
     status: document.getElementById('co_status').value || 'active',
     name: document.getElementById('co_name').value,
     corp_type: document.getElementById('co_corp_type').value || null,
-    industry: document.getElementById('co_industry').value || null,
+    industry: _coIndustries[0] || null, // 旧カラム互換: 先頭を代表値として保持
+    industries: _coIndustries.slice(),
+    industry_note: document.getElementById('co_industry_note')?.value || null,
     corp_no: document.getElementById('co_corp_no').value || null,
     tel: document.getElementById('co_tel').value || null,
     zip: document.getElementById('co_zip').value || null,
@@ -1900,6 +1935,96 @@ function getCoFormData() {
     last_visit: document.getElementById('co_last_visit').value || null,
     updated_at: new Date().toISOString()
   };
+}
+
+// ===== 業種（特定技能分野）: 複数選択 + 新規業種の追加 =====
+const BASE_INDUSTRIES = ['農業','漁業','建設','製造業','飲食料品製造業','外食業','介護','ビルクリーニング','宿泊','自動車整備','自動車運送','航空','造船・船用工業'];
+let _coIndustries = [];        // 編集中の企業の業種
+let _customIndustryOptions = []; // industry_options テーブルから読み込んだ追加業種
+
+// 企業レコードから業種配列を取り出す(旧 industry 単一カラムとの互換あり)
+function getCompanyIndustries(c) {
+  if (!c) return [];
+  if (Array.isArray(c.industries) && c.industries.length) return c.industries.filter(Boolean);
+  return c.industry ? [c.industry] : [];
+}
+
+// 選択肢一覧 = 標準 + 追加登録分 + 実データで使われている値
+function industryOptionList() {
+  const used = (typeof allCompanies !== 'undefined' ? allCompanies : []).flatMap(c => getCompanyIndustries(c));
+  return [...new Set([...BASE_INDUSTRIES, ..._customIndustryOptions, ...used].filter(Boolean))];
+}
+
+async function loadIndustryOptions() {
+  try {
+    const rows = await sbFetch('industry_options?select=name,sort_order&order=sort_order.asc,name.asc');
+    _customIndustryOptions = (rows || []).map(r => r.name).filter(Boolean);
+  } catch(e) { _customIndustryOptions = []; }
+}
+
+function renderIndustryChips() {
+  const box = document.getElementById('co_industry_chips');
+  if (!box) return;
+  box.innerHTML = _coIndustries.length
+    ? _coIndustries.map((n, i) => `<span class="ind-chip">${esc(n)}<button type="button" title="削除" onclick="removeIndustry(${i})">×</button></span>`).join('')
+    : '<span class="ind-chips-empty">未設定</span>';
+  const sel = document.getElementById('co_industry_add');
+  if (sel) {
+    const rest = industryOptionList().filter(n => !_coIndustries.includes(n));
+    sel.innerHTML = '<option value="">＋ 業種を選んで追加</option>' + rest.map(n => `<option>${esc(n)}</option>`).join('');
+    sel.value = '';
+  }
+  // 旧 industry カラム互換(先頭を代表値として保持)
+  const hid = document.getElementById('co_industry');
+  if (hid) hid.value = _coIndustries[0] || '';
+}
+
+function addIndustry(name) {
+  name = (name || '').trim();
+  if (!name) return;
+  if (!_coIndustries.includes(name)) _coIndustries.push(name);
+  renderIndustryChips();
+}
+function addIndustryFromSelect() {
+  const sel = document.getElementById('co_industry_add');
+  if (sel && sel.value) addIndustry(sel.value);
+}
+function removeIndustry(i) { _coIndustries.splice(i, 1); renderIndustryChips(); }
+
+function toggleNewIndustryInput(show) {
+  const row = document.getElementById('co_industry_new_row');
+  if (!row) return;
+  row.style.display = show ? 'flex' : 'none';
+  const inp = document.getElementById('co_industry_new');
+  if (inp) { inp.value = ''; if (show) setTimeout(() => inp.focus(), 0); }
+}
+
+// 新規業種を選択肢マスタ(industry_options)へ登録し、この企業にも付与
+async function commitNewIndustry() {
+  const inp = document.getElementById('co_industry_new');
+  if (!inp) return;
+  const name = (inp.value || '').trim();
+  if (!name) { showToast('業種名を入力してください', 'error'); return; }
+  if (industryOptionList().includes(name)) {
+    addIndustry(name);
+    toggleNewIndustryInput(false);
+    showToast('「' + name + '」は既にある業種のため選択しました');
+    return;
+  }
+  _customIndustryOptions.push(name);
+  addIndustry(name);
+  toggleNewIndustryInput(false);
+  try {
+    await sbFetch('industry_options', {
+      method: 'POST',
+      prefer: 'resolution=merge-duplicates,return=representation',
+      body: JSON.stringify({ name: name, sort_order: 900 })
+    });
+    if (typeof buildFilterOptions === 'function') buildFilterOptions();
+    showToast('✅ 業種「' + name + '」を追加しました');
+  } catch(e) {
+    showToast('⚠️ 選択肢には追加しましたがマスタ保存に失敗: ' + e.message, 'error');
+  }
 }
 
 // 正式なKMT担当者ロスター(表記ゆれ防止のためフォームのメイン/サブ担当はこのリストから選択)
@@ -17571,6 +17696,11 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260805.23', date:'2026-08-05', notify:true, items:[
+    '所属機関の基本情報「業種（特定技能分野）」を複数選択に対応。「＋業種を選んで追加」で何個でも登録でき、選択肢にない業種は「＋新規業種を追加」から登録すると以降どの企業でも選べるようになります（登録した業種は全員で共有）',
+    '同じ場所に「業種に関する詳細」フリー入力欄を追加。取扱品目・作業内容・分野に関する補足などを自由に記入できます',
+    '一覧の業種列は複数業種を「建設 / 製造業」のようにまとめて表示。業種フィルタは複数登録のどれかに一致すればヒットします',
+  ]},
   { version:'ver.20260804.22', date:'2026-08-05', notify:true, items:[
     '申請記録：「保存/更新」列を一番左（管理番号の左）へ移動。横スクロールしなくても保存ボタンと最終更新日時／更新者が見えるように。機能・並べ替え・未保存アラートは従来どおり',
   ]},
