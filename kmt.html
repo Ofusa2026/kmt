@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260805.29 -->
+<!-- KMT_VERSION ver.20260805.30 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -367,7 +367,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.29</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.30</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <div id="sidebarAlerts" style="margin-top:6px;display:none;flex-direction:column;gap:3px;"></div>
   </div>
@@ -10851,35 +10851,53 @@ function toggleLumpSumFields() {
 
 // ===== サイドバー用アラート件数（外国人材のバナーと同じ判定を簡潔表示）=====
 let _sidebarAlertData = null;
-function computeSidebarAlertCounts(list){
+// ===== 外国人材アラートの唯一の算出元 =====
+// サイドバーのバッジと外国人材ページ上部のバナーは、必ずこの関数の結果を使う。
+// （別々に計算すると数字がズレるため、判定ロジックをここ以外に書かないこと）
+function computeGlobalWorkerAlerts(list){
   list = list || [];
   const today = new Date(); today.setHours(0,0,0,0);
-  let miss=0, renewal=0, kokko=0;
+  const miss=[], renewal=[], kokkoPlacement=[], kokkoRetire=[], kokkoTg2=[];
   const isConstruction = w => /建設/.test(w.applicant_field || '');
   list.forEach(w => {
     if (w.kmt_support === 'KMT支援外') return;
     if (isConstruction(w) && w.visa_status !== '特定活動') {
-      if (w.status === '在職中' && w.visa_status === '特定技能1号' && !w.placement_report_date) kokko++;
-      if (['退職済(帰国)','退職済(転職)'].includes(w.status) && !w.retire_report_date) kokko++;
-      if (w.desired_visa === '特定技能2号' && w.apply_status === '審査完了' && !w.tg2_change_report_date && w.status !== '退職予定(更新なし決定)') kokko++;
+      if (w.status === '在職中' && w.visa_status === '特定技能1号' && !w.placement_report_date) kokkoPlacement.push(w);
+      if (['退職済(帰国)','退職済(転職)'].includes(w.status) && !w.retire_report_date) kokkoRetire.push(w);
+      if (w.desired_visa === '特定技能2号' && w.apply_status === '審査完了' && !w.tg2_change_report_date && w.status !== '退職予定(更新なし決定)') kokkoTg2.push(w);
     }
     if (!w.visa_expiry) return;
     const exp = new Date(w.visa_expiry); exp.setHours(0,0,0,0);
     const days = Math.floor((exp - today)/86400000);
     if (['退職済(帰国)','退職済(転職)'].includes(w.status)) return;
     if (w.status !== '退職予定(更新なし決定)') {
-      if (days <= 91 && !w.renewal_status) renewal++;
-      else if (days <= 61 && w.renewal_status === '要確認') renewal++;
+      if (days <= 91 && !w.renewal_status) renewal.push({ w, days, reason:'no_status' });
+      else if (days <= 61 && w.renewal_status === '要確認') renewal.push({ w, days, reason:'needs_check' });
     }
     const applyStatus = w.apply_status || '申請予定なし';
     const skipMiss = w.status === '退職予定(更新なし決定)' || w.support_type_2go === '2号企業単独';
-    if (days <= 90 && applyStatus === '申請予定なし' && !skipMiss) miss++;
+    if (days <= 90 && applyStatus === '申請予定なし' && !skipMiss) miss.push({ w, days });
   });
-  return { miss, renewal, kokko };
+  return { miss, renewal, kokkoPlacement, kokkoRetire, kokkoTg2,
+           kokkoTotal: kokkoPlacement.length + kokkoRetire.length + kokkoTg2.length };
+}
+// アラート算出に使う人材データ。allWorkers は画面によっては軽量selectで
+// 上書きされる（判定に必要な列が無い）ことがあるので、その場合は専用取得分を使う。
+function _alertSourceWorkers(){
+  const w0 = (allWorkers && allWorkers.length) ? allWorkers[0] : null;
+  const full = !!w0 && ('placement_report_date' in w0) && ('renewal_status' in w0);
+  if (full) return allWorkers;
+  if (_sidebarAlertData && _sidebarAlertData.length) return _sidebarAlertData;
+  return allWorkers || [];
+}
+// 件数だけ欲しいとき（後方互換）
+function computeSidebarAlertCounts(list){
+  const a = computeGlobalWorkerAlerts(list);
+  return { miss: a.miss.length, renewal: a.renewal.length, kokko: a.kokkoTotal };
 }
 function updateSidebarAlerts(list){
   const el = document.getElementById('sidebarAlerts'); if(!el) return;
-  const src = (list && list.length) ? list : (_sidebarAlertData || (allWorkers && allWorkers.length ? allWorkers : []));
+  const src = (list && list.length) ? list : _alertSourceWorkers();
   const { miss, renewal, kokko } = computeSidebarAlertCounts(src);
   const mk = (cnt, icon, label, color) => cnt>0
     ? `<div onclick="showScreen('workers')" title="外国人材で詳細を見る" style="cursor:pointer;display:flex;align-items:center;gap:5px;font-size:10px;color:${color};font-weight:700;background:rgba(255,255,255,.06);padding:3px 7px;border-radius:5px;">${icon} ${label}<span style="margin-left:auto;font-weight:800;">${cnt}件</span></div>`
@@ -10901,37 +10919,25 @@ function renderWorkerAlerts() {
   if (!banner) { updateSidebarAlerts(); return; }
   const today = new Date(); today.setHours(0,0,0,0);
   const alerts = { 0:[], 1:[], 2:[], 3:[] };
-  // 🚨 申請忘れ警告: 90日以内 かつ 申請予定なし(または未設定)
-  const missAlert = [];
-  // 🟣 不足あり放置警告: 特例期間中 かつ 申請済み・不足あり
+  // 🚨申請忘れ警告 / 📋更新リマインド / 🏗️就労管理システム報告 は
+  // computeGlobalWorkerAlerts() を唯一の算出元とし、全人材（一覧フィルター非適用）で数える。
+  // → サイドバーのバッジと必ず同じ数字になる。ここで再計算しないこと。
+  const _alertSrc = _alertSourceWorkers();
+  const _ga = computeGlobalWorkerAlerts(_alertSrc);
+  const missAlert = _ga.miss;                    // 申請忘れ警告
+  const renewalDueAlert = _ga.renewal;           // 更新リマインド
+  const kokkoPlacementAlert = _ga.kokkoPlacement; // 配属報告未提出
+  const kokkoRetireAlert = _ga.kokkoRetire;       // 退職報告未提出
+  const kokkoTg2Alert = _ga.kokkoTg2;             // 2号変更報告未提出
+  // 🟣 不足あり放置警告: 特例期間中 かつ 申請済み・不足あり（一覧フィルターに追従）
   const shortageAlert = [];
-  // 🏗️ 建設業就労管理システム報告アラート(3種類)
-  const kokkoPlacementAlert = []; // 配属報告未提出
-  const kokkoRetireAlert = [];    // 退職報告未提出
-  const kokkoTg2Alert = [];       // 2号変更報告未提出
   const lumpSumAlert = [];        // 脱退一時金あり & 転出/転入手続き未完了
   const leaveOverdueAlert = [];   // 退職予定日超過 & ステータス未変更 & 退職日未記入
-  const renewalDueAlert = [];     // 3か月以内×更新ステータス未入力 / 2か月以内×要確認
   const cardInfoAlert = [];        // 発行完了・入国済みで在留情報未入力
-  const isConstruction = (w) => /建設/.test(w.applicant_field || '');
+  // ↓ここから下のアラート（期限カード・脱退一時金・退職予定超過・在留情報未入力）は一覧フィルターに追従する
   (filteredWorkers.length ? filteredWorkers : allWorkers).forEach(w => {
     // KMT支援外は全アラートから除外(支援対象外なので)
     if (w.kmt_support === 'KMT支援外') return;
-    // 建設業の報告アラート判定(在留期限の有無にかかわらず)。特定活動は通知除外。
-    if (isConstruction(w) && w.visa_status !== '特定活動') {
-      // 受け入れ報告: 在職中 かつ 特定技能1号(特定活動→特定技能1号に変わった)で 受け入れ報告未提出
-      if (w.status === '在職中' && w.visa_status === '特定技能1号' && !w.placement_report_date) {
-        kokkoPlacementAlert.push(w);
-      }
-      // 退職報告: 退職済(帰国/転職)で退職報告未提出
-      if (['退職済(帰国)','退職済(転職)'].includes(w.status) && !w.retire_report_date) {
-        kokkoRetireAlert.push(w);
-      }
-      // 2号変更報告: 希望在留資格=特定技能2号 かつ 申請ステータス=審査完了 で 2号変更報告未提出
-      if (w.desired_visa === '特定技能2号' && w.apply_status === '審査完了' && !w.tg2_change_report_date && w.status !== '退職予定(更新なし決定)') {
-        kokkoTg2Alert.push(w);
-      }
-    }
     // 💴 脱退一時金あり & 転出/転入手続き未完了(在留期限の有無に関係なく判定)
     if (w.lump_sum_plan === 'あり' && !(w.transfer_out_done && w.transfer_in_done)) {
       const od = w.transfer_out_date ? Math.floor((today - new Date(w.transfer_out_date))/86400000) : null;
@@ -10953,18 +10959,9 @@ function renderWorkerAlerts() {
     if (['発行完了','入国済み'].includes(w.apply_status) && !w.card_info_done) {
       cardInfoAlert.push(w);
     }
-    // 📋 更新リマインド: 3か月以内×更新ステータス未入力 / 2か月以内×要確認(退職予定は除外)
-    if (w.status !== '退職予定(更新なし決定)') {
-      if (days <= 91 && !w.renewal_status) renewalDueAlert.push({ w, days, reason:'no_status' });
-      else if (days <= 61 && w.renewal_status === '要確認') renewalDueAlert.push({ w, days, reason:'needs_check' });
-    }
     // 申請忘れ判定(90日以内・期限切れ含む・申請予定なしor未設定)
     // ただし 退職予定(更新なし決定) と 2号企業単独 は「申請なし」アラートから除外(期限アラートはそのまま)
     const applyStatus = w.apply_status || '申請予定なし';
-    const skipMissAlert = w.status === '退職予定(更新なし決定)' || w.support_type_2go === '2号企業単独';
-    if (days <= 90 && applyStatus === '申請予定なし' && !skipMissAlert) {
-      missAlert.push({w, days});
-    }
     // 特例期間中 + 申請済み・不足あり の組み合わせ警告(退職予定は従来通り除外)
     if (applyStatus === '申請済み・不足あり' && days < 0 && w.status !== '退職予定(更新なし決定)') {
       const td = w.tokurei_date ? Math.floor((new Date(w.tokurei_date)-today)/86400000) : null;
@@ -10984,9 +10981,9 @@ function renderWorkerAlerts() {
     else if (days <= 90) alerts[3].push({w, days});
   });
   const total = alerts[0].length + alerts[1].length + alerts[2].length + alerts[3].length;
-  const kokkoTotal = kokkoPlacementAlert.length + kokkoRetireAlert.length + kokkoTg2Alert.length;
-  // サイドバーの件数は全体（フィルター非適用）で表示
-  _sidebarAlertData = allWorkers; updateSidebarAlerts(allWorkers);
+  const kokkoTotal = _ga.kokkoTotal;
+  // サイドバーもバナーと同じ算出元・同じデータで更新する
+  updateSidebarAlerts(_alertSrc);
   if (!total && !missAlert.length && !shortageAlert.length && !kokkoTotal && !lumpSumAlert.length && !leaveOverdueAlert.length && !renewalDueAlert.length) { banner.innerHTML=''; return; }
   // 残り日数で昇順ソート(期限切れも含めて期日が近い順)
   missAlert.sort((a,b) => a.days - b.days);
@@ -17895,6 +17892,10 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260805.30', date:'2026-08-05', notify:true, items:[
+    'サイドバーのアラート件数（🚨申請忘れ警告／📋更新リマインド／🏗️就労管理システム）と、外国人材ページ上部のバナーの件数が食い違っていた不具合を修正。バナー側が一覧の絞り込みに引きずられていたのが原因で、特に退職済の方が対象になる「退職報告未提出」が数に入らないことがありました',
+    '今後もズレないよう、両方の件数を同じ計算式・同じデータから出すように作り直しました（判定条件を変えても自動で両方に反映されます）',
+  ]},
   { version:'ver.20260805.29', date:'2026-08-05', notify:true, items:[
     '売上管理の「新規決定数」を、項目「初期費用」の行数ではなく数量の合計に変更。1行で複数名まとめて登録している場合も正しい人数になります（数量が未入力の行は従来どおり1件として数えます）',
   ]},
