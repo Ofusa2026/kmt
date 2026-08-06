@@ -84,6 +84,19 @@ UI変更やロジック変更のときは実際に描画して確かめる。
 `_AUTOSAVE_MAP` を参照。expense / partner / fee / user / sending / aiKn / intro は自動保存
 （入力1.5秒後に保存、右下に「✅保存済」）。`null` のものは手動保存。
 
+### チャット
+
+- **メンション**: `chat_messages.mentions`（jsonb の名前配列）。`isMentionForMe()` が部分一致で判定し、
+  一覧の @バッジ・「@メンション」絞り込み・ブラウザ通知に使われる。
+  返信（↩インライン／🧵スレッド）は `_withReplyMention()` で相手の名前を mentions に自動追加する（自分宛は除外）
+- **ピン留め**: `chat_pins` テーブル。`room_id` が入っていれば個別チャットのピン、
+  無ければ企業カードのピン（`_chatPinnedCompanyIds` / `_chatPinnedRoomIds`）。
+  個別ピンは企業内リストで先頭に並び、`_prependPinnedRoomSection()` が一覧最上部にも表示する
+- **添付**: `chat_messages.attachments`（`[{url,name,mimeType,size}]`）。実体は GAS 経由で Google Drive にアップロード。
+  画像（`isChatImageAttachment()` が true）は `driveImageUrl(url, 800)` でサムネイル化してチャット内に直接表示、
+  それ以外はファイルリンク。表示に失敗したら `_chatImgFallback()` がリンクに戻す
+- 入力欄での画像貼り付けは `initChatPasteImage()`（document の paste を拾って `addChatFiles()` に渡す）
+
 ### 外国人材アラート（サイドバーと画面上部バナー）
 
 **`computeGlobalWorkerAlerts(list)` が唯一の算出元。判定ロジックをここ以外に書かない。**
