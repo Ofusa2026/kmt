@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260805.42 -->
+<!-- KMT_VERSION ver.20260805.43 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -367,7 +367,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.42</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.43</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <div id="sidebarAlerts" style="margin-top:6px;display:none;flex-direction:column;gap:3px;"></div>
   </div>
@@ -6680,6 +6680,9 @@ async function saveWorker(returnResult=false) {
     notes:            g('wf_notes'),
     tokutei_history:  (function(){ try { return JSON.parse(document.getElementById('wf_tokutei_history')?.value || '[]'); } catch(e){ return []; } })(),
     past_employment:  (function(){ try { return JSON.parse(document.getElementById('wf_past_employment')?.value || '[]'); } catch(e){ return []; } })(),
+    history_verified:    document.getElementById('wf_history_verified')?.checked || false,
+    history_verified_at: g('wf_history_verified_at') || null,
+    history_verified_by: g('wf_history_verified_by') || null,
     contact_log:      (function(){ try { return JSON.parse(document.getElementById('wf_contact_log')?.value || '[]'); } catch(e){ return []; } })(),
     updated_at:       new Date().toISOString(),
     updated_by:       _curUserName(),
@@ -6975,8 +6978,31 @@ function applyTokuteiExpiryToForm(){
   showToast('✅ 5年満了日に反映しました', 'success');
 }
 
+// ===== 経歴内容の精査チェック =====
+// チェックONで「精査した日時＋ユーザー名」を自動記録、OFFで消去（保存で確定）
+function onHistoryVerifiedChange(on){
+  const at = document.getElementById('wf_history_verified_at');
+  const by = document.getElementById('wf_history_verified_by');
+  if (!at || !by) return;
+  if (on) { at.value = new Date().toISOString(); by.value = _curUserName(); }
+  else { at.value = ''; by.value = ''; }
+  renderHistoryVerifiedMeta();
+}
+function renderHistoryVerifiedMeta(){
+  const el = document.getElementById('wf_history_verified_meta');
+  if (!el) return;
+  const on = document.getElementById('wf_history_verified')?.checked;
+  if (!on) {
+    el.innerHTML = '<span style="color:var(--gray-400);">上記の経歴を確認したらチェックしてください（日時とユーザー名が自動で記録されます）</span>';
+    return;
+  }
+  const at = document.getElementById('wf_history_verified_at')?.value || '';
+  const by = document.getElementById('wf_history_verified_by')?.value || '';
+  el.innerHTML = '<span style="color:#15803d;font-weight:700;">✓ ' + esc(at ? _fmtUpdatedAt(at) : '') + (by ? '（' + esc(by) + '）' : '') + '</span>';
+}
+
 // ===== 過去の所属又は勤務先（特定技能以外） =====
-const PAST_EMP_VISA_OPTS = ['技能実習２号','技能実習３号','特定活動（特定技能移行準備以外）','留学生','家族滞在','技人国','その他'];
+const PAST_EMP_VISA_OPTS =['技能実習２号','技能実習３号','特定活動（特定技能移行準備以外）','留学生','家族滞在','技人国','その他'];
 let _pastEmpRows = [];
 
 function _pastEmpSyncHidden(){
@@ -12150,6 +12176,14 @@ async function openWorkerModal(id) {
     renderTokuteiRows();
     _pastEmpRows = Array.isArray((w||{}).past_employment) ? JSON.parse(JSON.stringify(w.past_employment)) : [];
     renderPastEmpRows();
+    // 経歴内容の精査チェック
+    const _hvChk = document.getElementById('wf_history_verified');
+    if (_hvChk) {
+      _hvChk.checked = !!(w||{}).history_verified;
+      document.getElementById('wf_history_verified_at').value = (w||{}).history_verified_at || '';
+      document.getElementById('wf_history_verified_by').value = (w||{}).history_verified_by || '';
+      renderHistoryVerifiedMeta();
+    }
     // 本人とのやり取りの記録
     _contactLogRows = Array.isArray((w||{}).contact_log) ? JSON.parse(JSON.stringify(w.contact_log)) : [];
     renderContactLog();
@@ -12792,6 +12826,17 @@ function buildWorkerModalBody(w) {
     </div>
     <div class="form-group full">
       <div id="wf_tokutei_calc"></div>
+    </div>
+    <div class="form-group full">
+      <div style="border:1px solid #bbf7d0;background:#f0fdf4;border-radius:8px;padding:8px 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;font-weight:800;color:#166534;margin:0;">
+          <input type="checkbox" id="wf_history_verified" onchange="onHistoryVerifiedChange(this.checked)" style="width:15px;height:15px;cursor:pointer;">
+          経歴内容を担当が精査済み
+        </label>
+        <input type="hidden" id="wf_history_verified_at" value="">
+        <input type="hidden" id="wf_history_verified_by" value="">
+        <span id="wf_history_verified_meta" style="font-size:11px;"></span>
+      </div>
     </div>
     <div class="form-group full">
       <div style="border:1px solid var(--gray-200);border-radius:8px;padding:10px 12px;background:#f8fafc;">
@@ -18777,6 +18822,11 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260805.43', date:'2026-08-07', notify:true, items:[
+    '人材詳細「10. 通算期間と過去の就労先」に「経歴内容を担当が精査済み」のチェック欄を追加しました',
+    'チェックを入れると、その日時とご自身のユーザー名が自動で記録され、その場に表示されます（保存で確定）',
+    'チェックを外すと記録は消えます。あとから見れば「誰がいつ経歴を確認したか」が分かります',
+  ]},
   { version:'ver.20260805.42', date:'2026-08-07', notify:true, items:[
     '人材詳細「10. 通算期間と過去の就労先」の「🏢 過去の所属又は勤務先（特定技能以外）」の枠を、セクションの一番下（5年満了日の下）に移動しました',
   ]},
