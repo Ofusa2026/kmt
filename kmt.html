@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260805.33 -->
+<!-- KMT_VERSION ver.20260805.35 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -367,7 +367,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.33</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.35</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <div id="sidebarAlerts" style="margin-top:6px;display:none;flex-direction:column;gap:3px;"></div>
   </div>
@@ -6444,7 +6444,7 @@ function buildChatScreen() {
         </div>
         <!-- メンション候補 -->
         <div style="position:relative;">
-        <div id="mentionPopup" style="display:none;position:absolute;bottom:calc(100% + 4px);left:0;right:0;background:white;border:1px solid var(--gray-200);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.15);z-index:999;overflow:hidden;"></div>
+        <div id="mentionPopup" style="display:none;position:absolute;bottom:calc(100% + 4px);left:0;right:0;background:white;border:1px solid var(--gray-200);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.15);z-index:999;overflow-y:auto;overflow-x:hidden;max-height:min(52vh,360px);overscroll-behavior:contain;"></div>
         <!-- 絵文字ピッカー -->
         <div id="emojiPicker" style="display:none;position:absolute;bottom:calc(100% + 4px);left:0;background:white;border:1px solid var(--gray-200);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.15);z-index:999;padding:8px;width:280px;"></div>
         <div style="display:flex;gap:8px;align-items:flex-end;">
@@ -8730,29 +8730,20 @@ function chatTextKeydown(event) {
   const popup = document.getElementById('mentionPopup');
   // 候補表示中のキー操作
   if (popup && popup.style.display !== 'none') {
-    const items = popup.querySelectorAll('[data-mention]');
+    const items = [...popup.querySelectorAll('[data-mention]')];
     const active = popup.querySelector('.mention-active');
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      if (!active && items[0]) items[0].classList.add('mention-active');
-      else if (active) {
-        active.classList.remove('mention-active');
-        const next = active.nextElementSibling;
-        if (next) next.classList.add('mention-active');
-        else items[0]?.classList.add('mention-active');
-      }
-      return;
-    }
-    if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      if (active) {
-        active.classList.remove('mention-active');
-        const prev = active.previousElementSibling;
-        if (prev) prev.classList.add('mention-active');
-        else items[items.length-1]?.classList.add('mention-active');
-      }
-      return;
-    }
+    // 見出し行を飛ばして候補だけを移動し、選択項目が隠れないようスクロールする
+    const moveActive = (dir) => {
+      if (!items.length) return;
+      const cur = active ? items.indexOf(active) : -1;
+      const next = cur < 0 ? (dir > 0 ? 0 : items.length - 1)
+                           : (cur + dir + items.length) % items.length;
+      items.forEach(el => el.classList.remove('mention-active'));
+      const el = items[next];
+      if (el) { el.classList.add('mention-active'); el.scrollIntoView({ block: 'nearest' }); }
+    };
+    if (event.key === 'ArrowDown') { event.preventDefault(); moveActive(1); return; }
+    if (event.key === 'ArrowUp')   { event.preventDefault(); moveActive(-1); return; }
     if (event.key === 'Enter' && !event.shiftKey) {
       const activeItem = popup.querySelector('.mention-active');
       if (activeItem) {
@@ -8887,6 +8878,7 @@ async function showMentionPopup(query) {
   }
   popup.innerHTML = html;
   popup.style.display = '';
+  popup.scrollTop = 0;
 }
 
 function insertMention(name) {
@@ -10089,7 +10081,7 @@ function updateTopbarButtons(name) {
     fees:         ``,  // 支援委託費は画面内にボタンを持つ
     sales:        ``,  // 売上管理は画面内にボタンを持つ
     expenses:     `<button class="btn btn-outline" onclick="loadExpenses()">🔄 更新</button><button class="btn btn-primary" onclick="openExpenseModal(null)">＋ 立替登録</button>`,
-    users:        `<button class="btn btn-outline" onclick="loadUsers()">🔄 更新</button><button class="btn btn-primary" onclick="openUserModal(null)">＋ ユーザー追加</button>`,
+    users:        `<button class="btn btn-outline" onclick="loadUsers()">🔄 更新</button>${isAdminUser() ? '<button class="btn btn-primary" onclick="openUserModal(null)">＋ ユーザー追加</button>' : ''}`,
     decision_report: ``,
     staff_list:   `<button class="btn btn-outline" onclick="loadStaffList()">🔄 更新</button><button id="staffListToggleBtn" class="btn btn-outline" onclick="toggleStaffCompanyList()" style="margin-left:4px;">📋 企業一覧を隠す</button>`,
     mail_list:    `<button class="btn btn-outline" onclick="loadMailList()">🔄 更新</button>`,
@@ -14644,7 +14636,7 @@ async function loadSending() {
   showLoading(false);
 }
 
-async function loadUsers(){showLoading(true);try{const data=await sbFetch('users?select=id,name,name_kana,role,team,email,is_active,avatar_url,affiliation,position&order=name.asc');allUsers=data||[];if(currentScreen==='users'){renderTeamUsers();}else{applyUserFilters();}}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
+async function loadUsers(){showLoading(true);try{const data=await sbFetch('users?select=id,name,name_kana,role,team,email,is_active,avatar_url,affiliation,position&order=name.asc');allUsers=data||[];if(_userTeams===null)await loadUserTeams();if(currentScreen==='users'){renderTeamUsers();}else{applyUserFilters();}}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
 
 function buildResumeScreen() {
   return `
@@ -15637,8 +15629,8 @@ function _renderShiftKanri() {
   const myName = currentUser?.name || '';
   const myPosition = currentUser?.position || '';
   const myRole = currentUser?.role || '';
-  // 編集権限: 管理者role or 管理職position(管理者/代表/マネージャー/リーダー/社員) → 全員編集可
-  const isAdminLike = myRole === '管理者' || ['管理者','代表','マネージャー','リーダー','社員'].includes(myPosition);
+  // 編集権限: 管理者role or 管理職position(管理者/代表/リーダー/社員) → 全員編集可
+  const isAdminLike = myRole === '管理者' || ['管理者','代表','リーダー','社員'].includes(myPosition);
   const isPart = myPosition === 'パート' || myPosition === 'その他';
   const myNN = myName.replace(/[\s\u3000]+/g,'');
 
@@ -15701,7 +15693,7 @@ function _shiftEditCell(staffName, dateStr) {
   const e = _shiftState.entries[key] || null;
   const myPosition = currentUser?.position || '';
   const myRole = currentUser?.role || '';
-  const isAdminLike = myRole === '管理者' || ['管理者','代表','マネージャー','リーダー','社員'].includes(myPosition);
+  const isAdminLike = myRole === '管理者' || ['管理者','代表','リーダー','社員'].includes(myPosition);
   const defStart = e ? (e.start_time||'09:00') : '09:00';
   const defEnd = e ? (e.end_time||'13:00') : '13:00';
   const defStatus = e ? e.status : (isAdminLike ? 'confirmed' : 'request');
@@ -15810,7 +15802,7 @@ function buildChatTeamsScreen(){
         <div style="font-size:14px;font-weight:800;color:var(--navy);">💬 チャットグループ</div>
         <div style="font-size:11px;color:var(--gray-400);margin-top:2px;">グループを作成してメンバーを追加すると、チャット内で<code style="background:#f1f5f9;padding:1px 4px;border-radius:3px;">@グループ名</code>でまとめてメンションできます</div>
       </div>
-      <button class="btn btn-primary" onclick="openChatTeamModal(null)" style="font-size:12px;padding:6px 14px;">＋ 新規グループ</button>
+      ${isAdminUser() ? '<button class="btn btn-primary" onclick="openChatTeamModal(null)" style="font-size:12px;padding:6px 14px;">＋ 新規グループ</button>' : '<span style="font-size:11px;color:#94a3b8;white-space:nowrap;">🔒 変更は管理者のみ（閲覧中）</span>'}
     </div>
   </div>
   <div id="chatTeamsList"><div style="text-align:center;padding:40px;color:var(--gray-400);">読み込み中...</div></div>
@@ -15861,8 +15853,8 @@ function renderChatTeams() {
             '</div>' +
           '</div>' +
           '<div style="display:flex;gap:4px;">' +
-            '<button class="btn btn-outline" style="font-size:11px;padding:3px 10px;" onclick="openChatTeamModal(\'' + t.id + '\')">編集</button>' +
-            '<button class="btn btn-outline" style="font-size:11px;padding:3px 10px;color:#dc2626;border-color:#fecaca;" onclick="deleteChatTeam(\'' + t.id + '\', \'' + esc(t.name).replace(/'/g, "\\'") + '\')">🗑</button>' +
+            (isAdminUser() ? '<button class="btn btn-outline" style="font-size:11px;padding:3px 10px;" onclick="openChatTeamModal(\'' + t.id + '\')">編集</button>' : '') +
+            (isAdminUser() ? '<button class="btn btn-outline" style="font-size:11px;padding:3px 10px;color:#dc2626;border-color:#fecaca;" onclick="deleteChatTeam(\'' + t.id + '\', \'' + esc(t.name).replace(/'/g, "\\'") + '\')">🗑</button>' : '') +
           '</div>' +
         '</div>' +
         (t.description ? '<div style="font-size:11px;color:#64748b;line-height:1.5;">' + esc(t.description) + '</div>' : '') +
@@ -15873,6 +15865,7 @@ function renderChatTeams() {
 }
 
 function openChatTeamModal(id) {
+  if (!requireAdmin('チャットグループの編集は管理者のみです')) return;
   _editingChatTeamId = id;
   const t = id ? _allChatTeams.find(x => x.id === id) : null;
   const memberIds = new Set((t?.members || []).map(m => m.user_id));
@@ -15972,6 +15965,7 @@ async function saveChatTeam() {
 }
 
 async function deleteChatTeam(id, name) {
+  if (!requireAdmin('チャットグループの削除は管理者のみです')) return;
   if (!confirm('グループ「' + name + '」を削除しますか？\n(メッセージ内のメンションは残ります)')) return;
   showLoading(true);
   try {
@@ -16020,15 +16014,125 @@ function buildUsersScreen(){
   <!-- ユーザー(チーム別) -->
   <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
     <input class="search-input" id="uSearchInput" placeholder="名前・メールで検索..." oninput="renderTeamUsers()" style="flex:1;min-width:200px;">
-    <button class="btn btn-primary" style="font-size:12px;white-space:nowrap;" onclick="openUserModal(null)">＋ ユーザー追加</button>
+    ${isAdminUser() ? `
+      <button class="btn btn-outline" style="font-size:12px;white-space:nowrap;" onclick="addUserTeam()">＋ チーム追加</button>
+      <button class="btn btn-primary" style="font-size:12px;white-space:nowrap;" onclick="openUserModal(null)">＋ ユーザー追加</button>`
+    : `<span style="font-size:11px;color:#94a3b8;white-space:nowrap;">🔒 変更は管理者のみ（閲覧中）</span>`}
   </div>
   <div id="teamUsersContainer"><div style="text-align:center;padding:40px;color:var(--gray-400)">読み込み中...</div></div>`;
 }
 
+// ===== 権限：変更操作は管理者のみ =====
+function isAdminUser() {
+  return String(currentUser?.role || '') === '管理者';
+}
+function requireAdmin(msg) {
+  if (isAdminUser()) return true;
+  showToast('🔒 ' + (msg || 'この操作は管理者のみ実行できます'), 'error');
+  return false;
+}
+
+// ===== チーム名マスタ（app_settings.user_teams に保存） =====
+const DEFAULT_USER_TEAMS = ['GLT','営業','総務','大房'];
+let _userTeams = null; // 読み込み済みのチーム名配列（未読込は null）
+
+async function loadUserTeams() {
+  try {
+    const rows = await sbFetch('app_settings?key=eq.user_teams&select=value');
+    const raw = rows && rows[0] ? rows[0].value : null;
+    const arr = raw ? JSON.parse(raw) : null;
+    _userTeams = Array.isArray(arr) && arr.length ? arr : DEFAULT_USER_TEAMS.slice();
+  } catch(e) {
+    _userTeams = DEFAULT_USER_TEAMS.slice();
+  }
+  return _userTeams;
+}
+async function saveUserTeams(list) {
+  _userTeams = list.slice();
+  await sbFetch('app_settings?on_conflict=key', {
+    method: 'POST',
+    prefer: 'return=representation,resolution=merge-duplicates',
+    body: JSON.stringify({ key: 'user_teams', value: JSON.stringify(_userTeams),
+      updated_at: new Date().toISOString(), updated_by: _curUserName() })
+  });
+}
+// 表示に使うチーム一覧 = マスタ ∪ 実データで使われているチーム
+function userTeamList() {
+  const base = (_userTeams && _userTeams.length) ? _userTeams : DEFAULT_USER_TEAMS;
+  const used = (allUsers || []).map(u => u.team).filter(Boolean);
+  return [...new Set([...base, ...used])];
+}
+
+// チームを追加
+async function addUserTeam() {
+  if (!requireAdmin('チームの追加は管理者のみです')) return;
+  const name = (prompt('新しいチーム名を入力してください') || '').trim();
+  if (!name) return;
+  if (userTeamList().includes(name)) { showToast('⚠️ 同じ名前のチームが既にあります', 'error'); return; }
+  showLoading(true);
+  try {
+    await saveUserTeams([...(_userTeams || DEFAULT_USER_TEAMS), name]);
+    showToast('✅ チーム「' + name + '」を追加しました', 'success');
+    renderTeamUsers();
+  } catch(e) { showToast('❌ ' + e.message, 'error'); }
+  showLoading(false);
+}
+
+// チーム名を変更（所属ユーザーの team も一括更新）
+async function renameUserTeam(oldName) {
+  if (!requireAdmin('チーム名の変更は管理者のみです')) return;
+  if (oldName === '未所属') { showToast('⚠️ 「未所属」は変更できません', 'error'); return; }
+  const name = (prompt('新しいチーム名', oldName) || '').trim();
+  if (!name || name === oldName) return;
+  if (userTeamList().includes(name)) { showToast('⚠️ 同じ名前のチームが既にあります', 'error'); return; }
+  const members = (allUsers || []).filter(u => u.team === oldName);
+  showLoading(true);
+  try {
+    const base = (_userTeams && _userTeams.length) ? _userTeams : DEFAULT_USER_TEAMS.slice();
+    await saveUserTeams(base.map(t => t === oldName ? name : t).concat(base.includes(oldName) ? [] : [name]));
+    if (members.length) {
+      await sbFetch('users?team=eq.' + encodeURIComponent(oldName), {
+        method: 'PATCH', prefer: 'return=minimal',
+        body: JSON.stringify({ team: name, updated_at: new Date().toISOString(), updated_by: _curUserName() })
+      });
+      members.forEach(u => u.team = name);
+    }
+    showToast('✅ 「' + oldName + '」を「' + name + '」に変更しました（' + members.length + '名）', 'success');
+    renderTeamUsers();
+  } catch(e) { showToast('❌ ' + e.message, 'error'); }
+  showLoading(false);
+}
+
+// チームを削除（所属ユーザーは未所属へ）
+async function deleteUserTeam(name) {
+  if (!requireAdmin('チームの削除は管理者のみです')) return;
+  if (name === '未所属') { showToast('⚠️ 「未所属」は削除できません', 'error'); return; }
+  const members = (allUsers || []).filter(u => u.team === name);
+  const msg = members.length
+    ? '「' + name + '」を削除しますか？\n所属している' + members.length + '名は「未所属」になります。'
+    : '「' + name + '」を削除しますか？';
+  if (!confirm(msg)) return;
+  showLoading(true);
+  try {
+    const base = (_userTeams && _userTeams.length) ? _userTeams : DEFAULT_USER_TEAMS.slice();
+    await saveUserTeams(base.filter(t => t !== name));
+    if (members.length) {
+      await sbFetch('users?team=eq.' + encodeURIComponent(name), {
+        method: 'PATCH', prefer: 'return=minimal',
+        body: JSON.stringify({ team: null, updated_at: new Date().toISOString(), updated_by: _curUserName() })
+      });
+      members.forEach(u => u.team = null);
+    }
+    showToast('🗑️ チーム「' + name + '」を削除しました', 'success');
+    renderTeamUsers();
+  } catch(e) { showToast('❌ ' + e.message, 'error'); }
+  showLoading(false);
+}
+
 // チーム別ユーザーカードを描画
-const USER_POSITIONS = ['管理者','代表','経理','マネージャー','リーダー','社員','パート','その他'];
-const POSITION_BG = {'管理者':'#fee2e2','代表':'#fef3c7','経理':'#d1fae5','マネージャー':'#fecaca','リーダー':'#fed7aa','社員':'#dbeafe','パート':'#f3e8ff','その他':'#e5e7eb'};
-const POSITION_COLOR = {'管理者':'#b91c1c','代表':'#92400e','経理':'#065f46','マネージャー':'#991b1b','リーダー':'#c2410c','社員':'#1e40af','パート':'#6b21a8','その他':'#475569'};
+const USER_POSITIONS = ['管理者','代表','経理','リーダー','社員','パート','その他'];
+const POSITION_BG = {'管理者':'#fee2e2','代表':'#fef3c7','経理':'#d1fae5','リーダー':'#fed7aa','社員':'#dbeafe','パート':'#f3e8ff','その他':'#e5e7eb'};
+const POSITION_COLOR = {'管理者':'#b91c1c','代表':'#92400e','経理':'#065f46','リーダー':'#c2410c','社員':'#1e40af','パート':'#6b21a8','その他':'#475569'};
 const TEAM_COLORS = ['#475569','#2563eb','#7c3aed','#0891b2','#059669','#d97706','#db2777'];
 
 function renderTeamUsers() {
@@ -16038,10 +16142,11 @@ function renderTeamUsers() {
   let list = (allUsers || []).filter(u =>
     !q || (u.name||'').toLowerCase().includes(q) || (u.email||'').toLowerCase().includes(q)
   );
-  // 固定チーム順 + データ由来チーム（未所属は最後）
-  const fixedOrder = ['GLT','営業','総務','大房'];
+  const canEdit = isAdminUser();
+  // チームマスタ順 + データ由来チーム（未所属は最後）
+  const fixedOrder = userTeamList();
   const byTeam = {};
-  // 固定順に空配列で初期化（メンバー0でもカードが出る）
+  // マスタ順に空配列で初期化（メンバー0でもカードが出る）
   fixedOrder.forEach(t => byTeam[t] = []);
   list.forEach(u => { const k = u.team || '未所属'; (byTeam[k] = byTeam[k] || []).push(u); });
   const teamNames = Object.keys(byTeam).sort((a,b) => {
@@ -16062,27 +16167,38 @@ function renderTeamUsers() {
     h += '<div style="background:'+color+';padding:12px 16px;display:flex;justify-content:space-between;align-items:center;">';
     h += '<div><div style="font-size:15px;font-weight:900;color:white;">👥 '+esc(tname)+'</div>';
     h += '<div style="font-size:11px;color:rgba(255,255,255,.75);">'+members.length+'名</div></div>';
-    h += '<button onclick="openUserModalForTeam(\''+esc(tname)+'\')" style="font-size:11px;padding:4px 10px;background:rgba(255,255,255,.2);color:white;border:1px solid rgba(255,255,255,.4);border-radius:6px;cursor:pointer;font-weight:700;">＋ 追加</button>';
+    if (canEdit) {
+      const btn = (label, onclick, title) => '<button onclick="'+onclick+'" title="'+title+'" style="font-size:11px;padding:4px 8px;background:rgba(255,255,255,.2);color:white;border:1px solid rgba(255,255,255,.4);border-radius:6px;cursor:pointer;font-weight:700;">'+label+'</button>';
+      h += '<div style="display:flex;gap:4px;flex-shrink:0;">';
+      h += btn('＋ 追加', 'openUserModalForTeam(\''+esc(tname)+'\')', 'このチームにユーザーを追加');
+      if (tname !== '未所属') {
+        h += btn('✏️', 'renameUserTeam(\''+esc(tname)+'\')', 'チーム名を変更');
+        h += btn('🗑', 'deleteUserTeam(\''+esc(tname)+'\')', 'チームを削除');
+      }
+      h += '</div>';
+    }
     h += '</div><div style="padding:6px 0;min-height:40px;">';
     members.forEach(u => {
       const pos = u.position || 'その他';
       const pb = POSITION_BG[pos] || '#e5e7eb';
       const pc = POSITION_COLOR[pos] || '#475569';
       // 行: draggable、左端にドラッグハンドル
-      h += '<div class="team-member-row" draggable="true" data-uid="'+u.id+'" data-uteam="'+esc(tname)+'" style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid #f1f5f9;cursor:grab;" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'\'">';
-      h += '<span style="font-size:14px;color:#cbd5e1;flex-shrink:0;user-select:none;" title="ドラッグして別チームへ移動">⋮⋮</span>';
+      h += '<div class="team-member-row" '+(canEdit?'draggable="true" ':'')+'data-uid="'+u.id+'" data-uteam="'+esc(tname)+'" style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid #f1f5f9;cursor:'+(canEdit?'grab':'default')+';" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'\'">';
+      h += canEdit ? '<span style="font-size:14px;color:#cbd5e1;flex-shrink:0;user-select:none;" title="ドラッグして別チームへ移動">⋮⋮</span>' : '';
       h += '<div class="user-avatar" style="width:30px;height:30px;font-size:12px;flex-shrink:0;">'+(u.avatar_url?'<img src="'+esc(u.avatar_url)+'" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">':esc((u.name||'?').charAt(0)))+'</div>';
-      h += '<div style="flex:1;min-width:0;cursor:pointer;" data-edit="'+u.id+'"><div style="font-size:13px;font-weight:600;color:#202124;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(u.name||'')+'</div>';
+      h += '<div style="flex:1;min-width:0;cursor:'+(canEdit?'pointer':'default')+';" '+(canEdit?'data-edit="'+u.id+'"':'')+'><div style="font-size:13px;font-weight:600;color:#202124;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(u.name||'')+'</div>';
       h += '<div style="font-size:10px;color:#94a3b8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(u.email||'')+'</div></div>';
+      if (u.role === '管理者') h += '<span title="権限: 管理者" style="font-size:10px;font-weight:800;padding:3px 8px;border-radius:5px;background:#fee2e2;color:#b91c1c;flex-shrink:0;">👑 管理者</span>';
+      else if (u.role === '閲覧のみ') h += '<span title="権限: 閲覧のみ" style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px;background:#f1f5f9;color:#64748b;flex-shrink:0;">閲覧のみ</span>';
       h += '<span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px;background:'+pb+';color:'+pc+';flex-shrink:0;">'+esc(pos)+'</span>';
       h += '</div>';
     });
-    if (!members.length) h += '<div style="padding:16px;text-align:center;color:#94a3b8;font-size:12px;">メンバーなし（ここにドラッグで移動）</div>';
+    if (!members.length) h += '<div style="padding:16px;text-align:center;color:#94a3b8;font-size:12px;">メンバーなし'+(canEdit?'（ここにドラッグで移動）':'')+'</div>';
     h += '</div></div>';
   });
   h += '</div>';
   cont.innerHTML = h;
-  attachTeamDnD(cont);
+  if (canEdit) attachTeamDnD(cont);
 }
 
 // ドラッグ&ドロップを各要素に紐付け
@@ -16137,6 +16253,7 @@ function attachTeamDnD(root) {
 
 // ユーザーのチームを更新
 async function moveUserToTeam(userId, newTeam) {
+  if (!requireAdmin('メンバーの移動は管理者のみです')) return;
   const u = (allUsers||[]).find(x => x.id === userId);
   if (!u) return;
   const teamForDb = newTeam === '未所属' ? null : newTeam;
@@ -16156,6 +16273,7 @@ async function moveUserToTeam(userId, newTeam) {
 
 // チーム名を初期セットしてユーザー追加モーダルを開く
 function openUserModalForTeam(teamName) {
+  if (!requireAdmin('ユーザーの追加は管理者のみです')) return;
   openUserModal(null);
   setTimeout(() => {
     const t = document.getElementById('uf_team');
@@ -16789,7 +16907,7 @@ function buildResumeHTML(c) {
 
 function buildSaleModalBody(s){s=s||{};const _curCompanyName=s.companies?.name||s.company_name_custom||'';return `<div class="form-grid"><div class="section-title">売上情報</div><div class="form-group full"><label class="form-label">企業</label><input class="form-input" id="saf_company_input" list="saf_company_datalist" placeholder="企業名を入力（候補から選択、または直接入力）" value="${esc(_curCompanyName)}" autocomplete="off"><datalist id="saf_company_datalist">${allCompanies.map(c=>`<option value="${esc(c.name)}">`).join('')}</datalist></div><div class="form-group"><label class="form-label">人材名</label><input class="form-input" id="saf_worker_name" value="${esc(s.worker_name||'')}"></div><div class="form-group"><label class="form-label">請求月</label><select class="form-select" id="saf_billing_month_type" onchange="toggleSaleBillingMonth()" style="margin-bottom:4px;"><option value="month" ${s.billing_month?'selected':''}>月を指定 (YYYY-MM)</option><option value="pending" ${!s.billing_month?'selected':''}>📦 配属後請求</option></select><input class="form-input" id="saf_billing_month" value="${esc(s.billing_month||'')}" placeholder="例: 2026-08" style="display:${s.billing_month!==null&&s.billing_month!==undefined?'':'none'};"></div><div class="form-group"><label class="form-label">請求法人</label><select class="form-select" id="saf_kmt_entity">${['','株式会社KMT','一般社団法人KMT','大房行政書士法人'].map(v=>`<option ${s.kmt_entity===v?'selected':''}>${v}</option>`).join('')}</select></div><div class="form-group full"><label class="form-label">項目名</label><select class="form-select" id="saf_item_name" onchange="document.getElementById('saf_soshiki_wrap').style.display=this.value==='人材紹介料'?'':'none'">${['初期費用','支援委託費','人材紹介料','通訳・翻訳費用','その他'].map(v=>`<option value="${v}" ${s.item_name===v?'selected':''}>${v}</option>`).join('')}</select></div><div class="form-group full" id="saf_soshiki_wrap" style="display:${s.item_name==='人材紹介料'?'':'none'}"><label class="form-label">登録支援機関 <span style="color:#ef4444;font-size:11px;">※必須</span></label><input class="form-input" id="saf_soshiki" placeholder="登録支援機関名を入力" value="${esc(s.soshiki||'')}"></div><div class="form-group"><label class="form-label">単価（円）</label><input class="form-input" id="saf_unit_price" type="number" value="${s.unit_price??''}"></div><div class="form-group"><label class="form-label">内申請費用（円）<span style="font-size:10px;color:var(--gray-400);font-weight:400;">※大房請求・合計除外</span></label><input class="form-input" id="saf_app_fee" type="number" value="${s.app_fee??''}" placeholder="単価に含まれる申請費用"></div><div class="form-group"><label class="form-label">数量</label><input class="form-input" id="saf_quantity" type="number" value="${s.quantity??''}"></div><div class="form-group"><label class="form-label">金額（税抜）</label><input class="form-input" id="saf_amount_excl" type="number" value="${s.amount_excl??''}"></div><div class="form-group"><label class="form-label">金額（税込）</label><input class="form-input" id="saf_amount_incl" type="number" value="${s.amount_incl??''}"></div><div class="form-group full"><label class="form-label">備考</label><textarea class="form-textarea" id="saf_notes">${esc(s.notes||'')}</textarea></div></div><div style="display:flex;gap:8px;align-items:center;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)"><span id="sm_sale" style="font-size:11px;color:#94a3b8;white-space:nowrap;margin-right:4px;"></span><button class="btn btn-primary" onclick="saveSale()" style="padding:8px 28px;font-size:14px;">💾 保存</button><button class="btn btn-outline" onclick="closeGenModal('saleModal')">閉じる</button><div style="flex:1;"></div><button class="btn" id="safDeleteBtn" onclick="deleteSale()" style="display:${s.id?'':'none'};border:1px solid #dc2626;color:#dc2626;background:white;">🗑 削除</button></div>`;}
 
-function buildUserModalBody(u){u=u||{};const teams=['GLT','営業','総務','大房'];const teamSel=u.team&&!teams.includes(u.team)?[u.team,...teams]:teams;return `<div class="form-grid"><div class="section-title">ユーザー情報</div><div class="form-group full"><label class="form-label">名前 *</label><input class="form-input" id="uf_name" value="${esc(u.name||'')}"></div><div class="form-group"><label class="form-label">フリガナ</label><input class="form-input" id="uf_name_kana" value="${esc(u.name_kana||'')}"></div><div class="form-group"><label class="form-label">メールアドレス</label><input class="form-input" id="uf_email" type="email" value="${esc(u.email||'')}"></div><div class="form-group"><label class="form-label">役職</label><select class="form-select" id="uf_position">${['管理者','代表','経理','マネージャー','リーダー','社員','パート','その他'].map(s=>`<option ${(u.position||'社員')===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">チーム</label><select class="form-select" id="uf_team"><option value="">選択...</option>${teamSel.map(s=>`<option ${u.team===s?'selected':''}>${esc(s)}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">権限</label><select class="form-select" id="uf_role">${['','管理者','一般','閲覧のみ'].map(s=>`<option ${u.role===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">アクティブ</label><select class="form-select" id="uf_active"><option value="true" ${u.is_active!==false?'selected':''}>有効</option><option value="false" ${u.is_active===false?'selected':''}>無効</option></select></div><div class="form-group full" style="border-top:1px dashed var(--gray-200);padding-top:10px;margin-top:6px;"><label class="form-label" style="color:#7c3aed;">🔐 暗証番号(4桁)　<span style="font-size:10px;color:#94a3b8;font-weight:400;">※変更しない場合は空欄のまま</span></label><input class="form-input" id="uf_pin" type="text" maxlength="4" pattern="\\d{4}" inputmode="numeric" autocomplete="off" placeholder="例: 1234" value=""></div></div><div style="display:flex;gap:8px;justify-content:space-between;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)"><button class="btn" id="ufDeleteBtn" onclick="deleteUser()" style="display:${editingUserId?'':'none'};border:1px solid #dc2626;color:#dc2626;background:white;">🗑 削除</button><button class="btn btn-outline" onclick="closeGenModal('userModal')">閉じる</button></div>`;}
+function buildUserModalBody(u){u=u||{};const teams=userTeamList();const teamSel=u.team&&!teams.includes(u.team)?[u.team,...teams]:teams;return `<div class="form-grid"><div class="section-title">ユーザー情報</div><div class="form-group full"><label class="form-label">名前 *</label><input class="form-input" id="uf_name" value="${esc(u.name||'')}"></div><div class="form-group"><label class="form-label">フリガナ</label><input class="form-input" id="uf_name_kana" value="${esc(u.name_kana||'')}"></div><div class="form-group"><label class="form-label">メールアドレス</label><input class="form-input" id="uf_email" type="email" value="${esc(u.email||'')}"></div><div class="form-group"><label class="form-label">役職</label><select class="form-select" id="uf_position">${['管理者','代表','経理','リーダー','社員','パート','その他'].map(s=>`<option ${(u.position||'社員')===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">チーム</label><select class="form-select" id="uf_team"><option value="">選択...</option>${teamSel.map(s=>`<option ${u.team===s?'selected':''}>${esc(s)}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">権限</label><select class="form-select" id="uf_role">${['','管理者','一般','閲覧のみ'].map(s=>`<option ${u.role===s?'selected':''}>${s}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">アクティブ</label><select class="form-select" id="uf_active"><option value="true" ${u.is_active!==false?'selected':''}>有効</option><option value="false" ${u.is_active===false?'selected':''}>無効</option></select></div><div class="form-group full" style="border-top:1px dashed var(--gray-200);padding-top:10px;margin-top:6px;"><label class="form-label" style="color:#7c3aed;">🔐 暗証番号(4桁)　<span style="font-size:10px;color:#94a3b8;font-weight:400;">※変更しない場合は空欄のまま</span></label><input class="form-input" id="uf_pin" type="text" maxlength="4" pattern="\\d{4}" inputmode="numeric" autocomplete="off" placeholder="例: 1234" value=""></div></div><div style="display:flex;gap:8px;justify-content:space-between;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)"><button class="btn" id="ufDeleteBtn" onclick="deleteUser()" style="display:${editingUserId?'':'none'};border:1px solid #dc2626;color:#dc2626;background:white;">🗑 削除</button><button class="btn btn-outline" onclick="closeGenModal('userModal')">閉じる</button></div>`;}
 
 function clearApiKey() {
   if (!confirm('APIキーを削除しますか？')) return;
@@ -17053,7 +17171,7 @@ function openSaleModal(id){const s=id?allSales.find(x=>x.id===id):null;editingSa
 
 function openSendingModal(id){const s=id?allSending.find(x=>x.id===id):null; editingSendingId=id; showGenModal('sendingModal',id?'✈️ 送り出し機関詳細':'✈️ 送り出し機関登録',buildSendingModalBody(s));}
 
-function openUserModal(id){const u=id?allUsers.find(x=>x.id===id):null;editingUserId=id;showGenModal('userModal',id?'⚙️ ユーザー詳細':'⚙️ ユーザー追加',buildUserModalBody(u));setTimeout(()=>setupAutoSave(saveUser),100);}
+function openUserModal(id){if(!requireAdmin('ユーザーの追加・編集は管理者のみです'))return;const u=id?allUsers.find(x=>x.id===id):null;editingUserId=id;showGenModal('userModal',id?'⚙️ ユーザー詳細':'⚙️ ユーザー追加',buildUserModalBody(u));setTimeout(()=>setupAutoSave(saveUser),100);}
 
 function removeWorkHistory(i) {
   _workHistory.splice(i, 1);
@@ -17768,7 +17886,7 @@ async function deleteSaleRow(id){
 
 async function saveUser(){const g=id=>document.getElementById(id)?.value||null;const data={name:g('uf_name'),name_kana:g('uf_name_kana'),email:g('uf_email'),role:g('uf_role'),team:g('uf_team'),position:g('uf_position'),is_active:document.getElementById('uf_active')?.value!=='false',updated_at: new Date().toISOString(), updated_by: _curUserName()};const pinVal=(document.getElementById('uf_pin')?.value||'').trim();if(pinVal){if(!/^\d{4}$/.test(pinVal)){showToast('❌ 暗証番号は4桁の数字で入力してください','error');return;}data.pin_code=pinVal;}if(!data.name){showToast('❌ 名前は必須','error');return;}showLoading(true);try{if(editingUserId){await sbFetch('users?id=eq.'+editingUserId,{method:'PATCH',body:JSON.stringify(data)});showToast(pinVal?'✅ 更新（暗証番号も変更）':'✅ 更新','success');}else{if(!data.pin_code)data.pin_code='0000';const _r=await sbFetch('users',{method:'POST',body:JSON.stringify(data),prefer:'return=representation'});if(_r&&_r[0]&&_r[0].id)editingUserId=_r[0].id;showToast('✅ 登録','success');}closeGenModal('userModal');await loadUsers();}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
 
-async function deleteUser(){
+async function deleteUser(){if(!requireAdmin('ユーザーの削除は管理者のみです'))return;
   if(!editingUserId)return;
   const u=(allUsers||[]).find(x=>x.id===editingUserId);
   if(!confirm('「'+(u?u.name:'このユーザー')+'」を削除しますか？\nこの操作は取り消せません。'))return;
@@ -18170,6 +18288,16 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260805.35', date:'2026-08-05', notify:true, items:[
+    'ユーザー設定：チーム（グループ）名の追加・変更・削除ができるようになりました。カード上部の「✏️」で名前変更（所属メンバーも一括で移動）、「🗑」で削除（メンバーは未所属へ）、上部の「＋ チーム追加」で新規作成できます',
+    'ユーザー設定：ユーザー一覧に権限バッジ（👑管理者／閲覧のみ）を表示。誰が管理者か一目で分かります',
+    'ユーザー設定・チャットグループ：変更操作を管理者のみに制限しました。一般ユーザーは閲覧のみで、追加・編集・削除・メンバーのドラッグ移動のボタンは表示されません（「🔒 変更は管理者のみ（閲覧中）」と表示されます）',
+    'ユーザー設定：役職の選択肢から「マネージャー」を削除しました',
+    'ニサ・白井を管理者に設定しました',
+  ]},
+  { version:'ver.20260805.34', date:'2026-08-05', notify:true, items:[
+    'チャット：@を入力したときのメンション候補リストが下までスクロールできるようになりました（候補が多いと下の方のユーザーが選べませんでした）。↑↓キーでの移動でも選択中の項目が自動で見える位置に来ます',
+  ]},
   { version:'ver.20260805.33', date:'2026-08-05', notify:true, items:[
     'チャット：企業カードに「どのチャットにメンションが来ているか」を人材名で表示するようにしました。企業を開かなくても、誰宛のやり取りかが一目で分かります（5件以上は「ほかn件」と省略）',
     'チャット：人材ごとのチャット行にも @バッジ を表示。企業を開いたときにどの人材に来ているか分かります',
