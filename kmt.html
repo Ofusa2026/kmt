@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260805.36 -->
+<!-- KMT_VERSION ver.20260805.37 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -367,7 +367,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.36</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.37</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <div id="sidebarAlerts" style="margin-top:6px;display:none;flex-direction:column;gap:3px;"></div>
   </div>
@@ -8784,7 +8784,7 @@ async function showMentionPopup(query) {
   // allUsersが空ならロード
   if (!allUsers.length) {
     try {
-      const ud = await sbFetch('users?select=id,name,team,avatar_url&order=name.asc');
+      const ud = await sbFetch('users?select=id,name,team,role,is_active,avatar_url&order=name.asc');
       allUsers = ud || [];
     } catch(e) {}
   }
@@ -8798,11 +8798,11 @@ async function showMentionPopup(query) {
       window._chatTeamsCache = (teams||[]).map(t => ({ ...t, memberNames: byId[t.id] || [] }));
     } catch(e) { window._chatTeamsCache = []; }
   }
-  // ユーザー候補
+  // ユーザー候補（全ユーザーを表示。リストはスクロールできる）
   const userCands = (allUsers || []).filter(u =>
     u.name && u.name !== currentUser?.name &&
     (!query || u.name.toLowerCase().includes(query))
-  ).slice(0, 8);
+  ).sort((a,b) => (a.name||'').localeCompare(b.name||'', 'ja'));
 
   // チーム候補1: 旧 users.team (後方互換のため残す)
   const teamSet = new Set();
@@ -8810,12 +8810,12 @@ async function showMentionPopup(query) {
   // チーム候補2: chat_teams 新グループ
   const chatTeamCands = (window._chatTeamsCache || []).filter(t =>
     !query || t.name.toLowerCase().includes(query)
-  ).slice(0, 6);
+  );
   // 旧teamCandsはchat_teamsに同名があれば除外(優先)
   const chatTeamNames = new Set(chatTeamCands.map(t => t.name));
   const teamCands = Array.from(teamSet).filter(t =>
     !chatTeamNames.has(t) && (!query || t.toLowerCase().includes(query))
-  ).slice(0, 3).map(t => {
+  ).map(t => {
     const members = (allUsers||[]).filter(u => u.team === t);
     return { type: 'team', name: t, count: members.length };
   });
@@ -8866,7 +8866,7 @@ async function showMentionPopup(query) {
   // 個人
   if (userCands.length) {
     if (teamCands.length || specialCands.length) {
-      html += '<div style="padding:4px 12px;font-size:10px;color:#94a3b8;font-weight:700;letter-spacing:.5px;background:#f8fafc;border-top:1px solid #f1f5f9;">👤 ユーザー</div>';
+      html += '<div style="padding:4px 12px;font-size:10px;color:#94a3b8;font-weight:700;letter-spacing:.5px;background:#f8fafc;border-top:1px solid #f1f5f9;position:sticky;top:0;z-index:1;">👤 ユーザー（' + userCands.length + '名）</div>';
     }
     userCands.forEach((u, i) => {
       html += '<div data-mention="' + esc(u.name) + '" data-mtype="user" class="mention-item' + (i===0 && !teamCands.length && !specialCands.length ?' mention-active':'') + '" ' +
@@ -18369,6 +18369,10 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260805.37', date:'2026-08-06', notify:true, items:[
+    'チャット：@のメンション候補に全ユーザーが表示されるようになりました（これまでは8名までしか出ていませんでした）。チャットグループ・チームも全件表示します。リストはスクロールできます',
+    'チャット：ユーザーの見出しに人数を表示し、スクロールしても見出しが上に残るようにしました',
+  ]},
   { version:'ver.20260805.36', date:'2026-08-06', notify:true, items:[
     '求人管理：絞り込みフィルターを追加しました。「案件（KMT／紹介）」「国籍」「分野」「職種」の4種類で、それぞれ値ごとに「インドネシア 34件（KMT 9・紹介 25）」のように件数と内訳が出ます。クリックで絞り込み、同じ項目内は複数選択（どれかに該当）、項目をまたぐとAND条件になります',
     '求人管理：件数は他の絞り込みを反映して変わるので、絞り込んだ後も実際に残る件数が分かります。項目ごとの「✕ n件選択中を解除」または上部の「✕ クリア」で解除できます',
