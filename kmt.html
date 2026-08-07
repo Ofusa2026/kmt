@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260805.35 -->
+<!-- KMT_VERSION ver.20260805.36 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -367,7 +367,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.35</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.36</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <div id="sidebarAlerts" style="margin-top:6px;display:none;flex-direction:column;gap:3px;"></div>
   </div>
@@ -15199,11 +15199,8 @@ const JP_STATUS_COLOR = {
 function buildJobsScreen() {
   return `
   <div id="jpForecast" style="margin-bottom:12px;"></div>
-  <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+  <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;align-items:center;">
     <input class="search-input" id="jpSearch" placeholder="コード・会社名・担当で検索..." oninput="renderJobProgress()" style="flex:1;min-width:200px;">
-    <select class="filter-select" id="jpFilterKmt" onchange="renderJobProgress()">
-      <option value="">KMT/紹介：全て</option><option value="kmt">KMT案件のみ</option><option value="intro">紹介案件のみ</option>
-    </select>
     <select class="filter-select" id="jpFilterStatus" onchange="renderJobProgress()">
       <option value="">全ステータス</option>${JP_STATUSES.map(s=>`<option>${s}</option>`).join('')}
     </select>
@@ -15213,10 +15210,12 @@ function buildJobsScreen() {
       <option value="kmt">KMT・紹介ごと</option>
       <option value="org">登録支援機関コードごと</option>
       <option value="industry">分野ごと</option>
+      <option value="jobType">職種ごと</option>
     </select>
     <button class="btn btn-outline" style="font-size:11px;padding:4px 10px" onclick="jpClearFilters()">✕ クリア</button>
     <button class="btn btn-outline" style="font-size:11px;padding:4px 10px" onclick="loadJobProgress()">🔄 更新</button>
   </div>
+  <div id="jpFilterPanel" style="margin-bottom:12px;"></div>
   <div id="jpGroupArea"><div style="text-align:center;padding:40px;color:var(--gray-400)">読み込み中...</div></div>`;
 }
 
@@ -15253,7 +15252,8 @@ async function seedJobProgress() {
 }
 
 function jpClearFilters() {
-  ['jpSearch','jpFilterKmt','jpFilterStatus'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['jpSearch','jpFilterStatus'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  Object.values(_jpFilters).forEach(s=>s.clear());
   renderJobProgress();
 }
 
@@ -15261,20 +15261,98 @@ function _jpYen(n){ return '¥' + Number(n||0).toLocaleString('ja-JP'); }
 function _jpNum(n){ return Number(n||0).toLocaleString('ja-JP'); }
 
 // フィルタ適用後の行を返す
-function _jpFiltered() {
+// ===== 求人管理 絞り込みフィルター（国籍／案件／分野／職種） =====
+// 各ディメンションは複数選択（OR）、ディメンション同士はAND。
+const JP_FILTER_DIMS = [
+  { key:'kmt',      label:'案件',   icon:'📁' },
+  { key:'nat',      label:'国籍',   icon:'🌏' },
+  { key:'industry', label:'分野',   icon:'🏭' },
+  { key:'jobType',  label:'職種',   icon:'🔧' },
+];
+const _jpFilters = { kmt:new Set(), nat:new Set(), industry:new Set(), jobType:new Set() };
+
+// 1行がそのディメンションで持つ値（国籍は複数持ちうる）
+function _jpDimValues(r, dim) {
+  if (dim==='kmt')      return [r.kmt_flag ? 'KMT案件' : '紹介案件'];
+  if (dim==='nat')      return (r.nationalities && r.nationalities.length) ? r.nationalities : ['（国籍指定なし）'];
+  if (dim==='industry') return [r.industry || '（分野なし）'];
+  if (dim==='jobType')  return [r.job_type || '（職種なし）'];
+  return [];
+}
+function _jpMatchDim(r, dim) {
+  const sel = _jpFilters[dim];
+  if (!sel || !sel.size) return true;
+  return _jpDimValues(r, dim).some(v => sel.has(v));
+}
+// 検索・ステータスだけを適用した母集合
+function _jpBaseRows() {
   const q = (document.getElementById('jpSearch')?.value||'').toLowerCase();
-  const kmt = document.getElementById('jpFilterKmt')?.value||'';
   const st = document.getElementById('jpFilterStatus')?.value||'';
   return (allJobProg||[]).filter(r=>{
     if (q) {
       const hay = [r.code,r.company_name,r.sales_staff,r.glt_staff,r.org_code].map(x=>(x||'').toLowerCase()).join(' ');
       if (!hay.includes(q)) return false;
     }
-    if (kmt==='kmt' && !r.kmt_flag) return false;
-    if (kmt==='intro' && r.kmt_flag) return false;
     if (st && r.progress!==st) return false;
     return true;
   });
+}
+function _jpFiltered() {
+  return _jpBaseRows().filter(r => JP_FILTER_DIMS.every(d => _jpMatchDim(r, d.key)));
+}
+// チップのクリック
+function jpToggleFilter(dim, val) {
+  const sel = _jpFilters[dim]; if (!sel) return;
+  if (sel.has(val)) sel.delete(val); else sel.add(val);
+  renderJobProgress();
+}
+function jpClearDim(dim) { _jpFilters[dim]?.clear(); renderJobProgress(); }
+
+// 絞り込みパネル：ディメンションごとに「値 n件（KMT x・紹介 y）」を表示
+function _jpRenderFilterPanel() {
+  const el = document.getElementById('jpFilterPanel'); if (!el) return;
+  const base = _jpBaseRows();
+  const sections = JP_FILTER_DIMS.map(d => {
+    // 件数は「自分以外のディメンションを適用した状態」で数える（絞り込むほど件数も追従）
+    const rowsForCount = base.filter(r => JP_FILTER_DIMS.every(o => o.key===d.key || _jpMatchDim(r, o.key)));
+    const map = new Map();
+    rowsForCount.forEach(r => _jpDimValues(r, d.key).forEach(v => {
+      if (!map.has(v)) map.set(v, { c:0, kmt:0 });
+      const t = map.get(v); t.c += 1; if (r.kmt_flag) t.kmt += 1;
+    }));
+    let keys = [...map.keys()];
+    if (d.key==='nat') {
+      keys.sort((a,b)=>{ const ia=JP_NAT_ORDER.indexOf(a), ib=JP_NAT_ORDER.indexOf(b);
+        return (ia<0?98:ia)-(ib<0?98:ib) || a.localeCompare(b,'ja'); });
+    } else if (d.key==='kmt') {
+      keys.sort((a,b)=> (a==='KMT案件'?0:1)-(b==='KMT案件'?0:1));
+    } else {
+      keys.sort((a,b)=> map.get(b).c - map.get(a).c || a.localeCompare(b,'ja'));
+    }
+    const sel = _jpFilters[d.key];
+    const chips = keys.map(k => {
+      const t = map.get(k);
+      const on = sel.has(k);
+      const flag = (d.key==='nat' && typeof natFlag==='function') ? natFlag(k) : '';
+      return '<span onclick="jpToggleFilter(\''+d.key+'\',\''+String(k).replace(/'/g,"\\'")+'\')" '+
+        'style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:14px;font-size:11px;font-weight:700;white-space:nowrap;border:1px solid '+
+        (on?'var(--blue);background:var(--blue-light);color:var(--blue)':'var(--gray-200);background:#fff;color:var(--gray-700)')+';">'+
+        (on?'✓ ':'')+flag+esc(k)+
+        '<span style="font-weight:800;color:'+(on?'var(--blue)':'var(--navy)')+';">'+t.c+'件</span>'+
+        '<span style="font-weight:600;color:'+(on?'var(--blue)':'var(--gray-400)')+';font-size:10px;">（KMT '+t.kmt+'・紹介 '+(t.c-t.kmt)+'）</span>'+
+      '</span>';
+    }).join('');
+    const selCount = sel.size;
+    return '<div style="border:1px solid var(--gray-200);border-radius:10px;background:white;padding:8px 12px;">'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">'+
+        '<span style="font-size:12px;font-weight:800;color:var(--navy);">'+d.icon+' '+d.label+'ごと</span>'+
+        '<span style="font-size:10px;color:var(--gray-400);">'+keys.length+'種類</span>'+
+        (selCount?'<span onclick="jpClearDim(\''+d.key+'\')" style="margin-left:auto;cursor:pointer;font-size:10px;font-weight:700;color:var(--red);">✕ '+selCount+'件選択中を解除</span>':'')+
+      '</div>'+
+      '<div style="display:flex;flex-wrap:wrap;gap:5px;max-height:132px;overflow-y:auto;">'+(chips||'<span style="font-size:11px;color:var(--gray-400);">該当なし</span>')+'</div>'+
+    '</div>';
+  }).join('');
+  el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:10px;">'+sections+'</div>';
 }
 
 // 売上見込みヘッダ（KMT案件 ◯人 ◯円 / 紹介案件 ◯人 ◯円）
@@ -15316,6 +15394,8 @@ function _jpBuildGroups(rows, by) {
     rows.forEach(r=>push(r.kmt_flag?'KMT案件':'紹介案件', r));
   } else if (by==='org') {
     rows.forEach(r=>push(r.org_code||'（コードなし）', r));
+  } else if (by==='jobType') {
+    rows.forEach(r=>push(r.job_type||'（職種なし）', r));
   } else { // industry
     rows.forEach(r=>push(r.industry||'（分野なし）', r));
   }
@@ -15346,6 +15426,7 @@ function renderJobProgress() {
   if (currentScreen!=='jobs') return;
   const rows = _jpFiltered();
   _jpRenderForecast(rows);
+  _jpRenderFilterPanel();
   const area = document.getElementById('jpGroupArea');
   if (!area) return;
   if (!rows.length) { area.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray-400)">該当する求人がありません</div>'; return; }
@@ -18288,6 +18369,12 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260805.36', date:'2026-08-06', notify:true, items:[
+    '求人管理：絞り込みフィルターを追加しました。「案件（KMT／紹介）」「国籍」「分野」「職種」の4種類で、それぞれ値ごとに「インドネシア 34件（KMT 9・紹介 25）」のように件数と内訳が出ます。クリックで絞り込み、同じ項目内は複数選択（どれかに該当）、項目をまたぐとAND条件になります',
+    '求人管理：件数は他の絞り込みを反映して変わるので、絞り込んだ後も実際に残る件数が分かります。項目ごとの「✕ n件選択中を解除」または上部の「✕ クリア」で解除できます',
+    '求人管理：グループ表示に「職種ごと」を追加しました',
+    '求人管理：「KMT/紹介：全て」のプルダウンは、より詳しい「案件」フィルターに置き換えました',
+  ]},
   { version:'ver.20260805.35', date:'2026-08-05', notify:true, items:[
     'ユーザー設定：チーム（グループ）名の追加・変更・削除ができるようになりました。カード上部の「✏️」で名前変更（所属メンバーも一括で移動）、「🗑」で削除（メンバーは未所属へ）、上部の「＋ チーム追加」で新規作成できます',
     'ユーザー設定：ユーザー一覧に権限バッジ（👑管理者／閲覧のみ）を表示。誰が管理者か一目で分かります',
