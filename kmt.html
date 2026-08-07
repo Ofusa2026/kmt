@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260805.37 -->
+<!-- KMT_VERSION ver.20260805.38 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -367,7 +367,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.37</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.38</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <div id="sidebarAlerts" style="margin-top:6px;display:none;flex-direction:column;gap:3px;"></div>
   </div>
@@ -6694,6 +6694,10 @@ async function saveWorker(returnResult=false) {
   // 🔔 申請ステータスが「発行完了」「入国済み」に変わったら、記入内容を人材チャットに自動投稿
   const _applyPrev = _origWorker ? (_origWorker.apply_status || '') : '';
   const _doApplyChatPost = ['発行完了','入国済み'].includes(data.apply_status) && data.apply_status !== _applyPrev;
+  // 🪪 申請ステータスが変わったら変更日時を記録（在留期限の更新待ちアラートの起点）
+  if ((data.apply_status || '') !== _applyPrev) {
+    data.apply_status_changed_at = new Date().toISOString();
+  }
 
   const autoMode = returnResult; // 自動保存（モーダル開いたまま）モード
   // 新規作成の二重POSTガード
@@ -11108,13 +11112,36 @@ let _sidebarAlertData = null;
 // ===== 外国人材アラートの唯一の算出元 =====
 // サイドバーのバッジと外国人材ページ上部のバナーは、必ずこの関数の結果を使う。
 // （別々に計算すると数字がズレるため、判定ロジックをここ以外に書かないこと）
+// 申請が完了扱いになるステータス（在留期限の更新待ち判定に使う）
+const APPLY_DONE_STATUSES = ['審査完了','発行待ち','発行完了','入国済み'];
+const VISA_UPDATE_WAIT_DAYS = 30;   // 完了から何日経過で通知するか
+const VISA_UPDATE_SOON_DAYS = 120;  // 在留期限が何日以内なら「更新されていない」とみなすか（4か月）
+
 function computeGlobalWorkerAlerts(list){
   list = list || [];
   const today = new Date(); today.setHours(0,0,0,0);
-  const miss=[], renewal=[], kokkoPlacement=[], kokkoRetire=[], kokkoTg2=[];
+  const miss=[], renewal=[], kokkoPlacement=[], kokkoRetire=[], kokkoTg2=[], visaUpdate=[];
   const isConstruction = w => /建設/.test(w.applicant_field || '');
+  const daysFrom = d => { if(!d) return null; const x=new Date(d); if(isNaN(x)) return null; x.setHours(0,0,0,0); return Math.floor((today-x)/86400000); };
   list.forEach(w => {
     if (w.kmt_support === 'KMT支援外') return;
+    // 🪪 在留期限の更新待ち: 申請完了(審査完了以降)から30日以上たっても
+    //    在留期限が空欄のまま、または4か月以内のまま(＝更新されていない)
+    if (APPLY_DONE_STATUSES.includes(w.apply_status || '')
+        && !['退職済(帰国)','退職済(転職)','辞退/キャンセル'].includes(w.status)) {
+      // 起点: ステータス変更日 → なければ申請日 → なければ申請依頼日
+      const baseDate = w.apply_status_changed_at || w.apply_date || w.request_date || null;
+      const elapsed = daysFrom(baseDate);
+      if (elapsed !== null && elapsed >= VISA_UPDATE_WAIT_DAYS) {
+        let expDays = null;
+        if (w.visa_expiry) {
+          const exp0 = new Date(w.visa_expiry); exp0.setHours(0,0,0,0);
+          expDays = Math.floor((exp0 - today)/86400000);
+        }
+        const notUpdated = (expDays === null) || (expDays <= VISA_UPDATE_SOON_DAYS);
+        if (notUpdated) visaUpdate.push({ w, elapsed, expDays });
+      }
+    }
     if (isConstruction(w) && w.visa_status !== '特定活動') {
       if (w.status === '在職中' && w.visa_status === '特定技能1号' && !w.placement_report_date) kokkoPlacement.push(w);
       if (['退職済(帰国)','退職済(転職)'].includes(w.status) && !w.retire_report_date) kokkoRetire.push(w);
@@ -11132,7 +11159,8 @@ function computeGlobalWorkerAlerts(list){
     const skipMiss = w.status === '退職予定(更新なし決定)' || w.support_type_2go === '2号企業単独';
     if (days <= 90 && applyStatus === '申請予定なし' && !skipMiss) miss.push({ w, days });
   });
-  return { miss, renewal, kokkoPlacement, kokkoRetire, kokkoTg2,
+  visaUpdate.sort((a,b) => b.elapsed - a.elapsed);
+  return { miss, renewal, kokkoPlacement, kokkoRetire, kokkoTg2, visaUpdate,
            kokkoTotal: kokkoPlacement.length + kokkoRetire.length + kokkoTg2.length };
 }
 // アラート算出に使う人材データ。allWorkers は画面によっては軽量selectで
@@ -11147,22 +11175,22 @@ function _alertSourceWorkers(){
 // 件数だけ欲しいとき（後方互換）
 function computeSidebarAlertCounts(list){
   const a = computeGlobalWorkerAlerts(list);
-  return { miss: a.miss.length, renewal: a.renewal.length, kokko: a.kokkoTotal };
+  return { miss: a.miss.length, renewal: a.renewal.length, kokko: a.kokkoTotal, visaUpdate: a.visaUpdate.length };
 }
 function updateSidebarAlerts(list){
   const el = document.getElementById('sidebarAlerts'); if(!el) return;
   const src = (list && list.length) ? list : _alertSourceWorkers();
-  const { miss, renewal, kokko } = computeSidebarAlertCounts(src);
+  const { miss, renewal, kokko, visaUpdate } = computeSidebarAlertCounts(src);
   const mk = (cnt, icon, label, color) => cnt>0
     ? `<div onclick="showScreen('workers')" title="外国人材で詳細を見る" style="cursor:pointer;display:flex;align-items:center;gap:5px;font-size:10px;color:${color};font-weight:700;background:rgba(255,255,255,.06);padding:3px 7px;border-radius:5px;">${icon} ${label}<span style="margin-left:auto;font-weight:800;">${cnt}件</span></div>`
     : '';
-  const html = [ mk(miss,'🚨','申請忘れ警告','#fca5a5'), mk(renewal,'📋','更新リマインド','#93c5fd'), mk(kokko,'🏗️','就労管理システム','#fdba74') ].filter(Boolean).join('');
+  const html = [ mk(miss,'🚨','申請忘れ警告','#fca5a5'), mk(renewal,'📋','更新リマインド','#93c5fd'), mk(visaUpdate,'🪪','在留期限の更新待ち','#c4b5fd'), mk(kokko,'🏗️','就労管理システム','#fdba74') ].filter(Boolean).join('');
   el.innerHTML = html;
   el.style.display = html ? 'flex' : 'none';
 }
 async function refreshSidebarAlerts(){
   try{
-    const d = await sbFetch('workers?select=status,visa_expiry,apply_status,renewal_status,applicant_field,visa_status,desired_visa,kmt_support,support_type_2go,placement_report_date,retire_report_date,tg2_change_report_date&is_deleted=eq.false');
+    const d = await sbFetch('workers?select=id,name,management_no,nationality,status,visa_expiry,apply_status,apply_status_changed_at,apply_date,request_date,renewal_status,applicant_field,visa_status,desired_visa,kmt_support,support_type_2go,placement_report_date,retire_report_date,tg2_change_report_date&is_deleted=eq.false');
     _sidebarAlertData = d || [];
     updateSidebarAlerts(_sidebarAlertData);
   }catch(e){}
@@ -11183,6 +11211,7 @@ function renderWorkerAlerts() {
   const kokkoPlacementAlert = _ga.kokkoPlacement; // 配属報告未提出
   const kokkoRetireAlert = _ga.kokkoRetire;       // 退職報告未提出
   const kokkoTg2Alert = _ga.kokkoTg2;             // 2号変更報告未提出
+  const visaUpdateAlert = _ga.visaUpdate;         // 在留期限の更新待ち
   // 🟣 不足あり放置警告: 特例期間中 かつ 申請済み・不足あり（一覧フィルターに追従）
   const shortageAlert = [];
   const lumpSumAlert = [];        // 脱退一時金あり & 転出/転入手続き未完了
@@ -11238,7 +11267,7 @@ function renderWorkerAlerts() {
   const kokkoTotal = _ga.kokkoTotal;
   // サイドバーもバナーと同じ算出元・同じデータで更新する
   updateSidebarAlerts(_alertSrc);
-  if (!total && !missAlert.length && !shortageAlert.length && !kokkoTotal && !lumpSumAlert.length && !leaveOverdueAlert.length && !renewalDueAlert.length) { banner.innerHTML=''; return; }
+  if (!total && !missAlert.length && !shortageAlert.length && !kokkoTotal && !lumpSumAlert.length && !leaveOverdueAlert.length && !renewalDueAlert.length && !visaUpdateAlert.length) { banner.innerHTML=''; return; }
   // 残り日数で昇順ソート(期限切れも含めて期日が近い順)
   missAlert.sort((a,b) => a.days - b.days);
   shortageAlert.sort((a,b) => a.tokureiDays - b.tokureiDays);
@@ -11398,6 +11427,35 @@ function renderWorkerAlerts() {
     wrap.appendChild(sList);
   }
 
+  // 🪪 在留期限の更新待ち（申請完了から30日以上・期限が空欄 or 4か月以内のまま）
+  if (visaUpdateAlert.length) {
+    window._visaUpdateAlertCache = visaUpdateAlert;
+    const vu = document.createElement('div');
+    vu.style.cssText = 'background:linear-gradient(135deg,#f5f3ff 0%,#ddd6fe 100%);border:2px solid #7c3aed;border-radius:10px;padding:12px 16px;margin-bottom:10px;cursor:pointer;transition:.15s;box-shadow:0 2px 8px rgba(124,58,237,.12);';
+    vu.onmouseover = () => vu.style.opacity = '0.92';
+    vu.onmouseout = () => vu.style.opacity = '1';
+    const blank = visaUpdateAlert.filter(x => x.expDays === null).length;
+    vu.innerHTML =
+      '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">'+
+        '<div style="display:flex;align-items:center;gap:10px;">'+
+          '<div style="font-size:28px;">🪪</div>'+
+          '<div>'+
+            '<div style="font-size:13px;font-weight:900;color:#5b21b6;">在留期限の更新待ち — 申請完了から'+VISA_UPDATE_WAIT_DAYS+'日以上</div>'+
+            '<div style="font-size:11px;color:#5b21b6;margin-top:2px;">申請ステータスが「審査完了」以降なのに、在留期限が未入力（'+blank+'名）または'+Math.round(VISA_UPDATE_SOON_DAYS/30)+'か月以内のままの人材です。新しい在留期限を人材詳細に入力してください</div>'+
+          '</div>'+
+        '</div>'+
+        '<div style="text-align:right;">'+
+          '<div style="font-size:26px;font-weight:900;color:#5b21b6;line-height:1;">'+visaUpdateAlert.length+'<span style="font-size:13px;font-weight:600;">名</span></div>'+
+          '<div style="font-size:10px;color:#5b21b6;margin-top:2px;">クリックで一覧表示 ▼</div>'+
+        '</div>'+
+      '</div>';
+    vu.onclick = () => toggleVisaUpdateAlertList(window._visaUpdateAlertCache);
+    wrap.appendChild(vu);
+    const vuList = document.createElement('div');
+    vuList.id = 'workerVisaUpdateAlertList';
+    wrap.appendChild(vuList);
+  }
+
   // 🏗️ 建設業就労管理システム報告アラート(オレンジ系の大きなバナー)
   if (kokkoTotal) {
     const kk = document.createElement('div');
@@ -11543,6 +11601,32 @@ function toggleKokkoAlertList(label, list) {
   }).join('');
   area.innerHTML = '<div style="margin-top:-2px;margin-bottom:10px;background:white;border:2px solid #ea580c;border-top:none;border-radius:0 0 10px 10px;overflow:hidden;">'+
     '<div style="padding:8px 12px;font-size:11px;font-weight:800;color:'+color+';background:#fff7ed;">'+esc(label)+' 未提出: '+(list||[]).length+'名</div>'+
+    rows+
+  '</div>';
+}
+
+// 在留期限の更新待ちリストを開閉
+function toggleVisaUpdateAlertList(list) {
+  const area = document.getElementById('workerVisaUpdateAlertList');
+  if (!area) return;
+  if (area.dataset.open === '1') { area.innerHTML=''; area.dataset.open=''; return; }
+  area.dataset.open = '1';
+  const rows = (list||[]).map(x => {
+    const w = x.w;
+    const expTxt = x.expDays === null
+      ? '<span style="background:#dc2626;color:white;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:800;">在留期限 未入力</span>'
+      : '<span style="background:#7c3aed;color:white;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:800;">期限まで '+x.expDays+'日</span>';
+    return '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #ddd6fe;cursor:pointer;background:white;flex-wrap:wrap;" onclick="event.stopPropagation();openWorkerModal(\''+w.id+'\')">'+
+      '<div style="min-width:80px;font-size:11px;font-weight:600;color:#64748b;">'+esc(w.management_no||'-')+'</div>'+
+      '<div style="flex:1;min-width:180px;font-size:12px;"><strong>'+esc(w.name)+'</strong> <span style="color:#94a3b8;font-size:11px;">('+esc(w.nationality||'-')+')</span></div>'+
+      '<div style="font-size:11px;color:#64748b;flex:1;min-width:120px;">'+esc(w.companies?.name||'-')+'</div>'+
+      '<div><span style="background:#ede9fe;color:#5b21b6;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:800;">'+esc(w.apply_status||'-')+'</span></div>'+
+      '<div style="font-size:11px;color:#5b21b6;font-weight:700;">完了から'+x.elapsed+'日</div>'+
+      '<div>'+expTxt+'</div>'+
+    '</div>';
+  }).join('');
+  area.innerHTML = '<div style="margin-top:-2px;margin-bottom:10px;background:white;border:2px solid #7c3aed;border-top:none;border-radius:0 0 10px 10px;overflow:hidden;">'+
+    '<div style="padding:8px 12px;font-size:11px;font-weight:800;color:#5b21b6;background:#f5f3ff;">在留期限の更新待ち: '+(list||[]).length+'名（クリックで人材詳細を開く）</div>'+
     rows+
   '</div>';
 }
@@ -18369,6 +18453,11 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260805.38', date:'2026-08-06', notify:true, items:[
+    '外国人材：「🪪 在留期限の更新待ち」アラートを新設しました。申請ステータスが「審査完了」以降（審査完了／発行待ち／発行完了／入国済み）になってから30日以上たっても、在留期限が未入力のまま、または4か月以内のまま（＝新しい期限に更新されていない）人材を通知します',
+    'アラートは外国人材ページ上部のバナーとサイドバーの両方に出ます。バナーをクリックすると対象者の一覧（申請ステータス／完了からの経過日数／期限までの日数）が開き、そこから人材詳細を開けます',
+    '経過日数の起点として、申請ステータスを変更した日時を記録するようにしました。これまでのデータは記録がないため、申請日→申請依頼日の順で代用します',
+  ]},
   { version:'ver.20260805.37', date:'2026-08-06', notify:true, items:[
     'チャット：@のメンション候補に全ユーザーが表示されるようになりました（これまでは8名までしか出ていませんでした）。チャットグループ・チームも全件表示します。リストはスクロールできます',
     'チャット：ユーザーの見出しに人数を表示し、スクロールしても見出しが上に残るようにしました',

@@ -101,7 +101,10 @@ UI変更やロジック変更のときは実際に描画して確かめる。
 
 **`computeGlobalWorkerAlerts(list)` が唯一の算出元。判定ロジックをここ以外に書かない。**
 
-- 対象は 🚨申請忘れ警告 / 📋更新リマインド / 🏗️建設業就労管理システム報告 の3種
+- 対象は 🚨申請忘れ警告 / 📋更新リマインド / 🪪在留期限の更新待ち / 🏗️建設業就労管理システム報告 の4種
+- 🪪在留期限の更新待ち: apply_status が APPLY_DONE_STATUSES（審査完了以降）になってから
+  VISA_UPDATE_WAIT_DAYS(30)日以上たっても、visa_expiry が空欄 or VISA_UPDATE_SOON_DAYS(120)日以内のまま。
+  経過日数の起点は workers.apply_status_changed_at（saveWorker がステータス変更時に記録）→ apply_date → request_date
 - サイドバーのバッジ（`updateSidebarAlerts`）と外国人材ページのバナー（`renderWorkerAlerts`）は
   同じ関数・同じデータソース（`_alertSourceWorkers()`）を使うので、必ず同じ数字になる
 - これらは **一覧フィルターに追従しない**（全人材で数える）。
