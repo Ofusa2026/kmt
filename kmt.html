@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260805.41 -->
+<!-- KMT_VERSION ver.20260805.42 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -367,7 +367,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.41</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.42</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <div id="sidebarAlerts" style="margin-top:6px;display:none;flex-direction:column;gap:3px;"></div>
   </div>
@@ -12779,13 +12779,6 @@ function buildWorkerModalBody(w) {
   <div class="section-title">10. 通算期間と過去の就労先</div>
   <div class="form-grid">
     <div class="form-group full">
-      <div style="border:1px solid var(--gray-200);border-radius:8px;padding:10px 12px;background:#f8fafc;margin-bottom:10px;">
-        <div style="font-size:12px;font-weight:800;color:var(--navy);margin-bottom:2px;">🏢 過去の所属又は勤務先（特定技能以外）</div>
-        <div style="font-size:10px;color:var(--gray-400);margin-bottom:8px;">技能実習・留学・家族滞在など、特定技能以外の在留歴を入力します（通算期間の計算には含まれません）</div>
-        <input type="hidden" id="wf_past_employment" value="">
-        <div id="wf_past_emp_rows"></div>
-        <button type="button" onclick="addPastEmpRow()" style="margin-top:6px;font-size:11px;color:#0f766e;background:none;border:1px dashed #5eead4;border-radius:4px;padding:4px 12px;cursor:pointer;width:100%;">＋ 所属又は勤務先を追加</button>
-      </div>
       <div style="background:#fffbeb;border-left:4px solid #f59e0b;border-radius:0 8px 8px 0;padding:8px 12px;font-size:11px;color:#92400e;line-height:1.6;margin-bottom:8px;">
         ⚠️ 以下は<strong>特定技能</strong>と<strong>特定技能移行のための特定活動</strong>の情報のみ入力してください（＝<strong>会社名の記載がある指定書</strong>の情報のみ）。<br>
         ミャンマー等の（会社名の記載がない）特定活動は入力不要です。
@@ -12799,6 +12792,15 @@ function buildWorkerModalBody(w) {
     </div>
     <div class="form-group full">
       <div id="wf_tokutei_calc"></div>
+    </div>
+    <div class="form-group full">
+      <div style="border:1px solid var(--gray-200);border-radius:8px;padding:10px 12px;background:#f8fafc;">
+        <div style="font-size:12px;font-weight:800;color:var(--navy);margin-bottom:2px;">🏢 過去の所属又は勤務先（特定技能以外）</div>
+        <div style="font-size:10px;color:var(--gray-400);margin-bottom:8px;">技能実習・留学・家族滞在など、特定技能以外の在留歴を入力します（通算期間の計算には含まれません）</div>
+        <input type="hidden" id="wf_past_employment" value="">
+        <div id="wf_past_emp_rows"></div>
+        <button type="button" onclick="addPastEmpRow()" style="margin-top:6px;font-size:11px;color:#0f766e;background:none;border:1px dashed #5eead4;border-radius:4px;padding:4px 12px;cursor:pointer;width:100%;">＋ 所属又は勤務先を追加</button>
+      </div>
     </div>
   </div>
 
@@ -18775,6 +18777,9 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260805.42', date:'2026-08-07', notify:true, items:[
+    '人材詳細「10. 通算期間と過去の就労先」の「🏢 過去の所属又は勤務先（特定技能以外）」の枠を、セクションの一番下（5年満了日の下）に移動しました',
+  ]},
   { version:'ver.20260805.41', date:'2026-08-07', notify:true, items:[
     '人材詳細「10. 通算期間と過去の就労先」の一番上に、別枠で「🏢 過去の所属又は勤務先（特定技能以外）」を追加しました',
     '所属又は勤務先名／在留資格／期間（開始・終了）を、就労先ごとに何件でも登録できます',
