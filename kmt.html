@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260805.38 -->
+<!-- KMT_VERSION ver.20260805.39 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -367,7 +367,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.38</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.39</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <div id="sidebarAlerts" style="margin-top:6px;display:none;flex-direction:column;gap:3px;"></div>
   </div>
@@ -6678,6 +6678,7 @@ async function saveWorker(returnResult=false) {
     workplace_name:   workplaceName,
     memo:             g('wf_memo'),
     notes:            g('wf_notes'),
+    tokutei_history:  (function(){ try { return JSON.parse(document.getElementById('wf_tokutei_history')?.value || '[]'); } catch(e){ return []; } })(),
     updated_at:       new Date().toISOString(),
     updated_by:       _curUserName(),
   };
@@ -6767,6 +6768,127 @@ async function _postApplyStatusToChat(workerId, data, status) {
     }
     await sbFetch('chat_messages', { method:'POST', body: JSON.stringify({ chat_room_id: roomId, room_id: roomId, sender_id: currentUser?.id||'', sender_name: currentUser?.name||'KMT', content: lines.join('\n'), created_at: new Date().toISOString() }) });
   } catch(e) { console.warn('apply status chat post failed', e); }
+}
+
+// ===== 10. 通算期間と過去の就労先 =====
+// 特定技能／特定技能移行の特定活動（＝会社名の記載がある指定書）だけを入力する。
+// 特定活動の期間は特定技能の通算期間には算入しない。
+const TOKUTEI_VISA_OPTS = ['特定技能1号','特定技能2号','特定活動'];
+const _isTokuteiVisa = v => /特定技能/.test(v || '');   // 特定活動は含めない
+let _tokuteiRows = [];
+
+function _tkDate(v){ if(!v) return null; const d=new Date(v); if(isNaN(d)) return null; d.setHours(0,0,0,0); return d; }
+// カレンダー差（年・月・日）
+function _tkDiffYMD(from, to){
+  if(!from || !to || to < from) return { y:0, m:0, d:0 };
+  let y = to.getFullYear()-from.getFullYear();
+  let m = to.getMonth()-from.getMonth();
+  let d = to.getDate()-from.getDate();
+  if (d < 0) { m--; d += new Date(to.getFullYear(), to.getMonth(), 0).getDate(); }
+  if (m < 0) { y--; m += 12; }
+  return { y, m, d };
+}
+const _tkFmt = o => o.y + '年' + o.m + 'ヶ月' + o.d + '日';
+const _tkFmtDate = d => d ? d.getFullYear()+'年'+String(d.getMonth()+1).padStart(2,'0')+'月'+String(d.getDate()).padStart(2,'0')+'日' : '―';
+
+// 入力行から通算期間・残り・5年満了日を計算
+function calcTokuteiSummary(rows) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const list = (rows||[]).filter(r => _tkDate(r.date)).sort((a,b)=> _tkDate(a.date) - _tkDate(b.date));
+  if (!list.length) return null;
+  // 起点: 「特定技能初回」チェックの行 → なければ最初の特定技能の行 → なければ最初の行
+  const firstRow = list.find(r => r.first) || list.find(r => _isTokuteiVisa(r.visa)) || list[0];
+  const startDate = _tkDate(firstRow.date);
+  // 5年満了日 = 起点 + 5年
+  const expiry5 = new Date(startDate.getFullYear()+5, startDate.getMonth(), startDate.getDate());
+  // 特定技能の期間だけを日数で合算（特定活動の期間は除外）
+  let days = 0;
+  list.forEach((r, i) => {
+    const from = _tkDate(r.date);
+    const to = (i+1 < list.length) ? _tkDate(list[i+1].date) : today;
+    if (!from || !to || to <= from) return;
+    if (_isTokuteiVisa(r.visa)) days += Math.floor((to - from)/86400000);
+  });
+  // 合算日数を起点から積み上げた仮の到達日で年月日表示にする
+  const virtualEnd = new Date(startDate.getTime() + days*86400000);
+  return {
+    elapsed: _tkDiffYMD(startDate, virtualEnd),
+    remain:  _tkDiffYMD(today, expiry5),
+    expiry5, startDate, days,
+    over: today > expiry5,
+  };
+}
+
+function _tokuteiSyncHidden(){
+  const h = document.getElementById('wf_tokutei_history');
+  if (h) h.value = JSON.stringify(_tokuteiRows);
+}
+function renderTokuteiRows(){
+  const box = document.getElementById('wf_tokutei_rows');
+  if (!box) return;
+  box.innerHTML = _tokuteiRows.map((r,i) => `
+    <div style="display:grid;grid-template-columns:64px 1fr 130px 130px 28px;gap:6px;align-items:center;margin-bottom:5px;">
+      <label style="display:flex;align-items:center;justify-content:center;gap:3px;font-size:10px;cursor:pointer;background:${r.first?'#dbeafe':'#f8fafc'};border:1px solid ${r.first?'#93c5fd':'var(--gray-200)'};border-radius:5px;padding:5px 2px;" title="特定技能の初回（5年満了日の起点）">
+        <input type="checkbox" ${r.first?'checked':''} onchange="setTokuteiFirst(${i}, this.checked)" style="margin:0;cursor:pointer;">初回
+      </label>
+      <input class="form-input" value="${esc(r.company||'')}" placeholder="会社名（指定書に記載のもの）" oninput="updateTokuteiRow(${i},'company',this.value)" style="font-size:12px;">
+      <select class="form-select" onchange="updateTokuteiRow(${i},'visa',this.value)" style="font-size:12px;">
+        <option value="">─ 選択 ─</option>
+        ${TOKUTEI_VISA_OPTS.map(v=>`<option ${r.visa===v?'selected':''}>${v}</option>`).join('')}
+      </select>
+      <input class="form-input" type="date" value="${r.date||''}" onchange="updateTokuteiRow(${i},'date',this.value)" style="font-size:12px;">
+      <button type="button" onclick="removeTokuteiRow(${i})" title="削除" style="background:none;border:none;color:#9ca3af;font-size:15px;cursor:pointer;padding:0;line-height:1;">✕</button>
+    </div>`).join('') ||
+    '<div style="font-size:11px;color:var(--gray-400);padding:6px 2px;">未入力（「＋ 就労先を追加」から入力してください）</div>';
+  _tokuteiSyncHidden();
+  renderTokuteiCalc();
+}
+function renderTokuteiCalc(){
+  const el = document.getElementById('wf_tokutei_calc');
+  if (!el) return;
+  const s = calcTokuteiSummary(_tokuteiRows);
+  if (!s) { el.innerHTML = '<div style="font-size:11px;color:var(--gray-400);">指定書発行日を入力すると、特定技能経過期間・残りの期間・5年満了日を自動計算します。</div>'; return; }
+  const cell = (label, val, color) =>
+    '<div style="flex:1;min-width:150px;background:white;border:1px solid var(--gray-200);border-left:4px solid '+color+';border-radius:8px;padding:8px 12px;">'+
+      '<div style="font-size:10px;font-weight:700;color:var(--gray-400);margin-bottom:2px;">'+label+'</div>'+
+      '<div style="font-size:15px;font-weight:800;color:'+color+';">'+val+'</div>'+
+    '</div>';
+  el.innerHTML =
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;">'+
+      cell('特定技能経過期間', _tkFmt(s.elapsed), '#1d4ed8')+
+      cell('残りの期間', s.over ? '<span style="color:#dc2626;">超過</span>' : _tkFmt(s.remain), s.over ? '#dc2626' : '#059669')+
+      cell('5年満了日', _tkFmtDate(s.expiry5), '#7c3aed')+
+    '</div>'+
+    '<div style="margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'+
+      '<button type="button" onclick="applyTokuteiExpiryToForm()" style="font-size:11px;color:#7c3aed;background:none;border:1px solid #ddd6fe;border-radius:4px;padding:3px 10px;cursor:pointer;">↑ この5年満了日を「8.支援情報」の5年満了日に反映</button>'+
+      '<span style="font-size:10px;color:var(--gray-400);">※特定活動の期間は特定技能の通算期間に含めていません</span>'+
+    '</div>';
+}
+function addTokuteiRow(){
+  _tokuteiRows.push({ company:'', visa:'', date:'', first: _tokuteiRows.length===0 });
+  renderTokuteiRows();
+}
+function removeTokuteiRow(i){ _tokuteiRows.splice(i,1); renderTokuteiRows(); }
+function updateTokuteiRow(i, key, val){
+  if (!_tokuteiRows[i]) return;
+  _tokuteiRows[i][key] = val;
+  _tokuteiSyncHidden();
+  renderTokuteiCalc();
+}
+// 「初回」は1件だけ
+function setTokuteiFirst(i, on){
+  _tokuteiRows.forEach((r,idx)=> r.first = on && idx===i);
+  renderTokuteiRows();
+}
+// 計算した5年満了日を 8.支援情報 の 5年満了日 に反映
+function applyTokuteiExpiryToForm(){
+  const s = calcTokuteiSummary(_tokuteiRows);
+  const el = document.getElementById('wf_tg2_expiry');
+  if (!s || !el) return;
+  const d = s.expiry5;
+  el.value = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  el.dispatchEvent(new Event('change', { bubbles:true }));
+  showToast('✅ 5年満了日に反映しました', 'success');
 }
 
 // 人材モーダル: 緊急連絡先セクションの開閉
@@ -11893,6 +12015,9 @@ async function openWorkerModal(id) {
   setTimeout(() => renderApplyStatusPanel((w||{}).apply_status||''), 100);
   setTimeout(() => { _syncWorkerApplyToForm(w); }, 130);
   setTimeout(() => {
+    // 10. 通算期間と過去の就労先
+    _tokuteiRows = Array.isArray((w||{}).tokutei_history) ? JSON.parse(JSON.stringify(w.tokutei_history)) : [];
+    renderTokuteiRows();
     _takeWorkerSnapshot();
     if (typeof updateWorkerPhotoPreview === 'function') updateWorkerPhotoPreview();
     bindDirtyTracking('workerModal');
@@ -12508,6 +12633,26 @@ function buildWorkerModalBody(w) {
     <div class="form-group"><label class="form-label">電話</label><input class="form-input" id="wf_emergency_phone" value="${esc(w.emergency_contact_phone||'')}"></div>
     <div class="form-group"><label class="form-label">WhatsApp</label><input class="form-input" id="wf_emergency_whatsapp" value="${esc(w.emergency_contact_whatsapp||'')}"></div>
     <div class="form-group full"><label class="form-label">SNS</label><input class="form-input" id="wf_emergency_sns" value="${esc(w.emergency_contact_sns||'')}"></div>
+  </div>
+
+  <!-- 10. 通算期間と過去の就労先 -->
+  <div class="section-title">10. 通算期間と過去の就労先</div>
+  <div class="form-grid">
+    <div class="form-group full">
+      <div style="background:#fffbeb;border-left:4px solid #f59e0b;border-radius:0 8px 8px 0;padding:8px 12px;font-size:11px;color:#92400e;line-height:1.6;margin-bottom:8px;">
+        ⚠️ <strong>特定技能</strong>と<strong>特定技能移行のための特定活動</strong>の情報のみ入力してください（＝<strong>会社名の記載がある指定書</strong>の情報のみ）。<br>
+        ミャンマー等の（会社名の記載がない）特定活動は入力不要です。
+      </div>
+      <input type="hidden" id="wf_tokutei_history" value="">
+      <div style="display:grid;grid-template-columns:64px 1fr 130px 130px 28px;gap:6px;font-size:10px;font-weight:700;color:var(--gray-400);padding:0 2px 3px;">
+        <div>初回</div><div>会社名</div><div>在留資格</div><div>指定書発行日</div><div></div>
+      </div>
+      <div id="wf_tokutei_rows"></div>
+      <button type="button" onclick="addTokuteiRow()" style="margin-top:6px;font-size:11px;color:#1d4ed8;background:none;border:1px dashed #93c5fd;border-radius:4px;padding:4px 12px;cursor:pointer;width:100%;">＋ 就労先を追加</button>
+    </div>
+    <div class="form-group full">
+      <div id="wf_tokutei_calc"></div>
+    </div>
   </div>
 
   </div><!-- end 右カラム -->
@@ -18453,6 +18598,12 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260805.39', date:'2026-08-06', notify:true, items:[
+    '人材詳細に「10. 通算期間と過去の就労先」を追加しました（右側の一番下）。会社名・在留資格・指定書発行日を就労先ごとに入力でき、「初回」チェックで特定技能の起点を指定します',
+    '入力すると「特定技能経過期間」「残りの期間」「5年満了日」を自動計算して表示します。特定活動の期間は特定技能の通算期間に含めません（会社が変わって空白期間がある場合も正しく合算します）',
+    '計算した5年満了日は、ボタン一つで「8.支援情報」の5年満了日に反映できます',
+    '※入力するのは特定技能と特定技能移行のための特定活動（＝会社名の記載がある指定書）のみです。ミャンマー等の会社名の記載がない特定活動は入力不要です',
+  ]},
   { version:'ver.20260805.38', date:'2026-08-06', notify:true, items:[
     '外国人材：「🪪 在留期限の更新待ち」アラートを新設しました。申請ステータスが「審査完了」以降（審査完了／発行待ち／発行完了／入国済み）になってから30日以上たっても、在留期限が未入力のまま、または4か月以内のまま（＝新しい期限に更新されていない）人材を通知します',
     'アラートは外国人材ページ上部のバナーとサイドバーの両方に出ます。バナーをクリックすると対象者の一覧（申請ステータス／完了からの経過日数／期限までの日数）が開き、そこから人材詳細を開けます',
