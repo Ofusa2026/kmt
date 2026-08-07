@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260805.32 -->
+<!-- KMT_VERSION ver.20260805.33 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -367,7 +367,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.32</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.33</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <div id="sidebarAlerts" style="margin-top:6px;display:none;flex-direction:column;gap:3px;"></div>
   </div>
@@ -6388,7 +6388,14 @@ function buildChatScreen() {
           <input type="checkbox" id="chatGroupByType" onchange="setChatGroupByType(this.checked)" style="cursor:pointer;margin:0;width:14px;height:14px;"> 📑 申請種別
         </label>
       </div>
-      <div style="padding:10px 14px;border-bottom:1px solid #e0e0e0;flex-shrink:0;font-size:12px;color:#94a3b8;">🏢 企業ごとにチャットがまとまります</div>
+      <div style="padding:8px 14px;border-bottom:1px solid #e0e0e0;flex-shrink:0;font-size:12px;color:#94a3b8;">
+        <div>🏢 企業ごとにチャットがまとまります</div>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:5px;font-size:11px;flex-wrap:wrap;">
+          <span style="display:inline-flex;align-items:center;gap:4px;"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#ef4444;"></span><span style="color:#dc2626;font-weight:700;">自分あて</span></span>
+          <span style="display:inline-flex;align-items:center;gap:4px;"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#f59e0b;"></span><span style="color:#b45309;font-weight:700;">所属チームあて</span></span>
+          <span style="color:#cbd5e1;">@バッジ＝未読メンション数</span>
+        </div>
+      </div>
       <div id="chatRoomList" style="flex:1;overflow-y:auto;"></div>
     </div>
     <!-- 右：メッセージエリア -->
@@ -7070,9 +7077,30 @@ async function loadChatUnread() {
         }
       }
     });
+    // 🔴自分あて / 🟡所属チームあて の内訳を出す
+    // 本文に @自分の名前 が書かれている、または自分の投稿への返信なら「自分あて(direct)」。
+    // それ以外（@全員・@チーム名の展開で自分に届いたもの）は「所属チームあて(group)」。
+    const directByRoom = {}, groupByRoom = {};
+    try {
+      const mmsgs = await sbFetch('chat_messages?select=chat_room_id,sender_name,sender_id,created_at,mentions,reply_to,content,deleted_at&mentions=not.is.null&order=created_at.desc&limit=800');
+      (mmsgs||[]).forEach(m => {
+        const roomId = m.chat_room_id;
+        if (!roomId || m.deleted_at) return;
+        if (m.sender_name === currentUser?.name || (m.sender_id && m.sender_id === currentUser?.id)) return;
+        const readAt = readMap[roomId];
+        if (readAt && m.created_at <= readAt) return;
+        if (!isMentionForMe(m.mentions)) return;
+        const repliedToMe = !!(m.reply_to && m.reply_to.sender_name && isMentionForMe([m.reply_to.sender_name]));
+        const namedInText = isMentionForMe(extractMentions(m.content || ''));
+        if (repliedToMe || namedInText) directByRoom[roomId] = (directByRoom[roomId] || 0) + 1;
+        else groupByRoom[roomId] = (groupByRoom[roomId] || 0) + 1;
+      });
+    } catch(e) { /* 内訳が取れなくても従来通り動く */ }
     chatRooms.forEach(r => {
       r.unread = unreadByRoom[r.id] || 0;
       r.mentionUnread = mentionByRoom[r.id] || 0;
+      r.mentionDirect = directByRoom[r.id] || 0;
+      r.mentionGroup  = groupByRoom[r.id] || 0;
     });
     const total = Object.values(unreadByRoom).reduce((s,v) => s+v, 0);
     // メンション未読をチェック（自分のメンションのみ、部分一致）
@@ -7550,6 +7578,11 @@ function renderGroupList() {
     const rooms = e.rooms;
     const unread = rooms.reduce((s,r)=>s+(r.unread||0),0);
     const mentionUnread = rooms.reduce((s,r)=>s+(r.mentionUnread||0),0);
+    const mentionDirect = rooms.reduce((s,r)=>s+(r.mentionDirect||0),0);
+    const mentionGroup  = rooms.reduce((s,r)=>s+(r.mentionGroup||0),0);
+    // どのチャットにメンションが来ているか（人材名／企業チャット）
+    const mentionRooms = rooms.filter(r => (r.mentionUnread||0) > 0)
+      .sort((a,b) => (b.mentionDirect||0)-(a.mentionDirect||0));
     const lastMsg = rooms.map(r=>r.lastMsg).filter(Boolean).sort((a,b)=>b.created_at>a.created_at?1:-1)[0];
     const lastTime = lastMsg ? (() => {
       const d = new Date(lastMsg.created_at), today = new Date();
@@ -7562,14 +7595,28 @@ function renderGroupList() {
     const isPinned = !isNone && _chatPinnedCompanyIds.has(e.cid);
     const div = document.createElement('div');
     div.dataset.cid = e.cid;
-    div.style.cssText = 'display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;border-radius:10px;margin:3px 8px;transition:background .1s;' + (isPinned ? 'background:#fefce8;' : (mentionUnread>0?'background:#fffbeb;border-left:4px solid #f59e0b;':''));
+    const _cardMentionBg = mentionDirect>0 ? 'background:#fef2f2;border-left:4px solid #ef4444;'
+                        : (mentionGroup>0 ? 'background:#fffbeb;border-left:4px solid #f59e0b;' : '');
+    div.style.cssText = 'display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;border-radius:10px;margin:3px 8px;transition:background .1s;' + (_cardMentionBg || (isPinned ? 'background:#fefce8;' : ''));
     const pinBtn = isNone ? '' :
       '<button class="_pinBtn" data-cid="' + e.cid + '" title="' + (isPinned ? 'ピン留めを外す' : 'ピン留めする') + '" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px 4px;flex-shrink:0;opacity:' + (isPinned ? '1' : '.3') + ';">' + (isPinned ? '📌' : '📍') + '</button>';
     const roomIds = rooms.map(r => r.id);
     const unreadBtn = isNone ? '' :
       '<button class="_unreadBtn" data-rids="' + roomIds.join(',') + '" title="' + (unread > 0 ? 'この企業のチャットを全て既読にする' : 'この企業のチャットを未読に戻す') + '" style="background:none;border:none;cursor:pointer;font-size:12px;padding:2px 4px;flex-shrink:0;color:#94a3b8;opacity:.6;">' + (unread > 0 ? '✓' : '◉') + '</button>';
-    const mentionBadge = mentionUnread > 0
-      ? '<span style="background:#f59e0b;color:white;font-size:12px;font-weight:800;padding:2px 8px;border-radius:12px;margin-right:4px;" title="未読のメンション">@'+mentionUnread+'</span>'
+    const mentionBadge = chatMentionBadge(mentionDirect, mentionGroup, 'md');
+    // 「どのチャットにメンションがあるか」を企業カード内に出す
+    const mentionWho = mentionRooms.length
+      ? '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:3px;">' +
+          mentionRooms.slice(0,4).map(r => {
+            const dir = (r.mentionDirect||0) > 0;
+            const label = r.is_company_chat ? '企業チャット' : (r.name || '(名称なし)');
+            const cnt = r.mentionUnread || 0;
+            return '<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;white-space:nowrap;'
+              + (dir ? 'background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;' : 'background:#fef3c7;color:#92400e;border:1px solid #fcd34d;') + '">'
+              + (dir ? '🔴' : '🟡') + esc(label) + ' @' + cnt + '</span>';
+          }).join('') +
+          (mentionRooms.length > 4 ? '<span style="font-size:10px;color:#94a3b8;font-weight:700;">ほか' + (mentionRooms.length-4) + '件</span>' : '') +
+        '</div>'
       : '';
     // applyTypeバッジ(グループモードON時に表示)
     const stType = APPLY_TYPE_STYLE[e.applyType] || APPLY_TYPE_STYLE['未設定'];
@@ -7598,9 +7645,10 @@ function renderGroupList() {
         '</div>' +
         '<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">' +
           '<span style="font-size:13px;color:#5f6368;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;"><span style="color:#94a3b8;font-size:12px;">👥'+rooms.length+'名</span> '+preview+'</span>' +
-          mentionBadge +
+          (mentionBadge ? '<span style="display:flex;gap:3px;flex-shrink:0;">'+mentionBadge+'</span>' : '') +
           (unread>0?'<span style="background:#1a73e8;color:white;font-size:12px;font-weight:800;padding:2px 8px;border-radius:12px;">'+unread+'</span>':'') +
         '</div>' +
+        mentionWho +
       '</div>' +
       unreadBtn +
       pinBtn;
@@ -7641,9 +7689,13 @@ function renderGroupList() {
   list.querySelectorAll('[data-cid]').forEach(el => {
     if (el.classList.contains('_pinBtn')) return; // ピンボタンは別ハンドラ
     const cid = el.dataset.cid;
-    const isPinnedRow = _chatPinnedCompanyIds.has(cid);
-    const defaultBg = isPinnedRow ? '#fefce8' : (el.style.background || '');
-    el.onmouseover = () => el.style.background = isPinnedRow ? '#fef9c3' : '#f1f3f4';
+    // インラインで設定済みの背景(メンション色・ピン色)をそのまま既定値として保持する
+    const defaultBg = el.style.background || '';
+    const hoverBg = /254, 242, 242|#fef2f2/.test(defaultBg) ? '#fee2e2'
+                  : /255, 251, 235|#fffbeb/.test(defaultBg) ? '#fef3c7'
+                  : /254, 252, 232|#fefce8/.test(defaultBg) ? '#fef9c3'
+                  : '#f1f3f4';
+    el.onmouseover = () => el.style.background = hoverBg;
     el.onmouseout = () => el.style.background = defaultBg;
     el.onclick = () => selectGroup(cid);
   });
@@ -7830,6 +7882,21 @@ function renderGroupRooms(companyId) {
 }
 
 // チャットルーム行のDOM要素を生成（企業チャット/人材チャット共用）
+// メンションバッジ（🔴自分あて / 🟡所属チームあて）
+// direct が1件でもあれば赤を優先、なければ黄色。両方あれば2つ並べる。
+function chatMentionBadge(direct, group, size) {
+  direct = direct || 0; group = group || 0;
+  if (!direct && !group) return '';
+  const sm = size !== 'md';
+  const pad = sm ? '1px 6px' : '2px 8px';
+  const fs  = sm ? '10px' : '12px';
+  const mk = (n, bg, title) => '<span title="' + title + '" style="display:inline-flex;align-items:center;background:' + bg + ';color:white;font-size:' + fs + ';font-weight:800;padding:' + pad + ';border-radius:10px;white-space:nowrap;">@' + n + '</span>';
+  const out = [];
+  if (direct) out.push(mk(direct, '#ef4444', '自分あてのメンション ' + direct + '件（未読）'));
+  if (group)  out.push(mk(group,  '#f59e0b', '所属チームあてのメンション ' + group + '件（未読）'));
+  return out.join('');
+}
+
 // チャットの人材名の右に出す「在職ステータス／申請ステータス」バッジ
 // size: 'sm'(一覧) | 'md'(ヘッダー)
 function chatWorkerStatusBadges(r, size) {
@@ -7885,9 +7952,12 @@ function buildChatRoomRow(r, companyId, isCompany) {
 
   const row = document.createElement('div');
   const isRoomPinned = _chatPinnedRoomIds.has(r.id);
-  const baseBg = isCompany ? (active?'#fef3c7':'#fffbeb') : (active?'#e8f0fe':(isRoomPinned?'#fefce8':''));
+  const _mDir = r.mentionDirect || 0, _mGrp = r.mentionGroup || 0;
+  const mentionBg = _mDir ? '#fef2f2' : (_mGrp ? '#fffbeb' : '');
+  const baseBg = isCompany ? (active?'#fef3c7':(mentionBg||'#fffbeb')) : (active?'#e8f0fe':(mentionBg || (isRoomPinned?'#fefce8':'')));
   const bg = baseBg;
-  row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;border-radius:8px;margin:2px 6px;transition:background .1s;background:'+bg+(isCompany?';border:1px solid #fde68a':'');
+  const mentionEdge = _mDir ? ';border-left:4px solid #ef4444' : (_mGrp ? ';border-left:4px solid #f59e0b' : '');
+  row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;border-radius:8px;margin:2px 6px;transition:background .1s;background:'+bg+(isCompany?';border:1px solid #fde68a':'')+mentionEdge;
   row.onmouseover = () => { if (!active) row.style.background = isCompany?'#fde68a':(isRoomPinned?'#fef9c3':'#f1f3f4'); };
   row.onmouseout = () => { row.style.background = baseBg; };
   row.onclick = () => openChatRoom(r.id);
@@ -7901,6 +7971,7 @@ function buildChatRoomRow(r, companyId, isCompany) {
     ? '<span style="font-size:9px;background:#e0e7ff;color:#3730a3;padding:1px 5px;border-radius:6px;margin-right:4px;font-weight:700;letter-spacing:.3px;white-space:nowrap;">'+esc(r.management_no)+'</span>'
     : '';
   const statusBadges = chatWorkerStatusBadges(r, 'sm');
+  const mentionBadgeRow = chatMentionBadge(r.mentionDirect, r.mentionGroup, 'sm');
   const staffLine = isCompany ? chatCompanyStaffLine(r, 'sm') : '';
   row.innerHTML =
     icon +
@@ -7913,6 +7984,7 @@ function buildChatRoomRow(r, companyId, isCompany) {
       staffLine +
       '<span style="font-size:12px;color:#5f6368;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;">'+preview+'</span>'+
     '</div>'+
+    (mentionBadgeRow ? '<span style="display:flex;gap:3px;margin-right:4px;flex-shrink:0;">'+mentionBadgeRow+'</span>' : '') +
     (r.unread>0?'<span style="background:#1a73e8;color:white;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;margin-right:4px;">'+r.unread+'</span>':'');
   // ピン留めボタン
   const pinBtn = document.createElement('button');
@@ -18098,6 +18170,12 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260805.33', date:'2026-08-05', notify:true, items:[
+    'チャット：企業カードに「どのチャットにメンションが来ているか」を人材名で表示するようにしました。企業を開かなくても、誰宛のやり取りかが一目で分かります（5件以上は「ほかn件」と省略）',
+    'チャット：人材ごとのチャット行にも @バッジ を表示。企業を開いたときにどの人材に来ているか分かります',
+    'チャット：メンションを色分け。🔴赤＝自分あて（本文に@自分の名前、または自分の投稿への返信）、🟡黄色＝所属チームあて（@全員・@チーム名で自分に届いたもの）。行の左端の縦線と背景色も同じ色になります',
+    'チャット：一覧の上部に色の意味の説明（凡例）を追加しました',
+  ]},
   { version:'ver.20260805.32', date:'2026-08-05', notify:true, items:[
     'チャット：人材名の右に「在職ステータス」と「申請ステータス」を表示。チャット一覧（左）と、チャットを開いた上部ヘッダーの両方に出ます。色は外国人材一覧と同じ配色です',
     'チャット：企業チャットは企業名の下に担当者（メイン／サブ／チーム内担当）を表示。所属機関の登録内容がそのまま出ます',
