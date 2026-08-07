@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260805.39 -->
+<!-- KMT_VERSION ver.20260805.40 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -367,7 +367,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.39</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.40</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <div id="sidebarAlerts" style="margin-top:6px;display:none;flex-direction:column;gap:3px;"></div>
   </div>
@@ -6679,6 +6679,7 @@ async function saveWorker(returnResult=false) {
     memo:             g('wf_memo'),
     notes:            g('wf_notes'),
     tokutei_history:  (function(){ try { return JSON.parse(document.getElementById('wf_tokutei_history')?.value || '[]'); } catch(e){ return []; } })(),
+    contact_log:      (function(){ try { return JSON.parse(document.getElementById('wf_contact_log')?.value || '[]'); } catch(e){ return []; } })(),
     updated_at:       new Date().toISOString(),
     updated_by:       _curUserName(),
   };
@@ -6768,6 +6769,88 @@ async function _postApplyStatusToChat(workerId, data, status) {
     }
     await sbFetch('chat_messages', { method:'POST', body: JSON.stringify({ chat_room_id: roomId, room_id: roomId, sender_id: currentUser?.id||'', sender_name: currentUser?.name||'KMT', content: lines.join('\n'), created_at: new Date().toISOString() }) });
   } catch(e) { console.warn('apply status chat post failed', e); }
+}
+
+// ===== 本人とのやり取りの記録（日付／項目／内容／対応内容） =====
+let _contactLogRows = [];
+
+function _contactLogSync(){
+  const h = document.getElementById('wf_contact_log');
+  if (h) h.value = JSON.stringify(_contactLogRows);
+}
+function renderContactLog(){
+  const box = document.getElementById('contactLogRows');
+  if (!box) return;
+  box.innerHTML = _contactLogRows.map((r,i) => `
+    <div style="display:grid;grid-template-columns:120px 110px 1fr 1fr 28px;gap:6px;align-items:start;margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid var(--gray-100);">
+      <input class="form-input" type="date" value="${r.date||''}" onchange="updateContactLogRow(${i},'date',this.value)" style="font-size:12px;">
+      <input class="form-input" list="contactLogKindList" value="${esc(r.kind||'')}" placeholder="定期面談 等" oninput="updateContactLogRow(${i},'kind',this.value)" style="font-size:12px;">
+      <textarea class="form-textarea" rows="3" placeholder="やり取りの内容" oninput="updateContactLogRow(${i},'content',this.value)" style="font-size:12px;line-height:1.6;">${esc(r.content||'')}</textarea>
+      <textarea class="form-textarea" rows="3" placeholder="対応内容" oninput="updateContactLogRow(${i},'action',this.value)" style="font-size:12px;line-height:1.6;">${esc(r.action||'')}</textarea>
+      <button type="button" onclick="removeContactLogRow(${i})" title="削除" style="background:none;border:none;color:#9ca3af;font-size:15px;cursor:pointer;padding:4px 0 0;line-height:1;">✕</button>
+    </div>`).join('') ||
+    '<div style="font-size:12px;color:var(--gray-400);padding:16px 2px;text-align:center;">記録がありません。「＋ 記録を追加」またはExcelからの取り込みで登録してください。</div>';
+  _contactLogSync();
+}
+function addContactLogRow(){
+  const today = new Date();
+  const d = today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
+  _contactLogRows.unshift({ date:d, kind:'', content:'', action:'' });
+  renderContactLog();
+}
+function removeContactLogRow(i){
+  if (!confirm('この記録を削除しますか？')) return;
+  _contactLogRows.splice(i,1); renderContactLog();
+}
+function updateContactLogRow(i, key, val){
+  if (!_contactLogRows[i]) return;
+  _contactLogRows[i][key] = val;
+  _contactLogSync();
+}
+// Excelからの貼り付け取り込み
+function openContactLogImport(show){
+  const box = document.getElementById('contactLogImportBox');
+  if (!box) return;
+  const on = (show === undefined) ? (box.style.display === 'none') : !!show;
+  box.style.display = on ? '' : 'none';
+  if (on) { const ta=document.getElementById('contactLogImportText'); if(ta){ ta.value=''; ta.focus(); } }
+}
+// Excelの日付表記をできるだけ YYYY-MM-DD に寄せる
+function _contactLogParseDate(v){
+  const t = String(v||'').trim();
+  if (!t) return '';
+  let m = t.match(/^(\d{4})[\/\-年.](\d{1,2})[\/\-月.](\d{1,2})/);
+  if (m) return m[1]+'-'+String(m[2]).padStart(2,'0')+'-'+String(m[3]).padStart(2,'0');
+  m = t.match(/^(\d{4})(\d{2})(\d{2})$/);
+  if (m) return m[1]+'-'+m[2]+'-'+m[3];
+  const d = new Date(t);
+  if (!isNaN(d)) return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  return '';
+}
+function importContactLogFromText(){
+  const ta = document.getElementById('contactLogImportText');
+  const raw = (ta?.value || '').replace(/\r\n/g,'\n');
+  if (!raw.trim()) { showToast('⚠️ 貼り付ける内容がありません', 'error'); return; }
+  const lines = raw.split('\n').filter(l => l.trim() !== '');
+  const added = [];
+  lines.forEach((line, idx) => {
+    const cols = line.split('\t');
+    const c0 = (cols[0]||'').trim();
+    // 1行目が見出しなら読み飛ばす
+    if (idx === 0 && (c0 === '日付' || c0 === '' ) && /項目|内容/.test(line)) return;
+    const date = _contactLogParseDate(c0);
+    const kind = (cols[1]||'').trim();
+    const content = (cols[2]||'').trim();
+    const action = (cols[3]||'').trim();
+    if (!date && !kind && !content && !action) return;
+    added.push({ date, kind, content, action });
+  });
+  if (!added.length) { showToast('⚠️ 取り込める行がありませんでした', 'error'); return; }
+  _contactLogRows = _contactLogRows.concat(added);
+  renderContactLog();
+  openContactLogImport(false);
+  const noDate = added.filter(a=>!a.date).length;
+  showToast('✅ ' + added.length + '件を取り込みました' + (noDate ? '（うち' + noDate + '件は日付を読み取れませんでした）' : '') + ' — 保存を押すと確定します', 'success');
 }
 
 // ===== 10. 通算期間と過去の就労先 =====
@@ -12018,6 +12101,10 @@ async function openWorkerModal(id) {
     // 10. 通算期間と過去の就労先
     _tokuteiRows = Array.isArray((w||{}).tokutei_history) ? JSON.parse(JSON.stringify(w.tokutei_history)) : [];
     renderTokuteiRows();
+    // 本人とのやり取りの記録
+    _contactLogRows = Array.isArray((w||{}).contact_log) ? JSON.parse(JSON.stringify(w.contact_log)) : [];
+    renderContactLog();
+    openContactLogImport(false);
     _takeWorkerSnapshot();
     if (typeof updateWorkerPhotoPreview === 'function') updateWorkerPhotoPreview();
     bindDirtyTracking('workerModal');
@@ -12028,7 +12115,7 @@ let editingWorkerId = null;
 let _savingWorkerNew = false;
 
 function switchWorkerTab(tab) {
-  const tabs = ['basic','note','tasks','schedules','kokko'];
+  const tabs = ['basic','contact','note','tasks','schedules','kokko'];
   tabs.forEach(t => {
     const btn = document.getElementById('wtab_'+t);
     const panel = document.getElementById('wtab_'+t+'_panel');
@@ -12324,6 +12411,10 @@ function buildWorkerModalBody(w) {
     <button id="wtab_basic" onclick="switchWorkerTab('basic')"
       style="padding:8px 18px;font-size:12px;font-weight:700;border:none;background:none;cursor:pointer;color:var(--blue);border-bottom:2px solid var(--blue);">
       📋 基本情報
+    </button>
+    <button id="wtab_contact" onclick="switchWorkerTab('contact')"
+      style="padding:8px 18px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--gray-400);border-bottom:2px solid transparent;">
+      🗒️ やり取りの記録
     </button>
     <button id="wtab_note" onclick="switchWorkerTab('note')"
       style="padding:8px 18px;font-size:12px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--gray-400);border-bottom:2px solid transparent;">
@@ -12657,6 +12748,36 @@ function buildWorkerModalBody(w) {
 
   </div><!-- end 右カラム -->
   </div><!-- end grid -->
+  </div>
+  <!-- 本人とのやり取りの記録タブ -->
+  <div id="wtab_contact_panel" style="display:none;padding:4px 0;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+      <div style="font-size:13px;font-weight:800;color:var(--navy);">🗒️ 本人とのやり取りの記録</div>
+      <div style="font-size:11px;color:var(--gray-400);">定期面談・電話・訪問などの記録を残します</div>
+      <div style="margin-left:auto;display:flex;gap:6px;">
+        <button type="button" class="btn btn-outline" style="font-size:11px;padding:4px 10px;" onclick="openContactLogImport()">📋 Excelから貼り付けて取り込み</button>
+        <button type="button" class="btn btn-primary" style="font-size:11px;padding:4px 10px;" onclick="addContactLogRow()">＋ 記録を追加</button>
+      </div>
+    </div>
+    <input type="hidden" id="wf_contact_log" value="">
+    <div id="contactLogImportBox" style="display:none;margin-bottom:10px;background:#f8fafc;border:1px dashed var(--gray-300);border-radius:8px;padding:10px 12px;">
+      <div style="font-size:11px;color:var(--gray-600);margin-bottom:6px;line-height:1.6;">
+        Excelで <strong>日付 / 項目 / 内容 / 対応内容</strong> の4列を選択してコピーし、下の欄に貼り付けて「取り込む」を押してください。<br>
+        1行目が見出し（「日付」など）の場合は自動で読み飛ばします。既存の記録の下に追加されます。
+      </div>
+      <textarea id="contactLogImportText" class="form-textarea" rows="5" placeholder="2025/01/15	定期面談	アナスさんの面談内容…	（対応内容）" style="font-size:12px;font-family:monospace;"></textarea>
+      <div style="display:flex;gap:6px;margin-top:6px;">
+        <button type="button" class="btn btn-primary" style="font-size:11px;padding:4px 12px;" onclick="importContactLogFromText()">取り込む</button>
+        <button type="button" class="btn btn-outline" style="font-size:11px;padding:4px 12px;" onclick="openContactLogImport(false)">キャンセル</button>
+      </div>
+    </div>
+    <datalist id="contactLogKindList">
+      ${['定期面談','電話','チャット','訪問','メール','来社','その他'].map(v=>`<option value="${v}">`).join('')}
+    </datalist>
+    <div style="display:grid;grid-template-columns:120px 110px 1fr 1fr 28px;gap:6px;font-size:10px;font-weight:700;color:var(--gray-400);padding:0 2px 4px;">
+      <div>日付</div><div>項目</div><div>内容</div><div>対応内容</div><div></div>
+    </div>
+    <div id="contactLogRows"></div>
   </div>
   <!-- ノートタブ -->
   <div id="wtab_note_panel" style="display:none;padding:4px 0;">
@@ -18598,6 +18719,11 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260805.40', date:'2026-08-06', notify:true, items:[
+    '人材詳細に「🗒️ やり取りの記録」タブを追加しました（基本情報の隣）。日付／項目／内容／対応内容の4項目で、本人とのやり取りを記録できます',
+    '「＋ 記録を追加」で1件ずつ入力できるほか、「📋 Excelから貼り付けて取り込み」でExcelの4列（日付・項目・内容・対応内容）をコピー＆貼り付けして一括登録できます。日付は 2025/01/15・2025-01-15・20250115 などの書き方を自動で判別します',
+    '取り込んだ内容は「💾 保存」を押すまで確定しません（未保存リマインドの対象です）',
+  ]},
   { version:'ver.20260805.39', date:'2026-08-06', notify:true, items:[
     '人材詳細に「10. 通算期間と過去の就労先」を追加しました（右側の一番下）。会社名・在留資格・指定書発行日を就労先ごとに入力でき、「初回」チェックで特定技能の起点を指定します',
     '入力すると「特定技能経過期間」「残りの期間」「5年満了日」を自動計算して表示します。特定活動の期間は特定技能の通算期間に含めません（会社が変わって空白期間がある場合も正しく合算します）',
