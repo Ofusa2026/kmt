@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260805.44 -->
+<!-- KMT_VERSION ver.20260805.45 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -367,7 +367,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.44</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.45</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <div id="sidebarAlerts" style="margin-top:6px;display:none;flex-direction:column;gap:3px;"></div>
   </div>
@@ -4346,7 +4346,7 @@ async function loadDecisionReport() {
   // 支援担当者セレクトをユーザー一覧から生成
   try {
     if (!allUsers.length) {
-      const ud = await sbFetch('users?select=id,name&order=name.asc');
+      const ud = await sbFetch('users?select=id,name,team&order=name.asc');
       allUsers = ud || [];
     }
     const sel = document.getElementById('dr_support_staff');
@@ -5905,10 +5905,11 @@ async function loadMyAccount() {
   // 最新のユーザー情報をDBから取得
   if (!currentUser?.id) return;
   try {
-    const data = await sbFetch('users?id=eq.' + currentUser.id + '&select=id,name,role,avatar_url&limit=1');
+    const data = await sbFetch('users?id=eq.' + currentUser.id + '&select=id,name,role,team,avatar_url&limit=1');
     if (data?.[0]) {
       currentUser = { ...currentUser, ...data[0] };
       safeSetItem('kmt_current_user', JSON.stringify(currentUser));
+      _myTeamCache = null; // 所属チームが変わった場合に通知範囲を取り直す
     }
   } catch(e) {}
   const cw = document.querySelector('.content-wrap');
@@ -6287,8 +6288,9 @@ async function checkPin() {
       return;
     }
     // 成功
-    currentUser = { id: u.id, name: u.name, email: u.email, role: u.role, position: u.position };
+    currentUser = { id: u.id, name: u.name, email: u.email, role: u.role, position: u.position, team: u.team || '' };
     safeSetItem('kmt_current_user', JSON.stringify(currentUser));
+    _myTeamCache = null;
     // 強制ログアウト判定用のログイン時刻
     try { localStorage.setItem('kmt_loginAt', new Date().toISOString()); } catch(e) {}
     document.getElementById('pinScreen').style.display = 'none';
@@ -7300,6 +7302,26 @@ function isMentionForMe(mentions) {
     return myName === mnNorm || myName.includes(mnNorm) || mnNorm.includes(myName);
   });
 }
+// 担当を持たず全体を見るチーム（総務など）は、全チャットの新着を通知する。
+// チーム名で判定しているので、このチームに人が増えても自動で対象になる。
+const NOTIFY_ALL_CHAT_TEAMS = ['総務'];
+let _myTeamCache = null;
+function _myTeam() {
+  if (_myTeamCache) return _myTeamCache;
+  let t = String(currentUser?.team || '').trim();
+  if (!t) {
+    // 既存ログイン(localStorageにteamが無い)向けのフォールバック
+    const u = (allUsers || []).find(x => x.id && x.id === currentUser?.id)
+           || (allUsers || []).find(x => x.name && x.name === currentUser?.name);
+    t = String(u?.team || '').trim();
+  }
+  if (t) _myTeamCache = t; // 取得できたときだけキャッシュする
+  return t;
+}
+function _notifyAllChats() {
+  return NOTIFY_ALL_CHAT_TEAMS.includes(_myTeam());
+}
+
 // room_id から「自分の担当チャットか」を判定（一覧の「👤 担当のみ」と同じ基準）
 function _chatIsMyRoomById(roomId) {
   if (!roomId) return false;
@@ -7307,12 +7329,14 @@ function _chatIsMyRoomById(roomId) {
   return r ? _chatIsMyRoom(r) : false;
 }
 
-// 🔔 通知を出すのは「自分あてメンション(個人＋グループ)」と「自分が担当のチャット」だけ
+// 🔔 通知を出すのは「自分あてメンション(個人＋グループ)」と「自分が担当のチャット」だけ。
+//    ただし総務など NOTIFY_ALL_CHAT_TEAMS のメンバーは全チャットを通知する。
 async function notifyNewMessages(newMessages) {
   if (!('Notification' in window)) return;
   if (Notification.permission !== 'granted') return;
   if (!Array.isArray(newMessages) || !newMessages.length) return;
-  const targets = newMessages.filter(m => isMentionForMe(m.mentions) || _chatIsMyRoomById(m.chat_room_id));
+  const notifyAll = _notifyAllChats();
+  const targets = newMessages.filter(m => notifyAll || isMentionForMe(m.mentions) || _chatIsMyRoomById(m.chat_room_id));
   if (!targets.length) return;
   // 直近5件のみ通知(多すぎる場合は集約)
   if (targets.length > 5) {
@@ -7320,7 +7344,7 @@ async function notifyNewMessages(newMessages) {
     const mentionCnt = targets.filter(m => isMentionForMe(m.mentions)).length;
     const body = mentionCnt > 0
       ? `新着 ${targets.length} 件 (うち @メンション ${mentionCnt} 件)`
-      : `担当チャットに新着 ${targets.length} 件`;
+      : `新着 ${targets.length} 件`;
     const n = new Notification('KMT 新着チャット', { body, tag: 'kmt-chat-bulk', requireInteraction: mentionCnt > 0 });
     n.onclick = () => { window.focus(); if (typeof showScreen === 'function') showScreen('chat'); n.close(); };
     return;
@@ -18835,6 +18859,11 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260805.45', date:'2026-08-07', notify:true, items:[
+    '総務チームの方（えなさん・高橋さん・新宅さん）は、担当や@メンションに関係なく、すべてのチャットの新着が通知されるようになりました',
+    'チーム名で判定しているので、今後 総務チームに人が増えた場合も自動で対象になります',
+    '総務チーム以外の方は、これまでどおり @メンションと自分が担当のチャットだけ通知されます',
+  ]},
   { version:'ver.20260805.44', date:'2026-08-07', notify:true, items:[
     'チャットの通知を「自分が送ったとき」ではなく「メッセージを受け取ったとき」に出るよう直しました',
     '通知が出るのは、自分あての@メンション（個人あて・@全員や@チーム名などのグループあての両方）と、自分が担当のチャットだけです。それ以外のチャットの新着では通知は出ません',
