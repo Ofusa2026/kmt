@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260805.47 -->
+<!-- KMT_VERSION ver.20260805.48 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -107,6 +107,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
 /* ===== TABLE ===== */
 .content-wrap{padding:0 24px 24px;}
+/* 担当一覧(横並び)の横スクロールバーを見やすく */
+.staff-board-scroll{scrollbar-width:auto;scrollbar-color:#94a3b8 #e2e8f0;}
+.staff-board-scroll::-webkit-scrollbar{height:14px;}
+.staff-board-scroll::-webkit-scrollbar-track{background:#e2e8f0;border-radius:7px;}
+.staff-board-scroll::-webkit-scrollbar-thumb{background:#94a3b8;border-radius:7px;border:3px solid #e2e8f0;}
+.staff-board-scroll::-webkit-scrollbar-thumb:hover{background:#64748b;}
+.staff-board-col{transition:opacity .12s;}
 .table-wrap{background:white;border-radius:12px;box-shadow:var(--shadow);border:1px solid var(--gray-200);overflow-x:auto;}
 table{width:100%;border-collapse:collapse;}
 thead th{padding:7px 12px;font-size:11px;color:var(--gray-400);font-weight:700;text-align:left;border-bottom:1px solid var(--gray-200);background:#fafafa;white-space:nowrap;position:sticky;top:0;z-index:10;}
@@ -367,7 +374,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.47</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.48</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <div id="sidebarAlerts" style="margin-top:6px;display:none;flex-direction:column;gap:3px;"></div>
   </div>
@@ -3219,6 +3226,9 @@ function buildStaffListScreen() {
       <select id="staffListFilter" class="form-select" onchange="renderStaffList()" style="width:auto;font-size:12px;">
         <option value="all">全担当者</option>
       </select>
+      <select id="staffGroupFilter" class="form-select" onchange="setStaffGroupFilter(this.value)" style="width:auto;font-size:12px;">
+        <option value="all">全グループ</option>
+      </select>
       <div style="display:flex;gap:6px;margin-left:auto;">
         <button onclick="setStaffViewMode('card')" id="staffViewCard" class="btn btn-primary" style="font-size:11px;padding:4px 12px;">🗂️ カード</button>
         <button onclick="setStaffViewMode('board')" id="staffViewBoard" class="btn btn-outline" style="font-size:11px;padding:4px 12px;">📊 横並び</button>
@@ -3232,6 +3242,70 @@ function buildStaffListScreen() {
 let _staffListData = null;
 let _staffViewMode = 'card';
 let _staffTeamOnly = new Set(); // チーム内担当のみの人(loadStaffListでデータから判定)
+let _staffBoardOrder = [];      // 横並び表示の並び順(担当者名の配列 / app_settingsに保存)
+let _staffGroups = [];          // チャットグループ [{id,name,icon,color,memberNames:[]}]
+let _staffGroupFilter = 'all';  // 選択中のグループid
+
+// 担当者名(短縮表記)とユーザー名(フルネーム)を突き合わせる
+function _staffNameMatches(staffName, userName) {
+  const norm = s => String(s||'').replace(/[\s　]/g, '');
+  const a = norm(staffName), b = norm(userName);
+  if (!a || !b) return false;
+  return a === b || a.includes(b) || b.includes(a);
+}
+
+// 担当一覧の並び順を app_settings から読む
+async function loadStaffBoardOrder() {
+  try {
+    const rows = await sbFetch('app_settings?key=eq.staff_board_order&select=value');
+    const raw = rows && rows[0] ? rows[0].value : null;
+    const arr = raw ? JSON.parse(raw) : null;
+    _staffBoardOrder = Array.isArray(arr) ? arr : [];
+  } catch(e) { _staffBoardOrder = []; }
+  return _staffBoardOrder;
+}
+async function saveStaffBoardOrder(list) {
+  _staffBoardOrder = list.slice();
+  await sbFetch('app_settings?on_conflict=key', {
+    method: 'POST',
+    prefer: 'return=representation,resolution=merge-duplicates',
+    body: JSON.stringify({ key: 'staff_board_order', value: JSON.stringify(_staffBoardOrder),
+      updated_at: new Date().toISOString(), updated_by: _curUserName() })
+  });
+}
+// 保存済みの並び順を適用（保存に無い人は後ろに元の順で残す）
+function applyStaffBoardOrder(list) {
+  if (!_staffBoardOrder.length) return list.slice();
+  const idx = n => { const i = _staffBoardOrder.indexOf(n); return i === -1 ? Infinity : i; };
+  return list.slice().sort((a,b) => { const d = idx(a) - idx(b); return d !== 0 ? d : 0; });
+}
+
+// フィルター用のチャットグループを取得
+async function loadStaffGroups() {
+  try {
+    const [teams, members] = await Promise.all([
+      sbFetch('chat_teams?select=id,name,icon,color&order=name.asc'),
+      sbFetch('chat_team_members?select=team_id,user_id'),
+    ]);
+    if (!(allUsers||[]).length) {
+      try { allUsers = await sbFetch('users?select=id,name,team&order=name.asc') || []; } catch(e) {}
+    }
+    const userById = {};
+    (allUsers||[]).forEach(u => { userById[u.id] = u.name; });
+    const byTeam = {};
+    (members||[]).forEach(m => {
+      const nm = userById[m.user_id];
+      if (nm) (byTeam[m.team_id] = byTeam[m.team_id] || []).push(nm);
+    });
+    _staffGroups = (teams||[]).map(t => ({ ...t, memberNames: byTeam[t.id] || [] }));
+  } catch(e) { _staffGroups = []; }
+  return _staffGroups;
+}
+
+function setStaffGroupFilter(gid) {
+  _staffGroupFilter = gid || 'all';
+  renderStaffList();
+}
 
 function setStaffViewMode(mode) {
   _staffViewMode = mode;
@@ -3296,6 +3370,16 @@ async function loadStaffList() {
         allStaff.map(s=>`<option value="${esc(s)}">${esc(s)}</option>`).join('');
     }
 
+    // 並び順とグループ(チャットグループ)を取得してグループ絞り込みを用意
+    await Promise.all([loadStaffBoardOrder(), loadStaffGroups()]);
+    const gsel = document.getElementById('staffGroupFilter');
+    if (gsel) {
+      gsel.innerHTML = '<option value="all">全グループ</option>' +
+        _staffGroups.map(g => `<option value="${esc(g.id)}">${esc((g.icon||'') + ' ' + g.name)}</option>`).join('');
+      gsel.value = _staffGroups.some(g => g.id === _staffGroupFilter) ? _staffGroupFilter : 'all';
+      if (gsel.value === 'all') _staffGroupFilter = 'all';
+    }
+
     renderStaffList();
   } catch(e) { showToast('❌ ' + e.message, 'error'); }
   showLoading(false);
@@ -3306,7 +3390,14 @@ function renderStaffList() {
   if (!wrap || !_staffListData) return;
   const { companies, workerCount, allStaff } = _staffListData;
   const filterStaff = document.getElementById('staffListFilter')?.value || 'all';
-  const targetStaff = filterStaff === 'all' ? allStaff : [filterStaff];
+  let targetStaff = filterStaff === 'all' ? allStaff : [filterStaff];
+  // グループ絞り込み: 選択したチャットグループのメンバーだけを残す
+  if (_staffGroupFilter !== 'all') {
+    const g = _staffGroups.find(x => x.id === _staffGroupFilter);
+    if (g) targetStaff = targetStaff.filter(s => (g.memberNames||[]).some(mn => _staffNameMatches(s, mn)));
+  }
+  // 横並び表示は保存された並び順に従う
+  if (_staffViewMode === 'board') targetStaff = applyStaffBoardOrder(targetStaff);
 
   if (_staffViewMode === 'table') {
     renderStaffTable(wrap, companies, workerCount, targetStaff);
@@ -3357,13 +3448,17 @@ function renderStaffBoard(wrap, companies, workerCount, targetStaff) {
       group('チーム', teamCos, '#7c3aed'),
     ].join('') || '<div style="font-size:11px;color:var(--gray-400);padding:12px 2px;">担当企業なし</div>';
 
-    return `<div style="flex:0 0 290px;width:290px;background:#f1f5f9;border:1px solid var(--gray-200);border-radius:10px;overflow:hidden;">
-      <div style="background:${color};padding:10px 12px;">
+    const canDrag = isAdminUser();
+    return `<div class="staff-board-col" data-staff="${esc(staff)}" ${canDrag ? 'draggable="true"' : ''}
+         style="flex:0 0 290px;width:290px;background:#f1f5f9;border:1px solid var(--gray-200);border-radius:10px;overflow:hidden;">
+      <div style="background:${color};padding:10px 12px;${canDrag?'cursor:grab;':''}">
         <div style="display:flex;align-items:center;gap:8px;">
+          ${canDrag ? '<span title="ドラッグして並び替え" style="color:rgba(255,255,255,.75);font-size:13px;flex-shrink:0;user-select:none;">⋮⋮</span>' : ''}
           <div style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:white;flex-shrink:0;">${esc(staff.slice(0,1))}</div>
           <div style="min-width:0;">
             <div style="font-size:13px;font-weight:800;color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(staff)}</div>
-            <div style="font-size:10px;color:rgba(255,255,255,.85);">${coCount}社 / ${total}名</div>
+            <div style="font-size:10px;color:white;font-weight:700;">メイン ${mainCos.length}社 / ${sumW(mainCos)}名</div>
+            <div style="font-size:10px;color:rgba(255,255,255,.8);">全体 ${coCount}社 / ${total}名</div>
           </div>
         </div>
       </div>
@@ -3373,11 +3468,84 @@ function renderStaffBoard(wrap, companies, workerCount, targetStaff) {
 
   // 縦は列ごとではなくページ全体でスクロールさせるため、高さは固定しない。
   // (横スクロール用に overflow-x:auto だけを付ける。高さが内容なりなので縦のバーは出ない)
+  const hint = isAdminUser()
+    ? '← → 横スクロール／上下はページごとスクロール／担当カードはドラッグで並び替えできます'
+    : '← → 横スクロール／上下はページごとスクロールできます';
   wrap.innerHTML =
-    '<div style="font-size:11px;color:var(--gray-400);margin-bottom:6px;">← → 横スクロール／上下はページごとスクロールできます</div>' +
-    '<div style="overflow-x:auto;border:1px solid var(--gray-200);border-radius:10px;background:#f8fafc;padding:10px;">' +
-      '<div style="display:flex;gap:10px;align-items:flex-start;min-width:min-content;">' + cols + '</div>' +
+    '<div style="font-size:11px;color:var(--gray-400);margin-bottom:6px;">' + hint + '</div>' +
+    '<div id="staffBoardScroll" class="staff-board-scroll" style="overflow-x:auto;border:1px solid var(--gray-200);border-radius:10px;background:#f8fafc;padding:10px;">' +
+      '<div id="staffBoardCols" style="display:flex;gap:10px;align-items:flex-start;min-width:min-content;">' + cols + '</div>' +
+    '</div>' +
+    // 画面下に貼り付く横スクロールバー(本体の一番下まで行かなくても左右に動かせる)
+    '<div id="staffBoardScrollProxy" class="staff-board-scroll" style="position:sticky;bottom:0;z-index:20;overflow-x:auto;background:rgba(248,250,252,.95);border:1px solid var(--gray-200);border-top:none;border-radius:0 0 10px 10px;">' +
+      '<div id="staffBoardScrollProxyInner" style="height:1px;"></div>' +
     '</div>';
+  _bindStaffBoardScrollSync();
+  _bindStaffBoardDnd();
+}
+
+// 本体の横スクロールと、画面下に固定したスクロールバーを同期する
+function _bindStaffBoardScrollSync() {
+  const main = document.getElementById('staffBoardScroll');
+  const proxy = document.getElementById('staffBoardScrollProxy');
+  const inner = document.getElementById('staffBoardScrollProxyInner');
+  if (!main || !proxy || !inner) return;
+  const sync = () => {
+    inner.style.width = main.scrollWidth + 'px';
+    // 横に溢れていなければ固定バーは出さない
+    proxy.style.display = (main.scrollWidth > main.clientWidth + 2) ? '' : 'none';
+  };
+  sync();
+  window.addEventListener('resize', sync);
+  let lock = false;
+  main.addEventListener('scroll', () => { if (lock) return; lock = true; proxy.scrollLeft = main.scrollLeft; lock = false; });
+  proxy.addEventListener('scroll', () => { if (lock) return; lock = true; main.scrollLeft = proxy.scrollLeft; lock = false; });
+}
+
+// 担当カードのドラッグ並び替え(管理者のみ)
+function _bindStaffBoardDnd() {
+  if (!isAdminUser()) return;
+  const cont = document.getElementById('staffBoardCols');
+  if (!cont) return;
+  let dragEl = null;
+  cont.querySelectorAll('.staff-board-col').forEach(col => {
+    col.addEventListener('dragstart', e => {
+      dragEl = col;
+      col.style.opacity = '.4';
+      try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', col.dataset.staff || ''); } catch(err) {}
+    });
+    col.addEventListener('dragend', () => {
+      if (dragEl) dragEl.style.opacity = '';
+      dragEl = null;
+      _persistStaffBoardOrder();
+    });
+    col.addEventListener('dragover', e => {
+      e.preventDefault();
+      if (!dragEl || dragEl === col) return;
+      const r = col.getBoundingClientRect();
+      const after = (e.clientX - r.left) > r.width / 2;
+      cont.insertBefore(dragEl, after ? col.nextSibling : col);
+    });
+    col.addEventListener('drop', e => e.preventDefault());
+  });
+}
+
+async function _persistStaffBoardOrder() {
+  const cont = document.getElementById('staffBoardCols');
+  if (!cont) return;
+  const shown = [...cont.querySelectorAll('.staff-board-col')].map(el => el.dataset.staff).filter(Boolean);
+  if (!shown.length) return;
+  // 既存の並び順をベースに、画面に出ている担当者の「枠」だけを新しい順で埋め直す。
+  // こうするとグループで絞り込んだ状態で並び替えても、隠れている人の位置は動かない
+  const base = (_staffBoardOrder.length ? _staffBoardOrder : (_staffListData?.allStaff || [])).slice();
+  (_staffListData?.allStaff || []).forEach(n => { if (!base.includes(n)) base.push(n); });
+  let i = 0;
+  const next = base.map(n => (shown.includes(n) && i < shown.length) ? shown[i++] : n);
+  shown.forEach(n => { if (!next.includes(n)) next.push(n); });
+  try {
+    await saveStaffBoardOrder(next);
+    showToast('✅ 並び順を保存しました', 'success');
+  } catch(e) { showToast('❌ 並び順の保存に失敗: ' + e.message, 'error'); }
 }
 
 function getStaffColor(name) {
@@ -18963,6 +19131,12 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260805.48', date:'2026-08-07', notify:true, items:[
+    '担当一覧の「📊 横並び」表示に、画面の下に貼り付く横スクロールバーを追加しました。下までスクロールしなくても左右に動かせます',
+    '担当名の下の表示を「メイン ○社 / ○名」→「全体 ○社 / ○名」の順に変更しました',
+    '管理者は担当カードをドラッグして好きな順番に並べ替えられます。並び順は保存され、全員の画面に反映されます',
+    'グループの絞り込みを追加しました。チャットグループ（例: ベトナムチーム）を選ぶと、そのメンバーの担当だけが表示されます',
+  ]},
   { version:'ver.20260805.47', date:'2026-08-07', notify:true, items:[
     '担当一覧の「📊 横並び」表示で、上下のスクロールをページ全体のスクロールに変更しました',
     '列の中だけがスクロールする形をやめたので、担当企業が多い方の一覧も途中で切れずに最後まで見られます',
