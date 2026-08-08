@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260805.52 -->
+<!-- KMT_VERSION ver.20260805.53 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -374,7 +374,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.52</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.53</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <button onclick="showScreen('my_account')" title="自分のダッシュボード・設定を開く" style="margin-top:6px;width:100%;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:800;color:#0f172a;background:#e2e8f0;border:none;border-radius:6px;padding:6px 8px;cursor:pointer;">📊 マイページ</button>
     <div id="myAlertSummary" style="margin-top:6px;display:none;"></div>
@@ -6368,6 +6368,7 @@ async function loadMyDashboard() {
     ]);
     _myDashData = { workers: workers || [], tasks: tasks || [] };
     renderMyDashboard();
+    loadMyNotes();
   } catch(e) {
     box.innerHTML = '<div style="text-align:center;padding:30px;color:#dc2626;font-size:12px;">読み込みに失敗しました: ' + esc(e.message) + '</div>';
   }
@@ -6399,33 +6400,71 @@ function renderMyDashboard() {
       '<div>' + items.map(render).join('') + '</div></div>';
   };
 
-  // 1. アラートまとめ
-  const alertsHtml =
-    section('🪪','在留期限 1か月以内','#dc2626', a.expiry1, i => row(i, dayTxt(i.days))) +
-    section('🪪','在留期限 2か月以内','#ea580c', a.expiry2, i => row(i, dayTxt(i.days))) +
-    section('🪪','在留期限 3か月以内','#d97706', a.expiry3, i => row(i, dayTxt(i.days))) +
-    section('⏳','特例期間に入っている人材','#b45309', a.tokurei, i => row(i, '<span style="color:#b45309;">特例あと' + i.tokureiDays + '日</span>')) +
-    section('📋','申請ステータス 未入力・要確認','#1d4ed8', a.applyCheck, i => row(i, '<span style="color:#1d4ed8;">' + esc(i.reason) + '</span>')) +
-    section('✍️','必須情報の未入力（在留情報）','#7c3aed', a.required, i => row(i, '<span style="color:#7c3aed;">未入力</span>'));
+  // 1. アラートまとめ（担当区分ごと）
+  const bucketHtml = b =>
+    section('🪪','在留期限 1か月以内','#dc2626', b.expiry1, i => row(i, dayTxt(i.days))) +
+    section('🪪','在留期限 2か月以内','#ea580c', b.expiry2, i => row(i, dayTxt(i.days))) +
+    section('🪪','在留期限 3か月以内','#d97706', b.expiry3, i => row(i, dayTxt(i.days))) +
+    section('🪪','在留期限 4か月以内','#ca8a04', b.expiry4, i => row(i, dayTxt(i.days))) +
+    section('⏳','特例期間に入っている人材','#b45309', b.tokurei, i => row(i, '<span style="color:#b45309;">特例あと' + i.tokureiDays + '日</span>')) +
+    section('📋','申請ステータス 未入力・要確認','#1d4ed8', b.applyCheck, i => row(i, '<span style="color:#1d4ed8;">' + esc(i.reason) + '</span>')) +
+    section('✍️','必須情報の未入力（在留情報）','#7c3aed', b.required, i => row(i, '<span style="color:#7c3aed;">未入力</span>'));
 
-  // 2. 自分の担当リスト（担当一覧と同じ基準）
+  // 担当区分の見出し付きブロック（0件の区分は出さない）
+  const roleBlock = (label, color, b) => {
+    if (!b.total) return '';
+    return '<div style="margin-bottom:12px;">' +
+      '<div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:800;color:' + color + ';margin:0 2px 6px;padding-bottom:4px;border-bottom:2px solid ' + color + '33;">' +
+        label + '<span style="margin-left:auto;font-size:11px;">' + b.total + '件</span></div>' +
+      bucketHtml(b) + '</div>';
+  };
+  const alertsHtml =
+    roleBlock('🔵 メイン担当', '#1d4ed8', a.byRole.main) +
+    (a.skipSub ? '' : roleBlock('⚪ サブ担当', '#6b7280', a.byRole.sub)) +
+    roleBlock('🟣 チーム担当', '#7c3aed', a.byRole.team) +
+    (a.skipSub && a.byRole.sub.total
+      ? '<div style="font-size:10px;color:var(--gray-400);padding:4px 2px;">※ 営業チームのため、サブ担当ぶんのアラートは表示していません</div>' : '');
+
+  // 2. 自分の担当リスト（担当一覧と同じ基準・メイン/サブ/チームで分ける）
   const me = currentUser?.name || '';
   const splitNames = v => (v||'').split(/[,、]/).map(s=>s.trim()).filter(Boolean);
   const isMe = v => splitNames(v).some(n => _chatStaffMatchesMe(n));
-  const myCos = (allCompanies || []).filter(c => isMe(c.main_staff) || isMe(c.sub_staff) || isMe(c.team_staff));
-  const wCount = {};
+  const wCount = {}, wByCo = {};
   (_myDashData.workers || []).forEach(w => {
-    if (!['退職済(帰国)','退職済(転職)','退職済'].includes(w.status)) wCount[w.company_id] = (wCount[w.company_id]||0) + 1;
+    if (['退職済(帰国)','退職済(転職)','退職済'].includes(w.status)) return;
+    wCount[w.company_id] = (wCount[w.company_id]||0) + 1;
+    (wByCo[w.company_id] = wByCo[w.company_id] || []).push(w);
   });
-  const roleOf = c => isMe(c.main_staff) ? ['メイン','#1d4ed8'] : isMe(c.sub_staff) ? ['サブ','#6b7280'] : ['チーム','#7c3aed'];
-  myCos.sort((x,y) => prefSortKey(x.pref||'') - prefSortKey(y.pref||'') || (x.name||'').localeCompare(y.name||'','ja'));
-  const coHtml = myCos.length
-    ? myCos.map(c => { const [lb, cl] = roleOf(c);
-        return '<div onclick="openCompanyModalFromMail(\'' + c.id + '\')" title="所属機関を開く" style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid var(--gray-100);cursor:pointer;font-size:12px;">' +
-          '<span style="font-size:9px;font-weight:700;color:' + cl + ';background:' + cl + '1a;border-radius:4px;padding:1px 6px;flex-shrink:0;">' + lb + '</span>' +
-          '<span style="flex:1;min-width:0;font-weight:700;color:var(--navy);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(c.name||'') + '</span>' +
-          '<span style="font-size:10px;color:var(--gray-400);flex-shrink:0;">' + esc(c.pref||'') + '</span>' +
-          '<span style="font-size:11px;font-weight:800;color:#059669;flex-shrink:0;">' + (wCount[c.id]||0) + '名</span></div>'; }).join('')
+  const byPref = (x,y) => prefSortKey(x.pref||'') - prefSortKey(y.pref||'') || (x.name||'').localeCompare(y.name||'','ja');
+  // メイン＞サブ＞チームの順で1社を1区分だけに割り当てる（担当が重複しても二重に出さない）
+  const coMain = [], coSub = [], coTeam = [];
+  (allCompanies || []).forEach(c => {
+    if (isMe(c.main_staff) || isMe(c.ofusa_staff)) coMain.push(c);
+    else if (isMe(c.sub_staff)) coSub.push(c);
+    else if (isMe(c.team_staff)) coTeam.push(c);
+  });
+  [coMain, coSub, coTeam].forEach(l => l.sort(byPref));
+  const coRow = c =>
+    '<div onclick="openCompanyModalFromMail(\'' + c.id + '\')" title="所属機関を開く" style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid var(--gray-100);cursor:pointer;font-size:12px;">' +
+      '<span style="flex:1;min-width:0;font-weight:700;color:var(--navy);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(c.name||'') + '</span>' +
+      '<span style="font-size:10px;color:var(--gray-400);flex-shrink:0;">' + esc(c.pref||'') + '</span>' +
+      '<span style="font-size:11px;font-weight:800;color:#059669;flex-shrink:0;">' + (wCount[c.id]||0) + '名</span></div>';
+  const wRow = w =>
+    '<div onclick="openWorkerModal(\'' + w.id + '\')" title="人材詳細を開く" style="display:flex;align-items:center;gap:8px;padding:5px 8px 5px 18px;border-bottom:1px solid var(--gray-100);cursor:pointer;font-size:11px;background:#fafbfc;">' +
+      '<span style="flex:1;min-width:0;color:var(--navy);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
+        (w.management_no ? '<span style="color:var(--gray-400);">[' + esc(w.management_no) + '] </span>' : '') + esc(w.name||'') + '</span>' +
+      '<span style="font-size:10px;color:var(--gray-400);flex-shrink:0;">' + esc(w.nationality||'') + '</span>' +
+      '<span style="font-size:10px;color:var(--gray-400);flex-shrink:0;">' + (w.visa_expiry ? esc(w.visa_expiry) : '') + '</span></div>';
+  // 企業の下に、その企業の在籍人材もぶら下げる
+  const coGroup = (label, color, list) => {
+    if (!list.length) return '';
+    const wTotal = list.reduce((s,c) => s + (wCount[c.id]||0), 0);
+    return '<div style="font-size:11px;font-weight:800;color:' + color + ';background:' + color + '14;padding:5px 10px;">' +
+        label + '（' + list.length + '社・' + wTotal + '名）</div>' +
+      list.map(c => coRow(c) + (wByCo[c.id]||[]).sort((x,y)=>(x.name||'').localeCompare(y.name||'','ja')).map(wRow).join('')).join('');
+  };
+  const coHtml = (coMain.length + coSub.length + coTeam.length)
+    ? coGroup('🔵 メイン担当', '#1d4ed8', coMain) + coGroup('⚪ サブ担当', '#6b7280', coSub) + coGroup('🟣 チーム担当', '#7c3aed', coTeam)
     : '<div style="padding:14px;text-align:center;color:var(--gray-400);font-size:12px;">担当している所属機関はありません</div>';
 
   // 3. タスク一覧（自分が担当者・確認者のもの。完了/不要は除く）
@@ -6461,9 +6500,218 @@ function renderMyDashboard() {
         (a.total ? '<div style="padding:8px;">' + alertsHtml + '</div>'
                  : '<div style="padding:20px;text-align:center;color:#16a34a;font-size:12px;">✅ 対応が必要なアラートはありません</div>'),
         a.total ? a.total + '件' : '') +
-      card('🏢 自分の担当リスト', coHtml, myCos.length ? myCos.length + '社' : '') +
+      card('🏢 自分の担当リスト', coHtml, (coMain.length + coSub.length + coTeam.length) ? (coMain.length + coSub.length + coTeam.length) + '社' : '') +
       card('✅ タスク一覧', taskHtml, myTasks.length ? myTasks.length + '件' : '') +
+    '</div>' +
+    '<div id="myNotesSection" style="margin-top:16px;"></div>';
+  renderMyNotes();
+}
+
+// ===== マイページ: 自分メモ（本人だけが見られるノート） =====
+let _myNotes = [];
+let _myNoteEditId = null;
+let _myNoteLabels = [];        // 編集中メモのラベル
+let _myNoteFilterCat = '';
+let _myNoteFilterLabel = '';
+let _myNoteSearch = '';
+
+async function loadMyNotes() {
+  if (!currentUser?.id) return;
+  try {
+    const d = await sbFetch('my_notes?user_id=eq.' + currentUser.id + '&is_deleted=eq.false&order=updated_at.desc');
+    _myNotes = d || [];
+  } catch(e) { _myNotes = []; }
+  renderMyNotes();
+}
+
+// 登録済みラベルを集める（フィルターの選択肢用）
+function _myNoteAllLabels() {
+  const s = new Set();
+  _myNotes.forEach(n => (Array.isArray(n.labels) ? n.labels : []).forEach(l => l && s.add(l)));
+  return [...s].sort((a,b) => a.localeCompare(b,'ja'));
+}
+
+function renderMyNotes() {
+  const box = document.getElementById('myNotesSection');
+  if (!box) return;
+  const labels = _myNoteAllLabels();
+  const q = (_myNoteSearch || '').toLowerCase();
+  const list = _myNotes.filter(n => {
+    if (_myNoteFilterCat && n.category !== _myNoteFilterCat) return false;
+    if (_myNoteFilterLabel && !(Array.isArray(n.labels) ? n.labels : []).includes(_myNoteFilterLabel)) return false;
+    if (q && !((n.title||'').toLowerCase().includes(q) || (n.content||'').toLowerCase().includes(q))) return false;
+    return true;
+  });
+  const catColors = {
+    '業務共有事項':'#1d4ed8','注意事項':'#dc2626','企業対応':'#7c3aed','人材対応':'#059669',
+    '求人関連':'#d97706','書類関連':'#0891b2','新規営業':'#be185d','分野ごと':'#065f46','その他':'#4b5563'
+  };
+  const cards = list.length ? list.map(n => {
+    const color = catColors[n.category] || '#4b5563';
+    const lbs = (Array.isArray(n.labels) ? n.labels : []);
+    return '<div style="background:white;border:1px solid var(--gray-200);border-top:3px solid ' + color + ';border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:6px;">' +
+      '<div style="display:flex;align-items:flex-start;gap:6px;">' +
+        '<div style="font-size:13px;font-weight:800;color:var(--navy);flex:1;min-width:0;">' + esc(n.title || '(無題)') + '</div>' +
+        '<button onclick="openMyNoteModal(\'' + n.id + '\')" class="btn btn-outline" style="font-size:10px;padding:2px 8px;flex-shrink:0;">✏️</button>' +
+        '<button onclick="deleteMyNote(\'' + n.id + '\')" class="btn btn-outline" style="font-size:10px;padding:2px 8px;color:#dc2626;border-color:#dc2626;flex-shrink:0;">🗑️</button>' +
+      '</div>' +
+      (n.category ? '<div><span style="font-size:9px;font-weight:700;color:white;background:' + color + ';border-radius:8px;padding:2px 8px;">' +
+        esc(n.category + (n.subcategory ? '／' + n.subcategory : '')) + '</span></div>' : '') +
+      '<div style="font-size:11px;color:var(--gray-600);white-space:pre-wrap;line-height:1.6;max-height:120px;overflow:hidden;">' + linkifyText(n.content || '') + '</div>' +
+      (lbs.length ? '<div style="display:flex;flex-wrap:wrap;gap:4px;">' + lbs.map(l =>
+        '<span onclick="setMyNoteFilter(null,\'' + esc(l) + '\')" title="このラベルで絞り込む" style="cursor:pointer;font-size:9px;font-weight:700;color:#475569;background:#e2e8f0;border-radius:8px;padding:1px 7px;">🏷️ ' + esc(l) + '</span>').join('') + '</div>' : '') +
+      '<div style="font-size:10px;color:var(--gray-400);margin-top:auto;">最終更新 ' + esc(_fmtUpdatedAt(n.updated_at)) + '</div>' +
     '</div>';
+  }).join('') : '<div style="grid-column:1/-1;padding:24px;text-align:center;color:var(--gray-400);font-size:12px;background:white;border:1px dashed var(--gray-300);border-radius:10px;">メモがありません。「＋ 新規メモ」から追加できます</div>';
+
+  box.innerHTML =
+    '<div style="background:white;border:1px solid var(--gray-200);border-radius:12px;box-shadow:var(--shadow);overflow:hidden;">' +
+      '<div style="padding:10px 14px;border-bottom:1px solid var(--gray-200);display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' +
+        '<div style="font-size:13px;font-weight:800;color:var(--navy);">📝 自分メモ</div>' +
+        '<span style="font-size:10px;color:var(--gray-400);">自分だけが見られるメモです</span>' +
+        '<button class="btn btn-primary" style="font-size:11px;padding:3px 12px;margin-left:auto;" onclick="openMyNoteModal(null)">＋ 新規メモ</button>' +
+      '</div>' +
+      '<div style="padding:8px 14px;border-bottom:1px solid var(--gray-100);display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' +
+        '<input class="search-input" style="flex:1;min-width:150px;font-size:12px;" placeholder="メモを検索..." value="' + esc(_myNoteSearch) + '" oninput="_myNoteSearch=this.value;renderMyNotes();">' +
+        '<select class="filter-select" onchange="setMyNoteFilter(this.value,null)"><option value="">全カテゴリー</option>' +
+          NOTICE_CATEGORIES.map(c => '<option value="' + esc(c) + '"' + (_myNoteFilterCat===c?' selected':'') + '>' + esc(c) + '</option>').join('') + '</select>' +
+        '<select class="filter-select" onchange="setMyNoteFilter(null,this.value)"><option value="">全ラベル</option>' +
+          labels.map(l => '<option value="' + esc(l) + '"' + (_myNoteFilterLabel===l?' selected':'') + '>' + esc(l) + '</option>').join('') + '</select>' +
+        ((_myNoteFilterCat || _myNoteFilterLabel || _myNoteSearch)
+          ? '<button class="btn btn-outline" style="font-size:11px;padding:3px 10px;" onclick="setMyNoteFilter(\'\',\'\',true)">✕ 解除</button>' : '') +
+        '<span style="font-size:11px;color:var(--gray-400);margin-left:auto;">' + list.length + '件</span>' +
+      '</div>' +
+      '<div style="padding:12px 14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;align-items:stretch;">' + cards + '</div>' +
+    '</div>';
+}
+
+function setMyNoteFilter(cat, label, clear) {
+  if (clear) { _myNoteFilterCat = ''; _myNoteFilterLabel = ''; _myNoteSearch = ''; }
+  else {
+    if (cat !== null && cat !== undefined) _myNoteFilterCat = cat;
+    if (label !== null && label !== undefined) _myNoteFilterLabel = label;
+  }
+  renderMyNotes();
+}
+
+function openMyNoteModal(id) {
+  _myNoteEditId = id;
+  const n = id ? _myNotes.find(x => x.id === id) : null;
+  _myNoteLabels = Array.isArray(n?.labels) ? n.labels.slice() : [];
+  const catOpts = NOTICE_CATEGORIES.map(c => '<option value="' + esc(c) + '"' + (n?.category===c?' selected':'') + '>' + esc(c) + '</option>').join('');
+  const subOpts = NOTICE_FIELDS_19.map(f => '<option value="' + esc(f) + '"' + (n?.subcategory===f?' selected':'') + '>' + esc(f) + '</option>').join('');
+  document.body.insertAdjacentHTML('beforeend',
+    '<div id="myNoteModal" style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;">' +
+      '<div style="background:white;border-radius:12px;width:600px;max-width:100%;max-height:90vh;overflow-y:auto;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.3);">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">' +
+          '<h3 style="font-size:16px;font-weight:800;color:var(--navy);">' + (id ? '✏️ メモを編集' : '＋ 新規メモ') + '</h3>' +
+          '<button onclick="closeMyNoteModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--gray-400);">✕</button>' +
+        '</div>' +
+        '<div class="form-grid" style="grid-template-columns:1fr;">' +
+          '<div class="form-group full"><label class="form-label">カテゴリー</label>' +
+            '<select class="form-select" id="mn_category" onchange="toggleMyNoteSubcat()"><option value="">── 選択 ──</option>' + catOpts + '</select></div>' +
+          '<div class="form-group full" id="mn_subcat_wrap" style="display:' + (n?.category==='分野ごと'?'':'none') + ';"><label class="form-label">分野</label>' +
+            '<select class="form-select" id="mn_subcategory"><option value="">── 選択 ──</option>' + subOpts + '</select></div>' +
+          '<div class="form-group full"><label class="form-label">タイトル <span style="color:#ef4444;">*</span></label>' +
+            '<input class="form-input" id="mn_title" value="' + esc(n?.title||'') + '" placeholder="例: 来週やること"></div>' +
+          '<div class="form-group full"><label class="form-label" style="display:flex;align-items:center;gap:6px;">内容 <span style="color:#ef4444;">*</span>' + memoExpandBtn('mn_content','自分メモ') + '</label>' +
+            '<textarea class="form-textarea" id="mn_content" rows="7" placeholder="メモの内容を入力...">' + esc(n?.content||'') + '</textarea></div>' +
+          '<div class="form-group full"><label class="form-label">ラベル <span style="font-size:10px;color:var(--gray-400);font-weight:400;">— Enterで追加</span></label>' +
+            '<input class="form-input" id="mn_label_input" placeholder="ラベル名を入力してEnter" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addMyNoteLabel();}">' +
+            '<div id="mn_label_chips" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;"></div></div>' +
+        '</div>' +
+        '<div style="display:flex;gap:8px;align-items:center;margin-top:16px;">' +
+          '<span id="sm_mynote" style="font-size:11px;"></span>' +
+          '<button onclick="saveMyNote()" class="btn btn-primary" style="margin-left:auto;">💾 保存</button>' +
+          '<button onclick="closeMyNoteModal()" class="btn btn-outline">閉じる</button>' +
+          (id ? '<button onclick="deleteMyNote(\'' + id + '\')" class="btn btn-outline" style="color:#dc2626;border-color:#dc2626;">🗑 削除</button>' : '') +
+        '</div>' +
+      '</div>' +
+    '</div>');
+  renderMyNoteLabelChips();
+  autoGrowAllTextareas(document.getElementById('myNoteModal'));
+  _manualSave.myNoteModal.dirty = false;
+  renderSaveMeta('sm_mynote', n?.updated_at, n?.updated_by);
+  // 入力を監視して未保存フラグを立てる
+  document.getElementById('myNoteModal').addEventListener('input', () => {
+    _manualSave.myNoteModal.dirty = true;
+    markSaveMetaDirty('sm_mynote');
+  });
+}
+function toggleMyNoteSubcat() {
+  const wrap = document.getElementById('mn_subcat_wrap');
+  if (wrap) wrap.style.display = document.getElementById('mn_category')?.value === '分野ごと' ? '' : 'none';
+}
+function addMyNoteLabel() {
+  const el = document.getElementById('mn_label_input');
+  const v = (el?.value || '').trim();
+  if (!v) return;
+  if (!_myNoteLabels.includes(v)) _myNoteLabels.push(v);
+  el.value = '';
+  _manualSave.myNoteModal.dirty = true;
+  markSaveMetaDirty('sm_mynote');
+  renderMyNoteLabelChips();
+}
+function removeMyNoteLabel(i) {
+  _myNoteLabels.splice(i, 1);
+  _manualSave.myNoteModal.dirty = true;
+  markSaveMetaDirty('sm_mynote');
+  renderMyNoteLabelChips();
+}
+function renderMyNoteLabelChips() {
+  const box = document.getElementById('mn_label_chips');
+  if (!box) return;
+  box.innerHTML = _myNoteLabels.map((l,i) =>
+    '<span style="display:flex;align-items:center;gap:4px;font-size:10px;font-weight:700;color:#475569;background:#e2e8f0;border-radius:10px;padding:2px 8px;">🏷️ ' + esc(l) +
+      '<button onclick="removeMyNoteLabel(' + i + ')" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:12px;padding:0;line-height:1;">✕</button></span>').join('');
+}
+// ✕・閉じるのどちらでも未保存リマインドを通す
+function closeMyNoteModal() {
+  if (_manualSave.myNoteModal.dirty) { promptSaveModal('myNoteModal', forceCloseMyNoteModal); return; }
+  forceCloseMyNoteModal();
+}
+function forceCloseMyNoteModal() {
+  _manualSave.myNoteModal.dirty = false;
+  document.getElementById('myNoteModal')?.remove();
+}
+
+async function saveMyNote() {
+  const title = (document.getElementById('mn_title')?.value || '').trim();
+  const content = (document.getElementById('mn_content')?.value || '').trim();
+  if (!title)   { showToastTop('❌ タイトルを入力してください'); return false; }
+  if (!content) { showToastTop('❌ 内容を入力してください'); return false; }
+  const cat = document.getElementById('mn_category')?.value || '';
+  const body = {
+    user_id: currentUser?.id, user_name: currentUser?.name || '',
+    category: cat || null,
+    subcategory: (cat === '分野ごと' ? (document.getElementById('mn_subcategory')?.value || null) : null),
+    title, content, labels: _myNoteLabels,
+    updated_at: new Date().toISOString(), updated_by: _curUserName(),
+  };
+  try {
+    if (_myNoteEditId) {
+      await sbFetch('my_notes?id=eq.' + _myNoteEditId, { method:'PATCH', body: JSON.stringify(body) });
+    } else {
+      const res = await sbFetch('my_notes', { method:'POST', headers:{'Prefer':'return=representation'}, body: JSON.stringify(body) });
+      _myNoteEditId = (Array.isArray(res) ? res[0] : res)?.id || null;
+    }
+    await loadMyNotes();
+    afterManualSave('myNoteModal');   // モーダルは開いたまま最終更新を表示
+    showToast('✅ メモを保存しました', 'success');
+    return true;
+  } catch(e) { showToast('❌ 保存に失敗: ' + e.message, 'error'); return false; }
+}
+
+async function deleteMyNote(id) {
+  const n = _myNotes.find(x => x.id === id);
+  if (!confirm('メモ「' + (n?.title || '') + '」を削除しますか？\nこの操作は取り消せません。')) return;
+  try {
+    await sbFetch('my_notes?id=eq.' + id, { method:'PATCH',
+      body: JSON.stringify({ is_deleted:true, deleted_at:new Date().toISOString(), updated_by:_curUserName() }) });
+    if (_myNoteEditId === id) forceCloseMyNoteModal();
+    await loadMyNotes();
+    showToast('🗑️ 削除しました', 'success');
+  } catch(e) { showToast('❌ 削除に失敗: ' + e.message, 'error'); }
 }
 
 function buildMyAccountScreen() {
@@ -12134,35 +12382,54 @@ function computeSidebarAlertCounts(list){
   return { miss: a.miss.length, renewal: a.renewal.length, kokko: a.kokkoTotal, visaUpdate: a.visaUpdate.length };
 }
 // ===== マイページ用: 自分の担当だけを対象にしたアラート集計 =====
-// この人材が自分の担当か（人材のstaff、または所属機関のメイン/サブ/チーム担当）
-function _workerIsMine(w) {
-  if (!w) return false;
-  if (_chatStaffMatchesMe(w.staff || '')) return true;
+// 営業チームの人はメイン担当ぶんだけ見ればよいので、サブ担当のアラートは出さない
+const SALES_TEAM_NAME = '営業';
+function _skipSubAlerts() { return _myTeam() === SALES_TEAM_NAME; }
+
+// この人材に対する自分の立場を返す（'main' / 'sub' / 'team' / null）。メイン＞サブ＞チームの順で優先
+function _myRoleForWorker(w) {
+  if (!w) return null;
   const c = (allCompanies || []).find(x => x.id === w.company_id);
   if (c) {
-    if (_chatStaffMatchesMe(c.main_staff)) return true;
-    if (_chatStaffMatchesMe(c.sub_staff))  return true;
-    if (_chatStaffMatchesMe(c.team_staff)) return true;
-    if (_chatStaffMatchesMe(c.ofusa_staff)) return true;
+    if (_chatStaffMatchesMe(c.main_staff) || _chatStaffMatchesMe(c.ofusa_staff)) return 'main';
+    if (_chatStaffMatchesMe(c.sub_staff))  return 'sub';
+    if (_chatStaffMatchesMe(c.team_staff)) return 'team';
   }
-  return false;
+  // 所属機関側で担当になっていなくても、人材の担当者欄が自分ならメイン扱い
+  if (_chatStaffMatchesMe(w.staff || '')) return 'main';
+  return null;
+}
+function _workerIsMine(w) { return !!_myRoleForWorker(w); }
+
+// 担当区分ごとの空カゴ
+function _emptyAlertBucket() {
+  return { expiry1:[], expiry2:[], expiry3:[], expiry4:[], tokurei:[], applyCheck:[], required:[], total:0 };
 }
 
-// マイページのアラート集計。判定の考え方は既存のアラートに合わせている
+// マイページのアラート集計。判定の考え方は既存のアラートに合わせ、担当区分ごとに分けて返す
 function computeMyWorkerAlerts(list) {
   const today = new Date(); today.setHours(0,0,0,0);
-  const mine = (list || []).filter(w => w.kmt_support !== 'KMT支援外' && _workerIsMine(w));
-  const expiry1 = [], expiry2 = [], expiry3 = [], tokurei = [], applyCheck = [], required = [];
   const gone = ['退職済(帰国)','退職済(転職)'];
-  mine.forEach(w => {
+  const skipSub = _skipSubAlerts();
+  const byRole = { main:_emptyAlertBucket(), sub:_emptyAlertBucket(), team:_emptyAlertBucket() };
+  const mine = [];
+
+  (list || []).forEach(w => {
+    if (w.kmt_support === 'KMT支援外') return;
+    const role = _myRoleForWorker(w);
+    if (!role) return;
+    mine.push(w);
+    if (role === 'sub' && skipSub) return;  // 営業チームはサブ担当のアラート対象外
+    const b = byRole[role];
+
     // ✍️ 必須情報の未入力（発行完了・入国済みなのに在留情報が未入力）
-    if (['発行完了','入国済み'].includes(w.apply_status) && !w.card_info_done && !gone.includes(w.status)) required.push({ w });
+    if (['発行完了','入国済み'].includes(w.apply_status) && !w.card_info_done && !gone.includes(w.status)) b.required.push({ w, days: 0 });
     // 📋 申請ステータスが未入力／要確認
     if (!gone.includes(w.status) && w.status !== '退職予定(更新なし決定)' && w.visa_expiry) {
       const e0 = new Date(w.visa_expiry); e0.setHours(0,0,0,0);
       const d0 = Math.floor((e0 - today)/86400000);
-      if (d0 <= 91 && !w.renewal_status) applyCheck.push({ w, days:d0, reason:'未入力' });
-      else if (d0 <= 61 && w.renewal_status === '要確認') applyCheck.push({ w, days:d0, reason:'要確認' });
+      if (d0 <= 91 && !w.renewal_status) b.applyCheck.push({ w, days:d0, reason:'未入力' });
+      else if (d0 <= 61 && w.renewal_status === '要確認') b.applyCheck.push({ w, days:d0, reason:'要確認' });
     }
     if (!w.visa_expiry || gone.includes(w.status)) return;
     const exp = new Date(w.visa_expiry); exp.setHours(0,0,0,0);
@@ -12170,18 +12437,26 @@ function computeMyWorkerAlerts(list) {
     if (days < 0) {
       // ⏳ 特例期間中（在留期限は過ぎているが特例期間の期日が未来）
       const td = w.tokurei_date ? Math.floor((new Date(w.tokurei_date) - today)/86400000) : null;
-      if (td !== null && td >= 0) tokurei.push({ w, days, tokureiDays: td });
+      if (td !== null && td >= 0) b.tokurei.push({ w, days, tokureiDays: td });
       return;
     }
-    if (days <= 30) expiry1.push({ w, days });
-    else if (days <= 60) expiry2.push({ w, days });
-    else if (days <= 90) expiry3.push({ w, days });
+    if (days <= 30) b.expiry1.push({ w, days });
+    else if (days <= 60) b.expiry2.push({ w, days });
+    else if (days <= 90) b.expiry3.push({ w, days });
+    else if (days <= 120) b.expiry4.push({ w, days });   // 4か月以内
   });
+
   const sortD = (a,b) => a.days - b.days;
-  expiry1.sort(sortD); expiry2.sort(sortD); expiry3.sort(sortD); applyCheck.sort(sortD);
-  tokurei.sort((a,b) => a.tokureiDays - b.tokureiDays);
-  const total = expiry1.length + expiry2.length + expiry3.length + tokurei.length + applyCheck.length + required.length;
-  return { mine, expiry1, expiry2, expiry3, tokurei, applyCheck, required, total };
+  let total = 0;
+  Object.values(byRole).forEach(b => {
+    b.expiry1.sort(sortD); b.expiry2.sort(sortD); b.expiry3.sort(sortD); b.expiry4.sort(sortD);
+    b.applyCheck.sort(sortD);
+    b.tokurei.sort((x,y) => x.tokureiDays - y.tokureiDays);
+    b.total = b.expiry1.length + b.expiry2.length + b.expiry3.length + b.expiry4.length
+            + b.tokurei.length + b.applyCheck.length + b.required.length;
+    total += b.total;
+  });
+  return { mine, byRole, total, skipSub };
 }
 
 // サイドバーのプロフィール直下に出す「自分の担当ぶん」のサマリ
@@ -12205,10 +12480,9 @@ function updateMyAlertSummary(list) {
   el.innerHTML =
     '<div onclick="showScreen(\'my_account\')" title="マイページで詳細を見る" style="cursor:pointer;background:rgba(255,255,255,.08);border-radius:6px;padding:5px 7px;display:flex;flex-direction:column;gap:3px;">' +
       '<div style="font-size:9px;color:#e2e8f0;font-weight:800;display:flex;align-items:center;gap:4px;">🔔 自分の担当のアラート<span style="margin-left:auto;background:#ef4444;color:white;border-radius:8px;padding:0 5px;font-weight:800;">' + a.total + '</span></div>' +
-      chip(a.expiry1.length + a.expiry2.length + a.expiry3.length, '🪪', '在留期限1〜3か月', '#fca5a5') +
-      chip(a.tokurei.length, '⏳', '特例期間中', '#fdba74') +
-      chip(a.applyCheck.length, '📋', '未入力・要確認', '#93c5fd') +
-      chip(a.required.length, '✍️', '必須情報の未入力', '#c4b5fd') +
+      chip(a.byRole.main.total, '🔵', 'メイン担当', '#93c5fd') +
+      chip(a.byRole.sub.total,  '⚪', 'サブ担当',   '#e2e8f0') +
+      chip(a.byRole.team.total, '🟣', 'チーム担当', '#c4b5fd') +
     '</div>';
 }
 
@@ -16115,6 +16389,7 @@ const _manualSave = {
   companyModal:  { dirty:false, prefix:'co_', save:()=>saveCompany(),   metaSlot:'sm_company',   label:'所属機関' },
   resumeModal:   { dirty:false, prefix:'rf_', save:()=>saveResume(),    metaSlot:'sm_resume',    label:'履歴書' },
   saleModal:     { dirty:false, prefix:'saf_', save:()=>saveSale(),   metaSlot:'sm_sale',      label:'売上' },
+  myNoteModal:   { dirty:false, prefix:'mn_', save:()=>saveMyNote(),  metaSlot:'sm_mynote',    label:'自分メモ' },
 };
 // 外国人材・所属機関はスナップショット比較を dirty の正とする（実際に値が変わった時だけリマインド）
 Object.defineProperty(_manualSave.workerModal, 'dirty', {
@@ -19646,6 +19921,13 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260805.53', date:'2026-08-07', notify:true, items:[
+    'マイページのアラートを「🔵 メイン担当／⚪ サブ担当／🟣 チーム担当」に分けて表示するようになりました。ステータス未入力・要確認、必須情報の未入力も同じように分かれます',
+    '在留期限のアラートに「4か月以内」を追加しました（1か月・2か月・3か月・4か月の4段階になります）',
+    '自分の担当リストも メイン／サブ／チーム で分かれ、各企業の下にその企業の在籍人材が並ぶようになりました',
+    '営業チームの方（蛭田さん・白井さん・高村さん）は、メイン担当ぶんのアラートのみ表示されます（サブ担当ぶんは出ません）',
+    'マイページに「📝 自分メモ」を追加しました。自分だけが見られるメモをカード形式で何枚でも作れます。カテゴリー・分野は社内共有事項と同じ項目で、ラベルを付けて絞り込めます。更新日は自動で入り、保存ボタン・未保存リマインド・削除（確認あり）に対応しています',
+  ]},
   { version:'ver.20260805.52', date:'2026-08-07', notify:true, items:[
     '左上のユーザー名の下に「📊 マイページ」ボタンを追加しました。ここから個人ダッシュボードを開けます',
     'プロフィール下の「自分の担当のアラート」が表示されない不具合を直しました。担当している人材の件数が正しく出るようになりました',
