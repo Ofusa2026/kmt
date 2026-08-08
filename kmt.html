@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260805.54 -->
+<!-- KMT_VERSION ver.20260805.55 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -374,7 +374,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.54</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.55</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <button onclick="showScreen('my_account')" title="自分のダッシュボード・設定を開く" style="margin-top:6px;width:100%;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:800;color:#0f172a;background:#e2e8f0;border:none;border-radius:6px;padding:6px 8px;cursor:pointer;">📊 マイページ</button>
     <div id="myAlertSummary" style="margin-top:6px;display:none;"></div>
@@ -6379,13 +6379,20 @@ function renderMyDashboard() {
   if (!box || !_myDashData) return;
   const a = computeMyWorkerAlerts(_myDashData.workers);
 
-  // 人材1件の行
-  const row = (item, extra) => {
+  // 申請ステータスのバッジ（一覧などと同じ色分け）
+  const applyBadge = w => {
+    const st = w.apply_status || '申請予定なし';
+    const cls = APPLY_STATUS_COLORS[st] || 'st-none';
+    return '<span class="st-badge ' + cls + '" style="font-size:9px;padding:1px 6px;flex-shrink:0;white-space:nowrap;">' + esc(st) + '</span>';
+  };
+  // 人材1件の行。showApply=true なら申請ステータスも出す
+  const row = (item, extra, showApply) => {
     const w = item.w;
     return '<div onclick="openWorkerModal(\'' + w.id + '\')" title="人材詳細を開く" ' +
       'style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid var(--gray-100);cursor:pointer;font-size:12px;">' +
       '<span style="font-weight:700;color:var(--navy);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
         (w.management_no ? '<span style="color:var(--gray-400);font-weight:400;">[' + esc(w.management_no) + '] </span>' : '') + esc(w.name || '') + '</span>' +
+      (showApply ? applyBadge(w) : '') +
       '<span style="font-size:10px;color:var(--gray-400);flex-shrink:0;">' + esc(w.nationality || '') + '</span>' +
       '<span style="font-size:11px;font-weight:700;flex-shrink:0;white-space:nowrap;">' + extra + '</span></div>';
   };
@@ -6402,10 +6409,10 @@ function renderMyDashboard() {
 
   // 1. アラート（担当区分ごとに別カード／在留期限4か月以内は優先度が低いので別カードにまとめる）
   const urgentHtml = b =>
-    section('🪪','在留期限 1か月以内','#dc2626', b.expiry1, i => row(i, dayTxt(i.days))) +
-    section('🪪','在留期限 2か月以内','#ea580c', b.expiry2, i => row(i, dayTxt(i.days))) +
-    section('🪪','在留期限 3か月以内','#d97706', b.expiry3, i => row(i, dayTxt(i.days))) +
-    section('⏳','特例期間に入っている人材','#b45309', b.tokurei, i => row(i, '<span style="color:#b45309;">特例あと' + i.tokureiDays + '日</span>')) +
+    section('🪪','在留期限 1か月以内','#dc2626', b.expiry1, i => row(i, dayTxt(i.days), true)) +
+    section('🪪','在留期限 2か月以内','#ea580c', b.expiry2, i => row(i, dayTxt(i.days), true)) +
+    section('🪪','在留期限 3か月以内','#d97706', b.expiry3, i => row(i, dayTxt(i.days), true)) +
+    section('⏳','特例期間に入っている人材','#b45309', b.tokurei, i => row(i, '<span style="color:#b45309;">特例あと' + i.tokureiDays + '日</span>', true)) +
     section('📋','申請ステータス 未入力・要確認','#1d4ed8', b.applyCheck, i => row(i, '<span style="color:#1d4ed8;">' + esc(i.reason) + '</span>')) +
     section('✍️','必須情報の未入力（在留情報）','#7c3aed', b.required, i => row(i, '<span style="color:#7c3aed;">未入力</span>'));
   const urgentCount = b => b.total - b.expiry4.length;
@@ -6414,7 +6421,7 @@ function renderMyDashboard() {
   const exp4Total = a.byRole.main.expiry4.length + a.byRole.sub.expiry4.length + a.byRole.team.expiry4.length;
   const exp4Group = (label, color, items) => items.length
     ? '<div style="font-size:11px;font-weight:800;color:' + color + ';background:' + color + '14;padding:5px 10px;">' + label + '（' + items.length + '件）</div>' +
-      items.map(i => row(i, dayTxt(i.days))).join('')
+      items.map(i => row(i, dayTxt(i.days), true)).join('')
     : '';
   const exp4Html =
     exp4Group('🔵 メイン担当', '#1d4ed8', a.byRole.main.expiry4) +
@@ -6445,10 +6452,16 @@ function renderMyDashboard() {
       '<span style="flex:1;min-width:0;font-weight:700;color:var(--navy);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(c.name||'') + '</span>' +
       '<span style="font-size:10px;color:var(--gray-400);flex-shrink:0;">' + esc(c.pref||'') + '</span>' +
       '<span style="font-size:11px;font-weight:800;color:#059669;flex-shrink:0;">' + (wCount[c.id]||0) + '名</span></div>';
+  const statusBadge = w => {
+    const st = w.status || '';
+    if (!st) return '';
+    return '<span class="st-badge ' + (STATUS_COLORS[st] || 'st-none') + '" style="font-size:9px;padding:1px 6px;flex-shrink:0;white-space:nowrap;">' + esc(st) + '</span>';
+  };
   const wRow = w =>
     '<div onclick="openWorkerModal(\'' + w.id + '\')" title="人材詳細を開く" style="display:flex;align-items:center;gap:8px;padding:5px 8px 5px 18px;border-bottom:1px solid var(--gray-100);cursor:pointer;font-size:11px;background:#fafbfc;">' +
       '<span style="flex:1;min-width:0;color:var(--navy);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
         (w.management_no ? '<span style="color:var(--gray-400);">[' + esc(w.management_no) + '] </span>' : '') + esc(w.name||'') + '</span>' +
+      statusBadge(w) +
       '<span style="font-size:10px;color:var(--gray-400);flex-shrink:0;">' + esc(w.nationality||'') + '</span>' +
       '<span style="font-size:10px;color:var(--gray-400);flex-shrink:0;">' + (w.visa_expiry ? esc(w.visa_expiry) : '') + '</span></div>';
   // 企業の下に、その企業の在籍人材もぶら下げる
@@ -19973,6 +19986,10 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260805.55', date:'2026-08-07', notify:true, items:[
+    'マイページの在留期限のアラート（1〜4か月以内・特例期間中）に、人材の申請ステータスを表示するようになりました',
+    'マイページの担当リストに並ぶ人材に、在職ステータスを表示するようになりました',
+  ]},
   { version:'ver.20260805.54', date:'2026-08-07', notify:true, items:[
     'マイページを「📊 担当・タスク」「📝 自分のノート」「⚙️ アカウント設定」の3つのタブに分けました',
     'メイン担当・サブ担当・チーム担当のアラートをそれぞれ別のカードに分けました',
