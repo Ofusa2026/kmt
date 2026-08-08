@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260805.49 -->
+<!-- KMT_VERSION ver.20260805.50 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -374,7 +374,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.49</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.50</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <div id="sidebarAlerts" style="margin-top:6px;display:none;flex-direction:column;gap:3px;"></div>
   </div>
@@ -7216,6 +7216,8 @@ async function saveWorker(returnResult=false) {
   // 🔔 申請ステータスが「発行完了」「入国済み」に変わったら、記入内容を人材チャットに自動投稿
   const _applyPrev = _origWorker ? (_origWorker.apply_status || '') : '';
   const _doApplyChatPost = ['発行完了','入国済み'].includes(data.apply_status) && data.apply_status !== _applyPrev;
+  // 🔁 発行完了/入国済み＋新しい在留期限あり → 申請予定なしへ自動初期化（チャット投稿の判定より後に行う）
+  const _didAutoReset = applyStatusAutoReset(data, _applyPrev);
   // 🪪 申請ステータスが変わったら変更日時を記録（在留期限の更新待ちアラートの起点）
   if ((data.apply_status || '') !== _applyPrev) {
     data.apply_status_changed_at = new Date().toISOString();
@@ -7243,6 +7245,14 @@ async function saveWorker(returnResult=false) {
     if (_doRenewalChatPost && editingWorkerId) { _postRenewalCompletionToChat(editingWorkerId, data); }
     if (_doApplyChatPost && editingWorkerId) { _postApplyStatusToChat(editingWorkerId, data, data.apply_status); }
     if (editingWorkerId && _arVals.present) { await _saveWorkerApplyFields(editingWorkerId, _arVals); }
+    // 自動初期化したときは、開いたままのフォームの表示も保存後の状態に合わせる
+    const sel = document.getElementById('wf_apply_status');
+    if (sel && sel.value !== data.apply_status) sel.value = data.apply_status;
+    renderApplyStatusPanel(data.apply_status);
+    renderApplyResetNote(data);
+    if (_didAutoReset && !autoMode) {
+      showToast('🔁 在留期限が更新されたため、申請ステータスを「申請予定なし」に初期化しました', 'success');
+    }
     await loadWorkers();
     if (autoMode) { return true; }
   } catch(e) { _savingWorkerNew = false; showToast('❌ '+e.message,'error'); if(!autoMode) showLoading(false); return false; }
@@ -12719,7 +12729,7 @@ async function openWorkerModal(id) {
     title = '👤 外国人材登録';
   }
   showGenModal('workerModal', title, buildWorkerModalBody(w));
-  setTimeout(() => renderApplyStatusPanel((w||{}).apply_status||''), 100);
+  setTimeout(() => { renderApplyStatusPanel((w||{}).apply_status||''); renderApplyResetNote(w||{}); }, 100);
   setTimeout(() => { _syncWorkerApplyToForm(w); }, 130);
   setTimeout(() => {
     // 10. 通算期間と過去の就労先
@@ -12881,6 +12891,67 @@ function onApplyStatusChange() {
     }
   }
   renderApplyStatusPanel(status);
+  // 「申請予定なし」以外に切り替えたら初期化の経緯はその場で消す(保存時に記録も消える)
+  if (status !== '申請予定なし') {
+    const note = document.getElementById('wf_apply_reset_note');
+    if (note) { note.style.display = 'none'; note.innerHTML = ''; }
+  }
+}
+
+// ===== 申請ステータスの自動初期化 =====
+// 【発行完了】【入国済み】かつ新しい在留期限が入っている(=期限まで10か月以上ある)なら、
+// 申請は一区切りとみなして【申請予定なし】に戻す。戻した経緯は workers に記録して画面に出す。
+const APPLY_RESET_FROM_STATUSES = ['発行完了', '入国済み'];
+const APPLY_RESET_MIN_MONTHS = 10;
+
+// 在留期限まで APPLY_RESET_MIN_MONTHS か月以上あるか
+function _expiryFarEnoughForReset(expiry) {
+  if (!expiry) return false;
+  const d = new Date(expiry);
+  if (isNaN(d)) return false;
+  const limit = new Date();
+  limit.setMonth(limit.getMonth() + APPLY_RESET_MIN_MONTHS);
+  return d >= limit;
+}
+
+// 保存データに自動初期化を適用する(戻り値: 初期化したか)
+// data は saveWorker が組み立てた保存前のオブジェクト。prevStatus は変更前の申請ステータス。
+function applyStatusAutoReset(data, prevStatus) {
+  const cur = data.apply_status || '';
+  if (APPLY_RESET_FROM_STATUSES.includes(cur) && _expiryFarEnoughForReset(data.visa_expiry)) {
+    data.apply_status_reset_from   = cur;
+    data.apply_status_reset_expiry = data.visa_expiry;
+    data.apply_status_reset_at     = new Date().toISOString();
+    data.apply_status = '申請予定なし';
+    return true;
+  }
+  // 「申請予定なし」以外に変わったら初期化の記録は消す(次の初期化まで出さない)
+  if (cur && cur !== '申請予定なし') {
+    data.apply_status_reset_from   = null;
+    data.apply_status_reset_expiry = null;
+    data.apply_status_reset_at     = null;
+  }
+  return false;
+}
+
+// 初期化の経緯をステータスの下に表示する
+function renderApplyResetNote(w) {
+  const el = document.getElementById('wf_apply_reset_note');
+  if (!el) return;
+  const from = (w||{}).apply_status_reset_from;
+  const at   = (w||{}).apply_status_reset_at;
+  const exp  = (w||{}).apply_status_reset_expiry;
+  const cur  = (w||{}).apply_status || '申請予定なし';
+  // 記録があっても、今のステータスが「申請予定なし」でなければ出さない
+  if (!from || !at || cur !== '申請予定なし') { el.style.display = 'none'; el.innerHTML = ''; return; }
+  const fmt = d => { const x = new Date(d); return isNaN(x) ? '-' :
+    x.getFullYear() + '.' + String(x.getMonth()+1).padStart(2,'0') + '.' + String(x.getDate()).padStart(2,'0'); };
+  el.style.display = '';
+  el.innerHTML =
+    '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-left:3px solid #22c55e;border-radius:6px;padding:6px 10px;font-size:11px;color:#166534;line-height:1.6;">' +
+      '（ステータスの' + esc(from) + '、在留期限' + esc(exp ? fmt(exp) : '未入力') + 'まで' +
+      '→【初期化日付】' + esc(fmt(at)) + 'に申請ステータス初期化）' +
+    '</div>';
 }
 
 function renderApplyStatusPanel(status) {
@@ -13080,7 +13151,9 @@ function buildWorkerModalBody(w) {
     <div class="form-group full"><label class="form-label">申請ステータス <span style="color:#ef4444;">*</span></label>
       <select class="form-select" id="wf_apply_status" onchange="onApplyStatusChange()" style="max-width:200px;">
         ${['申請予定なし', '申請準備中', '審査中', '申請済み・不足あり', '追完指示', '審査完了', '発行待ち', '発行完了', '入国済み', '取り下げ', '不許可'].map(s=>`<option ${(w.apply_status||'申請予定なし')===s?'selected':''}>${s}</option>`).join('')}
-      </select></div>
+      </select>
+      <!-- 自動初期化されたときの経緯 -->
+      <div id="wf_apply_reset_note" style="display:none;margin-top:6px;"></div></div>
 
     <!-- 発行完了・入国済み専用パネル -->
     <div id="wf_apply_status_panel" class="form-group full" style="display:none;"></div>
@@ -19375,6 +19448,11 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260805.50', date:'2026-08-07', notify:true, items:[
+    '申請ステータスが【発行完了】【入国済み】で、新しい在留期限（期限まで10か月以上あるもの）が入力されている人材は、保存すると自動で【申請予定なし】に戻るようになりました',
+    '自動で戻った人材は、申請ステータスのすぐ下に「（ステータスの発行完了、在留期限2029.01.01まで→【初期化日付】2026.08.01に申請ステータス初期化）」のように経緯が表示されます',
+    'その後、申請ステータスを【申請予定なし】以外に変更すると、この表示は消えます。次に自動で戻ったときにまた表示されます',
+  ]},
   { version:'ver.20260805.49', date:'2026-08-07', notify:true, items:[
     '社内共有事項：本文に書いたURLがそのままクリックできるリンクになりました',
     '社内共有事項：ファイルをドラッグ＆ドロップで添付できるようになりました。ファイルはGoogleドライブの共有フォルダに保存され、一覧からクリックで開けます（画像はサムネイル表示）',
