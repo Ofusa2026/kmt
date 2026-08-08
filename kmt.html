@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260805.53 -->
+<!-- KMT_VERSION ver.20260805.54 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -374,7 +374,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.53</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.54</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <button onclick="showScreen('my_account')" title="自分のダッシュボード・設定を開く" style="margin-top:6px;width:100%;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:800;color:#0f172a;background:#e2e8f0;border:none;border-radius:6px;padding:6px 8px;cursor:pointer;">📊 マイページ</button>
     <div id="myAlertSummary" style="margin-top:6px;display:none;"></div>
@@ -6368,7 +6368,7 @@ async function loadMyDashboard() {
     ]);
     _myDashData = { workers: workers || [], tasks: tasks || [] };
     renderMyDashboard();
-    loadMyNotes();
+    loadMyNotes();   // 「自分のノート」タブ用（切り替え時に待たせない）
   } catch(e) {
     box.innerHTML = '<div style="text-align:center;padding:30px;color:#dc2626;font-size:12px;">読み込みに失敗しました: ' + esc(e.message) + '</div>';
   }
@@ -6400,30 +6400,26 @@ function renderMyDashboard() {
       '<div>' + items.map(render).join('') + '</div></div>';
   };
 
-  // 1. アラートまとめ（担当区分ごと）
-  const bucketHtml = b =>
+  // 1. アラート（担当区分ごとに別カード／在留期限4か月以内は優先度が低いので別カードにまとめる）
+  const urgentHtml = b =>
     section('🪪','在留期限 1か月以内','#dc2626', b.expiry1, i => row(i, dayTxt(i.days))) +
     section('🪪','在留期限 2か月以内','#ea580c', b.expiry2, i => row(i, dayTxt(i.days))) +
     section('🪪','在留期限 3か月以内','#d97706', b.expiry3, i => row(i, dayTxt(i.days))) +
-    section('🪪','在留期限 4か月以内','#ca8a04', b.expiry4, i => row(i, dayTxt(i.days))) +
     section('⏳','特例期間に入っている人材','#b45309', b.tokurei, i => row(i, '<span style="color:#b45309;">特例あと' + i.tokureiDays + '日</span>')) +
     section('📋','申請ステータス 未入力・要確認','#1d4ed8', b.applyCheck, i => row(i, '<span style="color:#1d4ed8;">' + esc(i.reason) + '</span>')) +
     section('✍️','必須情報の未入力（在留情報）','#7c3aed', b.required, i => row(i, '<span style="color:#7c3aed;">未入力</span>'));
+  const urgentCount = b => b.total - b.expiry4.length;
 
-  // 担当区分の見出し付きブロック（0件の区分は出さない）
-  const roleBlock = (label, color, b) => {
-    if (!b.total) return '';
-    return '<div style="margin-bottom:12px;">' +
-      '<div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:800;color:' + color + ';margin:0 2px 6px;padding-bottom:4px;border-bottom:2px solid ' + color + '33;">' +
-        label + '<span style="margin-left:auto;font-size:11px;">' + b.total + '件</span></div>' +
-      bucketHtml(b) + '</div>';
-  };
-  const alertsHtml =
-    roleBlock('🔵 メイン担当', '#1d4ed8', a.byRole.main) +
-    (a.skipSub ? '' : roleBlock('⚪ サブ担当', '#6b7280', a.byRole.sub)) +
-    roleBlock('🟣 チーム担当', '#7c3aed', a.byRole.team) +
-    (a.skipSub && a.byRole.sub.total
-      ? '<div style="font-size:10px;color:var(--gray-400);padding:4px 2px;">※ 営業チームのため、サブ担当ぶんのアラートは表示していません</div>' : '');
+  // 在留期限4か月以内は担当区分ごとの小見出しでまとめて1カードに
+  const exp4Total = a.byRole.main.expiry4.length + a.byRole.sub.expiry4.length + a.byRole.team.expiry4.length;
+  const exp4Group = (label, color, items) => items.length
+    ? '<div style="font-size:11px;font-weight:800;color:' + color + ';background:' + color + '14;padding:5px 10px;">' + label + '（' + items.length + '件）</div>' +
+      items.map(i => row(i, dayTxt(i.days))).join('')
+    : '';
+  const exp4Html =
+    exp4Group('🔵 メイン担当', '#1d4ed8', a.byRole.main.expiry4) +
+    exp4Group('⚪ サブ担当',   '#6b7280', a.byRole.sub.expiry4) +
+    exp4Group('🟣 チーム担当', '#7c3aed', a.byRole.team.expiry4);
 
   // 2. 自分の担当リスト（担当一覧と同じ基準・メイン/サブ/チームで分ける）
   const me = currentUser?.name || '';
@@ -6496,15 +6492,31 @@ function renderMyDashboard() {
       '<button class="btn btn-outline" style="font-size:11px;padding:3px 10px;margin-left:auto;" onclick="loadMyDashboard()">🔄 更新</button>' +
     '</div>' +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px;align-items:start;">' +
-      card('🔔 アラートまとめ',
-        (a.total ? '<div style="padding:8px;">' + alertsHtml + '</div>'
-                 : '<div style="padding:20px;text-align:center;color:#16a34a;font-size:12px;">✅ 対応が必要なアラートはありません</div>'),
-        a.total ? a.total + '件' : '') +
+      // メイン担当・サブ担当・チーム担当はそれぞれ別カード（優先度の高いものだけ）
+      card('🔵 メイン担当のアラート',
+        (urgentCount(a.byRole.main) ? '<div style="padding:8px;">' + urgentHtml(a.byRole.main) + '</div>'
+          : '<div style="padding:18px;text-align:center;color:#16a34a;font-size:12px;">✅ 対応が必要なアラートはありません</div>'),
+        urgentCount(a.byRole.main) ? urgentCount(a.byRole.main) + '件' : '') +
+      (a.skipSub
+        ? card('⚪ サブ担当のアラート',
+            '<div style="padding:18px;text-align:center;color:var(--gray-400);font-size:12px;">営業チームのため、サブ担当ぶんのアラートは表示していません</div>', '')
+        : card('⚪ サブ担当のアラート',
+            (urgentCount(a.byRole.sub) ? '<div style="padding:8px;">' + urgentHtml(a.byRole.sub) + '</div>'
+              : '<div style="padding:18px;text-align:center;color:#16a34a;font-size:12px;">✅ 対応が必要なアラートはありません</div>'),
+            urgentCount(a.byRole.sub) ? urgentCount(a.byRole.sub) + '件' : '')) +
+      (a.byRole.team.total ? card('🟣 チーム担当のアラート',
+        (urgentCount(a.byRole.team) ? '<div style="padding:8px;">' + urgentHtml(a.byRole.team) + '</div>'
+          : '<div style="padding:18px;text-align:center;color:#16a34a;font-size:12px;">✅ 対応が必要なアラートはありません</div>'),
+        urgentCount(a.byRole.team) ? urgentCount(a.byRole.team) + '件' : '') : '') +
+      // 在留期限4か月以内は先の話なので独立したカードにまとめる
+      card('🗓️ 在留期限 4か月以内（先の予定）',
+        (exp4Total
+          ? exp4Html
+          : '<div style="padding:18px;text-align:center;color:var(--gray-400);font-size:12px;">該当なし</div>'),
+        exp4Total ? exp4Total + '件' : '') +
       card('🏢 自分の担当リスト', coHtml, (coMain.length + coSub.length + coTeam.length) ? (coMain.length + coSub.length + coTeam.length) + '社' : '') +
       card('✅ タスク一覧', taskHtml, myTasks.length ? myTasks.length + '件' : '') +
-    '</div>' +
-    '<div id="myNotesSection" style="margin-top:16px;"></div>';
-  renderMyNotes();
+    '</div>';
 }
 
 // ===== マイページ: 自分メモ（本人だけが見られるノート） =====
@@ -6714,11 +6726,37 @@ async function deleteMyNote(id) {
   } catch(e) { showToast('❌ 削除に失敗: ' + e.message, 'error'); }
 }
 
+// マイページ内のタブ切り替え（担当・タスク／自分のノート／アカウント設定）
+let _myPageTab = 'dash';
+function setMyPageTab(tab) {
+  _myPageTab = tab;
+  ['dash','notes','account'].forEach(t => {
+    const p = document.getElementById('mpPanel_' + t);
+    const b = document.getElementById('mpTab_' + t);
+    if (p) p.style.display = (t === tab) ? '' : 'none';
+    if (b) {
+      b.style.color = (t === tab) ? 'var(--navy)' : 'var(--gray-400)';
+      b.style.borderBottomColor = (t === tab) ? 'var(--blue)' : 'transparent';
+    }
+  });
+}
+
 function buildMyAccountScreen() {
   const u = currentUser || {};
   const avatar = u.avatar_url || '';
+  const tabBtn = (id, label, active) =>
+    `<button id="mpTab_${id}" onclick="setMyPageTab('${id}')" style="padding:9px 20px;font-size:13px;font-weight:700;border:none;background:none;cursor:pointer;color:${active?'var(--navy)':'var(--gray-400)'};border-bottom:2px solid ${active?'var(--blue)':'transparent'};">${label}</button>`;
   return `
-  <div style="padding:16px 24px 0;"><div id="myDashboard"></div></div>
+  <div style="padding:8px 24px 0;">
+    <div style="display:flex;gap:2px;border-bottom:1px solid var(--gray-200);margin-bottom:14px;flex-wrap:wrap;">
+      ${tabBtn('dash','📊 担当・タスク', _myPageTab==='dash')}
+      ${tabBtn('notes','📝 自分のノート', _myPageTab==='notes')}
+      ${tabBtn('account','⚙️ アカウント設定', _myPageTab==='account')}
+    </div>
+    <div id="mpPanel_dash" style="${_myPageTab==='dash'?'':'display:none;'}"><div id="myDashboard"></div></div>
+    <div id="mpPanel_notes" style="${_myPageTab==='notes'?'':'display:none;'}"><div id="myNotesSection"></div></div>
+  </div>
+  <div id="mpPanel_account" style="${_myPageTab==='account'?'':'display:none;'}">
   <div style="max-width:500px;margin:0 auto;padding:24px;">
     <div style="background:white;border:1px solid var(--gray-200);border-radius:16px;padding:28px;box-shadow:var(--shadow);">
       <div style="text-align:center;margin-bottom:24px;">
@@ -6772,6 +6810,7 @@ function buildMyAccountScreen() {
         <button class="btn btn-primary" style="margin-top:6px;" onclick="changePinCode()">🔐 暗証番号を変更</button>
       </div>
     </div>
+  </div>
   </div>`;
 }
 
@@ -12463,8 +12502,9 @@ function computeMyWorkerAlerts(list) {
 function updateMyAlertSummary(list) {
   const el = document.getElementById('myAlertSummary');
   if (!el) return;
-  // 担当判定には staff / company_id が要る。持っていないデータで呼ばれたら専用取得分に切り替える
-  const hasCols = arr => !!(arr && arr.length && ('company_id' in arr[0]) && ('staff' in arr[0]));
+  // 担当判定は所属機関の担当欄が主なので company_id があれば足りる。
+  // 持っていないデータで呼ばれたら専用取得分に切り替える
+  const hasCols = arr => !!(arr && arr.length && ('company_id' in arr[0]));
   let src = (list && list.length) ? list : _alertSourceWorkers();
   if (!hasCols(src)) {
     if (hasCols(allWorkers)) src = allWorkers;
@@ -12472,17 +12512,23 @@ function updateMyAlertSummary(list) {
     else { el.style.display = 'none'; el.innerHTML = ''; return; }
   }
   const a = computeMyWorkerAlerts(src);
-  if (!a.total) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  // 担当区分ではなくアラートの種類で出す。在留期限4か月以内は先の予定なのでここには含めない
+  const roles = [a.byRole.main, a.byRole.sub, a.byRole.team];
+  const sum = key => roles.reduce((s,b) => s + b[key].length, 0);
+  const expiry123 = sum('expiry1') + sum('expiry2') + sum('expiry3');
+  const grand = expiry123 + sum('tokurei') + sum('applyCheck') + sum('required');
+  if (!grand) { el.style.display = 'none'; el.innerHTML = ''; return; }
   const chip = (cnt, icon, label, color) => cnt > 0
     ? '<div style="display:flex;align-items:center;gap:4px;font-size:9px;color:' + color + ';font-weight:700;">' +
       icon + ' ' + label + '<span style="margin-left:auto;font-weight:800;">' + cnt + '</span></div>' : '';
   el.style.display = '';
   el.innerHTML =
     '<div onclick="showScreen(\'my_account\')" title="マイページで詳細を見る" style="cursor:pointer;background:rgba(255,255,255,.08);border-radius:6px;padding:5px 7px;display:flex;flex-direction:column;gap:3px;">' +
-      '<div style="font-size:9px;color:#e2e8f0;font-weight:800;display:flex;align-items:center;gap:4px;">🔔 自分の担当のアラート<span style="margin-left:auto;background:#ef4444;color:white;border-radius:8px;padding:0 5px;font-weight:800;">' + a.total + '</span></div>' +
-      chip(a.byRole.main.total, '🔵', 'メイン担当', '#93c5fd') +
-      chip(a.byRole.sub.total,  '⚪', 'サブ担当',   '#e2e8f0') +
-      chip(a.byRole.team.total, '🟣', 'チーム担当', '#c4b5fd') +
+      '<div style="font-size:9px;color:#e2e8f0;font-weight:800;display:flex;align-items:center;gap:4px;">🔔 自分の担当のアラート<span style="margin-left:auto;background:#ef4444;color:white;border-radius:8px;padding:0 5px;font-weight:800;">' + grand + '</span></div>' +
+      chip(expiry123,        '🪪', '在留期限1〜3か月', '#fca5a5') +
+      chip(sum('tokurei'),   '⏳', '特例期間中',       '#fdba74') +
+      chip(sum('applyCheck'),'📋', '未入力・要確認',   '#93c5fd') +
+      chip(sum('required'),  '✍️', '必須情報の未入力', '#c4b5fd') +
     '</div>';
 }
 
@@ -12493,7 +12539,13 @@ function updateSidebarAlerts(list){
   const mk = (cnt, icon, label, color) => cnt>0
     ? `<div onclick="showScreen('workers')" title="外国人材で詳細を見る" style="cursor:pointer;display:flex;align-items:center;gap:5px;font-size:10px;color:${color};font-weight:700;background:rgba(255,255,255,.06);padding:3px 7px;border-radius:5px;">${icon} ${label}<span style="margin-left:auto;font-weight:800;">${cnt}件</span></div>`
     : '';
-  const html = [ mk(miss,'🚨','申請忘れ警告','#fca5a5'), mk(renewal,'📋','更新リマインド','#93c5fd'), mk(visaUpdate,'🪪','在留期限の更新待ち','#c4b5fd'), mk(kokko,'🏗️','就労管理システム','#fdba74') ].filter(Boolean).join('');
+  // 全体アラートは件数だけのボタン1つにまとめる（内訳は外国人材のアラート欄で見る）
+  const grand = miss + renewal + visaUpdate + kokko;
+  const html = grand > 0
+    ? '<div onclick="showScreen(\'workers\')" title="外国人材のアラート一覧を開く（申請忘れ' + miss + '／更新リマインド' + renewal + '／在留期限の更新待ち' + visaUpdate + '／就労管理システム' + kokko + '）" ' +
+      'style="cursor:pointer;display:flex;align-items:center;gap:5px;font-size:10px;font-weight:800;color:#fde68a;background:rgba(255,255,255,.08);padding:5px 8px;border-radius:6px;">' +
+      '🔔 全体アラート<span style="margin-left:auto;background:#f59e0b;color:#1e293b;border-radius:8px;padding:0 6px;font-weight:800;">' + grand + '件</span></div>'
+    : '';
   el.innerHTML = html;
   el.style.display = html ? 'flex' : 'none';
   updateMyAlertSummary(src); // プロフィール直下の個人サマリも同じデータで更新
@@ -19921,6 +19973,13 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260805.54', date:'2026-08-07', notify:true, items:[
+    'マイページを「📊 担当・タスク」「📝 自分のノート」「⚙️ アカウント設定」の3つのタブに分けました',
+    'メイン担当・サブ担当・チーム担当のアラートをそれぞれ別のカードに分けました',
+    '在留期限4か月以内は「🗓️ 在留期限 4か月以内（先の予定）」として独立したカードにまとめ、急ぎのアラートが目立つようにしました',
+    '左のサイドバーの全体アラートを「🔔 全体アラート ○件」のボタン1つにまとめました。クリックすると外国人材のアラート一覧に移動します',
+    'サイドバーの「自分の担当のアラート」の内訳を、担当区分ではなくアラートの種類（在留期限1〜3か月／特例期間中／未入力・要確認／必須情報の未入力）で表示するようにしました',
+  ]},
   { version:'ver.20260805.53', date:'2026-08-07', notify:true, items:[
     'マイページのアラートを「🔵 メイン担当／⚪ サブ担当／🟣 チーム担当」に分けて表示するようになりました。ステータス未入力・要確認、必須情報の未入力も同じように分かれます',
     '在留期限のアラートに「4か月以内」を追加しました（1か月・2か月・3か月・4か月の4段階になります）',
