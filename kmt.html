@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260805.51 -->
+<!-- KMT_VERSION ver.20260805.52 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -374,8 +374,9 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.51</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.52</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
+    <button onclick="showScreen('my_account')" title="自分のダッシュボード・設定を開く" style="margin-top:6px;width:100%;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:800;color:#0f172a;background:#e2e8f0;border:none;border-radius:6px;padding:6px 8px;cursor:pointer;">📊 マイページ</button>
     <div id="myAlertSummary" style="margin-top:6px;display:none;"></div>
     <div id="sidebarAlerts" style="margin-top:6px;display:none;flex-direction:column;gap:3px;"></div>
   </div>
@@ -12187,7 +12188,14 @@ function computeMyWorkerAlerts(list) {
 function updateMyAlertSummary(list) {
   const el = document.getElementById('myAlertSummary');
   if (!el) return;
-  const src = (list && list.length) ? list : _alertSourceWorkers();
+  // 担当判定には staff / company_id が要る。持っていないデータで呼ばれたら専用取得分に切り替える
+  const hasCols = arr => !!(arr && arr.length && ('company_id' in arr[0]) && ('staff' in arr[0]));
+  let src = (list && list.length) ? list : _alertSourceWorkers();
+  if (!hasCols(src)) {
+    if (hasCols(allWorkers)) src = allWorkers;
+    else if (hasCols(_sidebarAlertData)) src = _sidebarAlertData;
+    else { el.style.display = 'none'; el.innerHTML = ''; return; }
+  }
   const a = computeMyWorkerAlerts(src);
   if (!a.total) { el.style.display = 'none'; el.innerHTML = ''; return; }
   const chip = (cnt, icon, label, color) => cnt > 0
@@ -12218,7 +12226,8 @@ function updateSidebarAlerts(list){
 }
 async function refreshSidebarAlerts(){
   try{
-    const d = await sbFetch('workers?select=id,name,management_no,nationality,status,visa_expiry,apply_status,apply_status_changed_at,apply_date,request_date,renewal_status,applicant_field,visa_status,desired_visa,kmt_support,support_type_2go,placement_report_date,retire_report_date,tg2_change_report_date&is_deleted=eq.false');
+    // staff / company_id / tokurei_date / card_info_done はマイページの個人アラート集計に必要
+    const d = await sbFetch('workers?select=id,name,management_no,nationality,status,staff,company_id,visa_expiry,tokurei_date,card_info_done,apply_status,apply_status_changed_at,apply_date,request_date,renewal_status,applicant_field,visa_status,desired_visa,kmt_support,support_type_2go,placement_report_date,retire_report_date,tg2_change_report_date&is_deleted=eq.false');
     _sidebarAlertData = d || [];
     updateSidebarAlerts(_sidebarAlertData);
   }catch(e){}
@@ -19637,6 +19646,10 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260805.52', date:'2026-08-07', notify:true, items:[
+    '左上のユーザー名の下に「📊 マイページ」ボタンを追加しました。ここから個人ダッシュボードを開けます',
+    'プロフィール下の「自分の担当のアラート」が表示されない不具合を直しました。担当している人材の件数が正しく出るようになりました',
+  ]},
   { version:'ver.20260805.51', date:'2026-08-07', notify:true, items:[
     'マイページ（左上の自分の名前をクリック）に個人ダッシュボードを追加しました',
     '「🔔 アラートまとめ」…自分が担当している人材のうち、在留期限1〜3か月以内・特例期間に入っている方・申請ステータスが未入力／要確認の方・在留情報が未入力の方が出ます。名前をクリックすると人材詳細が開きます',
