@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260805.48 -->
+<!-- KMT_VERSION ver.20260805.49 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -374,7 +374,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.48</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.49</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <div id="sidebarAlerts" style="margin-top:6px;display:none;flex-direction:column;gap:3px;"></div>
   </div>
@@ -708,7 +708,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
             <div id="co_team_staff_box" style="display:flex;flex-wrap:wrap;gap:10px 16px;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:12px;"></div>
           </div>
           <div class="form-group full">
-            <label class="form-label">社内メモ <span style="font-size:10px;color:var(--gray-400);font-weight:400;">— KMT側共有用</span></label>
+            <label class="form-label" style="display:flex;align-items:center;gap:6px;">社内メモ <span style="font-size:10px;color:var(--gray-400);font-weight:400;">— KMT側共有用</span><button type="button" onclick="openMemoFullscreen('co_memo','所属機関の社内メモ')" title="全画面で開く" style="margin-left:auto;font-size:10px;font-weight:700;color:#1d4ed8;background:none;border:1px solid #bfdbfe;border-radius:4px;padding:2px 8px;cursor:pointer;">⛶ 全画面</button></label>
             <textarea class="form-textarea" id="co_memo" rows="4" placeholder="社内共有メモを入力..."></textarea>
           </div>
         </div>
@@ -952,7 +952,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
               </div>
             </div>
             <div class="form-group full">
-              <label class="form-label">詳細メモ</label>
+              <label class="form-label" style="display:flex;align-items:center;gap:6px;">詳細メモ<button type="button" onclick="openMemoFullscreen('mf_memo','定期面談の詳細メモ')" title="全画面で開く" style="margin-left:auto;font-size:10px;font-weight:700;color:#1d4ed8;background:none;border:1px solid #bfdbfe;border-radius:4px;padding:2px 8px;cursor:pointer;">⛶ 全画面</button></label>
               <textarea class="form-textarea" id="mf_memo" rows="4" placeholder="面談内容・申し送り事項など..."></textarea>
             </div>
           </div>
@@ -1838,6 +1838,7 @@ function fillCoForm(co) {
   _coIndustries = getCompanyIndustries(co);
   renderIndustryChips();
   toggleNewIndustryInput(false);
+  autoGrowAllTextareas(document.getElementById('companyModal')); // メモを中身の高さに合わせる
 }
 
 function getCoFormData() {
@@ -2375,6 +2376,57 @@ const NOTICE_CATEGORIES = ['業務共有事項', '注意事項', '企業対応',
 const NOTICE_FIELDS_19 = ['介護', 'ビルクリーニング', '素形材・産業機械・電気電子情報関連製造業', '建設', '造船・舶用工業', '自動車整備', '航空', '宿泊', '農業', '漁業', '飲食料品製造業', '外食業', '工業製品製造業（素形材等）', '自動車運送業', '鉄道', '林業', '木材産業', '電気・電子・情報関連産業', 'その他分野'];
 let _notices = [];
 let _noticeEditId = null;
+let _noticeFiles = [];           // 添付予定のファイル(未アップロード)
+let _noticeAttachments = [];     // 保存済み添付 [{name,url}]
+let _noticeHighlightId = null;   // 共有リンクで開いたときに目立たせるノート
+
+// ノートの添付ファイル保管先(社内共有事項用のDriveフォルダ)
+const NOTICE_DRIVE_URL = 'https://drive.google.com/drive/folders/1S4vY3cqzKoJmWcPdQiBXAxAw8Dy0bl6D';
+const NOTICE_GAS_URL = 'https://script.google.com/macros/s/AKfycbzFG1X4KAUR09MLzwy3l-LJL_7HRnbB0rHfQwUwilxyf3PGTTGXFGqKiMXyv2kHJdIm/exec';
+
+// 本文中のURLをそのままクリックできるリンクにする(エスケープ後に置換するのでXSSにならない)
+function linkifyText(text) {
+  const escaped = esc(text || '');
+  return escaped.replace(/(https?:\/\/[^\s<>"']+)/g, (url) => {
+    const clean = url.replace(/[.,;:)\]}]+$/, '');   // 文末の句読点はリンクから外す
+    const tail = url.slice(clean.length);
+    return '<a href="' + clean + '" target="_blank" rel="noopener noreferrer" ' +
+      'style="color:#1d4ed8;text-decoration:underline;word-break:break-all;" onclick="event.stopPropagation();">' + clean + '</a>' + tail;
+  });
+}
+
+// 特定ノートへの共有リンク(URLの末尾に #notice=<id> を付ける)
+function noticeShareUrl(id) {
+  return location.origin + location.pathname + location.search + '#notice=' + id;
+}
+async function copyNoticeLink(id, title) {
+  const url = noticeShareUrl(id);
+  try {
+    await navigator.clipboard.writeText(url);
+    showToast('🔗 「' + title + '」のリンクをコピーしました', 'success');
+  } catch(e) {
+    // クリップボードが使えない環境向けのフォールバック
+    const ta = document.createElement('textarea');
+    ta.value = url; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); showToast('🔗 リンクをコピーしました', 'success'); }
+    catch(err) { prompt('このリンクをコピーしてください', url); }
+    ta.remove();
+  }
+}
+// 共有リンクで開かれたときに該当ノートまでスクロールして光らせる
+function focusSharedNotice() {
+  const m = (location.hash || '').match(/notice=([0-9a-f-]+)/i);
+  if (!m) return;
+  _noticeHighlightId = m[1];
+  setTimeout(() => {
+    const el = document.getElementById('notice_' + _noticeHighlightId);
+    if (!el) { showToast('⚠️ 指定された共有事項が見つかりません（削除された可能性があります）', 'error'); return; }
+    el.scrollIntoView({ behavior:'smooth', block:'center' });
+    el.style.transition = 'box-shadow .3s';
+    el.style.boxShadow = '0 0 0 3px #fbbf24';
+    setTimeout(() => { el.style.boxShadow = ''; }, 4000);
+  }, 300);
+}
 
 
 // 都道府県ソート順
@@ -2388,6 +2440,81 @@ function prefSortKey(pref) {
 
 
 
+
+// ===== メモ・テキストエリアの拡張 =====
+// 中身の高さに合わせて自動で伸ばす(中でスクロールさせない)。
+// 手動リサイズ(resize:vertical)した場合はその高さを尊重する。
+const AUTOGROW_MAX_PX = 900;
+function autoGrowTextarea(el) {
+  if (!el || el.tagName !== 'TEXTAREA') return;
+  if (el.dataset.manualResized === '1') return;
+  el.style.height = 'auto';
+  const h = Math.min(el.scrollHeight + 2, AUTOGROW_MAX_PX);
+  el.style.height = Math.max(h, 80) + 'px';
+  el.style.overflowY = (el.scrollHeight > AUTOGROW_MAX_PX) ? 'auto' : 'hidden';
+}
+// モーダルや画面を描画した後に、中のテキストエリアをまとめて調整する
+function autoGrowAllTextareas(root) {
+  const scope = root || document;
+  scope.querySelectorAll('textarea.form-textarea').forEach(autoGrowTextarea);
+}
+// 入力に追従(1か所で拾う)。手動で高さを変えたら自動調整をやめる
+document.addEventListener('input', e => {
+  if (e.target && e.target.matches && e.target.matches('textarea.form-textarea')) autoGrowTextarea(e.target);
+});
+document.addEventListener('mouseup', e => {
+  const el = e.target;
+  if (!el || !el.matches || !el.matches('textarea.form-textarea')) return;
+  // リサイズハンドルで高さが変わったら手動扱いにする
+  if (el.dataset.autoH && el.style.height && el.style.height !== el.dataset.autoH) el.dataset.manualResized = '1';
+});
+
+// メモを全画面で開いて編集する(元のテキストエリアと同期)
+function openMemoFullscreen(targetId, label) {
+  const src = document.getElementById(targetId);
+  if (!src) return;
+  const html =
+    '<div id="memoFsModal" style="position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:10050;display:flex;align-items:center;justify-content:center;padding:24px;">' +
+      '<div style="background:white;border-radius:12px;width:1000px;max-width:100%;height:88vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden;">' +
+        '<div style="display:flex;align-items:center;gap:8px;padding:14px 18px;border-bottom:1px solid var(--gray-200);">' +
+          '<div style="font-size:14px;font-weight:800;color:var(--navy);">📝 ' + esc(label || 'メモ') + '</div>' +
+          '<div style="font-size:11px;color:var(--gray-400);">閉じると元の欄に反映されます（保存はフォームの保存ボタンで）</div>' +
+          '<button onclick="closeMemoFullscreen()" style="margin-left:auto;background:none;border:none;font-size:20px;cursor:pointer;color:var(--gray-400);">✕</button>' +
+        '</div>' +
+        '<textarea id="memoFsText" class="form-textarea" style="flex:1;border:none;border-radius:0;resize:none;font-size:14px;line-height:1.8;padding:16px 18px;height:auto;"></textarea>' +
+        '<div style="display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid var(--gray-200);">' +
+          '<button onclick="closeMemoFullscreen()" class="btn btn-primary">✓ 閉じる</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  document.body.insertAdjacentHTML('beforeend', html);
+  const fs = document.getElementById('memoFsText');
+  fs.value = src.value;
+  fs.dataset.src = targetId;
+  fs.focus();
+  // 入力をその場で元の欄へ反映(未保存チェックにも乗るようイベントを飛ばす)
+  fs.addEventListener('input', () => {
+    src.value = fs.value;
+    src.dispatchEvent(new Event('input', { bubbles:true }));
+  });
+}
+function closeMemoFullscreen() {
+  const fs = document.getElementById('memoFsText');
+  const src = fs ? document.getElementById(fs.dataset.src) : null;
+  if (fs && src) {
+    src.value = fs.value;
+    src.dispatchEvent(new Event('input', { bubbles:true }));
+    src.dispatchEvent(new Event('change', { bubbles:true }));
+    autoGrowTextarea(src);
+  }
+  document.getElementById('memoFsModal')?.remove();
+}
+// メモ欄の右上に出す「⛶ 全画面」ボタン
+function memoExpandBtn(targetId, label) {
+  return '<button type="button" onclick="openMemoFullscreen(\'' + targetId + '\',\'' + esc(label) + '\')" ' +
+    'title="全画面で開く" style="margin-left:auto;font-size:10px;font-weight:700;color:#1d4ed8;background:none;' +
+    'border:1px solid #bfdbfe;border-radius:4px;padding:2px 8px;cursor:pointer;">⛶ 全画面</button>';
+}
 
 // ===== メール書式ボタン =====
 let _mailSavedRange = null;
@@ -3755,6 +3882,7 @@ async function loadNotices() {
     const data = await sbFetch('company_notices?is_deleted=eq.false&order=created_at.desc');
     _notices = data || [];
     renderNotices();
+    focusSharedNotice(); // 共有リンク(#notice=...)で開かれた場合はその項目まで移動
   } catch(e) { showToast('❌ ' + e.message, 'error'); }
   showLoading(false);
 }
@@ -3808,24 +3936,43 @@ function renderNotices() {
         <span style="font-size:11px;color:var(--gray-400);">${items.length}件</span>
       </div>
       ${items.map(n => `
-      <div style="background:white;border:1px solid var(--gray-200);border-left:4px solid ${color};border-radius:8px;padding:14px 16px;margin-bottom:8px;position:relative;">
+      <div id="notice_${n.id}" style="background:white;border:1px solid var(--gray-200);border-left:4px solid ${color};border-radius:8px;padding:14px 16px;margin-bottom:8px;position:relative;">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px;">
           <div style="font-size:13px;font-weight:700;color:var(--navy);flex:1;">${esc(n.title)}</div>
           <div style="display:flex;gap:4px;flex-shrink:0;">
+            <button onclick="copyNoticeLink('${n.id}','${esc(n.title)}')" class="btn btn-outline" title="この共有事項へのリンクをコピー" style="font-size:11px;padding:2px 10px;">🔗 リンク</button>
             <button onclick="openNoticeModal('${n.id}')" class="btn btn-outline" style="font-size:11px;padding:2px 10px;">✏️ 編集</button>
             <button onclick="deleteNotice('${n.id}','${esc(n.title)}')" class="btn btn-outline" style="font-size:11px;padding:2px 10px;color:#dc2626;border-color:#dc2626;">🗑️</button>
           </div>
         </div>
-        <div style="font-size:12px;color:var(--gray-600);white-space:pre-wrap;line-height:1.7;">${esc(n.content)}</div>
+        <div style="font-size:12px;color:var(--gray-600);white-space:pre-wrap;line-height:1.7;">${linkifyText(n.content)}</div>
+        ${noticeAttachmentsHtml(n.attachments)}
         <div style="margin-top:8px;font-size:11px;color:var(--gray-400);">${esc(n.created_by||'')} · ${esc((n.created_at||'').slice(0,10))}${n.updated_at!==n.created_at?' (編集済み)':''}</div>
       </div>`).join('')}
     </div>`;
   }).join('');
 }
 
+// 保存済み添付ファイルの一覧(画像はサムネイル、それ以外はリンク)
+function noticeAttachmentsHtml(list) {
+  const arr = Array.isArray(list) ? list : [];
+  if (!arr.length) return '';
+  return '<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px;">' + arr.map(a => {
+    const img = isChatImageAttachment(a) ? driveImageUrl(a.url, 400) : '';
+    return '<a href="' + esc(a.url) + '" target="_blank" rel="noopener noreferrer" title="' + esc(a.name||'') + '" ' +
+      'style="display:flex;align-items:center;gap:6px;background:#f8fafc;border:1px solid var(--gray-200);border-radius:6px;padding:5px 8px;text-decoration:none;color:var(--navy);max-width:260px;">' +
+      (img
+        ? '<img src="' + esc(img) + '" loading="lazy" onerror="_chatImgFallback(this)" style="width:32px;height:32px;object-fit:cover;border-radius:4px;flex-shrink:0;">'
+        : '<span style="font-size:14px;flex-shrink:0;">📎</span>') +
+      '<span style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(a.name||'ファイル') + '</span></a>';
+  }).join('') + '</div>';
+}
+
 function openNoticeModal(id) {
   _noticeEditId = id;
   const n = id ? _notices.find(x=>x.id===id) : null;
+  _noticeFiles = [];
+  _noticeAttachments = Array.isArray(n?.attachments) ? JSON.parse(JSON.stringify(n.attachments)) : [];
   const catOpts = NOTICE_CATEGORIES.map(c=>`<option value="${c}" ${n?.category===c?'selected':''}>${c}</option>`).join('');
   const subOpts = NOTICE_FIELDS_19.map(f=>`<option value="${f}" ${n?.subcategory===f?'selected':''}>${f}</option>`).join('');
   const modalHtml = `<div id="noticeModal" style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;">
@@ -3856,17 +4003,100 @@ function openNoticeModal(id) {
           <textarea class="form-textarea" id="nm_content" rows="6" placeholder="共有したい内容を入力...">${esc(n?.content||'')}</textarea>
         </div>
         <div class="form-group full">
+          <label class="form-label">添付ファイル <span style="font-size:10px;color:var(--gray-400);font-weight:400;">— ドラッグ＆ドロップ / 貼り付けでも追加できます（Googleドライブに保存されます）</span></label>
+          <div id="nm_dropzone"
+               ondragover="event.preventDefault();this.style.background='#eff6ff';this.style.borderColor='#3b82f6';"
+               ondragleave="this.style.background='';this.style.borderColor='';"
+               ondrop="onNoticeDrop(event, this)"
+               style="border:2px dashed var(--gray-300);border-radius:8px;padding:14px;text-align:center;cursor:pointer;transition:.15s;"
+               onclick="document.getElementById('nm_file_input').click()">
+            <div style="font-size:12px;color:var(--gray-500);">📎 ここにファイルをドラッグ、またはクリックして選択</div>
+            <input type="file" id="nm_file_input" multiple style="display:none;" onchange="addNoticeFiles([...this.files]);this.value='';">
+          </div>
+          <div id="nm_file_list" style="margin-top:8px;"></div>
+        </div>
+        <div class="form-group full">
           <label class="form-label">投稿者名</label>
           <input class="form-input" id="nm_created_by" value="${esc(n?.created_by||currentUser?.name||'')}" placeholder="例: 蛭田">
         </div>
       </div>
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
         <button onclick="document.getElementById('noticeModal').remove()" class="btn btn-outline">キャンセル</button>
-        <button onclick="saveNotice()" class="btn btn-primary">💾 保存</button>
+        <button onclick="saveNotice()" class="btn btn-primary" id="nm_save_btn">💾 保存</button>
       </div>
     </div>
   </div>`;
   document.body.insertAdjacentHTML('beforeend', modalHtml);
+  renderNoticeFileList();
+}
+
+function onNoticeDrop(e, zone) {
+  e.preventDefault();
+  zone.style.background = ''; zone.style.borderColor = '';
+  const files = [...(e.dataTransfer?.files || [])];
+  if (files.length) addNoticeFiles(files);
+}
+function addNoticeFiles(files) {
+  files.forEach(f => _noticeFiles.push({ id:'nf_'+Date.now()+'_'+Math.random().toString(36).slice(2,7), file:f }));
+  renderNoticeFileList();
+}
+function removeNoticeFile(fid) {
+  _noticeFiles = _noticeFiles.filter(f => f.id !== fid);
+  renderNoticeFileList();
+}
+function removeNoticeAttachment(idx) {
+  _noticeAttachments.splice(idx, 1);
+  renderNoticeFileList();
+}
+function renderNoticeFileList() {
+  const box = document.getElementById('nm_file_list');
+  if (!box) return;
+  const saved = _noticeAttachments.map((a, i) =>
+    '<div style="display:flex;align-items:center;gap:6px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:5px 8px;margin-bottom:4px;">' +
+      '<span style="font-size:13px;">📎</span>' +
+      '<a href="' + esc(a.url) + '" target="_blank" rel="noopener noreferrer" style="flex:1;min-width:0;font-size:11px;color:#166534;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(a.name||'') + '</a>' +
+      '<span style="font-size:10px;color:#16a34a;flex-shrink:0;">保存済み</span>' +
+      '<button onclick="removeNoticeAttachment(' + i + ')" title="この添付を外す" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:14px;padding:0 4px;">✕</button>' +
+    '</div>').join('');
+  const pending = _noticeFiles.map(f =>
+    '<div style="display:flex;align-items:center;gap:6px;background:white;border:1px solid var(--gray-200);border-radius:6px;padding:5px 8px;margin-bottom:4px;">' +
+      (/^image\//i.test(f.file.type)
+        ? '<img src="' + URL.createObjectURL(f.file) + '" style="width:30px;height:30px;object-fit:cover;border-radius:4px;flex-shrink:0;">'
+        : '<span style="font-size:13px;">📄</span>') +
+      '<span style="flex:1;min-width:0;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(f.file.name) + '</span>' +
+      '<span style="font-size:10px;color:#94a3b8;flex-shrink:0;">' + formatBytes(f.file.size) + '</span>' +
+      '<button onclick="removeNoticeFile(\'' + f.id + '\')" title="削除" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:14px;padding:0 4px;">✕</button>' +
+    '</div>').join('');
+  box.innerHTML = saved + pending;
+}
+
+// 添付をGoogleドライブ(社内共有事項フォルダ)へアップロードする
+async function uploadNoticeFiles() {
+  if (!_noticeFiles.length) return [];
+  const out = [];
+  for (let i = 0; i < _noticeFiles.length; i++) {
+    const file = _noticeFiles[i].file;
+    showToast(`📤 (${i+1}/${_noticeFiles.length}) ${file.name} をアップロード中...`, 'success');
+    const b64 = await new Promise((res, rej) => {
+      const reader = new FileReader();
+      reader.onload = e => res(e.target.result.split(',')[1]);
+      reader.onerror = rej;
+      reader.readAsDataURL(file);
+    });
+    const sep = NOTICE_GAS_URL.includes('?') ? '&' : '?';
+    const resp = await fetch(NOTICE_GAS_URL + sep + 't=' + Date.now() + '_' + i, {
+      method:'POST', cache:'no-store', redirect:'follow',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action:'uploadFileToDrive', driveUrl: NOTICE_DRIVE_URL,
+        fileName: file.name, fileData: b64, mimeType: file.type }),
+    });
+    if (!resp.ok) throw new Error(file.name + ': HTTP ' + resp.status);
+    const result = await resp.json();
+    if (!result.success) throw new Error(file.name + ': ' + (result.error || 'アップロード失敗'));
+    out.push({ name: file.name, url: result.fileUrl, mimeType: file.type, size: file.size });
+    if (i < _noticeFiles.length - 1) await new Promise(r => setTimeout(r, 400));
+  }
+  return out;
 }
 
 function toggleNoticeSubcat() {
@@ -3887,9 +4117,16 @@ async function saveNotice() {
   if (!title)   { showToastTop('❌ タイトルを入力してください'); return; }
   if (!content) { showToastTop('❌ 内容を入力してください'); return; }
 
+  const saveBtn = document.getElementById('nm_save_btn');
+  if (saveBtn) saveBtn.disabled = true;
   showLoading(true);
   try {
-    const body = { category: cat, subcategory: sub || null, title, content, created_by: who || null, updated_at: new Date().toISOString() };
+    // 添付があれば先にDriveへアップロードしてURLを確定させる
+    const uploaded = await uploadNoticeFiles();
+    _noticeFiles = [];
+    const attachments = [..._noticeAttachments, ...uploaded];
+    const body = { category: cat, subcategory: sub || null, title, content, created_by: who || null,
+      attachments, updated_at: new Date().toISOString(), updated_by: _curUserName() };
     if (_noticeEditId) {
       await sbFetch('company_notices?id=eq.' + _noticeEditId, { method: 'PATCH', body: JSON.stringify(body) });
       showToast('✅ 更新しました', 'success');
@@ -3900,6 +4137,7 @@ async function saveNotice() {
     document.getElementById('noticeModal')?.remove();
     await loadNotices();
   } catch(e) { showToast('❌ ' + e.message, 'error'); }
+  if (saveBtn) saveBtn.disabled = false;
   showLoading(false);
 }
 
@@ -6598,6 +6836,10 @@ function onLoginSuccess() {
   }
   // What's New: ログイン後1.2秒でチェック(新バージョンならトースト表示)
   try { setTimeout(checkAndShowWhatsNew, 1200); } catch(e) {}
+  // 共有リンク(#notice=...)で開かれたら社内共有事項を開く
+  if (/notice=/.test(location.hash || '')) {
+    setTimeout(() => { try { showScreen('notices'); } catch(e) {} }, 300);
+  }
 }
 
 function logoutUser() {
@@ -12977,7 +13219,7 @@ function buildWorkerModalBody(w) {
 
   <!-- 5. メモ -->
   <div class="section-title">5. メモ</div>
-  <div class="form-group full"><label class="form-label">備考</label><textarea class="form-textarea" id="wf_memo">${esc(w.memo||'')}</textarea></div>
+  <div class="form-group full"><label class="form-label" style="display:flex;align-items:center;gap:6px;">備考${memoExpandBtn('wf_memo','外国人材の備考メモ')}</label><textarea class="form-textarea" id="wf_memo">${esc(w.memo||'')}</textarea></div>
 
   </div><!-- end 左カラム -->
 
@@ -13193,7 +13435,7 @@ function buildWorkerModalBody(w) {
   </div>
   <!-- ノートタブ -->
   <div id="wtab_note_panel" style="display:none;padding:4px 0;">
-    <div style="margin-bottom:8px;font-size:11px;color:var(--gray-400);">この人材に関するメモ・申し送り事項を記録してください。</div>
+    <div style="margin-bottom:8px;font-size:11px;color:var(--gray-400);display:flex;align-items:center;gap:6px;">この人材に関するメモ・申し送り事項を記録してください。${memoExpandBtn('wf_notes','人材ノート')}</div>
     <textarea class="form-textarea" id="wf_notes" rows="14"
       style="font-size:13px;line-height:1.8;resize:vertical;"
       placeholder="例: 家族構成・日本語レベル・経歴・特記事項など...">${esc(w.notes||'')}</textarea>
@@ -18759,6 +19001,8 @@ function showGenModal(id, title, bodyHtml) {
   if(bodyEl) bodyEl.innerHTML=bodyHtml;
   modal.classList.add('show');
   kmtLog('🪟 モーダル', id + ' を開く', undefined, '#0891b2');
+  // メモ欄を中身の高さに合わせる(値をセットした後に実行)
+  setTimeout(() => autoGrowAllTextareas(bodyEl), 260);
   // 自動保存フック
   const fnName = _AUTOSAVE_MAP[id];
   if (fnName && typeof window[fnName] === 'function') {
@@ -19131,6 +19375,13 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260805.49', date:'2026-08-07', notify:true, items:[
+    '社内共有事項：本文に書いたURLがそのままクリックできるリンクになりました',
+    '社内共有事項：ファイルをドラッグ＆ドロップで添付できるようになりました。ファイルはGoogleドライブの共有フォルダに保存され、一覧からクリックで開けます（画像はサムネイル表示）',
+    '社内共有事項：各項目の「🔗 リンク」ボタンでその項目へのリンクをコピーできます。そのリンクを開くと該当箇所まで自動で移動して光ります',
+    'メモ欄が中身の長さに合わせて自動で広がるようになりました。枠の右下をドラッグして自分で高さを変えることもできます',
+    '所属機関の社内メモ／外国人材の備考・ノート／定期面談の詳細メモに「⛶ 全画面」ボタンを追加しました。押すと大きな画面で編集でき、閉じると元の欄に反映されます',
+  ]},
   { version:'ver.20260805.48', date:'2026-08-07', notify:true, items:[
     '担当一覧の「📊 横並び」表示に、画面の下に貼り付く横スクロールバーを追加しました。下までスクロールしなくても左右に動かせます',
     '担当名の下の表示を「メイン ○社 / ○名」→「全体 ○社 / ○名」の順に変更しました',
