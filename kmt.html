@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260805.46 -->
+<!-- KMT_VERSION ver.20260805.47 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -367,7 +367,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.46</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.47</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <div id="sidebarAlerts" style="margin-top:6px;display:none;flex-direction:column;gap:3px;"></div>
   </div>
@@ -3357,8 +3357,8 @@ function renderStaffBoard(wrap, companies, workerCount, targetStaff) {
       group('チーム', teamCos, '#7c3aed'),
     ].join('') || '<div style="font-size:11px;color:var(--gray-400);padding:12px 2px;">担当企業なし</div>';
 
-    return `<div style="flex:0 0 290px;width:290px;background:#f1f5f9;border:1px solid var(--gray-200);border-radius:10px;display:flex;flex-direction:column;max-height:100%;overflow:hidden;">
-      <div style="background:${color};padding:10px 12px;flex-shrink:0;">
+    return `<div style="flex:0 0 290px;width:290px;background:#f1f5f9;border:1px solid var(--gray-200);border-radius:10px;overflow:hidden;">
+      <div style="background:${color};padding:10px 12px;">
         <div style="display:flex;align-items:center;gap:8px;">
           <div style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:white;flex-shrink:0;">${esc(staff.slice(0,1))}</div>
           <div style="min-width:0;">
@@ -3367,14 +3367,16 @@ function renderStaffBoard(wrap, companies, workerCount, targetStaff) {
           </div>
         </div>
       </div>
-      <div style="flex:1;overflow-y:auto;padding:4px 8px 10px;">${body}</div>
+      <div style="padding:4px 8px 10px;">${body}</div>
     </div>`;
   }).join('');
 
+  // 縦は列ごとではなくページ全体でスクロールさせるため、高さは固定しない。
+  // (横スクロール用に overflow-x:auto だけを付ける。高さが内容なりなので縦のバーは出ない)
   wrap.innerHTML =
-    '<div style="font-size:11px;color:var(--gray-400);margin-bottom:6px;">← → 横スクロール、各列は上下スクロールで見られます</div>' +
-    '<div style="overflow:auto;height:calc(100vh - 250px);min-height:420px;border:1px solid var(--gray-200);border-radius:10px;background:#f8fafc;padding:10px;">' +
-      '<div style="display:flex;gap:10px;align-items:stretch;height:100%;min-width:min-content;">' + cols + '</div>' +
+    '<div style="font-size:11px;color:var(--gray-400);margin-bottom:6px;">← → 横スクロール／上下はページごとスクロールできます</div>' +
+    '<div style="overflow-x:auto;border:1px solid var(--gray-200);border-radius:10px;background:#f8fafc;padding:10px;">' +
+      '<div style="display:flex;gap:10px;align-items:flex-start;min-width:min-content;">' + cols + '</div>' +
     '</div>';
 }
 
@@ -18961,6 +18963,10 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260805.47', date:'2026-08-07', notify:true, items:[
+    '担当一覧の「📊 横並び」表示で、上下のスクロールをページ全体のスクロールに変更しました',
+    '列の中だけがスクロールする形をやめたので、担当企業が多い方の一覧も途中で切れずに最後まで見られます',
+  ]},
   { version:'ver.20260805.46', date:'2026-08-07', notify:true, items:[
     '所属機関の「チーム内サブ担当」を、5人固定ではなく全ユーザーから選べるようにしました',
     '担当一覧：チーム内サブ担当に設定された方は、誰でも自動で一覧に出るようになりました（担当が増えても設定作業は不要です）',
