@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260805.55 -->
+<!-- KMT_VERSION ver.20260805.56 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -374,13 +374,16 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.55</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.56</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <button onclick="showScreen('my_account')" title="自分のダッシュボード・設定を開く" style="margin-top:6px;width:100%;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:800;color:#0f172a;background:#e2e8f0;border:none;border-radius:6px;padding:6px 8px;cursor:pointer;">📊 マイページ</button>
     <div id="myAlertSummary" style="margin-top:6px;display:none;"></div>
     <div id="sidebarAlerts" style="margin-top:6px;display:none;flex-direction:column;gap:3px;"></div>
   </div>
-  <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット <span id="chatUnreadBadge" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
+  <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;" id="chatNavItem">💬 チャット
+    <span id="chatMentionDirectBadge" title="自分あての未読メンション" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:800;padding:1px 5px;border-radius:8px;margin-left:4px;">@0</span>
+    <span id="chatMentionGroupBadge" title="所属チームあての未読メンション" style="display:none;background:#f59e0b;color:#1e293b;font-size:9px;font-weight:800;padding:1px 5px;border-radius:8px;margin-left:3px;">@0</span>
+    <span id="chatUnreadBadge" title="未読の合計" style="display:none;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
   <div style="height:1px;background:rgba(255,255,255,0.08);margin:4px 16px 8px;"></div>
   <div class="nav-item active" onclick="showScreen('ofusa_view')" style="margin:8px 8px 4px;border-radius:6px;">📊 案件進捗確認</div>
   <div class="nav-item" onclick="showScreen('notices')">📋 社内共有事項</div>
@@ -7275,6 +7278,24 @@ let _selectedGroupId = null;
 let _chatSortMode = 'recent'; // 'folder' | 'recent' (デフォルト: 受信時間順)
 let _chatStaffOnly = false;   // true: ログイン中ユーザーが担当の人材/企業のみ表示
 let _chatMentionOnly = false; // true: 自分宛メンションの未読がある企業のみ表示
+let _mentionDirectTotal = 0;  // 🔴自分あての未読メンション合計
+let _mentionGroupTotal = 0;   // 🟡所属チームあての未読メンション合計
+
+// チャット一覧の凡例。@メンションで絞り込み中は内訳の件数を強調して出す
+function updateMentionLegend() {
+  const el = document.getElementById('chatMentionLegend');
+  if (!el) return;
+  const on = _chatMentionOnly;
+  const item = (color, textColor, label, cnt) =>
+    '<span style="display:inline-flex;align-items:center;gap:4px;' + (on ? 'background:' + color + '1a;border-radius:10px;padding:2px 8px;' : '') + '">' +
+      '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + color + ';"></span>' +
+      '<span style="color:' + textColor + ';font-weight:700;">' + label + '</span>' +
+      '<span style="color:' + textColor + ';font-weight:800;">' + cnt + '件</span></span>';
+  el.innerHTML =
+    item('#ef4444', '#dc2626', '自分あて', _mentionDirectTotal) +
+    item('#f59e0b', '#b45309', '所属チームあて', _mentionGroupTotal) +
+    (on ? '' : '<span style="color:#cbd5e1;">@バッジ＝未読メンション数</span>');
+}
 let _chatUnreadOnly = false;  // true: 未読がある企業のみ表示
 let _chatGroupByApplyType = false; // true: 企業を申請種別ごとに見出し付きグループ表示
 let _chatPinnedCompanyIds = new Set(); // ピン留めした company_id のセット(ログイン中ユーザー)
@@ -7323,11 +7344,7 @@ function buildChatScreen() {
       </div>
       <div style="padding:8px 14px;border-bottom:1px solid #e0e0e0;flex-shrink:0;font-size:12px;color:#94a3b8;">
         <div>🏢 企業ごとにチャットがまとまります</div>
-        <div style="display:flex;align-items:center;gap:10px;margin-top:5px;font-size:11px;flex-wrap:wrap;">
-          <span style="display:inline-flex;align-items:center;gap:4px;"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#ef4444;"></span><span style="color:#dc2626;font-weight:700;">自分あて</span></span>
-          <span style="display:inline-flex;align-items:center;gap:4px;"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#f59e0b;"></span><span style="color:#b45309;font-weight:700;">所属チームあて</span></span>
-          <span style="color:#cbd5e1;">@バッジ＝未読メンション数</span>
-        </div>
+        <div id="chatMentionLegend" style="display:flex;align-items:center;gap:10px;margin-top:5px;font-size:11px;flex-wrap:wrap;"></div>
       </div>
       <div id="chatRoomList" style="flex:1;overflow-y:auto;"></div>
     </div>
@@ -7419,6 +7436,7 @@ function buildChatScreen() {
 
 async function loadChatScreen() {
   showLoading(true);
+  updateMentionLegend(); // 直近の集計値で先に凡例を出す（loadChatUnread後に更新される）
   try {
     // usersをロード
     if (!allUsers.length) {
@@ -8381,6 +8399,20 @@ async function loadChatUnread() {
       const readAt = readMap[m.chat_room_id];
       return isMentionForMe(m.mentions) && (!readAt || m.created_at > readAt);
     }).length;
+    // 🔴自分あて / 🟡所属チームあて の合計（サイドバーのバッジと一覧の凡例で共有する）
+    _mentionDirectTotal = Object.values(directByRoom).reduce((s,v) => s+v, 0);
+    _mentionGroupTotal  = Object.values(groupByRoom).reduce((s,v) => s+v, 0);
+    const dBadge = document.getElementById('chatMentionDirectBadge');
+    if (dBadge) {
+      dBadge.textContent = '@' + _mentionDirectTotal;
+      dBadge.style.display = _mentionDirectTotal > 0 ? '' : 'none';
+    }
+    const gBadge = document.getElementById('chatMentionGroupBadge');
+    if (gBadge) {
+      gBadge.textContent = '@' + _mentionGroupTotal;
+      gBadge.style.display = _mentionGroupTotal > 0 ? '' : 'none';
+    }
+    updateMentionLegend();
     const badge = document.getElementById('chatUnreadBadge');
     if (badge) {
       badge.textContent = total;
@@ -8659,6 +8691,7 @@ function setChatStaffFilter(on) {
 }
 function setChatMentionFilter(on) {
   _chatMentionOnly = !!on;
+  updateMentionLegend();
   renderChatRooms();
 }
 function setChatUnreadFilter(on) {
@@ -19986,6 +20019,10 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260805.56', date:'2026-08-07', notify:true, items:[
+    'チャット一覧の凡例に「自分あて ○件／所属チームあて ○件」の件数が出るようになりました。「@メンション」で絞り込むと件数が強調表示されます',
+    '左メニューの「チャット」に、自分あてメンション（赤）と所属チームあてメンション（黄）の件数バッジを追加しました。右端の数字はこれまでどおり未読の合計です',
+  ]},
   { version:'ver.20260805.55', date:'2026-08-07', notify:true, items:[
     'マイページの在留期限のアラート（1〜4か月以内・特例期間中）に、人材の申請ステータスを表示するようになりました',
     'マイページの担当リストに並ぶ人材に、在職ステータスを表示するようになりました',
