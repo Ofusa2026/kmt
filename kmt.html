@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260805.73 -->
+<!-- KMT_VERSION ver.20260805.74 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -385,7 +385,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.73</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.74</div>
     <div id="currentUserBadge" style="font-size:10px;color:#334e6d;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(15,32,64,.08);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <button onclick="showScreen('my_account')" title="自分のダッシュボード・設定を開く" style="margin-top:6px;width:100%;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:800;color:#111111;background:#FFFFFF;border:1px solid #B9D4EE;border-radius:6px;padding:6px 8px;cursor:pointer;">📊 マイページ</button>
     <div id="myAlertSummary" style="margin-top:6px;display:none;"></div>
@@ -6851,7 +6851,7 @@ function renderMyCalendar() {
         items.map(({s, role}) => {
           const ev = SCHEDULE_EVENT_TYPES[s.event_type] || { icon:'📌', color:'#64748b', bg:'#f1f5f9', label:'予定' };
           const nm = s.workers?.name || '';
-          const done = s.status === 'done';
+          const done = schedIsDone(s);
           return '<div onclick="event.stopPropagation();openScheduleModal(\'' + s.id + '\')" ' +
             'title="' + esc((ev.label||'') + '：' + nm + (role==='main'?'（メイン担当）':'（サブ担当）')) + '" ' +
             'style="display:flex;align-items:center;gap:3px;background:' + ev.bg + ';color:' + ev.color + ';' +
@@ -14707,8 +14707,8 @@ function buildSupportSchedulesScreen() {
         <table>
           <thead><tr>
             <th style="width:90px;">種別</th>
-            <th style="width:110px;">予定日</th>
-            <th style="width:110px;">実施日</th>
+            <th style="width:110px;">日付</th>
+            <th style="width:110px;">時間</th>
             <th>人材</th>
             <th>企業</th>
             <th style="width:90px;">方法</th>
@@ -14946,6 +14946,81 @@ function _schedCalDateStr(d) {
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
 }
 
+// この予定が実質「実施済」か。日付が過ぎていれば、変更がない限り実施済とみなす
+function schedIsDone(s) {
+  if (!s) return false;
+  if (s.status === 'done') return true;
+  const key = s.scheduled_at || s.completed_at;
+  if (!key) return false;
+  const d = new Date(key); d.setHours(0,0,0,0);
+  const today = new Date(); today.setHours(0,0,0,0);
+  return d < today;   // 日付が過ぎたら実施済みとみなす
+}
+// 時間の表示（終日 or 09:00〜10:00）
+function schedTimeLabel(s) {
+  if (!s || s.all_day !== false) return '終日';
+  const t = v => (v || '').slice(0,5);
+  return t(s.start_time) + (s.end_time ? '〜' + t(s.end_time) : '');
+}
+
+// 月表示は普通のカレンダー（7列 × 週）で描く
+function renderScheduleMonthGrid(area, list) {
+  const anchor = new Date(_scheduleCalState.anchor);
+  const y = anchor.getFullYear(), m = anchor.getMonth();
+  const first = new Date(y, m, 1), last = new Date(y, m + 1, 0);
+  const start = new Date(first); start.setDate(1 - first.getDay());
+  const end   = new Date(last);  end.setDate(last.getDate() + (6 - last.getDay()));
+
+  const byDate = {};
+  (list || []).forEach(s => {
+    const key = s.scheduled_at || s.completed_at;
+    if (key) (byDate[key] = byDate[key] || []).push(s);
+  });
+  // 同じ日は 終日 → 開始時刻順
+  Object.values(byDate).forEach(arr => arr.sort((a,b) => {
+    const ad = a.all_day !== false, bd = b.all_day !== false;
+    if (ad !== bd) return ad ? -1 : 1;
+    return String(a.start_time||'').localeCompare(String(b.start_time||''));
+  }));
+
+  const todayStr = _schedCalDateStr(new Date());
+  const cells = [];
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const key = _schedCalDateStr(d);
+    const inMonth = d.getMonth() === m;
+    const isToday = key === todayStr;
+    const dow = d.getDay();
+    const dcolor = dow === 0 ? '#dc2626' : dow === 6 ? '#2563eb' : 'var(--navy)';
+    const items = byDate[key] || [];
+    cells.push(
+      '<div onclick="openScheduleModalPreset(null,null,\'' + key + '\')" title="この日に予定を登録" ' +
+        'style="min-height:96px;border:1px solid var(--gray-200);border-radius:6px;padding:4px;cursor:pointer;overflow:hidden;' +
+          'background:' + (isToday ? '#eff6ff' : inMonth ? 'white' : '#f8fafc') + ';' +
+          (isToday ? 'box-shadow:inset 0 0 0 2px #93c5fd;' : '') + '">' +
+        '<div style="font-size:11px;font-weight:700;color:' + (inMonth ? dcolor : '#cbd5e1') + ';margin-bottom:3px;">' + d.getDate() + '</div>' +
+        items.map(s => {
+          const ev = SCHEDULE_EVENT_TYPES[s.event_type] || { icon:'📌', color:'#64748b', bg:'#f1f5f9', label:'予定' };
+          const done = schedIsDone(s);
+          const tm = s.all_day === false ? (s.start_time||'').slice(0,5) + ' ' : '';
+          return '<div onclick="event.stopPropagation();openScheduleModal(\'' + s.id + '\')" ' +
+            'title="' + esc((ev.label||'') + '：' + (s.workers?.name||'') + ' / ' + schedTimeLabel(s) + (done ? '（実施済）' : '')) + '" ' +
+            'style="display:flex;align-items:center;gap:3px;background:' + ev.bg + ';color:' + ev.color + ';border-radius:3px;' +
+              'padding:1px 3px;margin-bottom:2px;font-size:10px;line-height:1.5;' + (done ? 'opacity:.5;' : '') + '">' +
+            '<span style="flex-shrink:0;">' + ev.icon + '</span>' +
+            '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(tm + (s.workers?.name || '')) + '</span></div>';
+        }).join('') +
+      '</div>');
+  }
+  const dows = ['日','月','火','水','木','金','土'];
+  area.innerHTML =
+    '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:4px;">' +
+      dows.map((w,i) => '<div style="text-align:center;font-size:11px;font-weight:700;color:' +
+        (i===0?'#dc2626':i===6?'#2563eb':'var(--gray-400)') + ';">' + w + '</div>').join('') +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;">' + cells.join('') + '</div>' +
+    '<div style="font-size:11px;color:var(--gray-400);margin-top:8px;">日付をクリックで予定を登録／予定をクリックで編集（薄く表示されているものは実施済です）</div>';
+}
+
 function renderScheduleCalendar() {
   const area = document.getElementById('scheduleCalArea');
   if (!area) return;
@@ -14959,6 +15034,37 @@ function renderScheduleCalendar() {
       lbl.textContent = range.start.getFullYear() + '年' + (range.start.getMonth()+1) + '月';
     }
   }
+  // 月表示は普通のカレンダー形式で描く（人材ごとの行にはしない）
+  if (_scheduleCalState.view === 'month') {
+    const y0 = range.start.getFullYear(), m0 = range.start.getMonth();
+    const monthList = (_supportSchedules || []).filter(s => {
+      if (_scheduleFilter.type !== 'all' && s.event_type !== _scheduleFilter.type) return false;
+      if (_scheduleFilter.worker !== 'all' && s.worker_id !== _scheduleFilter.worker) return false;
+      if (_scheduleFilter.company !== 'all' && s.company_id !== _scheduleFilter.company) return false;
+      if (_scheduleFilter.search) {
+        const q = _scheduleFilter.search;
+        const text = ((s.workers?.name||'') + ' ' + (s.companies?.name||'') + ' ' + (s.notes||'')).toLowerCase();
+        if (!text.includes(q)) return false;
+      }
+      if (_scheduleFilter.mainStaff !== 'all' || _scheduleFilter.subStaff !== 'all') {
+        const c = (allCompanies||[]).find(x => x.id === s.company_id);
+        if (!c) return false;
+        if (_scheduleFilter.mainStaff !== 'all' &&
+            !String(c.main_staff||'').split(/[,、，\s]+/).map(v=>v.trim()).includes(_scheduleFilter.mainStaff)) return false;
+        if (_scheduleFilter.subStaff !== 'all' &&
+            !String(c.sub_staff||'').split(/[,、，\s]+/).map(v=>v.trim()).includes(_scheduleFilter.subStaff)) return false;
+      }
+      const key = s.scheduled_at || s.completed_at;
+      if (!key) return false;
+      const d = new Date(key);
+      return d.getFullYear() === y0 && d.getMonth() === m0;
+    });
+    renderScheduleMonthGrid(area, monthList);
+    const cnt = document.getElementById('scheduleCountLabel');
+    if (cnt) cnt.textContent = '表示期間内: ' + monthList.length + '件 / 全' + (_supportSchedules||[]).length + '件';
+    return;
+  }
+
   // 日付配列
   const dates = [];
   const cur = new Date(range.start);
@@ -15054,10 +15160,9 @@ function renderScheduleCalendar() {
         const evs = eventMap[w.id + '||' + ds] || [];
         const cellEvents = evs.map(s => {
           const ev = SCHEDULE_EVENT_TYPES[s.event_type] || { icon:'📅', label:s.event_type, color:'#5f6368', bg:'#f1f3f4' };
-          const isDone = s.status === 'done';
-          const isOverdue = !isDone && s.scheduled_at && s.scheduled_at < todayStr;
-          const cls = (isDone?'done ':'') + (isOverdue?'overdue':'');
-          const tooltip = ev.label + (isDone?'（実施済）':(isOverdue?'（期限超過）':'（予定）')) + (s.event_method?' / '+(SCHEDULE_METHOD_LABEL[s.event_method]||s.event_method):'') + (s.notes?' / '+s.notes.slice(0,40):'');
+          const isDone = schedIsDone(s);
+          const cls = isDone ? 'done ' : '';
+          const tooltip = ev.label + '／' + schedTimeLabel(s) + (isDone?'（実施済）':'（予定）') + (s.event_method?' / '+(SCHEDULE_METHOD_LABEL[s.event_method]||s.event_method):'') + (s.notes?' / '+s.notes.slice(0,40):'');
           return '<span class="sched-event ' + cls + '" style="background:' + ev.bg + ';color:' + ev.color + ';" title="' + esc(tooltip) + '" onclick="event.stopPropagation();openScheduleModal(\'' + s.id + '\')">' + ev.icon + '</span>';
         }).join('');
         const addMini = cellEvents ? '' : '<span class="sched-add-mini">＋</span>';
@@ -15101,15 +15206,18 @@ async function openScheduleModalPreset(workerId, companyId, dateStr) {
   }, 50);
 }
 
-// 通知バナー（期限超過）
+// 通知バナー（今日の予定）
+// 日付が過ぎた予定は「実施済」とみなす運用にしたので、期限超過の警告は出さない
 function renderScheduleNotifyBanner() {
-  const today = new Date(); today.setHours(0,0,0,0);
-  const overdue = _supportSchedules.filter(s => s.status === 'planned' && s.scheduled_at && new Date(s.scheduled_at) < today);
   const banner = document.getElementById('scheduleNotifyBanner');
   if (!banner) return;
-  if (overdue.length > 0) {
+  const todayStr = _schedCalDateStr(new Date());
+  const todays = (_supportSchedules || []).filter(s => (s.scheduled_at || s.completed_at) === todayStr);
+  if (todays.length > 0) {
     banner.style.display = 'block';
-    banner.innerHTML = '<div style="font-weight:700;color:#92400e;">⚠️ ' + overdue.length + '件の予定が期限を過ぎています</div>';
+    banner.innerHTML = '<div style="font-weight:700;color:#92400e;">📅 今日の予定が' + todays.length + '件あります（' +
+      esc(todays.slice(0,5).map(s => (s.workers?.name || '') + '／' + schedTimeLabel(s)).join('、')) +
+      (todays.length > 5 ? ' ほか' : '') + '）</div>';
   } else {
     banner.style.display = 'none';
   }
@@ -15157,10 +15265,10 @@ function renderScheduleTable() {
   const todayStr = new Date().toISOString().slice(0,10);
   tbody.innerHTML = list.map(s => {
     const ev = SCHEDULE_EVENT_TYPES[s.event_type] || { label: s.event_type, icon: '📅', color: '#5f6368', bg: '#f1f3f4' };
-    const isOverdue = s.status === 'planned' && s.scheduled_at && s.scheduled_at < todayStr;
-    const isDone = s.status === 'done';
+    const isDone = schedIsDone(s);
+    const isOverdue = false;   // 日付が過ぎたものは実施済み扱いにするため使わない
     const sched = s.scheduled_at ? new Date(s.scheduled_at).toLocaleDateString('ja-JP') : '-';
-    const comp = s.completed_at ? new Date(s.completed_at).toLocaleDateString('ja-JP') : '-';
+    const comp = schedTimeLabel(s);   // 実施日のかわりに時間を出す
     const methodLabel = s.event_method ? (SCHEDULE_METHOD_LABEL[s.event_method] || s.event_method) : '-';
     const statusBadge = isDone
       ? '<span style="background:#dcfce7;color:#16a34a;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">✅ 実施済</span>'
@@ -15236,12 +15344,28 @@ function googleCalendarUrl(s) {
     s.notes ? 'メモ: ' + s.notes : '',
     '', '※ KMT案件管理システムの支援スケジュールから作成',
   ].filter(Boolean).join('\n');
+  // 終日なら日付だけ、時間帯があればその時刻でGoogleカレンダーに渡す
+  let dates;
+  if (s.all_day === false && s.start_time) {
+    const hhmm = v => String(v || '').slice(0,5).replace(':','') + '00';
+    const day = _gcalDate(s.scheduled_at);
+    const st = hhmm(s.start_time);
+    let et = s.end_time ? hhmm(s.end_time) : '';
+    if (!et) {  // 終了時刻が無ければ1時間後にする
+      const [h, mi] = String(s.start_time).slice(0,5).split(':').map(Number);
+      et = String((h + 1) % 24).padStart(2,'0') + String(mi).padStart(2,'0') + '00';
+    }
+    dates = day + 'T' + st + '/' + day + 'T' + et;
+  } else {
+    dates = _gcalDate(s.scheduled_at) + '/' + _gcalDate(s.scheduled_at, 1);  // 終日
+  }
   const p = new URLSearchParams({
     action: 'TEMPLATE',
     text: title,
-    dates: _gcalDate(s.scheduled_at) + '/' + _gcalDate(s.scheduled_at, 1),  // 終日
+    dates: dates,
     details: details,
   });
+  if (s.all_day === false && s.start_time) p.set('ctz', 'Asia/Tokyo');
   if (companyName) p.set('location', companyName);
   return 'https://calendar.google.com/calendar/render?' + p.toString();
 }
@@ -15257,12 +15381,16 @@ function addScheduleFormToGoogleCalendar() {
   const g = id => document.getElementById(id)?.value || '';
   const scheduled_at = g('schedScheduledAt');
   if (!scheduled_at) { showToast('⚠️ 予定日を入力してください', 'error'); return; }
+  const allDay = document.getElementById('schedAllDay')?.checked !== false;
   const url = googleCalendarUrl({
     event_type: g('schedTypeInput'),
     event_method: g('schedMethodInput'),
     worker_id: g('schedWorkerInput'),
     company_id: g('schedCompanyInput'),
     scheduled_at,
+    all_day: allDay,
+    start_time: allDay ? null : g('schedStartTime'),
+    end_time: allDay ? null : g('schedEndTime'),
     notes: g('schedNotes'),
   });
   if (url) window.open(url, '_blank', 'noopener');
@@ -15324,19 +15452,26 @@ async function openScheduleModal(scheduleId) {
           '<option value="">-- 選択 --</option>' +
           (allCompanies||[]).map(c => '<option value="' + c.id + '"' + (s?.company_id===c.id?' selected':'') + '>' + esc(c.name) + '</option>').join('') +
         '</select></div>' +
-      // 予定日
-      '<div style="display:flex;gap:10px;">' +
-        '<div style="flex:1;"><label style="font-weight:600;color:#5f6368;display:block;margin-bottom:4px;">予定日</label>' +
-          '<input type="date" id="schedScheduledAt" value="' + (s?.scheduled_at || '') + '" style="width:100%;padding:7px 10px;border:1px solid #dadce0;border-radius:6px;font-size:13px;"></div>' +
-        '<div style="flex:1;"><label style="font-weight:600;color:#5f6368;display:block;margin-bottom:4px;">実施日</label>' +
-          '<input type="date" id="schedCompletedAt" value="' + (s?.completed_at || '') + '" style="width:100%;padding:7px 10px;border:1px solid #dadce0;border-radius:6px;font-size:13px;"></div>' +
-      '</div>' +
-      // 状態
+      // 日付（予定日と実施日を1つにまとめた）
+      '<div><label style="font-weight:600;color:#5f6368;display:block;margin-bottom:4px;">日付 <span style="color:#dc2626;">*</span></label>' +
+        '<input type="date" id="schedScheduledAt" value="' + (s?.scheduled_at || s?.completed_at || '') + '" style="width:100%;padding:7px 10px;border:1px solid #dadce0;border-radius:6px;font-size:13px;"></div>' +
+      // 時間（終日 or 時間帯）
+      '<div><label style="font-weight:600;color:#5f6368;display:block;margin-bottom:4px;">時間</label>' +
+        '<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;margin-bottom:6px;">' +
+          '<input type="checkbox" id="schedAllDay" ' + (s?.all_day === false ? '' : 'checked') + ' onchange="onSchedAllDayChange()" style="cursor:pointer;">終日（一日中）' +
+        '</label>' +
+        '<div id="schedTimeWrap" style="display:' + (s?.all_day === false ? 'flex' : 'none') + ';gap:8px;align-items:center;">' +
+          '<input type="time" id="schedStartTime" value="' + ((s?.start_time||'').slice(0,5)) + '" style="flex:1;padding:7px 10px;border:1px solid #dadce0;border-radius:6px;font-size:13px;">' +
+          '<span style="color:#5f6368;">〜</span>' +
+          '<input type="time" id="schedEndTime" value="' + ((s?.end_time||'').slice(0,5)) + '" style="flex:1;padding:7px 10px;border:1px solid #dadce0;border-radius:6px;font-size:13px;">' +
+        '</div></div>' +
+      // 状態（日付が過ぎたら自動で実施済扱い）
       '<div><label style="font-weight:600;color:#5f6368;display:block;margin-bottom:4px;">状態</label>' +
         '<select id="schedStatusInput" style="width:100%;padding:7px 10px;border:1px solid #dadce0;border-radius:6px;font-size:13px;">' +
           '<option value="planned"' + (s?.status!=='done'?' selected':'') + '>⏰ 予定</option>' +
           '<option value="done"' + (s?.status==='done'?' selected':'') + '>✅ 実施済</option>' +
-        '</select></div>' +
+        '</select>' +
+        '<div style="font-size:11px;color:var(--gray-400);margin-top:4px;">日付が過ぎた予定は、変更しない限り自動で「実施済」として扱われます</div></div>' +
       // メモ
       '<div><label style="font-weight:600;color:#5f6368;display:block;margin-bottom:4px;">メモ</label>' +
         '<textarea id="schedNotes" rows="3" style="width:100%;padding:7px 10px;border:1px solid #dadce0;border-radius:6px;font-size:13px;font-family:inherit;box-sizing:border-box;resize:vertical;">' + esc(s?.notes||'') + '</textarea></div>' +
@@ -15365,6 +15500,18 @@ function onSchedTypeChange() {
   if (wrap) wrap.style.display = (t === 'periodic_meeting') ? '' : 'none';
 }
 
+function onSchedAllDayChange() {
+  const on = document.getElementById('schedAllDay')?.checked;
+  const wrap = document.getElementById('schedTimeWrap');
+  if (wrap) wrap.style.display = on ? 'none' : 'flex';
+  // 時間帯にしたとき、空なら使いやすい初期値を入れる
+  if (!on) {
+    const st = document.getElementById('schedStartTime'), en = document.getElementById('schedEndTime');
+    if (st && !st.value) st.value = '10:00';
+    if (en && !en.value) en.value = '11:00';
+  }
+}
+
 function onSchedWorkerChange() {
   // 人材選択時に紐づく企業を自動セット
   const sel = document.getElementById('schedWorkerInput');
@@ -15382,13 +15529,18 @@ async function saveSchedule(scheduleId) {
   const worker_id = document.getElementById('schedWorkerInput')?.value || null;
   const company_id = document.getElementById('schedCompanyInput')?.value || null;
   const scheduled_at = document.getElementById('schedScheduledAt')?.value || null;
-  const completed_at = document.getElementById('schedCompletedAt')?.value || null;
+  const all_day = document.getElementById('schedAllDay')?.checked !== false;
+  const start_time = all_day ? null : (document.getElementById('schedStartTime')?.value || null);
+  const end_time   = all_day ? null : (document.getElementById('schedEndTime')?.value || null);
   const status = document.getElementById('schedStatusInput')?.value || 'planned';
   const notes = document.getElementById('schedNotes')?.value || null;
+  // 実施日は日付に一本化したので、実施済のときだけ日付を実施日にも入れておく
+  const completed_at = status === 'done' ? scheduled_at : null;
 
   if (!event_type) { showToast('⚠️ 種別を選択してください','error'); return; }
   if (!worker_id) { showToast('⚠️ 人材を選択してください','error'); return; }
-  if (!scheduled_at && !completed_at) { showToast('⚠️ 予定日か実施日のいずれかを入力してください','error'); return; }
+  if (!scheduled_at) { showToast('⚠️ 日付を入力してください','error'); return; }
+  if (!all_day && !start_time) { showToast('⚠️ 開始時刻を入力してください（終日ならチェックを入れてください）','error'); return; }
 
   // 新規登録は保存と同時にGoogleカレンダーも開く。
   // 保存(await)の後に window.open するとブラウザにポップアップと判定されるので、
@@ -15404,6 +15556,9 @@ async function saveSchedule(scheduleId) {
     company_id,
     scheduled_at,
     completed_at,
+    all_day,
+    start_time,
+    end_time,
     status,
     notes,
     updated_at: new Date().toISOString(), updated_by: _curUserName()
@@ -15546,7 +15701,7 @@ async function loadWorkerSchedules(workerId) {
     }
     area.innerHTML = '<div style="display:flex;flex-direction:column;gap:6px;">' + list.map(s => {
       const ev = SCHEDULE_EVENT_TYPES[s.event_type] || { label: s.event_type, icon: '📅', color: '#5f6368', bg: '#f1f3f4' };
-      const isDone = s.status === 'done';
+      const isDone = schedIsDone(s);
       const sched = s.scheduled_at ? new Date(s.scheduled_at).toLocaleDateString('ja-JP') : '-';
       const comp = s.completed_at ? new Date(s.completed_at).toLocaleDateString('ja-JP') : '';
       const methodLabel = s.event_method ? (SCHEDULE_METHOD_LABEL[s.event_method] || '') : '';
@@ -15605,7 +15760,7 @@ async function loadCompanySchedules(companyId) {
     }
     area.innerHTML = '<div style="display:flex;flex-direction:column;gap:6px;">' + list.map(s => {
       const ev = SCHEDULE_EVENT_TYPES[s.event_type] || { label: s.event_type, icon: '📅', color: '#5f6368', bg: '#f1f3f4' };
-      const isDone = s.status === 'done';
+      const isDone = schedIsDone(s);
       const sched = s.scheduled_at ? new Date(s.scheduled_at).toLocaleDateString('ja-JP') : '-';
       const comp = s.completed_at ? new Date(s.completed_at).toLocaleDateString('ja-JP') : '';
       const workerName = s.workers?.name || '-';
@@ -20548,6 +20703,13 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260805.74', date:'2026-08-07', notify:true, items:[
+    '支援スケジュールの「月」表示を、普通のカレンダー（日〜土の7列）に変更しました。日付をクリックで登録、予定をクリックで編集できます',
+    '予定の入力を「予定日／実施日」の2つから「日付」1つにまとめ、あわせて「時間」を追加しました。終日（一日中）か、開始〜終了の時間帯を選べます',
+    '入力した時間はそのままGoogleカレンダーに反映されます（終日なら終日予定、時間帯なら その時刻の予定として登録されます）',
+    '日付が過ぎた予定は、状態を変えていなくても自動で「実施済」として扱われます。薄く表示されるので、済んだものが一目で分かります',
+    'これに伴い「期限を過ぎています」の警告はなくなり、代わりに「今日の予定」をお知らせするようになりました',
+  ]},
   { version:'ver.20260805.73', date:'2026-08-07', notify:true, items:[
     '「🧾 通算期間の精査状況」を追加しました。精査済みが何件・未精査が何件かが分かります',
     '外国人材ページのアラート欄に一覧として表示され、クリックすると未精査の人材の一覧が開きます。名前を押すとその人材の詳細に移動できます',
