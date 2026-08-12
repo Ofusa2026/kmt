@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260813.83 -->
+<!-- KMT_VERSION ver.20260813.84 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -58,9 +58,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .whats-new-toast-btn:active{transform:scale(.97);}
 /* 見出しは選択中のメニュー(.nav-item.active)と紛らわしくならないよう、
    文字を1.5倍にして色も一段明るい水色にする。選択中のメニューは #BBD9F5 のまま */
-.sidebar-section{display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;
+.sidebar-section{display:flex;align-items:center;gap:5px;cursor:pointer;user-select:none;
   margin:10px 8px 4px;padding:8px 10px;border-radius:6px;
-  background:#C6E2FB;color:#0f2040;font-size:18px;font-weight:800;letter-spacing:0;}
+  background:#C6E2FB;color:#0f2040;font-size:16px;font-weight:800;letter-spacing:0;
+  /* 長い見出し＋件数バッジでも2行に折り返さない */
+  white-space:nowrap;overflow:hidden;}
 .sidebar-section:hover{background:#B2D6F8;}
 .sidebar-section-arrow{font-size:13px;line-height:1;color:#0f2040;flex-shrink:0;width:13px;text-align:center;}
 .sidebar-section-count{margin-left:auto;font-size:10px;font-weight:800;color:#FFFFFF;background:#0f2040;border-radius:8px;padding:1px 6px;}
@@ -421,7 +423,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260813.83</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260813.84</div>
     <div id="currentUserBadge" style="font-size:10px;color:#334e6d;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(15,32,64,.08);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <button onclick="showScreen('my_account')" title="自分のダッシュボード・設定を開く" style="margin-top:6px;width:100%;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:800;color:#111111;background:#FFFFFF;border:1px solid #B9D4EE;border-radius:6px;padding:6px 8px;cursor:pointer;">📊 マイページ</button>
     <div id="myAlertSummary" style="margin-top:6px;display:none;"></div>
@@ -22002,6 +22004,9 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260813.84', date:'2026-08-13', notify:true, items:[
+    '左メニューの見出しの文字が大きすぎて「登録支援機関業務」が2行に折り返していたので、枠に収まる大きさに調整しました。件数が2桁になっても1行のままです（見出しは項目より大きい表示のままです）',
+  ]},
   { version:'ver.20260813.83', date:'2026-08-13', notify:true, items:[
     '左メニューの「求人・人材紹介」の一番上に「💬 求人チャット」を追加しました。求人案件ごとのチャットがここに一覧で出ます',
     '求人チャットの未読は、赤い「＠件数」（自分あてメンション）とピンクの件数（未読合計）で表示されます。この件数は今までの「💬 チャット」には含まれません（別々に数えます）',
