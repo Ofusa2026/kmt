@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260813.81 -->
+<!-- KMT_VERSION ver.20260813.82 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -69,6 +69,31 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .nav-item .badge{background:#dc2626;color:white;font-size:10px;padding:1px 6px;border-radius:10px;margin-left:auto;}
 /* チャットのバッジ: 折り返さず1行に収める。狭いときは _fitChatNavRow() が縮小率を下げる */
 #chatNavItem{--chatNavScale:1;}
+/* 求人案件: 求人詳細ノート / 候補者リスト */
+.jn-card{border:1px solid var(--gray-200);border-radius:8px;margin-bottom:14px;background:#fff;overflow:hidden;}
+.jn-head{display:flex;align-items:center;gap:8px;padding:8px 10px;background:#F3F8FE;border-bottom:1px solid var(--gray-200);}
+.jn-title{flex:1;min-width:0;border:1px solid transparent;background:transparent;font-size:13px;font-weight:700;color:#1e3a5f;padding:4px 6px;border-radius:4px;}
+.jn-title:focus{outline:none;border-color:#93c5fd;background:#fff;}
+.jn-meta{font-size:10px;color:var(--gray-400);white-space:nowrap;}
+.jn-tools{display:flex;flex-wrap:wrap;align-items:center;gap:4px;padding:6px 10px;background:#FAFCFF;border-bottom:1px solid var(--gray-200);}
+.jn-tools button,.jn-tools select{font-size:11px;padding:3px 7px;border:1px solid var(--gray-200);background:#fff;border-radius:4px;cursor:pointer;color:#1e3a5f;}
+.jn-tools button:hover{background:#EAF3FD;}
+.jn-color{display:inline-flex;align-items:center;gap:3px;font-size:11px;color:#1e3a5f;border:1px solid var(--gray-200);background:#fff;border-radius:4px;padding:2px 6px;cursor:pointer;}
+.jn-color input{width:20px;height:18px;border:none;background:none;padding:0;cursor:pointer;}
+.jn-body{min-height:120px;padding:12px;font-size:13px;line-height:1.7;color:#1e3a5f;outline:none;}
+.jn-body:focus{background:#FEFEFF;}
+.jn-table{border-collapse:collapse;margin:8px 0;min-width:60%;}
+.jn-table th,.jn-table td{border:1px solid #b6c8de;padding:5px 8px;font-size:12px;min-width:60px;}
+.jn-table th{background:#EAF3FD;font-weight:700;}
+.jp-add-bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px;}
+.jp-cand-row{display:flex;align-items:center;gap:8px;padding:9px 10px;border:1px solid var(--gray-200);border-radius:8px;margin-bottom:6px;background:#fff;}
+.jp-cand-main{flex:1;min-width:0;cursor:pointer;}
+.jp-cand-name{display:block;font-size:13px;font-weight:700;color:#1e3a5f;}
+.jp-cand-sub{display:block;font-size:11px;color:var(--gray-400);margin-top:1px;}
+.jp-dup{font-size:11px;color:#b45309;background:#FEF3C7;border:1px solid #FCD34D;border-radius:6px;padding:3px 7px;margin-top:5px;display:flex;flex-wrap:wrap;align-items:center;gap:4px;}
+.jp-dup-chip{background:#fff;border:1px solid #FCD34D;border-radius:10px;padding:1px 8px;cursor:pointer;color:#92400e;font-weight:700;}
+.jp-dup-chip:hover{background:#FDE68A;}
+.jp-dup-chip i{font-style:normal;font-weight:400;color:#b45309;margin-left:4px;}
 #chatNavLabel{font-size:calc(13px * var(--chatNavScale));}
 .chat-nav-badge{flex:0 0 auto;font-size:calc(9px * var(--chatNavScale));font-weight:800;
   padding:calc(1px * var(--chatNavScale)) calc(5px * var(--chatNavScale));border-radius:8px;line-height:1.5;}
@@ -386,7 +411,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260813.81</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260813.82</div>
     <div id="currentUserBadge" style="font-size:10px;color:#334e6d;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(15,32,64,.08);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <button onclick="showScreen('my_account')" title="自分のダッシュボード・設定を開く" style="margin-top:6px;width:100%;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:800;color:#111111;background:#FFFFFF;border:1px solid #B9D4EE;border-radius:6px;padding:6px 8px;cursor:pointer;">📊 マイページ</button>
     <div id="myAlertSummary" style="margin-top:6px;display:none;"></div>
@@ -17736,10 +17761,358 @@ function renderJobProgress() {
   area.innerHTML = `<div style="font-size:12px;color:var(--gray-400);margin-bottom:8px;">合計 ${rows.length}件 ・ 見込 ${_jpNum(rows.reduce((s,r)=>s+Number(r.expected_count||0),0))}人 ・ ${_jpYen(rows.reduce((s,r)=>s+Number(r.amount||0),0))}</div>` + groups.map(groupHtml).join('');
 }
 
-// 求人進捗 詳細/編集モーダル
+
+// ===== 求人案件: 求人詳細ノート / 候補者リスト / 求人チャット =====
+// 求人案件は job_progress（src_row が鍵）。候補者との紐付けは candidate_job_progress。
+// 「所属機関×外国人材」と同じ考え方だが、候補者は複数の求人に登録でき、重複も許す（重複先を表示する）。
+let _jpTab = 'info';
+let _jpDetailRow = null;
+let _jpNotes = [];
+let _jpCandLinks = [];
+let _cjpAllLinks = [];          // 全リンク（重複判定に使う）
+let _jpCandSearch = '';
+
+const CJP_STATUSES = ['提案中','書類選考','面接調整中','面接済','内定','決定','見送り','辞退'];
+const CJP_STATUS_COLOR = {'提案中':'#1a73e8','書類選考':'#7c3aed','面接調整中':'#d97706','面接済':'#0891b2','内定':'#16a34a','決定':'#15803d','見送り':'#94a3b8','辞退':'#dc2626'};
+
+function _jpRowOf(srcRow){ return (allJobProg||[]).find(x=>x.src_row===srcRow) || null; }
+function _jpTitleOf(srcRow){
+  const r = _jpRowOf(srcRow);
+  if (!r) return '求人' + srcRow;
+  return (r.code ? r.code + ' / ' : '') + (r.company_name || '求人');
+}
+
+// ---------- タブ ----------
+function switchJpTab(tab){
+  _jpTab = tab;
+  document.querySelectorAll('#jpModalTabs .modal-tab').forEach(el=>{
+    el.classList.toggle('active', el.dataset.jptab===tab);
+  });
+  const box = document.getElementById('jpTabBody');
+  if (!box) return;
+  if (tab==='info')  { box.innerHTML = _jpInfoTabHtml(_jpRowOf(_jpDetailRow)); }
+  if (tab==='notes') { box.innerHTML = '<div style="padding:20px;color:var(--gray-400);font-size:12px">読み込み中...</div>'; loadJobNotes(_jpDetailRow); }
+  if (tab==='cands') { box.innerHTML = '<div style="padding:20px;color:var(--gray-400);font-size:12px">読み込み中...</div>'; loadJpCandidates(_jpDetailRow); }
+}
+
+// ---------- 1. 求人詳細（フリーノート） ----------
+async function loadJobNotes(srcRow){
+  try {
+    _jpNotes = await sbFetch('job_notes?job_src_row=eq.'+srcRow+'&select=*&order=sort_order.asc,created_at.asc') || [];
+  } catch(e){ _jpNotes = []; }
+  renderJobNotes();
+}
+
+function renderJobNotes(){
+  const box = document.getElementById('jpTabBody');
+  if (!box || _jpTab!=='notes') return;
+  const notes = _jpNotes.map(n=>_jobNoteCardHtml(n)).join('');
+  box.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+      <button class="btn btn-primary" style="font-size:12px;padding:6px 12px" onclick="addJobNote()">＋ 新規ノート</button>
+      <span style="font-size:11px;color:var(--gray-400)">自由に書けるノートです。表の挿入・文字の大きさ／太さ／色を変えられます</span>
+    </div>
+    ${notes || '<div style="padding:28px;text-align:center;color:var(--gray-400);font-size:12px">まだノートがありません。「＋ 新規ノート」から追加してください</div>'}`;
+}
+
+function _jobNoteCardHtml(n){
+  const meta = n.updated_at ? ('最終更新 ' + _fmtUpdatedAt(n.updated_at) + (n.updated_by?'（'+esc(n.updated_by)+'）':'')) : '';
+  return `
+  <div class="jn-card" data-note="${n.id}">
+    <div class="jn-head">
+      <input class="jn-title" id="jnT_${n.id}" value="${esc(n.title||'')}" placeholder="ノートのタイトル" oninput="markJobNoteDirty('${n.id}')">
+      <span class="jn-meta" id="jnM_${n.id}">${meta}</span>
+      <button class="btn btn-primary" style="font-size:11px;padding:4px 10px" onclick="saveJobNote('${n.id}')">💾 保存</button>
+      <button class="btn btn-outline" style="font-size:11px;padding:4px 8px;color:#dc2626" onclick="deleteJobNote('${n.id}')">🗑</button>
+    </div>
+    <div class="jn-tools">
+      <select onchange="jnExec('${n.id}','fontSize',this.value);this.selectedIndex=0" title="文字の大きさ">
+        <option value="">大きさ</option>
+        <option value="1">極小</option><option value="2">小</option><option value="3">標準</option>
+        <option value="4">やや大</option><option value="5">大</option><option value="6">特大</option><option value="7">最大</option>
+      </select>
+      <button type="button" onclick="jnExec('${n.id}','bold')" title="太字" style="font-weight:900">B</button>
+      <button type="button" onclick="jnExec('${n.id}','italic')" title="斜体" style="font-style:italic">I</button>
+      <button type="button" onclick="jnExec('${n.id}','underline')" title="下線" style="text-decoration:underline">U</button>
+      <label class="jn-color" title="文字色">色
+        <input type="color" value="#1e3a5f" oninput="jnExec('${n.id}','foreColor',this.value)">
+      </label>
+      <label class="jn-color" title="背景色">背景
+        <input type="color" value="#fff59d" oninput="jnExec('${n.id}','hiliteColor',this.value)">
+      </label>
+      <button type="button" onclick="jnInsertTable('${n.id}')" title="表を挿入">▦ 表</button>
+      <button type="button" onclick="jnExec('${n.id}','insertUnorderedList')" title="箇条書き">• 一覧</button>
+      <button type="button" onclick="jnExec('${n.id}','removeFormat')" title="書式を消す">✕ 書式</button>
+    </div>
+    <div class="jn-body" id="jnB_${n.id}" contenteditable="true" oninput="markJobNoteDirty('${n.id}')">${n.content_html||''}</div>
+  </div>`;
+}
+
+function jnExec(noteId, cmd, val){
+  const el = document.getElementById('jnB_'+noteId);
+  if (!el) return;
+  el.focus();
+  try { document.execCommand('styleWithCSS', false, true); } catch(e){}
+  try { document.execCommand(cmd, false, val ?? null); } catch(e){}
+  markJobNoteDirty(noteId);
+}
+
+function jnInsertTable(noteId){
+  const rows = parseInt(prompt('行数は？（見出し行を含む）','3')||'0',10);
+  if (!rows || rows<1) return;
+  const cols = parseInt(prompt('列数は？','3')||'0',10);
+  if (!cols || cols<1) return;
+  let html = '<table class="jn-table"><tbody>';
+  for (let r=0;r<rows;r++){
+    html += '<tr>';
+    for (let c=0;c<cols;c++){
+      html += r===0 ? '<th>見出し</th>' : '<td><br></td>';
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table><p><br></p>';
+  const el = document.getElementById('jnB_'+noteId);
+  if (!el) return;
+  el.focus();
+  try { document.execCommand('insertHTML', false, html); } catch(e){ el.innerHTML += html; }
+  markJobNoteDirty(noteId);
+}
+
+function markJobNoteDirty(noteId){
+  const m = document.getElementById('jnM_'+noteId);
+  if (m) { m.textContent = '未保存の変更があります'; m.style.color = '#d97706'; }
+}
+
+async function addJobNote(){
+  const srcRow = _jpDetailRow;
+  if (srcRow==null) return;
+  try {
+    const created = await sbFetch('job_notes', {
+      method:'POST', prefer:'return=representation',
+      body: JSON.stringify({
+        job_src_row: srcRow, title:'', content_html:'',
+        sort_order: (_jpNotes.length ? Math.max(..._jpNotes.map(n=>n.sort_order||0))+1 : 0),
+        created_by: _curUserName(), updated_by: _curUserName()
+      })
+    });
+    const row = Array.isArray(created)?created[0]:created;
+    if (row) _jpNotes.push(row);
+    renderJobNotes();
+    setTimeout(()=>document.getElementById('jnT_'+row?.id)?.focus(), 80);
+  } catch(e){ showToast('❌ ノートを追加できませんでした: '+e.message,'error'); }
+}
+
+async function saveJobNote(noteId){
+  const title = document.getElementById('jnT_'+noteId)?.value || '';
+  const html  = document.getElementById('jnB_'+noteId)?.innerHTML || '';
+  const now = new Date().toISOString();
+  try {
+    await sbFetch('job_notes?id=eq.'+noteId, {
+      method:'PATCH', prefer:'return=minimal',
+      body: JSON.stringify({ title, content_html: html, updated_at: now, updated_by: _curUserName() })
+    });
+    const n = _jpNotes.find(x=>x.id===noteId);
+    if (n) { n.title=title; n.content_html=html; n.updated_at=now; n.updated_by=_curUserName(); }
+    const m = document.getElementById('jnM_'+noteId);
+    if (m) { m.textContent = '✓ 最終更新 ' + _fmtUpdatedAt(now) + '（' + _curUserName() + '）'; m.style.color='var(--gray-400)'; }
+    showToast('✅ 保存しました','success');
+  } catch(e){ showToast('❌ 保存失敗: '+e.message,'error'); }
+}
+
+async function deleteJobNote(noteId){
+  if (!confirm('このノートを削除しますか？')) return;
+  try {
+    await sbFetch('job_notes?id=eq.'+noteId, { method:'DELETE', prefer:'return=minimal' });
+    _jpNotes = _jpNotes.filter(n=>n.id!==noteId);
+    renderJobNotes();
+    showToast('🗑 削除しました','success');
+  } catch(e){ showToast('❌ 削除失敗: '+e.message,'error'); }
+}
+
+// ---------- 2/3. 候補者リスト（求人×候補者の紐付け） ----------
+async function loadJpCandidates(srcRow){
+  await ensureCandidatesLoaded();
+  try {
+    // この求人のリンク + 重複判定のため全リンクも取る
+    _cjpAllLinks = await sbFetch('candidate_job_progress?select=*') || [];
+  } catch(e){ _cjpAllLinks = []; }
+  _jpCandLinks = _cjpAllLinks.filter(l=>l.job_src_row===srcRow);
+  renderJpCandidates();
+}
+
+// この候補者が登録されている「他の」求人（重複先）
+function jpDupJobs(candId, curRow){
+  return (_cjpAllLinks||[])
+    .filter(l=>l.candidate_id===candId && l.job_src_row!==curRow)
+    .map(l=>({ row:l.job_src_row, status:l.status, label:_jpTitleOf(l.job_src_row) }));
+}
+
+function renderJpCandidates(){
+  const box = document.getElementById('jpTabBody');
+  if (!box || _jpTab!=='cands') return;
+  const srcRow = _jpDetailRow;
+  const linked = _jpCandLinks.slice().sort((a,b)=>(a.created_at||'').localeCompare(b.created_at||''));
+  const linkedIds = new Set(linked.map(l=>l.candidate_id));
+
+  const rows = linked.map(l=>{
+    const c = (allCandidates||[]).find(x=>x.id===l.candidate_id);
+    const dups = jpDupJobs(l.candidate_id, srcRow);
+    const dupHtml = dups.length
+      ? `<div class="jp-dup" title="この候補者は他の求人にも登録されています">⚠ 重複 ${dups.length}件：` +
+        dups.map(d=>`<span class="jp-dup-chip" onclick="event.stopPropagation();openJobProgressDetail(${d.row})">${esc(d.label)}<i>${esc(d.status||'')}</i></span>`).join('') + `</div>`
+      : '';
+    const color = CJP_STATUS_COLOR[l.status] || '#64748b';
+    return `
+    <div class="jp-cand-row">
+      <div class="jp-cand-main" onclick="openCandidateModal('${l.candidate_id}')">
+        <span class="jp-cand-name">${natFlag(c?.nationality||'')} ${esc(c?.name||'（削除された候補者）')}</span>
+        <span class="jp-cand-sub">${esc(c?.nationality||'')}${c?.status?' ・ '+esc(c.status):''}</span>
+        ${dupHtml}
+      </div>
+      <select class="filter-select" style="font-size:11px;max-width:130px;border-color:${color};color:${color};font-weight:700"
+        onchange="jpUpdateLinkStatus('${l.id}',this.value)">
+        ${CJP_STATUSES.map(s=>`<option ${l.status===s?'selected':''}>${s}</option>`).join('')}
+      </select>
+      <button class="btn btn-outline" style="font-size:11px;padding:4px 8px;color:#dc2626" title="この求人から外す"
+        onclick="jpRemoveLink('${l.id}')">✕</button>
+    </div>`;
+  }).join('');
+
+  const q = (_jpCandSearch||'').toLowerCase();
+  const opts = (allCandidates||[])
+    .filter(c=>!linkedIds.has(c.id))
+    .filter(c=>!q || ((c.name||'')+' '+(c.nationality||'')).toLowerCase().includes(q))
+    .map(c=>{
+      const n = (_cjpAllLinks||[]).filter(l=>l.candidate_id===c.id).length;
+      return `<option value="${c.id}">${esc(c.name||'')}（${esc(c.nationality||'')}）${n?' ／ 既に'+n+'件に登録':''}</option>`;
+    }).join('');
+
+  box.innerHTML = `
+    <div class="jp-add-bar">
+      <input class="search-input" style="flex:1;min-width:150px;font-size:12px" placeholder="候補者を名前で検索..."
+        value="${esc(_jpCandSearch)}" oninput="_jpCandSearch=this.value;renderJpCandidates()">
+      <select class="filter-select" id="jpCandPick" style="flex:2;min-width:200px;font-size:12px">
+        <option value="">＋ 候補者を選んで追加...</option>${opts}
+      </select>
+      <button class="btn btn-primary" style="font-size:12px;padding:6px 12px" onclick="jpAddCandidate()">＋ 追加</button>
+    </div>
+    <div style="font-size:11px;color:var(--gray-400);margin:0 0 10px">
+      同じ候補者を複数の求人に登録できます。他の求人にも登録済みの場合は「⚠ 重複」に登録先が出ます（クリックでその求人を開く）
+    </div>
+    ${rows || '<div style="padding:28px;text-align:center;color:var(--gray-400);font-size:12px">まだ候補者が登録されていません</div>'}`;
+}
+
+async function jpAddCandidate(){
+  const sel = document.getElementById('jpCandPick');
+  const candId = sel?.value;
+  if (!candId) { showToast('候補者を選んでください','warn'); return; }
+  const srcRow = _jpDetailRow;
+  try {
+    const created = await sbFetch('candidate_job_progress', {
+      method:'POST', prefer:'return=representation',
+      body: JSON.stringify({
+        candidate_id: candId, job_src_row: srcRow, status:'提案中',
+        proposal_date: new Date().toISOString().slice(0,10),
+        created_by: _curUserName(), updated_by: _curUserName()
+      })
+    });
+    const row = Array.isArray(created)?created[0]:created;
+    if (row) { _cjpAllLinks.push(row); _jpCandLinks.push(row); }
+    _jpCandSearch = '';
+    renderJpCandidates();
+    showToast('✅ 候補者を追加しました','success');
+  } catch(e){
+    showToast('❌ 追加できませんでした（すでに登録済みの可能性があります）','error');
+  }
+}
+
+async function jpUpdateLinkStatus(linkId, status){
+  try {
+    await sbFetch('candidate_job_progress?id=eq.'+linkId, {
+      method:'PATCH', prefer:'return=minimal',
+      body: JSON.stringify({ status, updated_at:new Date().toISOString(), updated_by:_curUserName() })
+    });
+    [_cjpAllLinks,_jpCandLinks].forEach(arr=>{ const l=arr.find(x=>x.id===linkId); if(l) l.status=status; });
+    renderJpCandidates();
+    showToast('✅ ステータスを更新しました','success');
+  } catch(e){ showToast('❌ 更新失敗: '+e.message,'error'); }
+}
+
+async function jpRemoveLink(linkId){
+  if (!confirm('この候補者をこの求人から外しますか？（候補者データ自体は消えません）')) return;
+  try {
+    await sbFetch('candidate_job_progress?id=eq.'+linkId, { method:'DELETE', prefer:'return=minimal' });
+    _cjpAllLinks = _cjpAllLinks.filter(l=>l.id!==linkId);
+    _jpCandLinks = _jpCandLinks.filter(l=>l.id!==linkId);
+    renderJpCandidates();
+    showToast('🗑 外しました','success');
+  } catch(e){ showToast('❌ 失敗: '+e.message,'error'); }
+}
+
+// ---------- 候補者側：登録されている求人の一覧 ----------
+async function loadCandidateJobProgLinks(candId){
+  const box = document.getElementById('candJobProgList');
+  if (!box) return;
+  try {
+    _cjpAllLinks = await sbFetch('candidate_job_progress?select=*') || [];
+  } catch(e){ _cjpAllLinks = []; }
+  const mine = _cjpAllLinks.filter(l=>l.candidate_id===candId);
+  if (!mine.length) { box.innerHTML = '<div style="font-size:12px;color:var(--gray-400);padding:8px 0">まだ求人に登録されていません</div>'; return; }
+  box.innerHTML = mine.map(l=>{
+    const color = CJP_STATUS_COLOR[l.status]||'#64748b';
+    return `<div class="jp-cand-row" style="cursor:pointer" onclick="openJobProgressDetail(${l.job_src_row})">
+      <div class="jp-cand-main"><span class="jp-cand-name">${esc(_jpTitleOf(l.job_src_row))}</span></div>
+      <span style="font-size:11px;font-weight:700;color:${color};border:1px solid ${color};border-radius:10px;padding:2px 8px">${esc(l.status||'')}</span>
+    </div>`;
+  }).join('') + (mine.length>1
+    ? `<div class="jp-dup" style="margin-top:6px">⚠ この候補者は ${mine.length} 件の求人に重複して登録されています</div>` : '');
+}
+
+// ---------- 4. 求人案件のチャット ----------
+async function _ensureJobRoomId(srcRow){
+  let roomId = (chatRooms||[]).find(r=>r.job_src_row===srcRow)?.id;
+  if (roomId) return roomId;
+  const found = await sbFetch('chat_rooms?job_src_row=eq.'+srcRow+'&select=id&limit=1');
+  if (found && found[0]) return found[0].id;
+  const created = await sbFetch('chat_rooms', {
+    method:'POST', prefer:'return=representation',
+    body: JSON.stringify({ job_src_row: srcRow, created_by: currentUser?.name||'', status:'active' })
+  });
+  return (Array.isArray(created)?created[0]:created)?.id || null;
+}
+
+async function openJobChat(srcRow){
+  try {
+    const roomId = await _ensureJobRoomId(srcRow);
+    if (!roomId) { showToast('❌ チャットを開けませんでした','error'); return; }
+    forceCloseModal('jobProgModal');
+    // 画面切替 → 初期化完了後に openChatRoom される
+    _pendingChatRoomId = roomId;
+    showScreen('chat');
+  } catch(e){ showToast('❌ チャットを開けませんでした: '+e.message,'error'); }
+}
+
+// 求人進捗 詳細/編集モーダル（タブ: 求人進捗情報 / 求人詳細 / 候補者リスト ＋ 💬チャット）
 function openJobProgressDetail(srcRow) {
   const r = (allJobProg||[]).find(x=>x.src_row===srcRow);
   if (!r) return;
+  _jpDetailRow = srcRow; _jpTab = 'info';
+  _jpNotes = []; _jpCandLinks = []; _jpCandSearch = '';
+  const tabs = `
+  <div class="modal-tabs" id="jpModalTabs" style="padding:0;margin:-4px 0 14px;align-items:center;">
+    <div class="modal-tab active" data-jptab="info"  onclick="switchJpTab('info')">📋 求人進捗 情報</div>
+    <div class="modal-tab"        data-jptab="notes" onclick="switchJpTab('notes')">📝 求人詳細</div>
+    <div class="modal-tab"        data-jptab="cands" onclick="switchJpTab('cands')">👥 候補者リスト</div>
+    <button class="btn btn-outline" style="margin-left:auto;font-size:12px;padding:4px 12px;white-space:nowrap"
+      onclick="openJobChat(${srcRow})" title="この求人案件のチャットを開く">💬 チャット</button>
+  </div>`;
+  showGenModal('jobProgModal', '💼 ' + (r.code?r.code+' / ':'') + (r.company_name||'求人進捗'),
+    tabs + '<div id="jpTabBody">' + _jpInfoTabHtml(r) + '</div>');
+}
+
+// 「求人進捗 情報」タブの中身
+function _jpInfoTabHtml(r) {
+  if (!r) return '';
   const natOpts = JP_NAT_ORDER;
   const chk = n => (r.nationalities||[]).includes(n)?'checked':'';
   const body = `
@@ -17772,10 +18145,14 @@ function openJobProgressDetail(srcRow) {
     <button class="btn btn-primary" onclick="saveJobProgress(${r.src_row})">💾 保存</button>
     <button class="btn btn-outline" onclick="closeGenModal('jobProgModal')">閉じる</button>
   </div>`;
-  showGenModal('jobProgModal', '💼 ' + (r.code?r.code+' / ':'') + (r.company_name||'求人進捗'), body);
+  return body;
 }
 
 async function saveJobProgress(srcRow) {
+  // 別タブを開いていると jpf_* が DOM に無く、空で上書きしてしまうので止める
+  if (!document.getElementById('jpf_progress')) {
+    showToast('「📋 求人進捗 情報」タブを開いてから保存してください', 'warn'); return;
+  }
   const v = id => document.getElementById(id)?.value;
   const nats = Array.from(document.querySelectorAll('.jpf_nat')).filter(c=>c.checked).map(c=>c.value);
   const numOrNull = x => (x===''||x==null)?null:Number(x);
@@ -21490,6 +21867,13 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260813.82', date:'2026-08-13', notify:true, items:[
+    '求人管理：各案件を開くと「📋 求人進捗 情報」「📝 求人詳細」「👥 候補者リスト」の3つのタブに分かれました',
+    '「📝 求人詳細」に自由に書けるノートを追加しました。ノートは何枚でも増やせます。文字の大きさ・太字・斜体・下線・文字色・背景色を変えられ、「▦ 表」から行数と列数を指定して表も作れます',
+    '「👥 候補者リスト」でこの求人に応募している候補者を管理できます。候補者は検索して選ぶだけで追加でき、提案中〜決定・見送りまでの状況を切り替えられます。名前を押すとその候補者の詳細が開きます',
+    '同じ候補者を複数の求人に登録できます。他の求人にも登録済みの候補者には「⚠ 重複」が出て、どの求人に登録されているかが分かります。その表示を押すとその求人がすぐ開きます',
+    '各案件の右上に「💬 チャット」ボタンを付けました（求人案件ごとのチャットです）',
+  ]},
   { version:'ver.20260813.81', date:'2026-08-13', notify:true, items:[
     '左メニューの見出し（支援・申請・案件登録 など）の文字を大きくし、色も一段明るい水色にしました。今までは見出しの色と、選んでいる項目の色が同じで見分けづらかったための変更です。選んでいる項目の色は今までどおりです',
   ]},
