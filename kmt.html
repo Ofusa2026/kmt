@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260805.72 -->
+<!-- KMT_VERSION ver.20260805.73 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -385,7 +385,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.72</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.73</div>
     <div id="currentUserBadge" style="font-size:10px;color:#334e6d;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(15,32,64,.08);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <button onclick="showScreen('my_account')" title="自分のダッシュボード・設定を開く" style="margin-top:6px;width:100%;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:800;color:#111111;background:#FFFFFF;border:1px solid #B9D4EE;border-radius:6px;padding:6px 8px;cursor:pointer;">📊 マイページ</button>
     <div id="myAlertSummary" style="margin-top:6px;display:none;"></div>
@@ -6377,7 +6377,7 @@ async function loadMyDashboard() {
   try {
     if (!(allCompanies || []).length) { try { await loadCompanies(); } catch(e) {} }
     const [workers, tasks] = await Promise.all([
-      sbFetch('workers?select=id,name,management_no,nationality,status,staff,company_id,visa_expiry,tokurei_date,apply_status,renewal_status,card_info_done,kmt_support,support_type_2go&is_deleted=eq.false'),
+      sbFetch('workers?select=id,name,management_no,nationality,status,staff,company_id,visa_expiry,tokurei_date,apply_status,renewal_status,card_info_done,history_verified,kmt_support,support_type_2go&is_deleted=eq.false'),
       sbFetch('task_requests?select=id,worker_id,task_name,status,deadline,assigned_to,checker,is_urgent,updated_at,workers(id,name)&order=updated_at.desc'),
     ]);
     _myDashData = { workers: workers || [], tasks: tasks || [] };
@@ -6535,6 +6535,24 @@ function renderMyDashboard() {
         (urgentCount(a.byRole.team) ? '<div style="padding:8px;">' + urgentHtml(a.byRole.team) + '</div>'
           : '<div style="padding:18px;text-align:center;color:#16a34a;font-size:12px;">✅ 対応が必要なアラートはありません</div>'),
         urgentCount(a.byRole.team) ? urgentCount(a.byRole.team) + '件' : '') : '') +
+      // 通算期間の精査状況（自分の担当ぶん・全員精査済みなら出さない）
+      (() => {
+        const hv = computeHistoryVerifyStats(a.mine);
+        if (!hv.todo) return '';
+        return card('🧾 通算期間の精査状況',
+          '<div style="padding:10px 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:12px;border-bottom:1px solid var(--gray-100);">' +
+            '<span style="color:#16a34a;font-weight:800;">精査済み ' + hv.done + '件</span>' +
+            '<span style="color:#dc2626;font-weight:800;">未精査 ' + hv.todo + '件</span>' +
+            '<span style="color:var(--gray-400);">（全' + hv.total + '件）</span>' +
+          '</div>' +
+          hv.todoList.map(w =>
+            '<div onclick="openWorkerModal(\'' + w.id + '\')" title="人材詳細を開く" style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid var(--gray-100);cursor:pointer;font-size:12px;">' +
+              '<span style="flex:1;min-width:0;font-weight:700;color:var(--navy);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
+                (w.management_no ? '<span style="color:var(--gray-400);font-weight:400;">[' + esc(w.management_no) + '] </span>' : '') + esc(w.name||'') + '</span>' +
+              '<span style="font-size:10px;color:var(--gray-400);flex-shrink:0;">' + esc(w.nationality||'') + '</span>' +
+              '<span style="font-size:11px;font-weight:700;color:#dc2626;flex-shrink:0;">未精査</span></div>').join(''),
+          hv.todo + '件未精査');
+      })() +
       // 在留期限4か月以内は先の話なので独立したカードにまとめる
       card('🗓️ 在留期限 4か月以内（先の予定）',
         (exp4Total
@@ -12714,6 +12732,16 @@ function _emptyAlertBucket() {
   return { expiry1:[], expiry2:[], expiry3:[], expiry4:[], tokurei:[], applyCheck:[], required:[], total:0 };
 }
 
+// 通算期間（経歴）の精査状況を数える。対象は在職系の人材のみ
+// 全員が精査済みになったら表示しない、という判断に使う
+function computeHistoryVerifyStats(list) {
+  const gone = ['退職済(帰国)','退職済(転職)','辞退/キャンセル'];
+  const target = (list || []).filter(w => w.kmt_support !== 'KMT支援外' && !gone.includes(w.status));
+  const done = target.filter(w => w.history_verified);
+  const todo = target.filter(w => !w.history_verified);
+  return { done: done.length, todo: todo.length, total: target.length, todoList: todo };
+}
+
 // マイページのアラート集計。判定の考え方は既存のアラートに合わせ、担当区分ごとに分けて返す
 function computeMyWorkerAlerts(list) {
   const today = new Date(); today.setHours(0,0,0,0);
@@ -12809,9 +12837,18 @@ function updateSidebarAlerts(list){
     ? `<div onclick="showScreen('workers')" title="外国人材で詳細を見る" style="cursor:pointer;display:flex;align-items:center;gap:5px;font-size:10px;color:${color};font-weight:700;background:rgba(255,255,255,.06);padding:3px 7px;border-radius:5px;">${icon} ${label}<span style="margin-left:auto;font-weight:800;">${cnt}件</span></div>`
     : '';
   // 全体アラートは件数だけのボタン1つにまとめる（内訳は外国人材のアラート欄で見る）
-  const grand = miss + renewal + visaUpdate + kokko;
+  // 在留期限系以外（未入力・要確認）もシステム全体のアラートに含める
+  const cardInfo = (src || []).filter(w =>
+    w.kmt_support !== 'KMT支援外' &&
+    ['発行完了','入国済み'].includes(w.apply_status) && !w.card_info_done &&
+    !['退職済(帰国)','退職済(転職)'].includes(w.status)).length;
+  const hv = computeHistoryVerifyStats(src);
+  const grand = miss + renewal + visaUpdate + kokko + cardInfo + hv.todo;
+  const tip = ['申請忘れ' + miss, '更新リマインド' + renewal, '在留期限の更新待ち' + visaUpdate,
+               '就労管理システム' + kokko, '必須情報の未入力' + cardInfo,
+               hv.todo ? '通算期間の未精査' + hv.todo : ''].filter(Boolean).join('／');
   const html = grand > 0
-    ? '<div onclick="showScreen(\'workers\')" title="外国人材のアラート一覧を開く（申請忘れ' + miss + '／更新リマインド' + renewal + '／在留期限の更新待ち' + visaUpdate + '／就労管理システム' + kokko + '）" ' +
+    ? '<div onclick="showScreen(\'workers\')" title="外国人材のアラート一覧を開く（' + tip + '）" ' +
       'style="cursor:pointer;display:flex;align-items:center;gap:5px;font-size:10px;font-weight:800;color:#92400e;background:#FFFFFF;border:1px solid #B9D4EE;padding:5px 8px;border-radius:6px;">' +
       '🔔 全体アラート<span style="margin-left:auto;background:#f59e0b;color:#1e293b;border-radius:8px;padding:0 6px;font-weight:800;">' + grand + '件</span></div>'
     : '';
@@ -12822,7 +12859,7 @@ function updateSidebarAlerts(list){
 async function refreshSidebarAlerts(){
   try{
     // staff / company_id / tokurei_date / card_info_done はマイページの個人アラート集計に必要
-    const d = await sbFetch('workers?select=id,name,management_no,nationality,status,staff,company_id,visa_expiry,tokurei_date,card_info_done,apply_status,apply_status_changed_at,apply_date,request_date,renewal_status,applicant_field,visa_status,desired_visa,kmt_support,support_type_2go,placement_report_date,retire_report_date,tg2_change_report_date&is_deleted=eq.false');
+    const d = await sbFetch('workers?select=id,name,management_no,nationality,status,staff,company_id,visa_expiry,tokurei_date,card_info_done,history_verified,apply_status,apply_status_changed_at,apply_date,request_date,renewal_status,applicant_field,visa_status,desired_visa,kmt_support,support_type_2go,placement_report_date,retire_report_date,tg2_change_report_date&is_deleted=eq.false');
     _sidebarAlertData = d || [];
     updateSidebarAlerts(_sidebarAlertData);
   }catch(e){}
@@ -12899,7 +12936,8 @@ function renderWorkerAlerts() {
   const kokkoTotal = _ga.kokkoTotal;
   // サイドバーもバナーと同じ算出元・同じデータで更新する
   updateSidebarAlerts(_alertSrc);
-  if (!total && !missAlert.length && !shortageAlert.length && !kokkoTotal && !lumpSumAlert.length && !leaveOverdueAlert.length && !renewalDueAlert.length && !visaUpdateAlert.length) { banner.innerHTML=''; return; }
+  const _hvStats = computeHistoryVerifyStats(_alertSrc);   // 通算期間の精査状況（未精査があれば表示する）
+  if (!total && !missAlert.length && !shortageAlert.length && !kokkoTotal && !lumpSumAlert.length && !leaveOverdueAlert.length && !renewalDueAlert.length && !visaUpdateAlert.length && !_hvStats.todo && !cardInfoAlert.length) { banner.innerHTML=''; return; }
   // 残り日数で昇順ソート(期限切れも含めて期日が近い順)
   missAlert.sort((a,b) => a.days - b.days);
   shortageAlert.sort((a,b) => a.tokureiDays - b.tokureiDays);
@@ -12989,6 +13027,25 @@ function renderWorkerAlerts() {
     loList.id = 'workerLeaveOverdueAlertList';
     wrap.appendChild(loList);
   }
+
+  // 🧾 通算期間の精査状況（一覧のみ・全員が精査済みになったら出さない）
+  (() => {
+    const hv = _hvStats;
+    if (!hv.todo) return;   // 全案件精査済みなら表示しない
+    const row = document.createElement('div');
+    row.style.cssText = 'background:white;border:1px solid var(--gray-200);border-left:4px solid #7c3aed;border-radius:8px;padding:8px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12px;';
+    row.innerHTML =
+      '<span style="font-weight:800;color:#5b21b6;">🧾 通算期間の精査状況</span>' +
+      '<span style="color:#16a34a;font-weight:700;">精査済み ' + hv.done + '件</span>' +
+      '<span style="color:#dc2626;font-weight:700;">未精査 ' + hv.todo + '件</span>' +
+      '<span style="color:var(--gray-400);font-size:11px;">（全' + hv.total + '件）</span>' +
+      '<span style="margin-left:auto;font-size:11px;color:#7c3aed;cursor:pointer;text-decoration:underline dotted;">未精査の一覧を見る ▼</span>';
+    row.onclick = () => toggleHistoryVerifyList(hv.todoList);
+    wrap.appendChild(row);
+    const list = document.createElement('div');
+    list.id = 'workerHistoryVerifyList';
+    wrap.appendChild(list);
+  })();
 
   // 📋 更新リマインド(3か月以内×未入力 / 2か月以内×要確認)
   // 在留情報未入力アラートバナー
@@ -13375,6 +13432,23 @@ function toggleLumpSumAlertList(list) {
 }
 
 // 退職予定日超過アラートの人材リストを開閉
+// 通算期間が未精査の人材を一覧で開閉する
+function toggleHistoryVerifyList(list) {
+  const area = document.getElementById('workerHistoryVerifyList');
+  if (!area) return;
+  if (area.dataset.open === '1') { area.innerHTML = ''; area.dataset.open = ''; return; }
+  const rows = (list || []).map(w =>
+    '<div style="display:flex;align-items:center;gap:10px;padding:7px 12px;border-bottom:1px solid var(--gray-100);cursor:pointer;background:white;flex-wrap:wrap;" onclick="event.stopPropagation();openWorkerModal(\'' + w.id + '\')">' +
+      '<div style="min-width:80px;font-size:11px;font-weight:600;color:#64748b;">' + esc(w.management_no||'-') + '</div>' +
+      '<div style="flex:1;min-width:160px;font-size:12px;"><strong>' + esc(w.name||'') + '</strong> <span style="color:#94a3b8;font-size:11px;">(' + esc(w.nationality||'-') + ')</span></div>' +
+      '<div style="font-size:11px;color:#64748b;flex:1;min-width:120px;">' + esc(w.companies?.name||'-') + '</div>' +
+      '<div style="font-size:11px;color:#64748b;">' + esc(w.staff||'担当未設定') + '</div>' +
+    '</div>').join('');
+  area.innerHTML = '<div style="background:white;border:1px solid var(--gray-200);border-radius:8px;overflow:hidden;margin-bottom:8px;max-height:340px;overflow-y:auto;">' +
+    (rows || '<div style="padding:14px;text-align:center;color:var(--gray-400);font-size:12px;">未精査の人材はいません</div>') + '</div>';
+  area.dataset.open = '1';
+}
+
 function toggleLeaveOverdueAlertList(list) {
   const area = document.getElementById('workerLeaveOverdueAlertList');
   if (!area) return;
@@ -20474,6 +20548,13 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260805.73', date:'2026-08-07', notify:true, items:[
+    '「🧾 通算期間の精査状況」を追加しました。精査済みが何件・未精査が何件かが分かります',
+    '外国人材ページのアラート欄に一覧として表示され、クリックすると未精査の人材の一覧が開きます。名前を押すとその人材の詳細に移動できます',
+    '各担当のマイページ（担当・タスク）にも、自分の担当ぶんの精査状況が同じように出ます',
+    '全員が精査済みになると、この表示は自動で消えます',
+    '左のサイドバーの「全体アラート」の件数に、必須情報の未入力と通算期間の未精査も含めるようにしました（内訳はボタンにマウスを載せると出ます）',
+  ]},
   { version:'ver.20260805.72', date:'2026-08-07', notify:true, items:[
     'マイページに「📅 支援カレンダー」タブを追加しました（自分のノートの左隣です）',
     '表示されるのは自分がメイン担当・サブ担当の予定だけです。左の色帯が濃い青ならメイン担当、グレーならサブ担当です',
