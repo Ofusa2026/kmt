@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260805.66 -->
+<!-- KMT_VERSION ver.20260805.67 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -385,7 +385,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.66</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.67</div>
     <div id="currentUserBadge" style="font-size:10px;color:#334e6d;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(15,32,64,.08);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <button onclick="showScreen('my_account')" title="自分のダッシュボード・設定を開く" style="margin-top:6px;width:100%;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:800;color:#111111;background:#FFFFFF;border:1px solid #B9D4EE;border-radius:6px;padding:6px 8px;cursor:pointer;">📊 マイページ</button>
     <div id="myAlertSummary" style="margin-top:6px;display:none;"></div>
@@ -415,8 +415,6 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div id="regSupportNav"></div>
   <div class="sidebar-section">マスタ</div>
   <div class="nav-item" onclick="showScreen('sending')">✈️ 送り出し機関</div>
-  <div class="sidebar-section">書類</div>
-  <div class="nav-item" onclick="showScreen('resume')">📝 履歴書</div>
   <div class="sidebar-section">管理</div>
   <div class="nav-item" onclick="showScreen('fees')">💴 支援委託費</div>
   <div class="nav-item" onclick="showScreen('sales')">📊 売上管理</div>
@@ -11449,7 +11447,7 @@ function updateTopbarButtons(name) {
     support_schedules: `<button class="btn btn-outline" onclick="loadSupportSchedules()">🔄 更新</button><button class="btn btn-primary" onclick="openScheduleModal(null)">＋ 予定登録</button>`,
     companies:    `<button class="btn btn-outline" onclick="loadCompanies()">🔄 更新</button><button class="btn btn-primary" onclick="openCompanyModal(null)">＋ 企業登録</button>`,
     workers:      `<button class="btn btn-outline" onclick="loadWorkers()">🔄 更新</button><button class="btn btn-primary" onclick="openWorkerModal(null)">＋ 人材登録</button>`,
-    candidates:   `<button class="btn btn-outline" onclick="loadCandidates()">🔄 更新</button><button class="btn btn-primary" onclick="openCandidateModal(null)">＋ 候補者登録</button>`,
+    candidates:   `<select id="candResumePick" class="filter-select" onchange="openResumeForCandidate(this.value)" title="履歴書を開く候補者を選ぶ" style="max-width:190px;"><option value="">📝 履歴書を開く...</option></select><button class="btn btn-outline" onclick="showScreen('resume')">📝 履歴書作成</button><button class="btn btn-outline" onclick="loadCandidates()">🔄 更新</button><button class="btn btn-primary" onclick="openCandidateModal(null)">＋ 候補者登録</button>`,
     jobs:         `<button class="btn btn-outline" onclick="showJobFlyer()">📄 求人票作成</button><button class="btn btn-outline" onclick="loadJobs()">🔄 更新</button><button class="btn btn-primary" onclick="openJobModal(null)">＋ 求人登録</button>`,
     intro_reg_orgs: `<button class="btn btn-outline" onclick="loadIntroRegOrgs()">🔄 更新</button>`,
     job_flyer:    `<button class="btn btn-outline" onclick="showScreen('jobs')">← 求人一覧に戻る</button>`,
@@ -11465,7 +11463,7 @@ function updateTopbarButtons(name) {
     mail_list:    `<button class="btn btn-outline" onclick="loadMailList()">🔄 更新</button>`,
     notices:      `<button class="btn btn-primary" onclick="openNoticeModal(null)">＋ 新規投稿</button>`,
     ofusa_view:   `<button class="btn btn-outline" onclick="document.getElementById('ofusaIframe').src=document.getElementById('ofusaIframe').src">🔄 更新</button><a href="https://ofusa2026.github.io/org-view/share.html?token=a952840c-7e8a-464e-a4fd-776a485d49e7" target="_blank" class="btn btn-outline">↗️ 別タブで開く</a>`,
-    resume:       `<button class="btn btn-outline" onclick="printResume()">🖨️ 印刷</button>`,
+    resume:       `<button class="btn btn-outline" onclick="showScreen('candidates')">← 候補者一覧へ</button><button class="btn btn-outline" onclick="printResume()">🖨️ 印刷</button>`,
   };
   actions.innerHTML = btnMap[name] || '';
 }
@@ -16313,6 +16311,7 @@ async function loadCandidates() {
     const data = await sbFetch('candidates?select=*&order=created_at.desc');
     allCandidates = data||[];
     applyCandidateFilters();
+    fillCandidateResumePicker();   // ヘッダーの履歴書リストも同じデータで作る
   } catch(e) { showToast('❌ '+e.message,'error'); }
   showLoading(false);
 }
@@ -16354,6 +16353,26 @@ async function loadJobs() {
 
 async function loadPartners(){showLoading(true);try{const data=await sbFetch('partner_support_orgs?select=*&order=name.asc');allPartners=data||[];applyPartnerFilters();}catch(e){showToast('❌ '+e.message,'error');}showLoading(false);}
 
+// ===== 候補者画面から履歴書を開く =====
+let _pendingResumeCandidateId = null;   // 履歴書画面の初期化後に選択させる候補者
+
+// 候補者一覧のヘッダーにある「📝 履歴書を開く...」の選択肢を作る
+function fillCandidateResumePicker() {
+  const sel = document.getElementById('candResumePick');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">📝 履歴書を開く...</option>' +
+    (allCandidates || []).map(c =>
+      `<option value="${esc(c.id)}">${natFlag(c.nationality)} ${esc(c.name || '')}</option>`).join('');
+}
+// 選んだ候補者の履歴書を開く（画面の初期化が終わってから選択を反映する）
+function openResumeForCandidate(id) {
+  if (!id) return;
+  _pendingResumeCandidateId = id;
+  const sel = document.getElementById('candResumePick');
+  if (sel) sel.value = '';
+  showScreen('resume');
+}
+
 async function loadResumeScreen() {
   showLoading(true);
   try {
@@ -16365,6 +16384,12 @@ async function loadResumeScreen() {
         allCandidates.map(c =>
           `<option value="${c.id}">${natFlag(c.nationality)} ${esc(c.name)}（${esc(c.nationality||'')}）</option>`
         ).join('');
+      // 候補者一覧から特定の人を指定して来た場合はその人を開く
+      if (_pendingResumeCandidateId) {
+        sel.value = _pendingResumeCandidateId;
+        _pendingResumeCandidateId = null;
+        if (sel.value) onResumeCandidateChange();
+      }
     }
   } catch(e) { showToast('❌ ' + e.message, 'error'); }
   showLoading(false);
@@ -20202,6 +20227,11 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260805.67', date:'2026-08-07', notify:true, items:[
+    '左メニューの「書類 → 履歴書」をなくし、履歴書を「候補者」の画面から開くようにしました',
+    '候補者一覧の右上に「📝 履歴書を開く...」のリストと「📝 履歴書作成」ボタンを追加しました。リストから候補者を選ぶと、その方の履歴書がそのまま開きます',
+    '履歴書の画面には「← 候補者一覧へ」ボタンを追加したので、すぐ戻れます',
+  ]},
   { version:'ver.20260805.66', date:'2026-08-07', notify:true, items:[
     '「🔒 システム管理」を、権限が「管理者」の方全員が見られるようにしました（これまでは役職も「管理者」の方だけでした）',
     'ただし全員に影響する操作（強制ログアウト・強制リロード・予約の解除）は大房さんのみ実行できます。他の管理者の方は状況の確認のみで、ボタンは押せません',
