@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260813.92 -->
+<!-- KMT_VERSION ver.20260813.93 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -441,7 +441,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260813.92</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260813.93</div>
     <div id="currentUserBadge" style="font-size:10px;color:#334e6d;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(15,32,64,.08);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <button onclick="showScreen('my_account')" title="自分のダッシュボード・設定を開く" style="margin-top:6px;width:100%;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:800;color:#111111;background:#FFFFFF;border:1px solid #B9D4EE;border-radius:6px;padding:6px 8px;cursor:pointer;">📊 マイページ</button>
     <div id="myAlertSummary" style="margin-top:6px;display:none;"></div>
@@ -18508,8 +18508,6 @@ function openJobProgressDetail(srcRow) {
     <div class="modal-tab active" data-jptab="info"  onclick="switchJpTab('info')">📋 求人進捗 情報</div>
     <div class="modal-tab"        data-jptab="notes" onclick="switchJpTab('notes')">📝 求人詳細</div>
     <div class="modal-tab"        data-jptab="cands" onclick="switchJpTab('cands')">👥 候補者リスト</div>
-    <button class="btn btn-outline" style="margin-left:auto;font-size:12px;padding:4px 12px;white-space:nowrap"
-      onclick="openJobChat(${srcRow})" title="この求人案件のチャットを開く">💬 チャット</button>
   </div>`;
   showGenModal('jobProgModal', '💼 ' + (r.code?r.code+' / ':'') + (r.company_name||'求人進捗'),
     tabs + '<div id="jpTabBody">' + _jpInfoTabHtml(r) + '</div>');
@@ -18546,7 +18544,10 @@ function _jpInfoTabHtml(r) {
     <div class="form-group full"><label class="form-label">候補者の状況</label><textarea class="form-textarea" id="jpf_candidate_status" rows="4">${esc(r.candidate_status||'')}</textarea></div>
     <div class="form-group full"><label class="form-label">コメント</label><textarea class="form-textarea" id="jpf_comment" rows="3">${esc(r.comment||'')}</textarea></div>
   </div>
-  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)">
+  <div style="display:flex;gap:8px;align-items:center;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)">
+    <button class="btn btn-outline" style="white-space:nowrap" onclick="openJobChat(${r.src_row})"
+      title="この求人案件専用のチャットを開く">💬 求人チャット</button>
+    <span style="margin-left:auto"></span>
     <button class="btn btn-primary" onclick="saveJobProgress(${r.src_row})">💾 保存</button>
     <button class="btn btn-outline" onclick="closeGenModal('jobProgModal')">閉じる</button>
   </div>`;
@@ -22272,6 +22273,11 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260813.93', date:'2026-08-13', notify:true, items:[
+    '求人管理で案件を開いたときのチャットボタンを、右上から一番左下（保存・閉じるの反対側）に移動しました',
+    'ボタンの名前を「チャット」から「求人チャット」に変えました。左メニューの全体チャットと紛らわしくないようにするためです',
+    'ボタンを押すとその案件専用のチャットが開き、そのまま書き込めます（初回は自動でチャットが作られます）',
+  ]},
   { version:'ver.20260813.92', date:'2026-08-13', notify:true, items:[
     '左メニューの「💬 チャット」を元の位置（アラートのすぐ下・支援の上）に戻しました。一番下に移動して見えなくなっていたためです。未読・メンションの件数表示もそのままです',
   ]},
