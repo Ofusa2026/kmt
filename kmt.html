@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260805.61 -->
+<!-- KMT_VERSION ver.20260805.62 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -56,12 +56,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .whats-new-toast-btn{background:#7c3aed;color:white;border:none;border-radius:6px;padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer;transition:background .15s,transform .1s;box-shadow:0 2px 6px rgba(124,58,237,.4);}
 .whats-new-toast-btn:hover{background:#8b5cf6;}
 .whats-new-toast-btn:active{transform:scale(.97);}
-.sidebar-section{padding:8px 12px 4px;font-size:10px;color:#94A3B8;font-weight:700;letter-spacing:1px;text-transform:uppercase;
-  display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;border-radius:5px;margin:0 4px;}
-.sidebar-section:hover{background:rgba(255,255,255,0.06);color:#CBD5E1;}
-.sidebar-section-arrow{margin-left:auto;font-size:11px;line-height:1;transition:transform .15s;}
-.sidebar-section.collapsed .sidebar-section-arrow{transform:rotate(-90deg);}
-.sidebar-section-count{font-size:9px;font-weight:800;color:#64748B;background:rgba(255,255,255,0.08);border-radius:8px;padding:0 5px;}
+/* 見出しは紺色のボックス＋白文字（マイページの白ボックスと見分けられるように） */
+.sidebar-section{display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;
+  margin:10px 8px 4px;padding:7px 10px;border-radius:6px;
+  background:#0f2040;color:#FFFFFF;font-size:11px;font-weight:800;letter-spacing:.5px;}
+.sidebar-section:hover{background:#16305e;}
+.sidebar-section-arrow{margin-left:auto;font-size:11px;line-height:1;color:#FFFFFF;}
+.sidebar-section-count{font-size:9px;font-weight:800;color:#0f2040;background:#FFFFFF;border-radius:8px;padding:0 6px;}
 .nav-item{display:flex;align-items:center;gap:10px;padding:9px 16px;color:#CBD5E1;font-size:13px;cursor:pointer;border-radius:6px;margin:1px 8px;}
 .nav-item:hover,.nav-item.active{background:rgba(255,255,255,0.1);color:white;}
 .nav-item .badge{background:#dc2626;color:white;font-size:10px;padding:1px 6px;border-radius:10px;margin-left:auto;}
@@ -384,9 +385,9 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.61</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.62</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
-    <button onclick="showScreen('my_account')" title="自分のダッシュボード・設定を開く" style="margin-top:6px;width:100%;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:800;color:#0f172a;background:#e2e8f0;border:none;border-radius:6px;padding:6px 8px;cursor:pointer;">📊 マイページ</button>
+    <button onclick="showScreen('my_account')" title="自分のダッシュボード・設定を開く" style="margin-top:6px;width:100%;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:800;color:#111111;background:#FFFFFF;border:none;border-radius:6px;padding:6px 8px;cursor:pointer;">📊 マイページ</button>
     <div id="myAlertSummary" style="margin-top:6px;display:none;"></div>
     <div id="sidebarAlerts" style="margin-top:6px;display:none;flex-direction:column;gap:3px;"></div>
   </div>
@@ -20186,6 +20187,10 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260805.62', date:'2026-08-07', notify:true, items:[
+    '左メニューの見出し（メイン／登録支援機関業務／マスタ／書類／管理）を紺色のボックスに白文字で表示し、目立つようにしました',
+    '「マイページ」ボタンは白いボックスに黒文字にして、見出しと見分けやすくしました',
+  ]},
   { version:'ver.20260805.61', date:'2026-08-07', notify:true, items:[
     '左メニューの見出し（メイン／登録支援機関業務／マスタ／書類／管理）をクリックすると、その区分の項目を開いたり閉じたりできるようになりました',
     '見出しの右の矢印が ▾ のときは開いた状態、▸ のときは閉じた状態です。見出しの横には項目数も表示されます',
