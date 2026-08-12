@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260805.74 -->
+<!-- KMT_VERSION ver.20260805.75 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -385,7 +385,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.74</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.75</div>
     <div id="currentUserBadge" style="font-size:10px;color:#334e6d;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(15,32,64,.08);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <button onclick="showScreen('my_account')" title="自分のダッシュボード・設定を開く" style="margin-top:6px;width:100%;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:800;color:#111111;background:#FFFFFF;border:1px solid #B9D4EE;border-radius:6px;padding:6px 8px;cursor:pointer;">📊 マイページ</button>
     <div id="myAlertSummary" style="margin-top:6px;display:none;"></div>
@@ -8108,7 +8108,7 @@ function renderTokuteiRows(){
   const box = document.getElementById('wf_tokutei_rows');
   if (!box) return;
   box.innerHTML = _tokuteiRows.map((r,i) => `
-    <div style="display:grid;grid-template-columns:48px minmax(96px,1fr) 68px 104px 116px 22px;gap:4px;align-items:center;margin-bottom:5px;">
+    <div style="display:grid;grid-template-columns:46px minmax(88px,1fr) 64px 100px 112px 38px 20px;gap:4px;align-items:center;margin-bottom:5px;">
       <label style="display:flex;align-items:center;justify-content:center;gap:3px;font-size:10px;cursor:pointer;background:${r.first?'#dbeafe':'#f8fafc'};border:1px solid ${r.first?'#93c5fd':'var(--gray-200)'};border-radius:5px;padding:5px 2px;" title="特定技能の初回（5年満了日の起点）">
         <input type="checkbox" ${r.first?'checked':''} onchange="setTokuteiFirst(${i}, this.checked)" style="margin:0;cursor:pointer;">初回
       </label>
@@ -8122,6 +8122,11 @@ function renderTokuteiRows(){
         ${TOKUTEI_VISA_OPTS.map(v=>`<option ${r.visa===v?'selected':''}>${v}</option>`).join('')}
       </select>
       <input class="form-input" type="date" value="${r.date||''}" onchange="updateTokuteiRow(${i},'date',this.value)" style="font-size:12px;">
+      <button type="button" onclick="openTokuteiDetail(${i})" title="${(r.detail||'').trim() ? esc((r.detail||'').slice(0,120)) : '詳細を記入する'}"
+        style="font-size:10px;font-weight:700;padding:5px 2px;border-radius:5px;cursor:pointer;white-space:nowrap;
+          background:${(r.detail||'').trim() ? '#dbeafe' : 'white'};
+          border:1px solid ${(r.detail||'').trim() ? '#60a5fa' : 'var(--gray-200)'};
+          color:${(r.detail||'').trim() ? '#1d4ed8' : 'var(--gray-500)'};">詳細</button>
       <button type="button" onclick="removeTokuteiRow(${i})" title="削除" style="background:none;border:none;color:#9ca3af;font-size:15px;cursor:pointer;padding:0;line-height:1;">✕</button>
     </div>`).join('') ||
     '<div style="font-size:11px;color:var(--gray-400);padding:6px 2px;">未入力（「＋ 就労先を追加」から入力してください）</div>';
@@ -8150,10 +8155,49 @@ function renderTokuteiCalc(){
     '</div>';
 }
 function addTokuteiRow(){
-  _tokuteiRows.push({ company:'', apply:'', visa:'', date:'', first: _tokuteiRows.length===0 });
+  _tokuteiRows.push({ company:'', apply:'', visa:'', date:'', detail:'', first: _tokuteiRows.length===0 });
   renderTokuteiRows();
 }
 function removeTokuteiRow(i){ _tokuteiRows.splice(i,1); renderTokuteiRows(); }
+
+// 就労先1行の「詳細」を大きな画面で記入する（枠が狭いので一覧はボタンだけ）
+function openTokuteiDetail(i){
+  const r = _tokuteiRows[i];
+  if (!r) return;
+  const label = [r.company, r.visa, r.date].filter(Boolean).join('／') || '就労先';
+  document.getElementById('tokuteiDetailModal')?.remove();
+  document.body.insertAdjacentHTML('beforeend',
+    '<div id="tokuteiDetailModal" style="position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:10050;display:flex;align-items:center;justify-content:center;padding:24px;">' +
+      '<div style="background:white;border-radius:12px;width:820px;max-width:100%;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden;">' +
+        '<div style="display:flex;align-items:center;gap:8px;padding:14px 18px;border-bottom:1px solid var(--gray-200);">' +
+          '<div style="font-size:14px;font-weight:800;color:var(--navy);">📝 詳細</div>' +
+          '<div style="font-size:11px;color:var(--gray-400);">' + esc(label) + '</div>' +
+          '<button onclick="closeTokuteiDetail()" style="margin-left:auto;background:none;border:none;font-size:20px;cursor:pointer;color:var(--gray-400);">✕</button>' +
+        '</div>' +
+        '<textarea id="tokuteiDetailText" class="form-textarea" placeholder="この就労先についての補足を記入してください（申請の経緯、指定書の内容、注意点など）" ' +
+          'style="flex:1;min-height:320px;border:none;border-radius:0;resize:none;font-size:14px;line-height:1.8;padding:16px 18px;">' + esc(r.detail || '') + '</textarea>' +
+        '<div style="display:flex;align-items:center;gap:8px;padding:12px 18px;border-top:1px solid var(--gray-200);">' +
+          '<span style="font-size:11px;color:var(--gray-400);">閉じると内容が反映されます（保存は人材詳細の💾保存で）</span>' +
+          '<button onclick="closeTokuteiDetail()" class="btn btn-primary" style="margin-left:auto;">✓ 閉じる</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>');
+  const ta = document.getElementById('tokuteiDetailText');
+  ta.dataset.idx = i;
+  ta.focus();
+}
+function closeTokuteiDetail(){
+  const ta = document.getElementById('tokuteiDetailText');
+  if (ta) {
+    const i = Number(ta.dataset.idx);
+    if (_tokuteiRows[i]) {
+      _tokuteiRows[i].detail = ta.value;
+      _tokuteiSyncHidden();
+      renderTokuteiRows();   // ボタンの色（記入あり＝水色）を更新
+    }
+  }
+  document.getElementById('tokuteiDetailModal')?.remove();
+}
 function updateTokuteiRow(i, key, val){
   if (!_tokuteiRows[i]) return;
   _tokuteiRows[i][key] = val;
@@ -14310,9 +14354,9 @@ function buildWorkerModalBody(w) {
       </div>
       <input type="hidden" id="wf_tokutei_history" value="">
       <div style="overflow-x:auto;">
-        <div style="min-width:470px;">
-          <div style="display:grid;grid-template-columns:48px minmax(96px,1fr) 68px 104px 116px 22px;gap:4px;font-size:10px;font-weight:700;color:var(--gray-400);padding:0 2px 3px;">
-            <div>初回</div><div>会社名</div><div>申請</div><div>在留資格</div><div>指定書発行日</div><div></div>
+        <div style="min-width:495px;">
+          <div style="display:grid;grid-template-columns:46px minmax(88px,1fr) 64px 100px 112px 38px 20px;gap:4px;font-size:10px;font-weight:700;color:var(--gray-400);padding:0 2px 3px;">
+            <div>初回</div><div>会社名</div><div>申請</div><div>在留資格</div><div>指定書発行日</div><div>詳細</div><div></div>
           </div>
           <div id="wf_tokutei_rows"></div>
         </div>
@@ -20703,6 +20747,11 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260805.75', date:'2026-08-07', notify:true, items:[
+    '人材詳細「10. 通算期間と過去の就労先」の指定書発行日の隣に「詳細」ボタンを追加しました',
+    'ボタンを押すと大きな画面が開き、その就労先についての補足をたっぷり記入できます',
+    '記入がある行はボタンが水色、記入がない行は白のままなので、どこに詳細が入っているか一目で分かります',
+  ]},
   { version:'ver.20260805.74', date:'2026-08-07', notify:true, items:[
     '支援スケジュールの「月」表示を、普通のカレンダー（日〜土の7列）に変更しました。日付をクリックで登録、予定をクリックで編集できます',
     '予定の入力を「予定日／実施日」の2つから「日付」1つにまとめ、あわせて「時間」を追加しました。終日（一日中）か、開始〜終了の時間帯を選べます',
