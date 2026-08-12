@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260805.77 -->
+<!-- KMT_VERSION ver.20260805.78 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -385,7 +385,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.77</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.78</div>
     <div id="currentUserBadge" style="font-size:10px;color:#334e6d;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(15,32,64,.08);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <button onclick="showScreen('my_account')" title="自分のダッシュボード・設定を開く" style="margin-top:6px;width:100%;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:800;color:#111111;background:#FFFFFF;border:1px solid #B9D4EE;border-radius:6px;padding:6px 8px;cursor:pointer;">📊 マイページ</button>
     <div id="myAlertSummary" style="margin-top:6px;display:none;"></div>
@@ -18693,7 +18693,7 @@ const REG_SUPPORT_TASKS = [
 REG_SUPPORT_TASKS.forEach(t => {
   SCREENS['reg_task_' + t.no] = {
     title: (t.kind === 'form' ? '📄 ' : '📘 ') + t.name,
-    init: () => {},
+    init: () => loadRegTaskRecords(t.no),
   };
 });
 
@@ -18725,42 +18725,444 @@ function renderRegSupportNav(){
       '📘 ' + esc(t.name) + '</div>').join('');
 }
 
-// 各項目の画面（中身はこれから設定する）
+// ===== 登録支援機関業務: 様式定義 =====
+// type: text/date/time/number/textarea/select/worker/company/rows
+// worker型を選ぶと氏名・生年月日・国籍・性別・在留カード番号・所属機関が自動反映される
+const REG_FORM_DEFS = {
+  1: { doc:true, fields:[
+    {k:'corp_name',l:'法人名称'},{k:'corp_no',l:'法人番号'},{k:'rep_name',l:'代表者氏名'},{k:'corp_addr',l:'住所'},
+    {k:'office_name',l:'事業所名称'},{k:'office_addr',l:'事業所住所'},{k:'office_tel',l:'事業所連絡先'},
+    {k:'officers',l:'役員氏名・役職・住所',type:'rows',cols:[{k:'name',l:'氏名'},{k:'title',l:'役職'},{k:'addr',l:'住所'}]},
+    {k:'monthly',l:'職員数・月次支援実績（毎月更新）',type:'rows',cols:[{k:'ym',l:'年月'},{k:'full',l:'常勤職員数'},{k:'part',l:'非常勤職員数'},{k:'sup',l:'支援人数／行方不明者数'}]},
+    {k:'staff',l:'支援責任者・支援担当者',type:'rows',cols:[{k:'kind',l:'区分'},{k:'name',l:'氏名'},{k:'role_addr',l:'役職・住所'},{k:'since',l:'就任日'}]},
+    {k:'langs',l:'対応可能言語・通訳担当者',type:'rows',cols:[{k:'lang',l:'言語'},{k:'name',l:'通訳担当者氏名'},{k:'emp',l:'常勤／委託別'}]},
+  ], listCols:[['corp_name','法人名称'],['office_name','事業所名称'],['rep_name','代表者']] },
+  2: { doc:true, fields:[
+    {k:'company',l:'特定技能所属機関（甲）',type:'company'},
+    {k:'org_name',l:'登録支援機関（乙）'},
+    {k:'worker',l:'１号特定技能外国人（丙）',type:'worker'},
+    {k:'fee_month',l:'委託料（月額・円）',type:'number'},
+    {k:'period_from',l:'契約期間（開始）',type:'date'},{k:'period_to',l:'契約期間（終了）',type:'date'},
+    {k:'court',l:'専属的合意管轄裁判所（○○地方裁判所）'},
+    {k:'contract_date',l:'契約締結日',type:'date'},
+    {k:'breakdown',l:'別紙：支援委託費用内訳（1名当たり月額）',type:'rows',cols:[{k:'item',l:'名目'},{k:'amount',l:'金額（円）'},{k:'timing',l:'徴収時期（随時／定期）'}]},
+  ], listCols:[['_company','所属機関'],['_worker','外国人'],['fee_month','月額']] },
+  3: { fields:[
+    {k:'worker',l:'対象の外国人材',type:'worker'},
+    {k:'plan_no',l:'支援計画書番号（1-17号）'},{k:'contract_no',l:'支援委託契約書番号（5-10号）'},
+    {k:'start',l:'支援開始日',type:'date'},{k:'end',l:'支援終了日',type:'date'},{k:'end_reason',l:'終了理由',type:'textarea'},
+  ], listCols:[['_worker','氏名'],['start','支援開始日'],['end','支援終了日']] },
+  4: { doc:true, fields:[
+    {k:'worker',l:'対象の外国人材',type:'worker'},
+    {k:'sessions',l:'実施日時',type:'rows',cols:[{k:'date',l:'年月日',t:'date'},{k:'from',l:'開始',t:'time'},{k:'to',l:'終了',t:'time'}]},
+    {k:'org_name',l:'特定技能所属機関（又は登録支援機関）の氏名又は名称'},
+    {k:'explainer',l:'説明者の氏名'},
+  ], listCols:[['_worker','氏名'],['_s0','実施日'],['explainer','説明者']] },
+  5: { fields:[
+    {k:'worker',l:'対象の外国人材',type:'worker'},
+    {k:'arrive_date',l:'出迎え日（上陸日）',type:'date'},{k:'arrive_staff',l:'実施担当者の氏名・役職（入国）'},
+    {k:'depart_date',l:'見送り日（出国日）',type:'date'},{k:'depart_staff',l:'実施担当者の氏名・役職（出国）'},
+  ], listCols:[['_worker','氏名'],['arrive_date','出迎え日'],['depart_date','見送り日']] },
+  6: { fields:[
+    {k:'worker',l:'対象の外国人材',type:'worker'},
+    {k:'addr',l:'住居住所'},{k:'house_type',l:'住居形態（賃貸・社宅等）'},{k:'rent',l:'家賃（月額・円）',type:'number'},
+    {k:'guarantee',l:'保証人契約の内容',type:'textarea'},
+    {k:'contracts',l:'支援した契約の内容（銀行口座・携帯・ライフライン等）',type:'textarea'},
+    {k:'staff',l:'実施担当者氏名・役職'},
+  ], listCols:[['_worker','氏名'],['addr','住居住所'],['staff','担当者']] },
+  7: { doc:true, fields:[
+    {k:'worker',l:'対象の外国人材',type:'worker'},
+    {k:'sessions',l:'実施日時',type:'rows',cols:[{k:'date',l:'年月日',t:'date'},{k:'from',l:'開始',t:'time'},{k:'to',l:'終了',t:'time'}]},
+    {k:'org_name',l:'特定技能所属機関（又は登録支援機関）の氏名又は名称'},
+    {k:'explainer',l:'説明者の氏名'},{k:'sign_date',l:'署名日',type:'date'},
+  ], listCols:[['_worker','氏名'],['_s0','実施日'],['explainer','説明者']] },
+  8: { fields:[
+    {k:'worker',l:'対象の外国人材',type:'worker'},
+    {k:'dt',l:'実施日時'},{k:'place',l:'実施場所'},{k:'content',l:'実施内容',type:'textarea'},
+    {k:'method',l:'実施方法'},{k:'staff',l:'実施担当者氏名・役職'},
+  ], listCols:[['_worker','氏名'],['dt','実施日時'],['content','実施内容']] },
+  9: { fields:[
+    {k:'worker',l:'対象の外国人材',type:'worker'},
+    {k:'content',l:'実施内容（教室名・教材名等）',type:'textarea'},{k:'method',l:'実施方法'},
+    {k:'staff',l:'実施担当者氏名・役職（委託先講師含む）'},
+  ], listCols:[['_worker','氏名'],['content','実施内容'],['staff','担当者']] },
+  10: { doc:true, fields:[
+    {k:'company',l:'所属機関（定期面談の取込に使用）',type:'company'},
+    {k:'period_from',l:'期間（から）',type:'date'},{k:'period_to',l:'期間（まで）',type:'date'},
+    {k:'org_name',l:'機関の氏名又は名称'},
+    {k:'rows',l:'相談記録',type:'rows',cols:[{k:'date',l:'相談受理日',t:'date'},{k:'name',l:'氏名'},{k:'gender',l:'性別'},{k:'nat',l:'国籍・地域'},{k:'birth',l:'生年月日',t:'date'},{k:'card',l:'在留カード番号'},{k:'content',l:'相談内容'}]},
+  ], listCols:[['_company','所属機関'],['period_from','期間から'],['period_to','期間まで']], importMeetings:true },
+  11: { fields:[
+    {k:'worker',l:'対象の外国人材',type:'worker'},
+    {k:'rows',l:'実施記録',type:'rows',cols:[{k:'date',l:'実施日',t:'date'},{k:'place',l:'実施場所'},{k:'method',l:'実施方法'},{k:'staff',l:'実施担当者氏名・役職'},{k:'note',l:'備考'}]},
+  ], listCols:[['_worker','氏名'],['_r0','直近の実施日']] },
+  12: { fields:[
+    {k:'worker',l:'対象の外国人材',type:'worker'},
+    {k:'consult_date',l:'転職相談日',type:'date'},{k:'time',l:'実施時間'},{k:'place',l:'実施場所'},
+    {k:'cand_name',l:'転職先候補企業の名称'},{k:'cand_addr',l:'転職先候補企業の所在地'},{k:'cand_tel',l:'転職先候補企業の連絡先'},
+    {k:'staff',l:'実施担当者の氏名・役職（通訳人含む）'},
+  ], listCols:[['_worker','氏名'],['consult_date','相談日'],['cand_name','候補企業']] },
+  13: { doc:true, fields:[
+    {k:'worker',l:'対象の外国人材',type:'worker'},
+    {k:'target',l:'面談の相手',type:'select',opts:['１号特定技能外国人（第５－５号）','監督者（第５－６号）']},
+    {k:'meet_date',l:'面談実施日',type:'date'},{k:'place',l:'面談場所'},{k:'method',l:'面談方法（対面・オンライン等）'},
+    {k:'interviewer',l:'面談者（支援責任者又は支援担当者）'},
+    {k:'report',l:'報告内容（生活状況・労働状況等）',type:'textarea'},{k:'notes',l:'特記事項',type:'textarea'},
+  ], listCols:[['_worker','氏名'],['meet_date','面談日'],['interviewer','面談者']] },
+  14: { fields:[
+    {k:'worker',l:'対象の外国人材',type:'worker'},
+    {k:'accept_date',l:'申出受付日',type:'date'},{k:'staff',l:'申出受付担当者'},
+    {k:'items',l:'不実施となった支援項目',type:'textarea'},{k:'reason',l:'申出内容（本人の意思・理由）',type:'textarea'},
+  ], listCols:[['_worker','氏名'],['accept_date','申出受付日'],['staff','受付担当者']] },
+};
+
+let _regTaskRecords = {};   // task_no → 記録の配列
+let _regTaskEditing = null; // { no, id }
+
+// ===== 一覧 =====
+async function loadRegTaskRecords(no){
+  // 選択肢用に人材・企業をそろえる
+  if (!(allCompanies||[]).length) { try { const d = await sbFetch('companies?select=id,name&is_deleted=eq.false&order=name.asc'); allCompanies = d||[]; } catch(e){} }
+  if (!(allWorkers||[]).length || !('residence_card' in (allWorkers[0]||{}))) {
+    try { const d = await sbFetch('workers?select=id,name,birthdate,nationality,gender,residence_card,company_id,companies(id,name)&is_deleted=eq.false&order=name.asc'); allWorkers = d||[]; } catch(e){}
+  }
+  try {
+    const d = await sbFetch('reg_support_records?task_no=eq.' + no + '&is_deleted=eq.false&order=updated_at.desc');
+    _regTaskRecords[no] = d || [];
+  } catch(e) { _regTaskRecords[no] = []; }
+  renderRegTaskList(no);
+}
+
+function _regCellValue(no, rec, key){
+  const d = rec.data || {};
+  if (key === '_worker')  return d.worker_name || '';
+  if (key === '_company') return d.company_name || '';
+  if (key === '_s0') return (d.sessions && d.sessions[0] && d.sessions[0].date) || '';
+  if (key === '_r0') return (d.rows && d.rows[0] && d.rows[0].date) || '';
+  return d[key] != null ? String(d[key]) : '';
+}
+
+function renderRegTaskList(no){
+  const box = document.getElementById('regTaskList_' + no);
+  if (!box) return;
+  const def = REG_FORM_DEFS[no];
+  const recs = _regTaskRecords[no] || [];
+  const head = def.listCols.map(c => '<th style="padding:6px 10px;font-size:11px;color:var(--gray-400);text-align:left;">' + esc(c[1]) + '</th>').join('');
+  const rows = recs.map(r =>
+    '<tr style="border-bottom:1px solid var(--gray-100);">' +
+      def.listCols.map(c => '<td style="padding:7px 10px;font-size:12px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(_regCellValue(no, r, c[0]).slice(0,60)) + '</td>').join('') +
+      '<td style="padding:7px 10px;font-size:10px;color:var(--gray-400);white-space:nowrap;">' + esc(_fmtUpdatedAt(r.updated_at)) + (r.updated_by ? '（' + esc(r.updated_by) + '）' : '') + '</td>' +
+      '<td style="padding:5px 10px;white-space:nowrap;text-align:right;">' +
+        (def.doc ? '<button class="btn btn-outline" style="font-size:10px;padding:2px 8px;" title="書類を生成して印刷" onclick="printRegTaskDoc(' + no + ',\'' + r.id + '\')">🖨️ 書類</button> ' : '') +
+        '<button class="btn btn-outline" style="font-size:10px;padding:2px 8px;" onclick="openRegTaskForm(' + no + ',\'' + r.id + '\')">✏️</button> ' +
+        '<button class="btn btn-outline" style="font-size:10px;padding:2px 8px;color:#dc2626;border-color:#fecaca;" onclick="deleteRegTaskRecord(' + no + ',\'' + r.id + '\')">🗑</button>' +
+      '</td></tr>').join('');
+  box.innerHTML = recs.length
+    ? '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">' +
+        '<thead><tr style="background:#f8fafc;border-bottom:1px solid var(--gray-200);">' + head +
+        '<th style="padding:6px 10px;font-size:11px;color:var(--gray-400);text-align:left;">最終更新</th><th></th></tr></thead>' +
+        '<tbody>' + rows + '</tbody></table></div>'
+    : '<div style="padding:24px;text-align:center;color:var(--gray-400);font-size:12px;">記録がありません。「＋ 新規作成」から登録してください</div>';
+}
+
+// ===== 入力フォーム =====
+function _regWorkerInfoHtml(d){
+  if (!d || !d.worker_id) return '';
+  return '<div style="background:#f8fafc;border:1px solid var(--gray-200);border-radius:6px;padding:6px 10px;font-size:11px;color:var(--gray-600);display:flex;gap:12px;flex-wrap:wrap;">' +
+    '<span>生年月日: <b>' + esc(d.worker_birth||'-') + '</b></span><span>国籍: <b>' + esc(d.worker_nat||'-') + '</b></span>' +
+    '<span>性別: <b>' + esc(d.worker_gender||'-') + '</b></span><span>在留カード番号: <b>' + esc(d.worker_card||'-') + '</b></span>' +
+    '<span>所属: <b>' + esc(d.company_name||'-') + '</b></span></div>';
+}
+
+function openRegTaskForm(no, id){
+  const def = REG_FORM_DEFS[no];
+  const t = REG_SUPPORT_TASKS.find(x => x.no === no);
+  const rec = id ? (_regTaskRecords[no]||[]).find(r => r.id === id) : null;
+  const d = rec ? JSON.parse(JSON.stringify(rec.data || {})) : {};
+  _regTaskEditing = { no, id: id || null, data: d };
+  const inp = 'style="width:100%;padding:7px 10px;border:1px solid #dadce0;border-radius:6px;font-size:13px;box-sizing:border-box;"';
+  const fieldHtml = f => {
+    const v = d[f.k] != null ? d[f.k] : '';
+    let inner;
+    if (f.type === 'worker') {
+      inner = '<select id="rgf_' + f.k + '" onchange="onRegWorkerPick(this.value)" ' + inp + '><option value="">-- 選択 --</option>' +
+        (allWorkers||[]).map(w => '<option value="' + w.id + '"' + (d.worker_id===w.id?' selected':'') + '>' + esc(w.name) + (w.nationality?'（'+esc(w.nationality)+'）':'') + '</option>').join('') + '</select>' +
+        '<div id="rgfWorkerInfo" style="margin-top:5px;">' + _regWorkerInfoHtml(d) + '</div>';
+    } else if (f.type === 'company') {
+      inner = '<select id="rgf_' + f.k + '" onchange="onRegCompanyPick(this.value)" ' + inp + '><option value="">-- 選択 --</option>' +
+        (allCompanies||[]).map(c => '<option value="' + c.id + '"' + (d.company_id===c.id?' selected':'') + '>' + esc(c.name) + '</option>').join('') + '</select>';
+    } else if (f.type === 'rows') {
+      inner = '<div id="rgfRows_' + f.k + '"></div>' +
+        '<button type="button" class="btn btn-outline" style="font-size:11px;padding:3px 12px;margin-top:4px;" onclick="regAddRow(\'' + f.k + '\')">＋ 行を追加</button>';
+    } else if (f.type === 'textarea') {
+      inner = '<textarea id="rgf_' + f.k + '" rows="3" ' + inp.replace('style="','style="resize:vertical;font-family:inherit;') + '>' + esc(v) + '</textarea>';
+    } else if (f.type === 'select') {
+      inner = '<select id="rgf_' + f.k + '" ' + inp + '><option value="">-- 選択 --</option>' +
+        f.opts.map(o => '<option' + (v===o?' selected':'') + '>' + esc(o) + '</option>').join('') + '</select>';
+    } else {
+      inner = '<input type="' + (f.type||'text') + '" id="rgf_' + f.k + '" value="' + esc(String(v)) + '" ' + inp + '>';
+    }
+    return '<div style="margin-bottom:11px;"><label style="font-weight:600;color:#5f6368;display:block;margin-bottom:4px;font-size:12px;">' + esc(f.l) + '</label>' + inner + '</div>';
+  };
+  document.getElementById('regTaskFormModal')?.remove();
+  document.body.insertAdjacentHTML('beforeend',
+    '<div id="regTaskFormModal" style="position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:10050;display:flex;align-items:center;justify-content:center;padding:20px;">' +
+      '<div style="background:white;border-radius:12px;width:760px;max-width:100%;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden;">' +
+        '<div style="padding:13px 18px;border-bottom:1px solid var(--gray-200);display:flex;align-items:center;gap:8px;background:#0f2040;">' +
+          '<span style="font-size:13px;font-weight:800;color:white;">' + (id ? '✏️ ' : '＋ ') + esc(t.name) + '</span>' +
+          '<button onclick="document.getElementById(\'regTaskFormModal\').remove()" style="margin-left:auto;background:none;border:none;font-size:18px;cursor:pointer;color:#cbd5e1;">✕</button>' +
+        '</div>' +
+        '<div style="flex:1;overflow-y:auto;padding:16px 18px;">' +
+          (def.importMeetings ? '<div style="margin-bottom:10px;"><button type="button" class="btn btn-outline" style="font-size:11px;" onclick="regImportMeetings()">📥 所属機関の定期面談から取り込む</button><span style="font-size:10px;color:var(--gray-400);margin-left:6px;">上で所属機関を選んでから押してください</span></div>' : '') +
+          def.fields.map(fieldHtml).join('') +
+        '</div>' +
+        '<div style="display:flex;gap:8px;align-items:center;padding:12px 18px;border-top:1px solid var(--gray-200);">' +
+          (def.doc ? '<button class="btn btn-outline" style="font-size:12px;" onclick="printRegTaskDoc(' + no + ', null)" title="入力中の内容で書類を生成します">🖨️ 書類を生成</button>' : '') +
+          '<button class="btn btn-outline" style="margin-left:auto;" onclick="document.getElementById(\'regTaskFormModal\').remove()">キャンセル</button>' +
+          '<button class="btn btn-primary" onclick="saveRegTaskRecord()">💾 保存</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>');
+  // rows型の初期描画
+  def.fields.filter(f => f.type === 'rows').forEach(f => {
+    if (!Array.isArray(d[f.k]) || !d[f.k].length) d[f.k] = [{}];
+    regRenderRows(f.k);
+  });
+}
+
+function _regRowsDef(k){ return REG_FORM_DEFS[_regTaskEditing.no].fields.find(f => f.k === k); }
+function regRenderRows(k){
+  const box = document.getElementById('rgfRows_' + k);
+  const f = _regRowsDef(k);
+  if (!box || !f) return;
+  const arr = _regTaskEditing.data[k] || [];
+  const w = Math.max(10, Math.floor(100 / f.cols.length));
+  box.innerHTML =
+    '<div style="display:flex;gap:4px;font-size:10px;color:var(--gray-400);font-weight:700;padding:0 2px 2px;">' +
+      f.cols.map(c => '<div style="flex:1;">' + esc(c.l) + '</div>').join('') + '<div style="width:20px;"></div></div>' +
+    arr.map((row, i) =>
+      '<div style="display:flex;gap:4px;margin-bottom:4px;">' +
+        f.cols.map(c =>
+          '<input type="' + (c.t||'text') + '" value="' + esc(String(row[c.k] != null ? row[c.k] : '')) + '" ' +
+            'oninput="_regTaskEditing.data[\'' + k + '\'][' + i + '][\'' + c.k + '\']=this.value" ' +
+            'style="flex:1;min-width:0;padding:5px 7px;border:1px solid #dadce0;border-radius:5px;font-size:12px;">').join('') +
+        '<button type="button" onclick="regRemoveRow(\'' + k + '\',' + i + ')" style="width:20px;background:none;border:none;color:#9ca3af;cursor:pointer;font-size:14px;padding:0;">✕</button>' +
+      '</div>').join('');
+}
+function regAddRow(k){ (_regTaskEditing.data[k] = _regTaskEditing.data[k] || []).push({}); regRenderRows(k); }
+function regRemoveRow(k, i){ _regTaskEditing.data[k].splice(i, 1); regRenderRows(k); }
+
+// 人材を選んだら基本情報を自動反映
+function onRegWorkerPick(id){
+  const d = _regTaskEditing.data;
+  const w = (allWorkers||[]).find(x => x.id === id);
+  d.worker_id = id || null;
+  d.worker_name  = w?.name || '';
+  d.worker_birth = w?.birthdate || '';
+  d.worker_nat   = w?.nationality || '';
+  d.worker_gender= w?.gender || '';
+  d.worker_card  = w?.residence_card || '';
+  if (w?.company_id) {
+    d.company_id = w.company_id;
+    d.company_name = w.companies?.name || (allCompanies||[]).find(c => c.id === w.company_id)?.name || '';
+    const cSel = document.getElementById('rgf_company');
+    if (cSel) cSel.value = w.company_id;
+  }
+  const info = document.getElementById('rgfWorkerInfo');
+  if (info) info.innerHTML = _regWorkerInfoHtml(d);
+}
+function onRegCompanyPick(id){
+  const d = _regTaskEditing.data;
+  d.company_id = id || null;
+  d.company_name = (allCompanies||[]).find(c => c.id === id)?.name || '';
+}
+
+// 相談記録書: 所属機関の定期面談（company_meetings）を行として取り込む
+async function regImportMeetings(){
+  const d = _regTaskEditing.data;
+  const cid = document.getElementById('rgf_company')?.value || d.company_id;
+  if (!cid) { showToast('⚠️ 先に所属機関を選択してください', 'error'); return; }
+  try {
+    const ms = await sbFetch('company_meetings?company_id=eq.' + cid + '&order=meeting_date.desc&limit=50');
+    if (!ms || !ms.length) { showToast('該当する定期面談の記録がありません', 'error'); return; }
+    const rows = d.rows = (d.rows || []).filter(r => Object.values(r).some(v => v));
+    let added = 0;
+    ms.forEach(m => {
+      if (!m.meeting_date) return;
+      if (rows.some(r => r.date === m.meeting_date && r.content === (m.memo||''))) return; // 重複防止
+      const names = (m.worker_ids||[]).map(wid => (allWorkers||[]).find(w=>w.id===wid)?.name).filter(Boolean);
+      rows.push({ date: m.meeting_date, name: names.join('、') || (m.contact_name||''), gender:'', nat:'', birth:'', card:'', content: m.memo || '' });
+      added++;
+    });
+    regRenderRows('rows');
+    showToast('📥 定期面談 ' + added + '件を取り込みました', 'success');
+  } catch(e) { showToast('❌ 取り込み失敗: ' + e.message, 'error'); }
+}
+
+// フォームの値を _regTaskEditing.data に集める
+function _regCollect(){
+  const def = REG_FORM_DEFS[_regTaskEditing.no];
+  const d = _regTaskEditing.data;
+  def.fields.forEach(f => {
+    if (f.type === 'rows') { d[f.k] = (d[f.k]||[]).filter(r => Object.values(r).some(v => v)); return; }
+    const el = document.getElementById('rgf_' + f.k);
+    if (!el) return;
+    if (f.type === 'worker') { onRegWorkerPick(el.value); return; }
+    if (f.type === 'company') { onRegCompanyPick(el.value); return; }
+    d[f.k] = el.value;
+  });
+  return d;
+}
+
+async function saveRegTaskRecord(){
+  const { no, id } = _regTaskEditing;
+  const d = _regCollect();
+  const body = { task_no: no, worker_id: d.worker_id || null, company_id: d.company_id || null,
+    data: d, updated_at: new Date().toISOString(), updated_by: _curUserName() };
+  try {
+    if (id) await sbFetch('reg_support_records?id=eq.' + id, { method:'PATCH', body: JSON.stringify(body) });
+    else await sbFetch('reg_support_records', { method:'POST', body: JSON.stringify(body), prefer:'return=minimal' });
+    showToast('✅ 保存しました', 'success');
+    document.getElementById('regTaskFormModal')?.remove();
+    await loadRegTaskRecords(no);
+  } catch(e) { showToast('❌ 保存失敗: ' + e.message, 'error'); }
+}
+
+async function deleteRegTaskRecord(no, id){
+  if (!confirm('この記録を削除しますか？')) return;
+  try {
+    await sbFetch('reg_support_records?id=eq.' + id, { method:'PATCH',
+      body: JSON.stringify({ is_deleted:true, updated_at:new Date().toISOString(), updated_by:_curUserName() }) });
+    showToast('🗑️ 削除しました', 'success');
+    await loadRegTaskRecords(no);
+  } catch(e) { showToast('❌ ' + e.message, 'error'); }
+}
+
+// ===== 書類生成（印刷用ウィンドウ） =====
+function _regFmtD(v){ if(!v) return '　　年　　月　　日'; const x=new Date(v); return isNaN(x)?esc(v):(x.getFullYear()+'年'+(x.getMonth()+1)+'月'+x.getDate()+'日'); }
+function _regDocSessions(arr){
+  const list = (arr||[]).filter(r => r.date || r.from || r.to);
+  const line = r => _regFmtD(r.date) + '　' + (r.from||'　時　分') + ' から ' + (r.to||'　時　分') + ' まで';
+  return (list.length ? list : [{},{},{}]).map(r => '<div style="text-align:center;margin:4px 0;">' + line(r) + '</div>').join('');
+}
+function buildRegTaskDocHtml(no, d){
+  const T = (title) => '<div class="t">' + title + '</div>';
+  const kv = (l, v) => '<tr><th>' + l + '</th><td>' + (esc(String(v??''))||'　') + '</td></tr>';
+  const rowsTable = (cols, arr) =>
+    '<table class="g"><tr>' + cols.map(c=>'<th>'+c.l+'</th>').join('') + '</tr>' +
+    ((arr&&arr.length?arr:[{},{},{}]).map(r=>'<tr>'+cols.map(c=>'<td>'+(esc(String(r[c.k]??''))||'　')+'</td>').join('')+'</tr>').join('')) + '</table>';
+  if (no === 1) {
+    return T('支援実施体制管理簿') +
+      '<h4>法人情報／事業所情報</h4><table class="g">' + kv('法人名称', d.corp_name) + kv('法人番号', d.corp_no) +
+      kv('代表者氏名', d.rep_name) + kv('住所', d.corp_addr) + kv('事業所名称', d.office_name) +
+      kv('事業所住所', d.office_addr) + kv('事業所連絡先', d.office_tel) + '</table>' +
+      '<h4>役員氏名・役職・住所</h4>' + rowsTable(REG_FORM_DEFS[1].fields.find(f=>f.k==='officers').cols, d.officers) +
+      '<h4>職員数・月次支援実績（毎月更新）</h4>' + rowsTable(REG_FORM_DEFS[1].fields.find(f=>f.k==='monthly').cols, d.monthly) +
+      '<h4>支援責任者・支援担当者（身分事項・住所・役職・経歴）</h4>' + rowsTable(REG_FORM_DEFS[1].fields.find(f=>f.k==='staff').cols, d.staff) +
+      '<h4>対応可能言語・通訳担当者</h4>' + rowsTable(REG_FORM_DEFS[1].fields.find(f=>f.k==='langs').cols, d.langs) +
+      '<p class="note">※ 履歴書・就任承諾書を各担当者分添付してください。</p>';
+  }
+  if (no === 2) {
+    const bl = (v, w) => '<span style="display:inline-block;min-width:' + (w||120) + 'px;border-bottom:1px solid #333;text-align:center;">' + (esc(String(v??''))||'　') + '</span>';
+    return '<div style="text-align:right;font-size:11px;">参考様式第５－１０号</div>' + T('支 援 委 託 契 約 書') +
+      '<p>特定技能所属機関 ' + bl(d.company_name,200) + '（以下「甲」という。）は、登録支援機関 ' + bl(d.org_name,200) +
+      '（以下「乙」という。）に、甲が雇用する１号特定技能外国人 ' + bl(d.worker_name,200) + '（以下「丙」という。）に対する' +
+      '１号特定技能外国人支援計画について、以下のとおり支援業務委託契約を締結する。</p>' +
+      '<h4>第１条（委託する支援業務）</h4><p>甲は、丙について作成した、１号特定技能外国人支援計画について、その全部の実施を乙に委託する。乙は、１号特定技能支援計画に従って支援を実施する。（事前ガイダンス、出入国送迎、住居確保・生活契約支援、生活オリエンテーション、公的手続への同行、日本語学習機会の提供、相談・苦情対応、日本人との交流促進、転職支援、定期面談・行政機関への通報 ほか）</p>' +
+      '<h4>第２条（委託料）</h4><p>甲は、乙に対し、別紙に記載した内訳のとおり、本件業務の対価として、月額 ' + bl(d.fee_month,100) + ' 円を支払う。当月分を翌月末日までに乙の指定する銀行口座等に振込送金にて支払う（送金費用は甲の負担）。</p>' +
+      '<h4>第３条（費用の負担）</h4><p>第１条の業務を遂行する上で必要な費用は乙が負担するものとする。</p>' +
+      '<h4>第４条（乙の遵守すべき事項）</h4><p>乙は、国内外の法令を遵守し、甲より委託された支援業務を誠実に遂行する。乙は、本件支援業務に関して知り得た個人情報および業務上の機密情報を第三者に漏えいしてはならない。</p>' +
+      '<h4>第５条（実施状況の報告）</h4><p>乙は、甲に対し、適時、書面又は口頭で、支援業務の実施状況を報告する。ただし、丙からの相談・苦情に関しては、本人の同意なく甲に報告してはならない。</p>' +
+      '<h4>第６条（契約期間等）</h4><p>本契約の期間は、' + _regFmtD(d.period_from) + ' から ' + _regFmtD(d.period_to) + ' までとする。期間満了１か月前までに別段の意思表示がないときは、同一条件にて更新される。</p>' +
+      '<h4>第７条（解除）</h4><p>相手方が特定技能基準省令第２条第１項第４号各号に規定する欠格事由又は登録拒否事由のいずれかに該当することが認められた場合は、直ちに本契約を解除することができる。</p>' +
+      '<h4>第８条（専属的合意管轄裁判所）</h4><p>本契約に関する一切の争訟は ' + bl(d.court,140) + ' 地方裁判所を第一審の専属的合意管轄裁判所とする。</p>' +
+      '<p style="margin-top:14px;">契約締結日：' + _regFmtD(d.contract_date) + '</p>' +
+      '<div style="margin-top:18px;">甲：' + bl(d.company_name,240) + '　　印</div>' +
+      '<div style="margin-top:10px;">乙：' + bl(d.org_name,240) + '　　印</div>' +
+      '<div style="page-break-before:always;"></div>' +
+      '<div style="text-align:right;font-size:11px;">参考様式第５－１０号・別紙</div>' +
+      T('支援委託費用内訳（特定技能外国人１名当たりの月額）') +
+      rowsTable(REG_FORM_DEFS[2].fields.find(f=>f.k==='breakdown').cols, d.breakdown) +
+      '<p style="text-align:right;font-weight:700;">合計　' + esc(String((d.breakdown||[]).reduce((s,r)=>s+(parseInt(r.amount)||0),0) || '　　　　')) + ' 円</p>';
+  }
+  if (no === 4 || no === 7) {
+    const is4 = no === 4;
+    const items4 = ['私が従事する業務の内容、報酬の額その他の労働条件に関する事項','私が日本において行うことができる活動の内容','私の入国に当たっての手続に関する事項','保証金の徴収その他名目のいかんを問わず、金銭その他の財産を管理されず、違約金契約等を締結しておらず、締結させないことが見込まれること','自国等の機関に費用を支払っている場合は、その額及び内訳を十分理解して合意している必要があること','支援に要する費用について、直接又は間接に負担させないこととしていること','入国しようとする港又は飛行場において送迎を行う必要があることとなっていること','適切な住居の確保に係る支援がされること','職業生活、日常生活又は社会生活に関する相談又は苦情の申出を受ける体制があること'];
+    const items7 = ['私の日本での生活一般に関する事項','法令の規定により履行しなければならない国又は地方公共団体の機関に対する届出その他の手続に関する事項','相談又は苦情の申出に対応することとされている者の連絡先及び申出をすべき国又は地方公共団体の機関の連絡先','私が十分に理解することができる言語により医療を受けることができる医療機関に関する事項','防災及び防犯に関する事項並びに急病その他の緊急時における対応に必要な事項','出入国又は労働に関する法令の規定に違反していることを知ったときの対応方法その他私の法的保護に必要な事項'];
+    return '<div style="text-align:right;font-size:11px;">参考様式第５－' + (is4?'９':'８') + '号</div>' +
+      T(is4 ? '事前ガイダンスの確認書' : '生活オリエンテーションの確認書') +
+      '<ol>' + (is4?items4:items7).map(x=>'<li>'+x+'</li>').join('') + '</ol>' +
+      '<p style="margin-top:10px;">について、</p>' + _regDocSessions(d.sessions) +
+      '<table class="g" style="margin-top:14px;">' + kv('特定技能所属機関（又は登録支援機関）の氏名又は名称', d.org_name) + kv('説明者の氏名', d.explainer) + '</table>' +
+      '<p style="margin-top:12px;">から説明を受け、内容を十分に理解しました。</p>' +
+      '<div style="margin-top:22px;display:flex;justify-content:space-between;">' +
+        '<span>特定技能外国人の署名：＿＿＿＿＿＿＿＿＿＿＿＿＿＿（' + esc(d.worker_name||'') + '）</span>' +
+        '<span>' + (is4 ? '' : _regFmtD(d.sign_date)) + '</span></div>';
+  }
+  if (no === 10) {
+    return '<div style="text-align:right;font-size:11px;">参考様式第５－４号</div>' + T('相　談　記　録　書') +
+      '<p>（' + _regFmtD(d.period_from) + ' から ' + _regFmtD(d.period_to) + ' まで）　機関の氏名又は名称：' + esc(d.org_name||'') + '</p>' +
+      rowsTable(REG_FORM_DEFS[10].fields.find(f=>f.k==='rows').cols, d.rows) +
+      '<p class="note">（注意）用紙が足りない場合は、適宜２枚目を作成すること。</p>';
+  }
+  if (no === 13) {
+    return '<div style="text-align:right;font-size:11px;">参考様式第５－５号／第５－６号</div>' + T('定期面談報告書') +
+      '<table class="g">' + kv('対象の外国人', d.worker_name) + kv('生年月日', d.worker_birth) + kv('国籍・地域', d.worker_nat) +
+      kv('在留カード番号', d.worker_card) + kv('面談の相手', d.target) + kv('面談実施日', _regFmtD(d.meet_date)) +
+      kv('面談場所', d.place) + kv('面談方法', d.method) + kv('面談者（支援責任者又は支援担当者）', d.interviewer) + '</table>' +
+      '<h4>報告内容（生活状況・労働状況等）</h4><div class="box">' + (esc(d.report||'')||'　').replace(/\n/g,'<br>') + '</div>' +
+      '<h4>特記事項</h4><div class="box">' + (esc(d.notes||'')||'　').replace(/\n/g,'<br>') + '</div>';
+  }
+  return T('書類') + '<p>この様式の書類生成は未対応です。</p>';
+}
+
+function printRegTaskDoc(no, id){
+  let d;
+  if (id) { const rec = (_regTaskRecords[no]||[]).find(r => r.id === id); if (!rec) return; d = rec.data || {}; }
+  else { d = _regCollect(); }
+  const t = REG_SUPPORT_TASKS.find(x => x.no === no);
+  const w = window.open('', '_blank');
+  if (!w) { showToast('❌ ポップアップがブロックされました', 'error'); return; }
+  w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>' + esc(t.name) + '</title><style>' +
+    'body{font-family:"Hiragino Mincho ProN","Yu Mincho",serif;font-size:12px;color:#111;margin:18mm 16mm;line-height:1.8;}' +
+    '.t{text-align:center;font-size:18px;font-weight:700;letter-spacing:6px;margin:8px 0 14px;}' +
+    'h4{font-size:12.5px;margin:12px 0 4px;border-left:4px solid #333;padding-left:6px;}' +
+    'table.g{width:100%;border-collapse:collapse;margin:4px 0 8px;}' +
+    'table.g th,table.g td{border:1px solid #333;padding:5px 8px;font-size:11.5px;text-align:left;font-weight:400;}' +
+    'table.g th{background:#f2f2f2;white-space:nowrap;}' +
+    'ol li{margin-bottom:5px;} .note{font-size:10.5px;color:#444;} .box{border:1px solid #333;min-height:70px;padding:8px;}' +
+    '@media print{ body{margin:0;} }</style></head><body>' +
+    buildRegTaskDocHtml(no, d) + '</body></html>');
+  w.document.close();
+  setTimeout(() => { try { w.focus(); w.print(); } catch(e) {} }, 400);
+}
+
+// 各項目の画面（管理リスト）
 function buildRegSupportTaskScreen(key){
   const t = regSupportTaskByKey(key);
   if (!t) return '<div style="padding:40px;text-align:center;color:var(--gray-400);">項目が見つかりません</div>';
+  const def = REG_FORM_DEFS[t.no] || { fields:[], listCols:[] };
   const isForm = t.kind === 'form';
   const forms = isForm ? [] : regSupportFormsOf(t.no);
-  const ledgers = REG_SUPPORT_TASKS.filter(x => x.kind !== 'form');
-  const pos = ledgers.findIndex(x => x.no === t.no) + 1;
   return `
-  <div style="max-width:900px;">
+  <div style="max-width:1000px;">
     <div style="background:white;border:1px solid var(--gray-200);border-radius:12px;box-shadow:var(--shadow);overflow:hidden;">
-      <div style="padding:14px 18px;border-bottom:1px solid var(--gray-200);display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+      <div style="padding:13px 18px;border-bottom:1px solid var(--gray-200);display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
         <span style="font-size:16px;">${isForm ? '📄' : '📘'}</span>
         <span style="font-size:15px;font-weight:800;color:var(--navy);">${esc(t.name)}</span>
-        ${isForm ? '<span style="font-size:9px;font-weight:700;color:#0891b2;background:#ecfeff;border-radius:8px;padding:2px 8px;">参考様式</span>' : ''}
-        ${pos ? `<span style="margin-left:auto;font-size:11px;color:var(--gray-400);">登録支援機関業務 ${pos}／${ledgers.length}</span>` : ''}
+        ${def.doc ? '<span style="font-size:9px;font-weight:700;color:#0891b2;background:#ecfeff;border-radius:8px;padding:2px 8px;">書類生成対応</span>' : ''}
+        <button class="btn btn-primary" style="margin-left:auto;font-size:12px;" onclick="openRegTaskForm(${t.no}, null)">＋ 新規作成</button>
+        <button class="btn btn-outline" style="font-size:12px;" onclick="loadRegTaskRecords(${t.no})">🔄</button>
       </div>
-      <div style="padding:36px 18px;text-align:center;color:var(--gray-400);font-size:13px;line-height:1.9;">
-        🚧 この項目の中身はこれから設定します<br>
-        <span style="font-size:11px;">様式の入力欄・記録の一覧・ファイル添付など、必要な形が決まりましたら組み込みます</span>
-      </div>
+      <div id="regTaskList_${t.no}"><div style="padding:24px;text-align:center;color:var(--gray-400);font-size:12px;">読み込み中...</div></div>
       ${forms.length ? `
-      <div style="border-top:1px solid var(--gray-200);padding:12px 18px;background:#fafbfc;">
-        <div style="font-size:11px;font-weight:800;color:var(--navy);margin-bottom:8px;">📄 この帳票で使う参考様式</div>
+      <div style="border-top:1px solid var(--gray-200);padding:10px 18px;background:#fafbfc;">
+        <div style="font-size:11px;font-weight:800;color:var(--navy);margin-bottom:6px;">📄 この帳票で使う参考様式</div>
         ${forms.map(f => `
-        <div onclick="showScreen('${regSupportKey(f.no)}')" title="開く"
-             style="display:flex;align-items:center;gap:8px;background:white;border:1px solid var(--gray-200);border-left:3px solid #0891b2;border-radius:8px;padding:9px 12px;margin-bottom:6px;cursor:pointer;">
-          <span style="flex-shrink:0;color:#94a3b8;font-size:12px;">↳</span>
-          <span style="flex:1;min-width:0;font-size:12px;font-weight:600;color:var(--gray-600);">${esc(f.name)}</span>
-          <span style="flex-shrink:0;font-size:9px;font-weight:700;color:#0891b2;background:#ecfeff;border-radius:8px;padding:2px 8px;">参考様式</span>
+        <div onclick="showScreen('${regSupportKey(f.no)}')" style="display:flex;align-items:center;gap:8px;background:white;border:1px solid var(--gray-200);border-left:3px solid #0891b2;border-radius:8px;padding:8px 12px;margin-bottom:5px;cursor:pointer;">
+          <span style="color:#94a3b8;font-size:12px;">↳</span>
+          <span style="flex:1;font-size:12px;font-weight:600;color:var(--gray-600);">${esc(f.name)}</span>
         </div>`).join('')}
-      </div>` : ''}
-      ${isForm ? `
-      <div style="border-top:1px solid var(--gray-200);padding:12px 18px;background:#fafbfc;font-size:11px;">
-        <a onclick="showScreen('${regSupportKey((REG_SUPPORT_TASKS.filter(x=>x.kind!=='form'&&x.no<t.no).pop()||{}).no)}')"
-           style="color:#1d4ed8;cursor:pointer;text-decoration:underline dotted;">← ${esc((REG_SUPPORT_TASKS.filter(x=>x.kind!=='form'&&x.no<t.no).pop()||{}).name || '一覧')} に戻る</a>
       </div>` : ''}
     </div>
   </div>`;
@@ -20751,6 +21153,12 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260805.78', date:'2026-08-07', notify:true, items:[
+    '登録支援機関業務の全14様式に、管理リストとデータ入力の機能を付けました。各ページの「＋ 新規作成」から登録できます',
+    '入力画面で外国人材を選ぶと、氏名・生年月日・国籍・性別・在留カード番号・所属機関が自動で反映されます。所属機関も同じように選択できます',
+    '支援実施体制管理簿・支援委託契約書（第５－１０号）・事前ガイダンスの確認書（第５－９号）・生活オリエンテーションの確認書（第５－８号）・相談記録書（第５－４号）・定期面談報告書（第５－５／５－６号）は、入力内容から書類を生成して印刷できます（🖨️ボタン）',
+    '相談記録書には「所属機関の定期面談から取り込む」ボタンがあり、所属機関詳細の定期面談の記録がそのまま相談記録の行に入ります',
+  ]},
   { version:'ver.20260805.77', date:'2026-08-07', notify:true, items:[
     '左のサイドバーの「全体アラート」の件数から、通算期間の未精査の件数を外しました',
     '通算期間の精査状況の表示自体はこれまで通りで、外国人材ページのアラート欄とマイページで一覧として確認できます',
