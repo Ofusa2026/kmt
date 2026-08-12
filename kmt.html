@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260813.80 -->
+<!-- KMT_VERSION ver.20260813.81 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -56,13 +56,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .whats-new-toast-btn{background:#7c3aed;color:white;border:none;border-radius:6px;padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer;transition:background .15s,transform .1s;box-shadow:0 2px 6px rgba(124,58,237,.4);}
 .whats-new-toast-btn:hover{background:#8b5cf6;}
 .whats-new-toast-btn:active{transform:scale(.97);}
-/* 見出しは選択中のメニューと同じ明るい水色のボックス。開閉の矢印は文字の左に置く */
+/* 見出しは選択中のメニュー(.nav-item.active)と紛らわしくならないよう、
+   文字を1.5倍にして色も一段明るい水色にする。選択中のメニューは #BBD9F5 のまま */
 .sidebar-section{display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;
-  margin:10px 8px 4px;padding:8px 12px;border-radius:6px;
-  background:#BBD9F5;color:#0f2040;font-size:12px;font-weight:800;letter-spacing:.5px;}
-.sidebar-section:hover{background:#A6CCF0;}
-.sidebar-section-arrow{font-size:10px;line-height:1;color:#0f2040;flex-shrink:0;width:11px;text-align:center;}
-.sidebar-section-count{margin-left:auto;font-size:9px;font-weight:800;color:#FFFFFF;background:#0f2040;border-radius:8px;padding:1px 7px;}
+  margin:10px 8px 4px;padding:8px 10px;border-radius:6px;
+  background:#C6E2FB;color:#0f2040;font-size:18px;font-weight:800;letter-spacing:0;}
+.sidebar-section:hover{background:#B2D6F8;}
+.sidebar-section-arrow{font-size:13px;line-height:1;color:#0f2040;flex-shrink:0;width:13px;text-align:center;}
+.sidebar-section-count{margin-left:auto;font-size:10px;font-weight:800;color:#FFFFFF;background:#0f2040;border-radius:8px;padding:1px 6px;}
 .nav-item{display:flex;align-items:center;gap:10px;padding:9px 16px;color:#1e3a5f;font-size:13px;cursor:pointer;border-radius:6px;margin:1px 8px;}
 .nav-item:hover,.nav-item.active{background:#BBD9F5;color:#0f2040;font-weight:700;}
 .nav-item .badge{background:#dc2626;color:white;font-size:10px;padding:1px 6px;border-radius:10px;margin-left:auto;}
@@ -385,7 +386,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260813.80</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260813.81</div>
     <div id="currentUserBadge" style="font-size:10px;color:#334e6d;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(15,32,64,.08);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <button onclick="showScreen('my_account')" title="自分のダッシュボード・設定を開く" style="margin-top:6px;width:100%;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:800;color:#111111;background:#FFFFFF;border:1px solid #B9D4EE;border-radius:6px;padding:6px 8px;cursor:pointer;">📊 マイページ</button>
     <div id="myAlertSummary" style="margin-top:6px;display:none;"></div>
@@ -21489,6 +21490,9 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260813.81', date:'2026-08-13', notify:true, items:[
+    '左メニューの見出し（支援・申請・案件登録 など）の文字を大きくし、色も一段明るい水色にしました。今までは見出しの色と、選んでいる項目の色が同じで見分けづらかったための変更です。選んでいる項目の色は今までどおりです',
+  ]},
   { version:'ver.20260813.80', date:'2026-08-13', notify:true, items:[
     '登録支援機関業務：管理簿・記録簿の一覧に、まだ記録が無い人材も「未記入」として並ぶようになりました。氏名は人材情報から自動で入り、残りは後から入力できます。行の右の「＋ 記入」を押すとその人材を選んだ状態で入力画面が開きます',
     '一覧の上に検索欄・絞り込み・「未記入も表示」のチェックを追加しました。未記入で出す範囲は既定で在職中の人材のみ（「未記入は全員」に切り替えると退職済も出ます）。記入済みの記録は絞り込みに関係なく必ず表示されます',
