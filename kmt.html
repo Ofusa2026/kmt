@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260805.78 -->
+<!-- KMT_VERSION ver.20260805.79 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -385,7 +385,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.78</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.79</div>
     <div id="currentUserBadge" style="font-size:10px;color:#334e6d;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(15,32,64,.08);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <button onclick="showScreen('my_account')" title="自分のダッシュボード・設定を開く" style="margin-top:6px;width:100%;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:800;color:#111111;background:#FFFFFF;border:1px solid #B9D4EE;border-radius:6px;padding:6px 8px;cursor:pointer;">📊 マイページ</button>
     <div id="myAlertSummary" style="margin-top:6px;display:none;"></div>
@@ -18885,12 +18885,14 @@ function openRegTaskForm(no, id){
     const v = d[f.k] != null ? d[f.k] : '';
     let inner;
     if (f.type === 'worker') {
-      inner = '<select id="rgf_' + f.k + '" onchange="onRegWorkerPick(this.value)" ' + inp + '><option value="">-- 選択 --</option>' +
-        (allWorkers||[]).map(w => '<option value="' + w.id + '"' + (d.worker_id===w.id?' selected':'') + '>' + esc(w.name) + (w.nationality?'（'+esc(w.nationality)+'）':'') + '</option>').join('') + '</select>' +
+      inner = '<input type="text" id="rgfSearch_' + f.k + '" placeholder="🔍 名前で検索..." oninput="regFillWorkerOptions()" ' +
+          inp.replace('style="','style="margin-bottom:4px;') + '>' +
+        '<select id="rgf_' + f.k + '" onchange="onRegWorkerPick(this.value)" ' + inp + '></select>' +
         '<div id="rgfWorkerInfo" style="margin-top:5px;">' + _regWorkerInfoHtml(d) + '</div>';
     } else if (f.type === 'company') {
-      inner = '<select id="rgf_' + f.k + '" onchange="onRegCompanyPick(this.value)" ' + inp + '><option value="">-- 選択 --</option>' +
-        (allCompanies||[]).map(c => '<option value="' + c.id + '"' + (d.company_id===c.id?' selected':'') + '>' + esc(c.name) + '</option>').join('') + '</select>';
+      inner = '<input type="text" id="rgfSearch_' + f.k + '" placeholder="🔍 名前で検索..." oninput="regFillCompanyOptions()" ' +
+          inp.replace('style="','style="margin-bottom:4px;') + '>' +
+        '<select id="rgf_' + f.k + '" onchange="onRegCompanyPick(this.value)" ' + inp + '></select>';
     } else if (f.type === 'rows') {
       inner = '<div id="rgfRows_' + f.k + '"></div>' +
         '<button type="button" class="btn btn-outline" style="font-size:11px;padding:3px 12px;margin-top:4px;" onclick="regAddRow(\'' + f.k + '\')">＋ 行を追加</button>';
@@ -18928,6 +18930,9 @@ function openRegTaskForm(no, id){
     if (!Array.isArray(d[f.k]) || !d[f.k].length) d[f.k] = [{}];
     regRenderRows(f.k);
   });
+  // 人材・所属機関の選択肢を組み立てる（編集時は保存済みの選択を復元）
+  regFillCompanyOptions();
+  regFillWorkerOptions();
 }
 
 function _regRowsDef(k){ return REG_FORM_DEFS[_regTaskEditing.no].fields.find(f => f.k === k); }
@@ -18952,6 +18957,43 @@ function regRenderRows(k){
 function regAddRow(k){ (_regTaskEditing.data[k] = _regTaskEditing.data[k] || []).push({}); regRenderRows(k); }
 function regRemoveRow(k, i){ _regTaskEditing.data[k].splice(i, 1); regRenderRows(k); }
 
+// 人材の選択肢を組み立てる（検索文字＋選択中の所属機関で絞り込み）
+function regFillWorkerOptions(){
+  const sel = document.getElementById('rgf_worker');
+  if (!sel) return;
+  const d = _regTaskEditing.data;
+  const q = (document.getElementById('rgfSearch_worker')?.value || '').toLowerCase().trim();
+  const cid = document.getElementById('rgf_company')?.value || '';
+  let list = allWorkers || [];
+  if (cid) list = list.filter(w => w.company_id === cid);   // 所属機関を選んだらその人材だけ
+  if (q) list = list.filter(w => ((w.name||'') + ' ' + (w.nationality||'')).toLowerCase().includes(q));
+  const cur = sel.value || d.worker_id || '';
+  // 選択中の人材が絞り込みで消えないように残す
+  if (cur && !list.some(w => w.id === cur)) {
+    const w = (allWorkers||[]).find(x => x.id === cur);
+    if (w) list = [w, ...list];
+  }
+  sel.innerHTML = '<option value="">-- 選択 --（' + list.length + '名）</option>' +
+    list.slice(0, 300).map(w => '<option value="' + w.id + '"' + (cur===w.id?' selected':'') + '>' +
+      esc(w.name) + (w.nationality?'（'+esc(w.nationality)+'）':'') + '</option>').join('');
+}
+// 所属機関の選択肢を組み立てる（検索文字で絞り込み）
+function regFillCompanyOptions(){
+  const sel = document.getElementById('rgf_company');
+  if (!sel) return;
+  const d = _regTaskEditing.data;
+  const q = (document.getElementById('rgfSearch_company')?.value || '').toLowerCase().trim();
+  let list = allCompanies || [];
+  if (q) list = list.filter(c => (c.name||'').toLowerCase().includes(q));
+  const cur = sel.value || d.company_id || '';
+  if (cur && !list.some(c => c.id === cur)) {
+    const c = (allCompanies||[]).find(x => x.id === cur);
+    if (c) list = [c, ...list];
+  }
+  sel.innerHTML = '<option value="">-- 選択 --（' + list.length + '社）</option>' +
+    list.slice(0, 300).map(c => '<option value="' + c.id + '"' + (cur===c.id?' selected':'') + '>' + esc(c.name) + '</option>').join('');
+}
+
 // 人材を選んだら基本情報を自動反映
 function onRegWorkerPick(id){
   const d = _regTaskEditing.data;
@@ -18975,6 +19017,7 @@ function onRegCompanyPick(id){
   const d = _regTaskEditing.data;
   d.company_id = id || null;
   d.company_name = (allCompanies||[]).find(c => c.id === id)?.name || '';
+  regFillWorkerOptions();   // 人材リストをこの所属機関のぶんだけに絞り込む
 }
 
 // 相談記録書: 所属機関の定期面談（company_meetings）を行として取り込む
@@ -21153,6 +21196,11 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260805.79', date:'2026-08-07', notify:true, items:[
+    '登録支援機関業務の入力画面で、所属機関・外国人材の選択欄に名前検索を追加しました。検索欄に入力するとリストが絞り込まれます',
+    '所属機関を選ぶと、人材のリストにはその所属機関の人材だけが表示されるようになりました',
+    '選択欄には該当の件数（○名／○社）も表示されます',
+  ]},
   { version:'ver.20260805.78', date:'2026-08-07', notify:true, items:[
     '登録支援機関業務の全14様式に、管理リストとデータ入力の機能を付けました。各ページの「＋ 新規作成」から登録できます',
     '入力画面で外国人材を選ぶと、氏名・生年月日・国籍・性別・在留カード番号・所属機関が自動で反映されます。所属機関も同じように選択できます',
