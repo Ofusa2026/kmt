@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260813.93 -->
+<!-- KMT_VERSION ver.20260813.94 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -441,7 +441,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260813.93</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260813.94</div>
     <div id="currentUserBadge" style="font-size:10px;color:#334e6d;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(15,32,64,.08);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <button onclick="showScreen('my_account')" title="自分のダッシュボード・設定を開く" style="margin-top:6px;width:100%;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:800;color:#111111;background:#FFFFFF;border:1px solid #B9D4EE;border-radius:6px;padding:6px 8px;cursor:pointer;">📊 マイページ</button>
     <div id="myAlertSummary" style="margin-top:6px;display:none;"></div>
@@ -18192,8 +18192,7 @@ function switchJpTab(tab){
   });
   const box = document.getElementById('jpTabBody');
   if (!box) return;
-  if (tab==='info')  { box.innerHTML = _jpInfoTabHtml(_jpRowOf(_jpDetailRow)); }
-  if (tab==='notes') { box.innerHTML = '<div style="padding:20px;color:var(--gray-400);font-size:12px">読み込み中...</div>'; loadJobNotes(_jpDetailRow); }
+  if (tab==='info')  { box.innerHTML = _jpInfoTabHtml(_jpRowOf(_jpDetailRow)); loadJobNotes(_jpDetailRow); }
   if (tab==='cands') { box.innerHTML = '<div style="padding:20px;color:var(--gray-400);font-size:12px">読み込み中...</div>'; loadJpCandidates(_jpDetailRow); }
 }
 
@@ -18206,8 +18205,8 @@ async function loadJobNotes(srcRow){
 }
 
 function renderJobNotes(){
-  const box = document.getElementById('jpTabBody');
-  if (!box || _jpTab!=='notes') return;
+  const box = document.getElementById('jpNotesInline');
+  if (!box) return;
   const notes = _jpNotes.map(n=>_jobNoteCardHtml(n)).join('');
   box.innerHTML = `
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
@@ -18502,15 +18501,18 @@ function openJobProgressDetail(srcRow) {
   const r = (allJobProg||[]).find(x=>x.src_row===srcRow);
   if (!r) return;
   _jpDetailRow = srcRow; _jpTab = 'info';
+  if (!(allCompanies||[]).length) {
+    sbFetch('companies?select=id,name&order=name.asc').then(d => { allCompanies = d || []; }).catch(()=>{});
+  }
   _jpNotes = []; _jpCandLinks = []; _jpCandSearch = '';
   const tabs = `
   <div class="modal-tabs" id="jpModalTabs" style="padding:0;margin:-4px 0 14px;align-items:center;">
     <div class="modal-tab active" data-jptab="info"  onclick="switchJpTab('info')">📋 求人進捗 情報</div>
-    <div class="modal-tab"        data-jptab="notes" onclick="switchJpTab('notes')">📝 求人詳細</div>
     <div class="modal-tab"        data-jptab="cands" onclick="switchJpTab('cands')">👥 候補者リスト</div>
   </div>`;
   showGenModal('jobProgModal', '💼 ' + (r.code?r.code+' / ':'') + (r.company_name||'求人進捗'),
     tabs + '<div id="jpTabBody">' + _jpInfoTabHtml(r) + '</div>');
+  loadJobNotes(srcRow);
 }
 
 // 「求人進捗 情報」タブの中身
@@ -18541,6 +18543,43 @@ function _jpInfoTabHtml(r) {
       <div style="display:flex;flex-wrap:wrap;gap:8px;padding:6px 0;">
         ${natOpts.map(n=>`<label style="font-size:12px;display:inline-flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" class="jpf_nat" value="${n}" ${chk(n)}>${n}</label>`).join('')}
       </div></div>
+    <div class="section-title">📝 求人詳細</div>
+    <div class="form-group full"><div id="jpNotesInline"><div style="font-size:12px;color:var(--gray-400);padding:8px 0;">読み込み中...</div></div></div>
+
+    <div class="section-title" style="color:#dc2626;">⚖️ 労働局指定項目（求人受理票）</div>
+    <div class="form-group"><label class="form-label">担当者連絡先電話番号</label><input class="form-input" id="jpf_contact_phone" type="tel" value="${esc(r.contact_phone||'')}" placeholder="03-1234-5678"></div>
+    <div class="form-group"><label class="form-label">受付年月日</label><input class="form-input" id="jpf_reception_date" type="date" value="${r.reception_date||''}"></div>
+    <div class="form-group"><label class="form-label">有効期間（終了日）</label><input class="form-input" id="jpf_valid_until" type="date" value="${r.valid_until||''}"></div>
+    <div class="form-group"><label class="form-label">雇用期間</label>
+      <select class="form-select" id="jpf_employment_period_type">${['','無期','有期','定めなし'].map(x=>`<option ${r.employment_period_type===x?'selected':''}>${x}</option>`).join('')}</select></div>
+    <div class="form-group full"><label class="form-label">雇用期間詳細（有期の場合）</label><input class="form-input" id="jpf_employment_period_detail" value="${esc(r.employment_period_detail||'')}" placeholder="例: 1年（更新あり）"></div>
+
+    <div class="section-title">求人基本情報</div>
+    <div class="form-group"><label class="form-label">就業場所（都道府県等）</label><input class="form-input" id="jpf_location" value="${esc(r.location||'')}"></div>
+    <div class="form-group"><label class="form-label">所属機関</label>
+      <select class="form-select" id="jpf_company_id"><option value="">選択...</option>${(allCompanies||[]).map(c=>`<option value="${c.id}" ${r.company_id===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div>
+
+    <div class="section-title">条件</div>
+    <div class="form-group"><label class="form-label">日本語レベル</label><input class="form-input" id="jpf_jp_level_req" value="${esc(r.jp_level_req||'')}"></div>
+    <div class="form-group"><label class="form-label">必要資格</label><input class="form-input" id="jpf_required_license" value="${esc(r.required_license||'')}"></div>
+
+    <div class="section-title">給与・住居</div>
+    <div class="form-group"><label class="form-label">給与種別</label>
+      <select class="form-select" id="jpf_salary_type">${['','月給','時給'].map(x=>`<option ${r.salary_type===x?'selected':''}>${x}</option>`).join('')}</select></div>
+    <div class="form-group"><label class="form-label">給与額（円）</label><input class="form-input" id="jpf_salary_amount" type="number" value="${r.salary_amount??''}"></div>
+    <div class="form-group"><label class="form-label">寮</label>
+      <select class="form-select" id="jpf_dormitory_available">${['','あり','なし'].map(x=>`<option ${r.dormitory_available===x?'selected':''}>${x}</option>`).join('')}</select></div>
+    <div class="form-group"><label class="form-label">年間休日</label><input class="form-input" id="jpf_annual_holiday_days" type="number" value="${r.annual_holiday_days??''}"></div>
+
+    <div class="section-title" style="color:#1a73e8;">📋 KMT社内</div>
+    <div class="form-group"><label class="form-label">紹介費（円・税抜）</label><input class="form-input" id="jpf_referral_fee" type="number" value="${r.referral_fee??''}"></div>
+    <div class="form-group"><label class="form-label">大房側担当</label><input class="form-input" id="jpf_obo_staff" value="${esc(r.obo_staff||'')}"></div>
+    <div class="form-group"><label class="form-label">募集開始日</label><input class="form-input" id="jpf_recruit_start" type="date" value="${r.recruit_start||''}"></div>
+    <div class="form-group"><label class="form-label">STOCKのURL</label><input class="form-input" id="jpf_stock_url" value="${esc(r.stock_url||'')}"></div>
+    <div class="form-group full"><label class="form-label">仕事内容</label><textarea class="form-textarea" id="jpf_job_description" rows="3">${esc(r.job_description||'')}</textarea></div>
+    <div class="form-group full"><label class="form-label">案件担当のコメント（候補者の状況・進捗）</label><textarea class="form-textarea" id="jpf_progress_note" rows="3">${esc(r.progress_note||'')}</textarea></div>
+    <div class="form-group full"><label class="form-label">人材担当のコメント</label><textarea class="form-textarea" id="jpf_jinzai_comment" rows="3">${esc(r.jinzai_comment||'')}</textarea></div>
+
     <div class="form-group full"><label class="form-label">候補者の状況</label><textarea class="form-textarea" id="jpf_candidate_status" rows="4">${esc(r.candidate_status||'')}</textarea></div>
     <div class="form-group full"><label class="form-label">コメント</label><textarea class="form-textarea" id="jpf_comment" rows="3">${esc(r.comment||'')}</textarea></div>
   </div>
@@ -18578,7 +18617,29 @@ async function saveJobProgress(srcRow) {
     amount: numOrNull(v('jpf_amount')),
     nationalities: nats,
     candidate_status: v('jpf_candidate_status')||null,
-    comment: v('jpf_comment')||null
+    comment: v('jpf_comment')||null,
+    // 旧「求人登録」から取り込んだ項目
+    company_id: v('jpf_company_id')||null,
+    contact_phone: v('jpf_contact_phone')||null,
+    reception_date: v('jpf_reception_date')||null,
+    valid_until: v('jpf_valid_until')||null,
+    employment_period_type: v('jpf_employment_period_type')||null,
+    employment_period_detail: v('jpf_employment_period_detail')||null,
+    location: v('jpf_location')||null,
+    jp_level_req: v('jpf_jp_level_req')||null,
+    required_license: v('jpf_required_license')||null,
+    salary_type: v('jpf_salary_type')||null,
+    salary_amount: numOrNull(v('jpf_salary_amount')),
+    dormitory_available: v('jpf_dormitory_available')||null,
+    annual_holiday_days: numOrNull(v('jpf_annual_holiday_days')),
+    referral_fee: numOrNull(v('jpf_referral_fee')),
+    obo_staff: v('jpf_obo_staff')||null,
+    recruit_start: v('jpf_recruit_start')||null,
+    stock_url: v('jpf_stock_url')||null,
+    job_description: v('jpf_job_description')||null,
+    progress_note: v('jpf_progress_note')||null,
+    jinzai_comment: v('jpf_jinzai_comment')||null,
+    updated_at: new Date().toISOString(), updated_by: _curUserName()
   };
   try {
     await sbFetch('job_progress?src_row=eq.'+srcRow, { method:'PATCH', prefer:'return=minimal', body: JSON.stringify(payload) });
@@ -22273,6 +22334,11 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260813.94', date:'2026-08-13', notify:true, items:[
+    '求人管理：これまで別だった「求人登録」の項目を、すべての求人案件の「求人進捗 情報」に取り込みました。労働局指定項目（担当者連絡先・受付年月日・有効期間・雇用期間）、求人基本情報（就業場所・所属機関）、条件（日本語レベル・必要資格）、給与・住居（給与種別・給与額・寮・年間休日）、KMT社内（紹介費・大房側担当・募集開始日・STOCKのURL・仕事内容・案件担当のコメント・人材担当のコメント）が入力できます',
+    '「📝 求人詳細」のノートを別タブから「求人進捗 情報」の中へ移しました。位置は対象国籍のすぐ下です。タブは「求人進捗 情報」と「候補者リスト」の2つになりました',
+    '候補者リストは今までどおり、そのまま連携しています',
+  ]},
   { version:'ver.20260813.93', date:'2026-08-13', notify:true, items:[
     '求人管理で案件を開いたときのチャットボタンを、右上から一番左下（保存・閉じるの反対側）に移動しました',
     'ボタンの名前を「チャット」から「求人チャット」に変えました。左メニューの全体チャットと紛らわしくないようにするためです',
