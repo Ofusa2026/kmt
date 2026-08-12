@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260813.91 -->
+<!-- KMT_VERSION ver.20260813.92 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -441,12 +441,17 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260813.91</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260813.92</div>
     <div id="currentUserBadge" style="font-size:10px;color:#334e6d;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(15,32,64,.08);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <button onclick="showScreen('my_account')" title="自分のダッシュボード・設定を開く" style="margin-top:6px;width:100%;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:800;color:#111111;background:#FFFFFF;border:1px solid #B9D4EE;border-radius:6px;padding:6px 8px;cursor:pointer;">📊 マイページ</button>
     <div id="myAlertSummary" style="margin-top:6px;display:none;"></div>
     <div id="sidebarAlerts" style="margin-top:6px;display:none;flex-direction:column;gap:3px;"></div>
   </div>
+  <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;gap:4px;flex-wrap:nowrap;white-space:nowrap;overflow:hidden;" id="chatNavItem"><span id="chatNavLabel" style="flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;">💬 チャット</span>
+    <span id="chatMentionDirectBadge" class="chat-nav-badge" title="自分あての未読メンション" style="display:none;background:#ef4444;color:white;">@0</span>
+    <span id="chatMentionGroupBadge" class="chat-nav-badge" title="所属チームあての未読メンション" style="display:none;background:#f59e0b;color:#1e293b;">@0</span>
+    <span id="chatUnreadBadge" class="chat-nav-badge" title="未読の合計" style="display:none;background:#fda4af;color:#881337;font-weight:700;">0</span></div>
+  <div style="height:1px;background:#B9D4EE;margin:4px 16px 8px;"></div>
   <div class="sidebar-section">支援</div>
   <div class="nav-item" onclick="showScreen('companies')">🏢 所属機関</div>
   <div class="nav-item" onclick="showScreen('workers')">👤 外国人材</div>
@@ -478,12 +483,6 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="nav-item" id="navSysAdmin" onclick="showScreen('system_admin')" style="display:none;">🔒 システム管理</div>
   <div class="nav-item" onclick="showScreen('audit_log')">📋 操作ログ</div>
   <div class="nav-item" onclick="showScreen('ai_knowledge')">🧠 AI記憶</div>
-  <!-- 💬 チャットはメニューの一番下（左下）に置く -->
-  <div style="height:1px;background:#B9D4EE;margin:10px 16px 6px;"></div>
-  <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;gap:4px;flex-wrap:nowrap;white-space:nowrap;overflow:hidden;" id="chatNavItem"><span id="chatNavLabel" style="flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;">💬 チャット</span>
-    <span id="chatMentionDirectBadge" class="chat-nav-badge" title="自分あての未読メンション" style="display:none;background:#ef4444;color:white;">@0</span>
-    <span id="chatMentionGroupBadge" class="chat-nav-badge" title="所属チームあての未読メンション" style="display:none;background:#f59e0b;color:#1e293b;">@0</span>
-    <span id="chatUnreadBadge" class="chat-nav-badge" title="未読の合計" style="display:none;background:#fda4af;color:#881337;font-weight:700;">0</span></div>
   <div class="sidebar-user">
     <div class="user-info">
       <div class="user-avatar" id="userAvatar">K</div>
@@ -22273,6 +22272,9 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260813.92', date:'2026-08-13', notify:true, items:[
+    '左メニューの「💬 チャット」を元の位置（アラートのすぐ下・支援の上）に戻しました。一番下に移動して見えなくなっていたためです。未読・メンションの件数表示もそのままです',
+  ]},
   { version:'ver.20260813.91', date:'2026-08-13', notify:true, items:[
     '支援スケジュールの種別を増やしました。事前ガイダンス／入国（上陸日）／配属／生活オリエンテーション／定期面談／本帰国（出国日）／一時帰国／再入国／企業面接／病院対応／その他対応 の11種類です',
     '種別で「配属」を選ぶと「生活オリエンテーションも同じ日に実施」のチェックが出ます。チェックして登録すると、配属と同じ日付・同じ担当者で生活オリエンテーションの予定も一緒に登録されます（同じ日に登録済みの場合は重複して作りません）',
