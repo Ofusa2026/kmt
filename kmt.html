@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260813.86 -->
+<!-- KMT_VERSION ver.20260813.87 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -111,6 +111,7 @@ body.jn-resizing .jn-body{cursor:col-resize;}
 .jc-when{font-size:10px;color:var(--gray-400);white-space:nowrap;}
 .jc-tag{font-size:9px;font-weight:800;background:#1e3a5f;color:#fff;border-radius:8px;padding:1px 6px;margin-left:6px;}
 .jc-tag-i{background:#7c3aed;}
+.jp-group-head:hover{filter:brightness(1.18);}
 #chatNavLabel{font-size:calc(13px * var(--chatNavScale));}
 .chat-nav-badge{flex:0 0 auto;font-size:calc(9px * var(--chatNavScale));font-weight:800;
   padding:calc(1px * var(--chatNavScale)) calc(5px * var(--chatNavScale));border-radius:8px;line-height:1.5;}
@@ -428,7 +429,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260813.86</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260813.87</div>
     <div id="currentUserBadge" style="font-size:10px;color:#334e6d;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(15,32,64,.08);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <button onclick="showScreen('my_account')" title="自分のダッシュボード・設定を開く" style="margin-top:6px;width:100%;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:800;color:#111111;background:#FFFFFF;border:1px solid #B9D4EE;border-radius:6px;padding:6px 8px;cursor:pointer;">📊 マイページ</button>
     <div id="myAlertSummary" style="margin-top:6px;display:none;"></div>
@@ -17511,6 +17512,22 @@ async function removeJobFromCandidate(candId, jobId){
 // 💼 求人管理（求人進捗：階層グループ表示 + 売上見込み）
 // ============================================================
 let allJobProg = [], _jpGroupBy = 'nationality', _jpSeeding = false;
+// 求人管理のグループ見出しの開閉状態。'グループ種別|ラベル' をキーに閉じているものだけ持つ
+let _jpCollapsed = new Set();
+let _jpGroupLabels = [];
+try { _jpCollapsed = new Set(JSON.parse(localStorage.getItem('kmt_jp_collapsed') || '[]')); } catch(e) {}
+function _jpGroupKey(label){ return _jpGroupBy + '|' + label; }
+function toggleJpGroup(i){
+  const key = _jpGroupKey(_jpGroupLabels[i]);
+  if (_jpCollapsed.has(key)) _jpCollapsed.delete(key); else _jpCollapsed.add(key);
+  try { localStorage.setItem('kmt_jp_collapsed', JSON.stringify([..._jpCollapsed])); } catch(e) {}
+  renderJobProgress();
+}
+function jpToggleAllGroups(collapse){
+  _jpGroupLabels.forEach(l => { const k=_jpGroupKey(l); if (collapse) _jpCollapsed.add(k); else _jpCollapsed.delete(k); });
+  try { localStorage.setItem('kmt_jp_collapsed', JSON.stringify([..._jpCollapsed])); } catch(e) {}
+  renderJobProgress();
+}
 const JP_NAT_ORDER = ['インドネシア','ベトナム','タイ','カンボジア','ミャンマー','バングラデシュ','スリランカ','フィリピン','中国','ネパール'];
 const JP_STATUSES = ['募集中','新着','提案中','結果待ち','保留','停止','決定','募集再開'];
 const JP_STATUS_COLOR = {
@@ -17592,6 +17609,14 @@ const JP_FILTER_DIMS = [
   { key:'jobType',  label:'職種',   icon:'🔧' },
 ];
 const _jpFilters = { kmt:new Set(), nat:new Set(), industry:new Set(), jobType:new Set() };
+// フィルターパネル（案件ごと／国籍ごと／分野ごと／職種ごと）の開閉状態。閉じているキーだけ持つ
+let _jpDimCollapsed = new Set();
+try { _jpDimCollapsed = new Set(JSON.parse(localStorage.getItem('kmt_jp_dim_collapsed') || '[]')); } catch(e) {}
+function toggleJpDim(key){
+  if (_jpDimCollapsed.has(key)) _jpDimCollapsed.delete(key); else _jpDimCollapsed.add(key);
+  try { localStorage.setItem('kmt_jp_dim_collapsed', JSON.stringify([..._jpDimCollapsed])); } catch(e) {}
+  _jpRenderFilterPanel();
+}
 
 // 1行がそのディメンションで持つ値（国籍は複数持ちうる）
 function _jpDimValues(r, dim) {
@@ -17665,16 +17690,20 @@ function _jpRenderFilterPanel() {
       '</span>';
     }).join('');
     const selCount = sel.size;
+    const dimClosed = _jpDimCollapsed.has(d.key);
     return '<div style="border:1px solid var(--gray-200);border-radius:10px;background:white;padding:8px 12px;">'+
-      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">'+
+      '<div onclick="toggleJpDim(\''+d.key+'\')" title="'+(dimClosed?'開く':'閉じる')+'" '+
+        'style="display:flex;align-items:center;gap:8px;margin-bottom:'+(dimClosed?'0':'6px')+';cursor:pointer;user-select:none;">'+
+        '<span style="width:12px;flex-shrink:0;text-align:center;font-size:10px;line-height:1;color:var(--navy);">'+(dimClosed?'▶':'▼')+'</span>'+
         '<span style="font-size:12px;font-weight:800;color:var(--navy);">'+d.icon+' '+d.label+'ごと</span>'+
         '<span style="font-size:10px;color:var(--gray-400);">'+keys.length+'種類</span>'+
-        (selCount?'<span onclick="jpClearDim(\''+d.key+'\')" style="margin-left:auto;cursor:pointer;font-size:10px;font-weight:700;color:var(--red);">✕ '+selCount+'件選択中を解除</span>':'')+
+        (selCount?'<span onclick="event.stopPropagation();jpClearDim(\''+d.key+'\')" style="margin-left:auto;cursor:pointer;font-size:10px;font-weight:700;color:var(--red);">✕ '+selCount+'件選択中を解除</span>':'')+
       '</div>'+
-      '<div style="display:flex;flex-wrap:wrap;gap:5px;max-height:132px;overflow-y:auto;">'+(chips||'<span style="font-size:11px;color:var(--gray-400);">該当なし</span>')+'</div>'+
+      (dimClosed ? '' :
+      '<div style="display:flex;flex-wrap:wrap;gap:5px;max-height:132px;overflow-y:auto;">'+(chips||'<span style="font-size:11px;color:var(--gray-400);">該当なし</span>')+'</div>')+
     '</div>';
   }).join('');
-  el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:10px;">'+sections+'</div>';
+  el.innerHTML = '<div style="display:grid;grid-template-columns:1fr;gap:8px;">'+sections+'</div>';
 }
 
 // 売上見込みヘッダ（KMT案件 ◯人 ◯円 / 紹介案件 ◯人 ◯円）
@@ -17772,24 +17801,34 @@ function renderJobProgress() {
       <td style="font-size:11px;">${esc(r.glt_staff||r.sales_staff||'')}</td>
       <td style="font-size:11px;color:var(--gray-500);max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${esc(r.candidate_status||'')}">${esc(r.candidate_status||'')}</td>
     </tr>`;
-  const groupHtml = g => {
+  const groupHtml = (g, i) => {
     const cnt = g.rows.length;
     const sumN = g.rows.reduce((s,r)=>s+Number(r.expected_count||0),0);
     const sumY = g.rows.reduce((s,r)=>s+Number(r.amount||0),0);
     const kmtC = g.rows.filter(r=>r.kmt_flag).length;
+    const closed = _jpCollapsed.has(_jpGroupKey(g.label));
     return `
     <div style="margin-bottom:16px;">
-      <div style="display:flex;align-items:center;gap:12px;background:var(--navy);color:white;border-radius:8px 8px 0 0;padding:8px 14px;font-weight:800;font-size:13px;">
+      <div class="jp-group-head" onclick="toggleJpGroup(${i})" title="${closed?'開く':'閉じる'}"
+        style="display:flex;align-items:center;gap:12px;background:var(--navy);color:white;border-radius:${closed?'8px':'8px 8px 0 0'};padding:8px 14px;font-weight:800;font-size:13px;cursor:pointer;user-select:none;">
+        <span style="width:14px;flex-shrink:0;text-align:center;font-size:11px;line-height:1;">${closed?'▶':'▼'}</span>
         <span>🏷️ ${esc(g.label)}</span>
         <span style="font-size:12px;font-weight:600;opacity:.9;">${cnt}件（KMT ${kmtC}・紹介 ${cnt-kmtC}）</span>
         <span style="margin-left:auto;font-size:12px;font-weight:700;">見込 ${_jpNum(sumN)}人 ・ ${_jpYen(sumY)}</span>
       </div>
-      <div class="table-wrap" style="border-radius:0 0 8px 8px;">
+      ${closed ? '' : `<div class="table-wrap" style="border-radius:0 0 8px 8px;">
         <table><thead>${colHead}</thead><tbody>${g.rows.map(rowHtml).join('')}</tbody></table>
-      </div>
+      </div>`}
     </div>`;
   };
-  area.innerHTML = `<div style="font-size:12px;color:var(--gray-400);margin-bottom:8px;">合計 ${rows.length}件 ・ 見込 ${_jpNum(rows.reduce((s,r)=>s+Number(r.expected_count||0),0))}人 ・ ${_jpYen(rows.reduce((s,r)=>s+Number(r.amount||0),0))}</div>` + groups.map(groupHtml).join('');
+  _jpGroupLabels = groups.map(g => g.label);
+  const bar = `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+    <span style="font-size:12px;color:var(--gray-400);">合計 ${rows.length}件 ・ 見込 ${_jpNum(rows.reduce((s,r)=>s+Number(r.expected_count||0),0))}人 ・ ${_jpYen(rows.reduce((s,r)=>s+Number(r.amount||0),0))}</span>
+    <span style="margin-left:auto;display:flex;gap:6px;">
+      <button class="btn btn-outline" style="font-size:11px;padding:3px 9px" onclick="jpToggleAllGroups(false)">▼ すべて開く</button>
+      <button class="btn btn-outline" style="font-size:11px;padding:3px 9px" onclick="jpToggleAllGroups(true)">▶ すべて閉じる</button>
+    </span></div>`;
+  area.innerHTML = bar + groups.map(groupHtml).join('');
 }
 
 
@@ -22118,6 +22157,11 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260813.87', date:'2026-08-13', notify:true, items:[
+    '求人管理の「案件ごと」「国籍ごと」「分野ごと」「職種ごと」を、文字の左にある矢印で開いたり閉じたりできるようにしました（▼が開く、▶が閉じる）。閉じた状態は次に開いたときも覚えています',
+    'この4つを横並びではなく縦に一列で表示するようにしました。1つの枠が横に広くなるので、種類が多くても見やすくなります',
+    '一覧のグループ見出し（ベトナム／KMT案件 など）も同じように矢印で開閉できます。右上の「▼すべて開く」「▶すべて閉じる」でまとめて切り替えられます',
+  ]},
   { version:'ver.20260813.86', date:'2026-08-13', notify:true, items:[
     '左メニューの見出し（社内・求人・人材紹介・登録支援機関業務 など）の枠を広くしました。文字の大きさはそのままで、枠の横幅を広げて上下も厚くしたので、長い見出しでも窮屈に見えなくなります',
   ]},
