@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260805.67 -->
+<!-- KMT_VERSION ver.20260805.68 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -385,7 +385,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.67</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.68</div>
     <div id="currentUserBadge" style="font-size:10px;color:#334e6d;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(15,32,64,.08);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <button onclick="showScreen('my_account')" title="自分のダッシュボード・設定を開く" style="margin-top:6px;width:100%;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:800;color:#111111;background:#FFFFFF;border:1px solid #B9D4EE;border-radius:6px;padding:6px 8px;cursor:pointer;">📊 マイページ</button>
     <div id="myAlertSummary" style="margin-top:6px;display:none;"></div>
@@ -396,33 +396,34 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
     <span id="chatMentionGroupBadge" class="chat-nav-badge" title="所属チームあての未読メンション" style="display:none;background:#f59e0b;color:#1e293b;">@0</span>
     <span id="chatUnreadBadge" class="chat-nav-badge" title="未読の合計" style="display:none;background:#fda4af;color:#881337;font-weight:700;">0</span></div>
   <div style="height:1px;background:#B9D4EE;margin:4px 16px 8px;"></div>
-  <div class="nav-item active" onclick="showScreen('ofusa_view')" style="margin:8px 8px 4px;border-radius:6px;">📊 案件進捗確認</div>
+  <div class="sidebar-section">支援</div>
+  <div class="nav-item" onclick="showScreen('companies')">🏢 所属機関</div>
+  <div class="nav-item" onclick="showScreen('workers')">👤 外国人材</div>
+  <div class="nav-item" onclick="showScreen('support_schedules')">📅 支援スケジュール <span id="supportScheduleBadge" style="display:none;background:#dc2626;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
+  <div class="nav-item" onclick="showScreen('tasks_board')">✅ タスクボード</div>
+  <div class="sidebar-section">申請・案件登録</div>
+  <div class="nav-item" onclick="showScreen('decision_report')">📋 決定報告</div>
+  <div class="nav-item active" onclick="showScreen('ofusa_view')">📊 案件進捗確認</div>
+  <div class="sidebar-section">社内</div>
   <div class="nav-item" onclick="showScreen('notices')">📋 社内共有事項</div>
   <div class="nav-item" onclick="showScreen('staff_list')">👥 担当一覧</div>
   <div class="nav-item" onclick="showScreen('mail_list')">📧 メール送信</div>
-  <div class="nav-item" onclick="showScreen('decision_report')" style="margin:2px 8px 4px;border-radius:6px;">📋 決定報告</div>
-  <div style="height:1px;background:#B9D4EE;margin:4px 16px 8px;"></div>
-  <div class="sidebar-section">メイン</div>
-  <div class="nav-item" onclick="showScreen('companies')">🏢 所属機関</div>
-  <div class="nav-item" onclick="showScreen('workers')">👤 外国人材</div>
-  <div class="nav-item" onclick="showScreen('tasks_board')">✅ タスクボード</div>
-  <div class="nav-item" onclick="showScreen('support_schedules')">📅 支援スケジュール <span id="supportScheduleBadge" style="display:none;background:#dc2626;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
+  <div class="nav-item" onclick="showScreen('shift_kanri')">📅 シフト管理</div>
+  <div class="sidebar-section">求人・人材紹介</div>
   <div class="nav-item" onclick="showScreen('candidates')">📋 候補者</div>
   <div class="nav-item" onclick="showScreen('jobs')">💼 求人管理</div>
-  <div class="nav-item" onclick="showScreen('intro_reg_orgs')">🏢 提携先登録支援機関一覧</div>
-  <div class="nav-item" onclick="showScreen('introductions')">🤝 紹介案件</div>
+  <div class="nav-item" onclick="showScreen('intro_reg_orgs')">🏢 提携先登録支援機関</div>
+  <div class="nav-item" onclick="showScreen('sending')">✈️ 送り出し機関</div>
   <div class="sidebar-section">登録支援機関業務</div>
   <div id="regSupportNav"></div>
-  <div class="sidebar-section">マスタ</div>
-  <div class="nav-item" onclick="showScreen('sending')">✈️ 送り出し機関</div>
-  <div class="sidebar-section">管理</div>
+  <div class="sidebar-section">売り上げ・経理</div>
   <div class="nav-item" onclick="showScreen('fees')">💴 支援委託費</div>
   <div class="nav-item" onclick="showScreen('sales')">📊 売上管理</div>
   <div class="nav-item" onclick="showScreen('expenses')">💸 立替管理</div>
+  <div class="sidebar-section">設定</div>
   <div class="nav-item" onclick="showScreen('users')">⚙️ ユーザー設定</div>
-  <div class="nav-item" id="navSysAdmin" onclick="showScreen('system_admin')" style="display:none;">🔒 システム管理</div>
-  <div class="nav-item" onclick="showScreen('shift_kanri')">📅 シフト管理</div>
   <div class="nav-item" onclick="showScreen('chat_teams')">💬 チャットグループ</div>
+  <div class="nav-item" id="navSysAdmin" onclick="showScreen('system_admin')" style="display:none;">🔒 システム管理</div>
   <div class="nav-item" onclick="showScreen('audit_log')">📋 操作ログ</div>
   <div class="nav-item" onclick="showScreen('ai_knowledge')">🧠 AI記憶</div>
   <div class="sidebar-user">
@@ -18206,18 +18207,25 @@ function regSupportTaskByKey(key){
   return m ? REG_SUPPORT_TASKS.find(t => t.no === Number(m[1])) : null;
 }
 
+// 参考様式（↳）は記録簿の中で扱うので、直前の記録簿にぶら下げて返す
+function regSupportFormsOf(no){
+  const i = REG_SUPPORT_TASKS.findIndex(t => t.no === no);
+  const out = [];
+  for (let k = i + 1; k < REG_SUPPORT_TASKS.length && REG_SUPPORT_TASKS[k].kind === 'form'; k++) {
+    out.push(REG_SUPPORT_TASKS[k]);
+  }
+  return out;
+}
+
 // サイドバーの「登録支援機関業務」セクションの項目を作る（一覧は REG_SUPPORT_TASKS が唯一の元）
+// 参考様式（↳）はサイドバーには出さず、記録簿のページの中に表示する
 function renderRegSupportNav(){
   const box = document.getElementById('regSupportNav');
   if (!box) return;
-  box.innerHTML = REG_SUPPORT_TASKS.map(t => {
-    const isForm = t.kind === 'form';
-    return '<div class="nav-item" onclick="showScreen(\'' + regSupportKey(t.no) + '\')" ' +
-      'title="' + esc(t.name) + '" ' +
-      'style="font-size:' + (isForm ? '11px' : '12px') + ';line-height:1.4;' +
-        (isForm ? 'padding-left:30px;color:#A8BCDA;' : '') + '">' +
-      (isForm ? '↳ ' : '📘 ') + esc(t.name) + '</div>';
-  }).join('');
+  box.innerHTML = REG_SUPPORT_TASKS.filter(t => t.kind !== 'form').map(t =>
+    '<div class="nav-item" onclick="showScreen(\'' + regSupportKey(t.no) + '\')" ' +
+      'title="' + esc(t.name) + '" style="font-size:12px;line-height:1.4;">' +
+      '📘 ' + esc(t.name) + '</div>').join('');
 }
 
 // 各項目の画面（中身はこれから設定する）
@@ -18225,6 +18233,9 @@ function buildRegSupportTaskScreen(key){
   const t = regSupportTaskByKey(key);
   if (!t) return '<div style="padding:40px;text-align:center;color:var(--gray-400);">項目が見つかりません</div>';
   const isForm = t.kind === 'form';
+  const forms = isForm ? [] : regSupportFormsOf(t.no);
+  const ledgers = REG_SUPPORT_TASKS.filter(x => x.kind !== 'form');
+  const pos = ledgers.findIndex(x => x.no === t.no) + 1;
   return `
   <div style="max-width:900px;">
     <div style="background:white;border:1px solid var(--gray-200);border-radius:12px;box-shadow:var(--shadow);overflow:hidden;">
@@ -18232,12 +18243,28 @@ function buildRegSupportTaskScreen(key){
         <span style="font-size:16px;">${isForm ? '📄' : '📘'}</span>
         <span style="font-size:15px;font-weight:800;color:var(--navy);">${esc(t.name)}</span>
         ${isForm ? '<span style="font-size:9px;font-weight:700;color:#0891b2;background:#ecfeff;border-radius:8px;padding:2px 8px;">参考様式</span>' : ''}
-        <span style="margin-left:auto;font-size:11px;color:var(--gray-400);">登録支援機関業務 ${t.no}／${REG_SUPPORT_TASKS.length}</span>
+        ${pos ? `<span style="margin-left:auto;font-size:11px;color:var(--gray-400);">登録支援機関業務 ${pos}／${ledgers.length}</span>` : ''}
       </div>
       <div style="padding:36px 18px;text-align:center;color:var(--gray-400);font-size:13px;line-height:1.9;">
         🚧 この項目の中身はこれから設定します<br>
         <span style="font-size:11px;">様式の入力欄・記録の一覧・ファイル添付など、必要な形が決まりましたら組み込みます</span>
       </div>
+      ${forms.length ? `
+      <div style="border-top:1px solid var(--gray-200);padding:12px 18px;background:#fafbfc;">
+        <div style="font-size:11px;font-weight:800;color:var(--navy);margin-bottom:8px;">📄 この帳票で使う参考様式</div>
+        ${forms.map(f => `
+        <div onclick="showScreen('${regSupportKey(f.no)}')" title="開く"
+             style="display:flex;align-items:center;gap:8px;background:white;border:1px solid var(--gray-200);border-left:3px solid #0891b2;border-radius:8px;padding:9px 12px;margin-bottom:6px;cursor:pointer;">
+          <span style="flex-shrink:0;color:#94a3b8;font-size:12px;">↳</span>
+          <span style="flex:1;min-width:0;font-size:12px;font-weight:600;color:var(--gray-600);">${esc(f.name)}</span>
+          <span style="flex-shrink:0;font-size:9px;font-weight:700;color:#0891b2;background:#ecfeff;border-radius:8px;padding:2px 8px;">参考様式</span>
+        </div>`).join('')}
+      </div>` : ''}
+      ${isForm ? `
+      <div style="border-top:1px solid var(--gray-200);padding:12px 18px;background:#fafbfc;font-size:11px;">
+        <a onclick="showScreen('${regSupportKey((REG_SUPPORT_TASKS.filter(x=>x.kind!=='form'&&x.no<t.no).pop()||{}).no)}')"
+           style="color:#1d4ed8;cursor:pointer;text-decoration:underline dotted;">← ${esc((REG_SUPPORT_TASKS.filter(x=>x.kind!=='form'&&x.no<t.no).pop()||{}).name || '一覧')} に戻る</a>
+      </div>` : ''}
     </div>
   </div>`;
 }
@@ -20227,6 +20254,12 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260805.68', date:'2026-08-07', notify:true, items:[
+    '左メニューの区分を整理しました：支援／申請・案件登録／社内／求人・人材紹介／登録支援機関業務／売り上げ・経理／設定 の7つになります（チャットはこれまで通り一番上）',
+    '登録支援機関業務は記録簿の9項目だけをメニューに出し、参考様式（↳の項目）は該当する記録簿のページの中に「この帳票で使う参考様式」として表示するようにしました',
+    '「提携先登録支援機関一覧」は「提携先登録支援機関」に名称を短くし、送り出し機関と一緒に「求人・人材紹介」へ移しました',
+    'シフト管理を「社内」へ、AI記憶・操作ログを「設定」へ移動しました',
+  ]},
   { version:'ver.20260805.67', date:'2026-08-07', notify:true, items:[
     '左メニューの「書類 → 履歴書」をなくし、履歴書を「候補者」の画面から開くようにしました',
     '候補者一覧の右上に「📝 履歴書を開く...」のリストと「📝 履歴書作成」ボタンを追加しました。リストから候補者を選ぶと、その方の履歴書がそのまま開きます',
