@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260813.88 -->
+<!-- KMT_VERSION ver.20260813.89 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -430,7 +430,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260813.88</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260813.89</div>
     <div id="currentUserBadge" style="font-size:10px;color:#334e6d;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(15,32,64,.08);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <button onclick="showScreen('my_account')" title="自分のダッシュボード・設定を開く" style="margin-top:6px;width:100%;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:800;color:#111111;background:#FFFFFF;border:1px solid #B9D4EE;border-radius:6px;padding:6px 8px;cursor:pointer;">📊 マイページ</button>
     <div id="myAlertSummary" style="margin-top:6px;display:none;"></div>
@@ -17704,7 +17704,7 @@ function _jpRenderFilterPanel() {
       '<div style="display:flex;flex-wrap:wrap;gap:5px;max-height:132px;overflow-y:auto;">'+(chips||'<span style="font-size:11px;color:var(--gray-400);">該当なし</span>')+'</div>')+
     '</div>';
   }).join('');
-  el.innerHTML = '<div style="display:grid;grid-template-columns:1fr;gap:8px;">'+sections+'</div>';
+  el.innerHTML = '<div style="display:grid;grid-template-columns:repeat('+JP_FILTER_DIMS.length+',minmax(0,1fr));gap:8px;align-items:start;">'+sections+'</div>';
 }
 
 // 売上見込みヘッダ（KMT案件 ◯人 ◯円 / 紹介案件 ◯人 ◯円）
@@ -22158,6 +22158,9 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260813.89', date:'2026-08-13', notify:true, items:[
+    '求人管理の「案件ごと」「国籍ごと」「分野ごと」「職種ごと」を横に一列で並べるようにしました（縦に積む表示をやめました）。4つとも同じ幅で並び、開閉の矢印は文字の左のままです',
+  ]},
   { version:'ver.20260813.88', date:'2026-08-13', notify:true, items:[
     '左メニューの見出しの幅を、その下に並ぶ項目（決定報告・案件進捗確認 など）と同じ幅にそろえました。左右の端がぴったり合うので見た目が整います。枠の厚み（上下の余裕）は前のままです',
   ]},
