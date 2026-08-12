@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260813.90 -->
+<!-- KMT_VERSION ver.20260813.91 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -113,6 +113,17 @@ body.jn-resizing .jn-body{cursor:col-resize;}
 .jc-tag{font-size:9px;font-weight:800;background:#1e3a5f;color:#fff;border-radius:8px;padding:1px 6px;margin-left:6px;}
 .jc-tag-i{background:#7c3aed;}
 .jp-group-head:hover{filter:brightness(1.18);}
+/* 支援スケジュール: 対応担当者の複数選択 */
+.sched-staff-chips{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:5px;min-height:22px;}
+.sched-staff-chip{display:inline-flex;align-items:center;gap:5px;background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;
+  border-radius:12px;padding:2px 8px;font-size:11px;font-weight:700;}
+.sched-staff-chip i{font-style:normal;cursor:pointer;color:#60a5fa;font-weight:900;}
+.sched-staff-chip i:hover{color:#dc2626;}
+.sched-staff-list{max-height:132px;overflow-y:auto;border:1px solid #dadce0;border-radius:6px;background:#fff;}
+.sched-staff-row{display:flex;align-items:center;gap:7px;padding:5px 9px;font-size:12px;cursor:pointer;border-bottom:1px solid #f1f5f9;}
+.sched-staff-row:last-child{border-bottom:none;}
+.sched-staff-row:hover{background:#f8fafc;}
+.sched-staff-row i{font-style:normal;color:var(--gray-400);font-size:10px;margin-left:6px;}
 #chatNavLabel{font-size:calc(13px * var(--chatNavScale));}
 .chat-nav-badge{flex:0 0 auto;font-size:calc(9px * var(--chatNavScale));font-weight:800;
   padding:calc(1px * var(--chatNavScale)) calc(5px * var(--chatNavScale));border-radius:8px;line-height:1.5;}
@@ -430,7 +441,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260813.90</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260813.91</div>
     <div id="currentUserBadge" style="font-size:10px;color:#334e6d;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(15,32,64,.08);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <button onclick="showScreen('my_account')" title="自分のダッシュボード・設定を開く" style="margin-top:6px;width:100%;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:800;color:#111111;background:#FFFFFF;border:1px solid #B9D4EE;border-radius:6px;padding:6px 8px;cursor:pointer;">📊 マイページ</button>
     <div id="myAlertSummary" style="margin-top:6px;display:none;"></div>
@@ -14720,15 +14731,22 @@ async function setTaskStatusFromBoard(taskId, status, workerId) {
 // 📅 支援スケジュール
 // ==============================
 // イベント種別の定義
+// 並び順がそのまま種別プルダウンの並びになる。キーは既存データと合わせるため変更しないこと
 const SCHEDULE_EVENT_TYPES = {
-  periodic_meeting: { label: '定期面談',   icon: '🗣️', color: '#2563eb', bg: '#eff6ff' },
-  placement:        { label: '配属',       icon: '🏢', color: '#16a34a', bg: '#f0fdf4' },
-  entry:            { label: '入国',       icon: '✈️', color: '#0891b2', bg: '#ecfeff' },
-  temp_return:      { label: '一時帰国',   icon: '🛫', color: '#f59e0b', bg: '#fffbeb' },
-  reentry:          { label: '再入国',     icon: '🛬', color: '#a855f7', bg: '#faf5ff' },
-  interview:        { label: '企業面接',   icon: '🤝', color: '#0d9488', bg: '#f0fdfa' },
-  other_support:    { label: 'その他対応', icon: '🏥', color: '#db2777', bg: '#fdf2f8' },
+  pre_guidance:     { label: '事前ガイダンス',        icon: '📖', color: '#7c3aed', bg: '#f5f3ff' },
+  entry:            { label: '入国（上陸日）',        icon: '✈️', color: '#0891b2', bg: '#ecfeff' },
+  placement:        { label: '配属',                  icon: '🏢', color: '#16a34a', bg: '#f0fdf4' },
+  life_orientation: { label: '生活オリエンテーション', icon: '🧭', color: '#0284c7', bg: '#f0f9ff' },
+  periodic_meeting: { label: '定期面談',              icon: '🗣️', color: '#2563eb', bg: '#eff6ff' },
+  final_return:     { label: '本帰国（出国日）',      icon: '🧳', color: '#b45309', bg: '#fffbeb' },
+  temp_return:      { label: '一時帰国',              icon: '🛫', color: '#f59e0b', bg: '#fffbeb' },
+  reentry:          { label: '再入国',                icon: '🛬', color: '#a855f7', bg: '#faf5ff' },
+  interview:        { label: '企業面接',              icon: '🤝', color: '#0d9488', bg: '#f0fdfa' },
+  hospital:         { label: '病院対応',              icon: '🏥', color: '#dc2626', bg: '#fef2f2' },
+  other_support:    { label: 'その他対応',            icon: '📌', color: '#db2777', bg: '#fdf2f8' },
 };
+// 配属と同じ日に生活オリエンテーションも登録するときに使う
+const SCHED_PLACEMENT = 'placement', SCHED_LIFE_ORI = 'life_orientation';
 const SCHEDULE_METHOD_LABEL = { online: '🖥️ オンライン', visit: '🏢 訪問' };
 
 let _supportSchedules = [];
@@ -14819,10 +14837,11 @@ function buildSupportSchedulesScreen() {
             <th>人材</th>
             <th>企業</th>
             <th style="width:90px;">方法</th>
+            <th style="width:130px;">対応担当者</th>
             <th style="width:80px;">状態</th>
             <th style="width:130px;">操作</th>
           </tr></thead>
-          <tbody id="scheduleTbody"><tr><td colspan="8" style="text-align:center;padding:40px;color:var(--gray-400);">読み込み中...</td></tr></tbody>
+          <tbody id="scheduleTbody"><tr><td colspan="9" style="text-align:center;padding:40px;color:var(--gray-400);">読み込み中...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -15366,7 +15385,7 @@ function renderScheduleTable() {
   if (countEl) countEl.textContent = list.length + '件 / 全' + _supportSchedules.length + '件';
 
   if (!list.length) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--gray-400);">該当データなし</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--gray-400);">該当データなし</td></tr>';
     return;
   }
   const todayStr = new Date().toISOString().slice(0,10);
@@ -15389,12 +15408,16 @@ function renderScheduleTable() {
       ? '<a href="javascript:void(0)" onclick="openCompanyModal(\'' + s.company_id + '\')" style="color:#1a73e8;text-decoration:none;">' + esc(s.companies?.name||'-') + '</a>'
       : esc(s.companies?.name||'-');
     return '<tr>' +
-      '<td><span style="background:' + ev.bg + ';color:' + ev.color + ';padding:3px 8px;border-radius:10px;font-size:11px;font-weight:700;">' + ev.icon + ' ' + ev.label + '</span></td>' +
+      '<td><span style="background:' + ev.bg + ';color:' + ev.color + ';padding:3px 8px;border-radius:10px;font-size:11px;font-weight:700;">' + ev.icon + ' ' + ev.label + '</span>' +
+        (s.other_label ? '<div style="font-size:10px;color:var(--gray-500);margin-top:3px;">' + esc(s.other_label) + '</div>' : '') + '</td>' +
       '<td style="' + (isOverdue?'color:#dc2626;font-weight:700;':'') + '">' + sched + '</td>' +
       '<td>' + comp + '</td>' +
       '<td>' + workerLink + (s.workers?.nationality ? ' <span style="font-size:10px;color:#94a3b8;">' + esc(s.workers.nationality) + '</span>' : '') + '</td>' +
       '<td>' + companyLink + '</td>' +
       '<td style="font-size:11px;">' + methodLabel + '</td>' +
+      '<td style="font-size:11px;">' + (Array.isArray(s.staff_names) && s.staff_names.length
+          ? s.staff_names.map(n => '<span style="display:inline-block;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:9px;padding:1px 6px;margin:1px 2px 1px 0;font-weight:700;">' + esc(n) + '</span>').join('')
+          : '<span style="color:var(--gray-400);">-</span>') + '</td>' +
       '<td>' + statusBadge + '</td>' +
       '<td>' +
         (!isDone ? '<button class="btn btn-primary" style="font-size:10px;padding:3px 8px;" onclick="markScheduleDone(\'' + s.id + '\')">✓ 実施</button> ' : '') +
@@ -15517,6 +15540,10 @@ async function openScheduleModal(scheduleId) {
       allCompanies = d || [];
     } catch(e) {}
   }
+  // 対応担当者の選択肢（全ユーザー）
+  if (!allUsers || !allUsers.length) {
+    try { allUsers = await sbFetch('users?select=id,name,team&order=name.asc') || []; } catch(e) {}
+  }
   let s = null;
   if (scheduleId) {
     s = _supportSchedules.find(x => x.id === scheduleId);
@@ -15529,6 +15556,8 @@ async function openScheduleModal(scheduleId) {
   }
   const isEdit = !!s;
 
+  _schedStaff = Array.isArray(s?.staff_names) ? s.staff_names.slice() : [];
+  _schedStaffSearch = '';
   showGenModal('scheduleModal', isEdit ? '✏️ 予定を編集' : '＋ 予定を登録',
     '<div style="display:flex;flex-direction:column;gap:12px;font-size:13px;">' +
       // 種別
@@ -15584,6 +15613,25 @@ async function openScheduleModal(scheduleId) {
           '<option value="done"' + (s?.status==='done'?' selected':'') + '>✅ 実施済</option>' +
         '</select>' +
         '<div style="font-size:11px;color:var(--gray-400);margin-top:4px;">日付が過ぎた予定は、変更しない限り自動で「実施済」として扱われます</div></div>' +
+      // 配属のときだけ出る「生活オリエンテーションも同じ日に実施」
+      '<div id="schedLifeOriWrap" style="' + (s?.event_type === SCHED_PLACEMENT ? '' : 'display:none;') + '">' +
+        '<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:8px 10px;">' +
+          '<input type="checkbox" id="schedAlsoLifeOri" style="cursor:pointer;">' +
+          '<span>生活オリエンテーションも同じ日に実施</span>' +
+        '</label>' +
+        '<div style="font-size:11px;color:var(--gray-400);margin-top:4px;">チェックすると、配属と同じ日付・同じ担当者で「生活オリエンテーション」の予定も一緒に登録します</div>' +
+      '</div>' +
+      // その他対応のときだけ出る自由記入
+      '<div id="schedOtherWrap" style="' + (s?.event_type === 'other_support' ? '' : 'display:none;') + '">' +
+        '<label style="font-weight:600;color:#5f6368;display:block;margin-bottom:4px;">対応内容（自由記入）</label>' +
+        '<input type="text" id="schedOtherLabel" value="' + esc(s?.other_label||'') + '" placeholder="例：役所手続きの同行" style="width:100%;padding:7px 10px;border:1px solid #dadce0;border-radius:6px;font-size:13px;box-sizing:border-box;"></div>' +
+      // 対応担当者名（全ユーザーから検索して複数選択）
+      '<div><label style="font-weight:600;color:#5f6368;display:block;margin-bottom:4px;">対応担当者名</label>' +
+        '<div id="schedStaffChips" class="sched-staff-chips"></div>' +
+        '<input type="text" id="schedStaffSearch" placeholder="🔍 名前で検索..." oninput="_schedStaffSearch=this.value;renderSchedStaff()" ' +
+          'style="width:100%;padding:6px 10px;border:1px solid #dadce0;border-radius:6px;font-size:12px;box-sizing:border-box;margin-bottom:4px;">' +
+        '<div id="schedStaffList" class="sched-staff-list"></div>' +
+        '<div style="font-size:11px;color:var(--gray-400);margin-top:4px;">1人以上選択できます（複数可）</div></div>' +
       // メモ
       '<div><label style="font-weight:600;color:#5f6368;display:block;margin-bottom:4px;">メモ</label>' +
         '<textarea id="schedNotes" rows="3" style="width:100%;padding:7px 10px;border:1px solid #dadce0;border-radius:6px;font-size:13px;font-family:inherit;box-sizing:border-box;resize:vertical;">' + esc(s?.notes||'') + '</textarea></div>' +
@@ -15604,12 +15652,49 @@ async function openScheduleModal(scheduleId) {
           '</div>') +
     '</div>'
   );
+  // 対応担当者のチップと一覧を描く（モーダルのDOMができてから）
+  setTimeout(renderSchedStaff, 60);
 }
 
 function onSchedTypeChange() {
   const t = document.getElementById('schedTypeInput')?.value;
   const wrap = document.getElementById('schedMethodWrap');
   if (wrap) wrap.style.display = (t === 'periodic_meeting') ? '' : 'none';
+  // 配属のときだけ「生活オリエンテーションも同じ日に実施」を出す
+  const lo = document.getElementById('schedLifeOriWrap');
+  if (lo) lo.style.display = (t === SCHED_PLACEMENT) ? '' : 'none';
+  // その他対応のときだけ自由記入欄を出す
+  const ot = document.getElementById('schedOtherWrap');
+  if (ot) ot.style.display = (t === 'other_support') ? '' : 'none';
+}
+
+// ===== 対応担当者（複数選択・名前で検索） =====
+let _schedStaff = [];          // 選択中の名前
+let _schedStaffSearch = '';
+function renderSchedStaff() {
+  const chips = document.getElementById('schedStaffChips');
+  const list  = document.getElementById('schedStaffList');
+  if (chips) {
+    chips.innerHTML = _schedStaff.length
+      ? _schedStaff.map(n => '<span class="sched-staff-chip">' + esc(n) +
+          '<i onclick="toggleSchedStaff(\'' + String(n).replace(/'/g,"\\'") + '\')" title="外す">✕</i></span>').join('')
+      : '<span style="font-size:11px;color:var(--gray-400);">未選択</span>';
+  }
+  if (list) {
+    const q = (_schedStaffSearch||'').toLowerCase();
+    const users = (allUsers||[]).filter(u => u.name && (!q || String(u.name).toLowerCase().includes(q)));
+    list.innerHTML = users.length ? users.map(u => {
+      const on = _schedStaff.includes(u.name);
+      return '<label class="sched-staff-row"><input type="checkbox" ' + (on?'checked':'') +
+        ' onchange="toggleSchedStaff(\'' + String(u.name).replace(/'/g,"\\'") + '\')">' +
+        '<span>' + esc(u.name) + (u.team ? '<i>' + esc(u.team) + '</i>' : '') + '</span></label>';
+    }).join('') : '<div style="font-size:11px;color:var(--gray-400);padding:6px;">該当する人がいません</div>';
+  }
+}
+function toggleSchedStaff(name) {
+  const i = _schedStaff.indexOf(name);
+  if (i >= 0) _schedStaff.splice(i,1); else _schedStaff.push(name);
+  renderSchedStaff();
 }
 
 // 「一日中」にチェックすると時間帯の欄を隠す
@@ -15646,6 +15731,10 @@ async function saveSchedule(scheduleId) {
   const end_time   = all_day ? null : (document.getElementById('schedEndTime')?.value || null);
   const status = document.getElementById('schedStatusInput')?.value || 'planned';
   const notes = document.getElementById('schedNotes')?.value || null;
+  const staff_names = _schedStaff.slice();
+  const other_label = event_type === 'other_support' ? (document.getElementById('schedOtherLabel')?.value || null) : null;
+  // 配属のとき「生活オリエンテーションも同じ日に実施」がチェックされているか
+  const alsoLifeOri = event_type === SCHED_PLACEMENT && !!document.getElementById('schedAlsoLifeOri')?.checked;
   // 実施日は日付に一本化したので、実施済のときだけ日付を実施日にも入れておく
   const completed_at = status === 'done' ? scheduled_at : null;
 
@@ -15673,6 +15762,8 @@ async function saveSchedule(scheduleId) {
     end_time,
     status,
     notes,
+    staff_names,
+    other_label,
     updated_at: new Date().toISOString(), updated_by: _curUserName()
   };
 
@@ -15694,6 +15785,25 @@ async function saveSchedule(scheduleId) {
       });
       savedRow = Array.isArray(created) ? created[0] : created;
       showToast('✅ 登録しました（Googleカレンダーを開きます）', 'success');
+    }
+
+    // 「生活オリエンテーションも同じ日に実施」→ 同じ日付・担当で別予定をもう1件作る
+    if (alsoLifeOri) {
+      try {
+        const already = (_supportSchedules || []).some(x =>
+          x.event_type === SCHED_LIFE_ORI && x.worker_id === worker_id && (x.scheduled_at || x.completed_at) === scheduled_at);
+        if (already) {
+          showToast('ℹ️ 同じ日の生活オリエンテーションはすでに登録済みです', 'info');
+        } else {
+          const lo = Object.assign({}, payload, { event_type: SCHED_LIFE_ORI, event_method: null, other_label: null });
+          const loCreated = await sbFetch('support_schedules', {
+            method: 'POST', headers: { 'Prefer': 'return=representation' }, body: JSON.stringify(lo)
+          });
+          const loRow = Array.isArray(loCreated) ? loCreated[0] : loCreated;
+          if (loRow) _supportSchedules.push(loRow);
+          showToast('✅ 生活オリエンテーションも同じ日に登録しました', 'success');
+        }
+      } catch(e) { showToast('⚠️ 生活オリエンテーションの登録に失敗: ' + e.message, 'error'); }
     }
 
     // 確保しておいたタブをGoogleカレンダーの登録画面にする
@@ -20346,7 +20456,7 @@ function buildFeesScreen() {
 }
 
 function buildPartnersScreen(){return `<div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;"><input class="search-input" id="pSearchInput" placeholder="機関名で検索..." oninput="applyPartnerFilters()" style="flex:1;min-width:200px;"><select class="filter-select" id="pFilterType" onchange="applyPartnerFilters()"><option value="">全区分</option><option>登録支援機関</option><option>人材紹介会社+登録支援機関</option><option>営業代理店</option></select><button class="btn btn-outline" style="font-size:11px;padding:4px 10px" onclick="clearPartnerFilters()">✕</button></div>
-<div class="table-wrap"><table><thead><tr><th>機関名</th><th>区分</th><th>コード</th><th>主な職種</th><th>KMT請求</th><th>GLT担当</th><th>案件数</th><th>提携開始日</th></tr></thead><tbody id="partnerTbody"><tr><td colspan="8" style="text-align:center;padding:40px;color:var(--gray-400)">読み込み中...</td></tr></tbody></table><div class="pagination-bar" id="partnerPagination"></div></div>`;}
+<div class="table-wrap"><table><thead><tr><th>機関名</th><th>区分</th><th>コード</th><th>主な職種</th><th>KMT請求</th><th>GLT担当</th><th>案件数</th><th>提携開始日</th></tr></thead><tbody id="partnerTbody"><tr><td colspan="9" style="text-align:center;padding:40px;color:var(--gray-400)">読み込み中...</td></tr></tbody></table><div class="pagination-bar" id="partnerPagination"></div></div>`;}
 
 function addWorkHistory() {
   _workHistory.push({period:'',company:'',location:'',job_type:''});
@@ -21295,7 +21405,7 @@ function renderJobTable() {
   renderGenPagination('jobPagination',total,jobPage,p=>{jobPage=p;renderJobTable();});
 }
 
-function renderPartnerTable(){const tbody=document.getElementById('partnerTbody');if(!tbody)return;const total=filteredPartners.length;const page=filteredPartners.slice((partnerPage-1)*PAGE_SIZE,partnerPage*PAGE_SIZE);if(!page.length){tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--gray-400)">データなし</td></tr>';document.getElementById('partnerPagination').innerHTML='';return;}tbody.innerHTML=page.map(p=>`<tr onclick="openPartnerModal('${p.id}')"><td><strong>${esc(p.name)}</strong></td><td style="font-size:11px">${esc(p.org_type||'-')}</td><td style="color:var(--blue);font-weight:700">${esc(p.job_code||'-')}</td><td style="font-size:11px">${esc(p.main_industry||'-')}</td><td style="font-size:12px">${p.fee_kmt?Number(p.fee_kmt).toLocaleString()+'円':'-'}</td><td style="font-size:12px">${esc(p.glt_staff||'-')}</td><td style="font-size:12px;text-align:center">${p.case_count??'-'}</td><td style="font-size:12px">${p.partnership_start?formatDate(p.partnership_start):'-'}</td></tr>`).join('');renderGenPagination('partnerPagination',total,partnerPage,p2=>{partnerPage=p2;renderPartnerTable();});}
+function renderPartnerTable(){const tbody=document.getElementById('partnerTbody');if(!tbody)return;const total=filteredPartners.length;const page=filteredPartners.slice((partnerPage-1)*PAGE_SIZE,partnerPage*PAGE_SIZE);if(!page.length){tbody.innerHTML='<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--gray-400)">データなし</td></tr>';document.getElementById('partnerPagination').innerHTML='';return;}tbody.innerHTML=page.map(p=>`<tr onclick="openPartnerModal('${p.id}')"><td><strong>${esc(p.name)}</strong></td><td style="font-size:11px">${esc(p.org_type||'-')}</td><td style="color:var(--blue);font-weight:700">${esc(p.job_code||'-')}</td><td style="font-size:11px">${esc(p.main_industry||'-')}</td><td style="font-size:12px">${p.fee_kmt?Number(p.fee_kmt).toLocaleString()+'円':'-'}</td><td style="font-size:12px">${esc(p.glt_staff||'-')}</td><td style="font-size:12px;text-align:center">${p.case_count??'-'}</td><td style="font-size:12px">${p.partnership_start?formatDate(p.partnership_start):'-'}</td></tr>`).join('');renderGenPagination('partnerPagination',total,partnerPage,p2=>{partnerPage=p2;renderPartnerTable();});}
 
 // 売上: 作成/請求/入金 日付表示(MM/DD)
 function fmtMD(d){ if(!d)return''; const dt=new Date(d); if(isNaN(dt)){ const m=String(d).match(/(\d{4})-(\d{2})-(\d{2})/); return m?`${m[2]}/${m[3]}`:''; } return String(dt.getMonth()+1).padStart(2,'0')+'/'+String(dt.getDate()).padStart(2,'0'); }
@@ -22163,6 +22273,12 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260813.91', date:'2026-08-13', notify:true, items:[
+    '支援スケジュールの種別を増やしました。事前ガイダンス／入国（上陸日）／配属／生活オリエンテーション／定期面談／本帰国（出国日）／一時帰国／再入国／企業面接／病院対応／その他対応 の11種類です',
+    '種別で「配属」を選ぶと「生活オリエンテーションも同じ日に実施」のチェックが出ます。チェックして登録すると、配属と同じ日付・同じ担当者で生活オリエンテーションの予定も一緒に登録されます（同じ日に登録済みの場合は重複して作りません）',
+    '種別で「その他対応」を選ぶと、対応内容を自由に書ける欄が出ます。書いた内容は一覧の種別の下に表示されます',
+    '「対応担当者名」を追加しました。全ユーザーから選べて、名前で検索できます。1人でも複数人でも選べます。選んだ担当者は一覧の「対応担当者」列に表示されます',
+  ]},
   { version:'ver.20260813.90', date:'2026-08-13', notify:true, items:[
     '左メニューの「💬 チャット」を一番下（ログイン中の名前のすぐ上）に移動しました。未読やメンションの件数表示はそのままです',
     '求人チャットの見出しに求人コードと会社名が出るようになりました（今までは「求人 10」のような番号だけでした）',
