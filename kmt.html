@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260805.75 -->
+<!-- KMT_VERSION ver.20260805.76 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -385,7 +385,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.75</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.76</div>
     <div id="currentUserBadge" style="font-size:10px;color:#334e6d;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(15,32,64,.08);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <button onclick="showScreen('my_account')" title="自分のダッシュボード・設定を開く" style="margin-top:6px;width:100%;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:800;color:#111111;background:#FFFFFF;border:1px solid #B9D4EE;border-radius:6px;padding:6px 8px;cursor:pointer;">📊 マイページ</button>
     <div id="myAlertSummary" style="margin-top:6px;display:none;"></div>
@@ -15499,16 +15499,21 @@ async function openScheduleModal(scheduleId) {
       // 日付（予定日と実施日を1つにまとめた）
       '<div><label style="font-weight:600;color:#5f6368;display:block;margin-bottom:4px;">日付 <span style="color:#dc2626;">*</span></label>' +
         '<input type="date" id="schedScheduledAt" value="' + (s?.scheduled_at || s?.completed_at || '') + '" style="width:100%;padding:7px 10px;border:1px solid #dadce0;border-radius:6px;font-size:13px;"></div>' +
-      // 時間（終日 or 時間帯）
-      '<div><label style="font-weight:600;color:#5f6368;display:block;margin-bottom:4px;">時間</label>' +
-        '<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;margin-bottom:6px;">' +
-          '<input type="checkbox" id="schedAllDay" ' + (s?.all_day === false ? '' : 'checked') + ' onchange="onSchedAllDayChange()" style="cursor:pointer;">終日（一日中）' +
-        '</label>' +
-        '<div id="schedTimeWrap" style="display:' + (s?.all_day === false ? 'flex' : 'none') + ';gap:8px;align-items:center;">' +
-          '<input type="time" id="schedStartTime" value="' + ((s?.start_time||'').slice(0,5)) + '" style="flex:1;padding:7px 10px;border:1px solid #dadce0;border-radius:6px;font-size:13px;">' +
-          '<span style="color:#5f6368;">〜</span>' +
-          '<input type="time" id="schedEndTime" value="' + ((s?.end_time||'').slice(0,5)) + '" style="flex:1;padding:7px 10px;border:1px solid #dadce0;border-radius:6px;font-size:13px;">' +
-        '</div></div>' +
+      // 時間（時間帯を先に出し、その下の「一日中」を押すと時間帯が消える）
+      (() => {
+        const isAllDay = s ? (s.all_day !== false) : false;   // 新規は時間帯を出しておく
+        const st = (s?.start_time || '').slice(0,5) || '10:00';
+        const en = (s?.end_time   || '').slice(0,5) || '11:00';
+        return '<div><label style="font-weight:600;color:#5f6368;display:block;margin-bottom:4px;">時間</label>' +
+          '<div id="schedTimeWrap" style="display:' + (isAllDay ? 'none' : 'flex') + ';gap:8px;align-items:center;">' +
+            '<input type="time" id="schedStartTime" value="' + st + '" style="flex:1;padding:7px 10px;border:1px solid #dadce0;border-radius:6px;font-size:13px;">' +
+            '<span style="color:#5f6368;">〜</span>' +
+            '<input type="time" id="schedEndTime" value="' + en + '" style="flex:1;padding:7px 10px;border:1px solid #dadce0;border-radius:6px;font-size:13px;">' +
+          '</div>' +
+          '<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;margin-top:6px;">' +
+            '<input type="checkbox" id="schedAllDay" ' + (isAllDay ? 'checked' : '') + ' onchange="onSchedAllDayChange()" style="cursor:pointer;">一日中' +
+          '</label></div>';
+      })() +
       // 状態（日付が過ぎたら自動で実施済扱い）
       '<div><label style="font-weight:600;color:#5f6368;display:block;margin-bottom:4px;">状態</label>' +
         '<select id="schedStatusInput" style="width:100%;padding:7px 10px;border:1px solid #dadce0;border-radius:6px;font-size:13px;">' +
@@ -15544,12 +15549,12 @@ function onSchedTypeChange() {
   if (wrap) wrap.style.display = (t === 'periodic_meeting') ? '' : 'none';
 }
 
+// 「一日中」にチェックすると時間帯の欄を隠す
 function onSchedAllDayChange() {
   const on = document.getElementById('schedAllDay')?.checked;
   const wrap = document.getElementById('schedTimeWrap');
   if (wrap) wrap.style.display = on ? 'none' : 'flex';
-  // 時間帯にしたとき、空なら使いやすい初期値を入れる
-  if (!on) {
+  if (!on) {   // 時間帯に戻したとき、空なら使いやすい初期値を入れる
     const st = document.getElementById('schedStartTime'), en = document.getElementById('schedEndTime');
     if (st && !st.value) st.value = '10:00';
     if (en && !en.value) en.value = '11:00';
@@ -20747,6 +20752,11 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260805.76', date:'2026-08-07', notify:true, items:[
+    '予定の登録・編集で、時間帯の欄を先に表示し、その下に「一日中」のチェックを置きました',
+    '新規登録では最初から時間帯（10:00〜11:00）が入っているので、そのまま時刻を直すだけで登録できます',
+    '「一日中」にチェックを入れると時間帯の欄が消え、終日の予定として登録されます',
+  ]},
   { version:'ver.20260805.75', date:'2026-08-07', notify:true, items:[
     '人材詳細「10. 通算期間と過去の就労先」の指定書発行日の隣に「詳細」ボタンを追加しました',
     'ボタンを押すと大きな画面が開き、その就労先についての補足をたっぷり記入できます',
