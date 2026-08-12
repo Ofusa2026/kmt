@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260813.84 -->
+<!-- KMT_VERSION ver.20260813.85 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -84,8 +84,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .jn-color input{width:20px;height:18px;border:none;background:none;padding:0;cursor:pointer;}
 .jn-body{min-height:120px;padding:12px;font-size:13px;line-height:1.7;color:#1e3a5f;outline:none;}
 .jn-body:focus{background:#FEFEFF;}
-.jn-table{border-collapse:collapse;margin:8px 0;min-width:60%;}
-.jn-table th,.jn-table td{border:1px solid #b6c8de;padding:5px 8px;font-size:12px;min-width:60px;}
+.jn-table{border-collapse:collapse;margin:8px 0;width:auto;table-layout:fixed;}
+.jn-table th,.jn-table td{border:1px solid #b6c8de;padding:5px 8px;font-size:12px;overflow:hidden;word-wrap:break-word;vertical-align:top;}
+/* 罫線をドラッグして列幅・行高を変える */
+.jn-body .jn-table th,.jn-body .jn-table td{position:relative;}
+body.jn-resizing{cursor:col-resize;user-select:none;}
+body.jn-resizing .jn-body{cursor:col-resize;}
 .jn-table th{background:#EAF3FD;font-weight:700;}
 .jp-add-bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px;}
 .jp-cand-row{display:flex;align-items:center;gap:8px;padding:9px 10px;border:1px solid var(--gray-200);border-radius:8px;margin-bottom:6px;background:#fff;}
@@ -423,7 +427,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260813.84</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260813.85</div>
     <div id="currentUserBadge" style="font-size:10px;color:#334e6d;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(15,32,64,.08);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <button onclick="showScreen('my_account')" title="自分のダッシュボード・設定を開く" style="margin-top:6px;width:100%;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:800;color:#111111;background:#FFFFFF;border:1px solid #B9D4EE;border-radius:6px;padding:6px 8px;cursor:pointer;">📊 マイページ</button>
     <div id="myAlertSummary" style="margin-top:6px;display:none;"></div>
@@ -17789,6 +17793,112 @@ function renderJobProgress() {
 
 
 
+
+// ===== ノート内の表: 列幅・行高をドラッグで調整 =====
+// 幅は <colgroup><col style="width:..."> に持たせるので、保存(innerHTML)でそのまま残る。
+const JN_EDGE = 6;        // 境界とみなす距離(px)
+const JN_MIN_COL = 34;    // 列の最小幅
+const JN_MIN_ROW = 22;    // 行の最小高
+let _jnDrag = null;
+let _jnResizeReady = false;
+
+// 列数ぶんの <col> を用意する（既存の表にも後から付ける）
+function _jnEnsureColgroup(table){
+  const firstRow = table.rows[0];
+  if (!firstRow) return null;
+  const n = firstRow.cells.length;
+  let cg = table.querySelector('colgroup');
+  if (!cg) {
+    cg = document.createElement('colgroup');
+    // 今の見た目の幅をそのまま引き継ぐ
+    const widths = [...firstRow.cells].map(c => Math.round(c.getBoundingClientRect().width));
+    for (let i=0;i<n;i++){
+      const col = document.createElement('col');
+      col.style.width = (widths[i] || 90) + 'px';
+      cg.appendChild(col);
+    }
+    table.insertBefore(cg, table.firstChild);
+  }
+  while (cg.children.length < n) {
+    const col = document.createElement('col');
+    col.style.width = '90px';
+    cg.appendChild(col);
+  }
+  table.style.tableLayout = 'fixed';
+  return cg;
+}
+
+// マウス位置が「どのセルのどの境界」に当たるかを返す
+function _jnHitEdge(e){
+  const cell = e.target.closest ? e.target.closest('.jn-table th, .jn-table td') : null;
+  if (!cell) return null;
+  const table = cell.closest('.jn-table');
+  if (!table || !table.closest('.jn-body')) return null;
+  const r = cell.getBoundingClientRect();
+  const row = cell.parentElement;
+  // 列幅: 自分の右端、または自分の左端（＝ひとつ前の列の右端）
+  if (Math.abs(e.clientX - r.right) <= JN_EDGE) return { type:'col', table, idx: cell.cellIndex };
+  if (Math.abs(e.clientX - r.left)  <= JN_EDGE && cell.cellIndex > 0) return { type:'col', table, idx: cell.cellIndex - 1 };
+  // 行高: 自分の下端、または自分の上端（＝ひとつ上の行の下端）
+  if (Math.abs(e.clientY - r.bottom) <= JN_EDGE) return { type:'row', table, row };
+  if (Math.abs(e.clientY - r.top) <= JN_EDGE && row.previousElementSibling)
+    return { type:'row', table, row: row.previousElementSibling };
+  return null;
+}
+
+function _jnInitResize(){
+  if (_jnResizeReady) return;
+  _jnResizeReady = true;
+
+  document.addEventListener('mousemove', e => {
+    if (_jnDrag) {
+      if (_jnDrag.type === 'col') {
+        const w = Math.max(JN_MIN_COL, _jnDrag.startW + (e.clientX - _jnDrag.startX));
+        _jnDrag.col.style.width = Math.round(w) + 'px';
+      } else {
+        const h = Math.max(JN_MIN_ROW, _jnDrag.startH + (e.clientY - _jnDrag.startY));
+        _jnDrag.row.style.height = Math.round(h) + 'px';
+      }
+      e.preventDefault();
+      return;
+    }
+    // ドラッグ中でなければカーソルだけ変える
+    const hit = _jnHitEdge(e);
+    const body = e.target.closest ? e.target.closest('.jn-body') : null;
+    if (body) body.style.cursor = hit ? (hit.type==='col' ? 'col-resize' : 'row-resize') : '';
+  });
+
+  document.addEventListener('mousedown', e => {
+    const hit = _jnHitEdge(e);
+    if (!hit) return;
+    e.preventDefault();  // 文字選択やキャレット移動を止める
+    const noteEl = hit.table.closest('.jn-card');
+    const noteId = noteEl?.dataset.note || null;
+    if (hit.type === 'col') {
+      const cg = _jnEnsureColgroup(hit.table);
+      if (!cg) return;
+      const col = cg.children[hit.idx];
+      if (!col) return;
+      // 実際に表示されている幅を起点にする
+      const headCell = hit.table.rows[0]?.cells[hit.idx];
+      const startW = headCell ? headCell.getBoundingClientRect().width : (parseFloat(col.style.width) || 90);
+      _jnDrag = { type:'col', col, startX:e.clientX, startW, noteId };
+    } else {
+      _jnDrag = { type:'row', row: hit.row, startY:e.clientY,
+                  startH: hit.row.getBoundingClientRect().height, noteId };
+    }
+    document.body.classList.add('jn-resizing');
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!_jnDrag) return;
+    const noteId = _jnDrag.noteId;
+    _jnDrag = null;
+    document.body.classList.remove('jn-resizing');
+    if (noteId) markJobNoteDirty(noteId);   // 保存し忘れないよう「未保存」に切り替える
+  });
+}
+
 // ===== 💬 求人チャット（求人案件ごとのチャット一覧） =====
 // 求人ルームは chat_rooms.job_src_row で見分ける。
 // openChatRoom / 未読集計をそのまま使えるよう chatRooms には入れておき、
@@ -17947,9 +18057,10 @@ function renderJobNotes(){
   box.innerHTML = `
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
       <button class="btn btn-primary" style="font-size:12px;padding:6px 12px" onclick="addJobNote()">＋ 新規ノート</button>
-      <span style="font-size:11px;color:var(--gray-400)">自由に書けるノートです。表の挿入・文字の大きさ／太さ／色を変えられます</span>
+      <span style="font-size:11px;color:var(--gray-400)">自由に書けるノートです。表の挿入・文字の大きさ／太さ／色を変えられます。表は罫線をドラッグすると列幅・行の高さを変えられます</span>
     </div>
     ${notes || '<div style="padding:28px;text-align:center;color:var(--gray-400);font-size:12px">まだノートがありません。「＋ 新規ノート」から追加してください</div>'}`;
+  _jnInitResize();
 }
 
 function _jobNoteCardHtml(n){
@@ -17999,7 +18110,9 @@ function jnInsertTable(noteId){
   if (!rows || rows<1) return;
   const cols = parseInt(prompt('列数は？','3')||'0',10);
   if (!cols || cols<1) return;
-  let html = '<table class="jn-table"><tbody>';
+  let html = '<table class="jn-table" style="table-layout:fixed"><colgroup>'
+           + Array.from({length:cols}, () => '<col style="width:110px">').join('')
+           + '</colgroup><tbody>';
   for (let r=0;r<rows;r++){
     html += '<tr>';
     for (let c=0;c<cols;c++){
@@ -22004,6 +22117,11 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260813.85', date:'2026-08-13', notify:true, items:[
+    '求人詳細のノートに入れた表を、罫線をドラッグして自由に調整できるようにしました。縦の罫線を左右に引くと列の幅、横の罫線を上下に引くと行の高さが変わります',
+    '罫線に近づくとカーソルの形が変わるので、そこから引いてください。変えた幅と高さは「💾 保存」を押すと次に開いたときもそのまま残ります',
+    '前に作った表もそのまま調整できます',
+  ]},
   { version:'ver.20260813.84', date:'2026-08-13', notify:true, items:[
     '左メニューの見出しの文字が大きすぎて「登録支援機関業務」が2行に折り返していたので、枠に収まる大きさに調整しました。件数が2桁になっても1行のままです（見出しは項目より大きい表示のままです）',
   ]},
