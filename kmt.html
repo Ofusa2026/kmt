@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260805.68 -->
+<!-- KMT_VERSION ver.20260805.69 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -385,7 +385,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.68</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.69</div>
     <div id="currentUserBadge" style="font-size:10px;color:#334e6d;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(15,32,64,.08);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <button onclick="showScreen('my_account')" title="自分のダッシュボード・設定を開く" style="margin-top:6px;width:100%;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:800;color:#111111;background:#FFFFFF;border:1px solid #B9D4EE;border-radius:6px;padding:6px 8px;cursor:pointer;">📊 マイページ</button>
     <div id="myAlertSummary" style="margin-top:6px;display:none;"></div>
@@ -14975,6 +14975,7 @@ function renderScheduleTable() {
       '<td>' +
         (!isDone ? '<button class="btn btn-primary" style="font-size:10px;padding:3px 8px;" onclick="markScheduleDone(\'' + s.id + '\')">✓ 実施</button> ' : '') +
         '<button class="btn btn-outline" style="font-size:10px;padding:3px 8px;" onclick="openScheduleModal(\'' + s.id + '\')">✏️</button> ' +
+        '<button class="btn btn-outline" style="font-size:10px;padding:3px 8px;" title="Googleカレンダーに追加" onclick="addScheduleToGoogleCalendar(\'' + s.id + '\')">📅</button> ' +
         '<button class="btn btn-outline" style="font-size:10px;padding:3px 8px;color:#dc2626;border-color:#fecaca;" onclick="deleteSchedule(\'' + s.id + '\')">🗑</button>' +
       '</td>' +
     '</tr>';
@@ -15002,6 +15003,62 @@ function updateSupportScheduleBadge() {
 }
 
 // 予定/編集モーダル
+// ===== Googleカレンダーに追加 =====
+// 予定日しか持っていないので「終日予定」として登録する（Googleの終日指定は終了日＝翌日）
+function _gcalDate(dateStr, addDays) {
+  const d = new Date(dateStr);
+  if (isNaN(d)) return null;
+  d.setDate(d.getDate() + (addDays || 0));
+  return d.getFullYear() + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0');
+}
+// 予定1件からGoogleカレンダーの登録URLを作る
+function googleCalendarUrl(s) {
+  if (!s || !s.scheduled_at) return null;
+  const t = SCHEDULE_EVENT_TYPES[s.event_type] || {};
+  const workerName  = s.workers?.name || (allWorkers||[]).find(w => w.id === s.worker_id)?.name || '';
+  const companyName = s.companies?.name || (allCompanies||[]).find(c => c.id === s.company_id)?.name || '';
+  const methodLabel = s.event_method === 'online' ? 'オンライン' : s.event_method === 'visit' ? '訪問' : '';
+  const title = '【KMT】' + (t.label || '予定') + (workerName ? '：' + workerName : '');
+  const details = [
+    '種別: ' + (t.label || '-'),
+    methodLabel ? '実施方法: ' + methodLabel : '',
+    workerName  ? '人材: ' + workerName : '',
+    companyName ? '企業: ' + companyName : '',
+    s.notes ? 'メモ: ' + s.notes : '',
+    '', '※ KMT案件管理システムの支援スケジュールから作成',
+  ].filter(Boolean).join('\n');
+  const p = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: title,
+    dates: _gcalDate(s.scheduled_at) + '/' + _gcalDate(s.scheduled_at, 1),  // 終日
+    details: details,
+  });
+  if (companyName) p.set('location', companyName);
+  return 'https://calendar.google.com/calendar/render?' + p.toString();
+}
+// 予定を新しいタブでGoogleカレンダーに送る
+function addScheduleToGoogleCalendar(scheduleId) {
+  const s = (_supportSchedules || []).find(x => x.id === scheduleId);
+  if (!s) { showToast('❌ 予定が見つかりません', 'error'); return; }
+  if (!s.scheduled_at) { showToast('⚠️ 予定日が未入力のため登録できません', 'error'); return; }
+  window.open(googleCalendarUrl(s), '_blank', 'noopener');
+}
+// 予定モーダルの入力内容からそのままカレンダーに送る（保存前でも使える）
+function addScheduleFormToGoogleCalendar() {
+  const g = id => document.getElementById(id)?.value || '';
+  const scheduled_at = g('schedScheduledAt');
+  if (!scheduled_at) { showToast('⚠️ 予定日を入力してください', 'error'); return; }
+  const url = googleCalendarUrl({
+    event_type: g('schedTypeInput'),
+    event_method: g('schedMethodInput'),
+    worker_id: g('schedWorkerInput'),
+    company_id: g('schedCompanyInput'),
+    scheduled_at,
+    notes: g('schedNotes'),
+  });
+  if (url) window.open(url, '_blank', 'noopener');
+}
+
 async function openScheduleModal(scheduleId) {
   // workers/companies一覧をロード
   if (!allWorkers || !allWorkers.length) {
@@ -15075,8 +15132,9 @@ async function openScheduleModal(scheduleId) {
       '<div><label style="font-weight:600;color:#5f6368;display:block;margin-bottom:4px;">メモ</label>' +
         '<textarea id="schedNotes" rows="3" style="width:100%;padding:7px 10px;border:1px solid #dadce0;border-radius:6px;font-size:13px;font-family:inherit;box-sizing:border-box;resize:vertical;">' + esc(s?.notes||'') + '</textarea></div>' +
       // ボタン
-      '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px;">' +
-        '<button class="btn btn-outline" onclick="closeGenModal(\'scheduleModal\')">キャンセル</button>' +
+      '<div style="display:flex;gap:8px;align-items:center;margin-top:6px;">' +
+        '<button class="btn btn-outline" onclick="addScheduleFormToGoogleCalendar()" title="入力した内容でGoogleカレンダーの登録画面を開きます" style="font-size:12px;">📅 カレンダーに追加</button>' +
+        '<button class="btn btn-outline" style="margin-left:auto;" onclick="closeGenModal(\'scheduleModal\')">キャンセル</button>' +
         '<button class="btn btn-primary" onclick="saveSchedule(' + (isEdit ? "'" + s.id + "'" : 'null') + ')">' + (isEdit?'💾 更新':'＋ 登録') + '</button>' +
       '</div>' +
     '</div>'
@@ -15265,6 +15323,7 @@ async function loadWorkerSchedules(workerId) {
         '<span style="flex-shrink:0;">' + (isDone ? '<span style="color:#16a34a;font-weight:700;">✅</span>' : '<span style="color:#1a73e8;font-weight:700;">⏰</span>') + '</span>' +
         (!isDone ? '<button class="btn btn-primary" style="font-size:10px;padding:2px 6px;flex-shrink:0;" onclick="markScheduleDoneFromWorker(\'' + s.id + '\',\'' + workerId + '\')">✓</button>' : '') +
         '<button class="btn btn-outline" style="font-size:10px;padding:2px 6px;flex-shrink:0;" onclick="openScheduleModal(\'' + s.id + '\')">✏️</button>' +
+        '<button class="btn btn-outline" style="font-size:10px;padding:2px 6px;flex-shrink:0;" title="Googleカレンダーに追加" onclick="addScheduleToGoogleCalendar(\'' + s.id + '\')">📅</button>' +
       '</div>';
     }).join('') + '</div>';
   } catch(e) {
@@ -15323,6 +15382,7 @@ async function loadCompanySchedules(companyId) {
         '<span style="flex:1;color:#94a3b8;">' + (s.notes ? esc(s.notes).slice(0,40) : '') + '</span>' +
         '<span style="flex-shrink:0;">' + (isDone ? '<span style="color:#16a34a;font-weight:700;">✅</span>' : '<span style="color:#1a73e8;font-weight:700;">⏰</span>') + '</span>' +
         '<button class="btn btn-outline" style="font-size:10px;padding:2px 6px;flex-shrink:0;" onclick="openScheduleModal(\'' + s.id + '\')">✏️</button>' +
+        '<button class="btn btn-outline" style="font-size:10px;padding:2px 6px;flex-shrink:0;" title="Googleカレンダーに追加" onclick="addScheduleToGoogleCalendar(\'' + s.id + '\')">📅</button>' +
       '</div>';
     }).join('') + '</div>';
   } catch(e) {
@@ -20254,6 +20314,12 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260805.69', date:'2026-08-07', notify:true, items:[
+    '支援スケジュールに「📅 カレンダーに追加」を追加しました。ご自身のGoogleカレンダーに予定を登録できます',
+    '予定の登録・編集画面の左下のボタンからは、入力中の内容でそのまま登録できます（保存前でも使えます）',
+    '一覧（テーブル表示）や人材・企業の詳細に並ぶ予定にも📅ボタンが付いています',
+    '種別・人材・企業・メモがカレンダーの予定内容に自動で入ります。時刻の入力欄がないため「終日の予定」として登録されます',
+  ]},
   { version:'ver.20260805.68', date:'2026-08-07', notify:true, items:[
     '左メニューの区分を整理しました：支援／申請・案件登録／社内／求人・人材紹介／登録支援機関業務／売り上げ・経理／設定 の7つになります（チャットはこれまで通り一番上）',
     '登録支援機関業務は記録簿の9項目だけをメニューに出し、参考様式（↳の項目）は該当する記録簿のページの中に「この帳票で使う参考様式」として表示するようにしました',
