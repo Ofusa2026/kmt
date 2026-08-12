@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260805.76 -->
+<!-- KMT_VERSION ver.20260805.77 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -385,7 +385,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.76</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.77</div>
     <div id="currentUserBadge" style="font-size:10px;color:#334e6d;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(15,32,64,.08);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <button onclick="showScreen('my_account')" title="自分のダッシュボード・設定を開く" style="margin-top:6px;width:100%;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:800;color:#111111;background:#FFFFFF;border:1px solid #B9D4EE;border-radius:6px;padding:6px 8px;cursor:pointer;">📊 マイページ</button>
     <div id="myAlertSummary" style="margin-top:6px;display:none;"></div>
@@ -12886,11 +12886,10 @@ function updateSidebarAlerts(list){
     w.kmt_support !== 'KMT支援外' &&
     ['発行完了','入国済み'].includes(w.apply_status) && !w.card_info_done &&
     !['退職済(帰国)','退職済(転職)'].includes(w.status)).length;
-  const hv = computeHistoryVerifyStats(src);
-  const grand = miss + renewal + visaUpdate + kokko + cardInfo + hv.todo;
+  // 通算期間の精査状況は件数に含めない（外国人材ページとマイページで一覧として見る）
+  const grand = miss + renewal + visaUpdate + kokko + cardInfo;
   const tip = ['申請忘れ' + miss, '更新リマインド' + renewal, '在留期限の更新待ち' + visaUpdate,
-               '就労管理システム' + kokko, '必須情報の未入力' + cardInfo,
-               hv.todo ? '通算期間の未精査' + hv.todo : ''].filter(Boolean).join('／');
+               '就労管理システム' + kokko, '必須情報の未入力' + cardInfo].join('／');
   const html = grand > 0
     ? '<div onclick="showScreen(\'workers\')" title="外国人材のアラート一覧を開く（' + tip + '）" ' +
       'style="cursor:pointer;display:flex;align-items:center;gap:5px;font-size:10px;font-weight:800;color:#92400e;background:#FFFFFF;border:1px solid #B9D4EE;padding:5px 8px;border-radius:6px;">' +
@@ -20752,6 +20751,10 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260805.77', date:'2026-08-07', notify:true, items:[
+    '左のサイドバーの「全体アラート」の件数から、通算期間の未精査の件数を外しました',
+    '通算期間の精査状況の表示自体はこれまで通りで、外国人材ページのアラート欄とマイページで一覧として確認できます',
+  ]},
   { version:'ver.20260805.76', date:'2026-08-07', notify:true, items:[
     '予定の登録・編集で、時間帯の欄を先に表示し、その下に「一日中」のチェックを置きました',
     '新規登録では最初から時間帯（10:00〜11:00）が入っているので、そのまま時刻を直すだけで登録できます',
