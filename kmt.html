@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260805.69 -->
+<!-- KMT_VERSION ver.20260805.70 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -385,7 +385,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.69</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.70</div>
     <div id="currentUserBadge" style="font-size:10px;color:#334e6d;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(15,32,64,.08);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <button onclick="showScreen('my_account')" title="自分のダッシュボード・設定を開く" style="margin-top:6px;width:100%;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:800;color:#111111;background:#FFFFFF;border:1px solid #B9D4EE;border-radius:6px;padding:6px 8px;cursor:pointer;">📊 マイページ</button>
     <div id="myAlertSummary" style="margin-top:6px;display:none;"></div>
@@ -7911,6 +7911,7 @@ function importContactLogFromText(){
 // 特定技能／特定技能移行の特定活動（＝会社名の記載がある指定書）だけを入力する。
 // 特定活動の期間は特定技能の通算期間には算入しない。
 const TOKUTEI_VISA_OPTS = ['特定技能1号','特定技能2号','特定活動'];
+const TOKUTEI_APPLY_OPTS = ['認定','変更','更新'];   // 申請の種類
 const _isTokuteiVisa = v => /特定技能/.test(v || '');   // 特定活動は含めない
 let _tokuteiRows = [];
 
@@ -7964,11 +7965,15 @@ function renderTokuteiRows(){
   const box = document.getElementById('wf_tokutei_rows');
   if (!box) return;
   box.innerHTML = _tokuteiRows.map((r,i) => `
-    <div style="display:grid;grid-template-columns:64px 1fr 130px 130px 28px;gap:6px;align-items:center;margin-bottom:5px;">
+    <div style="display:grid;grid-template-columns:48px minmax(96px,1fr) 68px 104px 116px 22px;gap:4px;align-items:center;margin-bottom:5px;">
       <label style="display:flex;align-items:center;justify-content:center;gap:3px;font-size:10px;cursor:pointer;background:${r.first?'#dbeafe':'#f8fafc'};border:1px solid ${r.first?'#93c5fd':'var(--gray-200)'};border-radius:5px;padding:5px 2px;" title="特定技能の初回（5年満了日の起点）">
         <input type="checkbox" ${r.first?'checked':''} onchange="setTokuteiFirst(${i}, this.checked)" style="margin:0;cursor:pointer;">初回
       </label>
       <input class="form-input" value="${esc(r.company||'')}" placeholder="会社名（指定書に記載のもの）" oninput="updateTokuteiRow(${i},'company',this.value)" style="font-size:12px;">
+      <select class="form-select" onchange="updateTokuteiRow(${i},'apply',this.value)" style="font-size:12px;">
+        <option value="">─ 選択 ─</option>
+        ${TOKUTEI_APPLY_OPTS.map(v=>`<option ${r.apply===v?'selected':''}>${v}</option>`).join('')}
+      </select>
       <select class="form-select" onchange="updateTokuteiRow(${i},'visa',this.value)" style="font-size:12px;">
         <option value="">─ 選択 ─</option>
         ${TOKUTEI_VISA_OPTS.map(v=>`<option ${r.visa===v?'selected':''}>${v}</option>`).join('')}
@@ -8002,7 +8007,7 @@ function renderTokuteiCalc(){
     '</div>';
 }
 function addTokuteiRow(){
-  _tokuteiRows.push({ company:'', visa:'', date:'', first: _tokuteiRows.length===0 });
+  _tokuteiRows.push({ company:'', apply:'', visa:'', date:'', first: _tokuteiRows.length===0 });
   renderTokuteiRows();
 }
 function removeTokuteiRow(i){ _tokuteiRows.splice(i,1); renderTokuteiRows(); }
@@ -14105,10 +14110,14 @@ function buildWorkerModalBody(w) {
         ミャンマー等の（会社名の記載がない）特定活動は入力不要です。
       </div>
       <input type="hidden" id="wf_tokutei_history" value="">
-      <div style="display:grid;grid-template-columns:64px 1fr 130px 130px 28px;gap:6px;font-size:10px;font-weight:700;color:var(--gray-400);padding:0 2px 3px;">
-        <div>初回</div><div>会社名</div><div>在留資格</div><div>指定書発行日</div><div></div>
+      <div style="overflow-x:auto;">
+        <div style="min-width:470px;">
+          <div style="display:grid;grid-template-columns:48px minmax(96px,1fr) 68px 104px 116px 22px;gap:4px;font-size:10px;font-weight:700;color:var(--gray-400);padding:0 2px 3px;">
+            <div>初回</div><div>会社名</div><div>申請</div><div>在留資格</div><div>指定書発行日</div><div></div>
+          </div>
+          <div id="wf_tokutei_rows"></div>
+        </div>
       </div>
-      <div id="wf_tokutei_rows"></div>
       <button type="button" onclick="addTokuteiRow()" style="margin-top:6px;font-size:11px;color:#1d4ed8;background:none;border:1px dashed #93c5fd;border-radius:4px;padding:4px 12px;cursor:pointer;width:100%;">＋ 就労先を追加</button>
     </div>
     <div class="form-group full">
@@ -20314,6 +20323,10 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260805.70', date:'2026-08-07', notify:true, items:[
+    '人材詳細「10. 通算期間と過去の就労先」で、会社名と在留資格の間に「申請」の欄を追加しました。認定／変更／更新 から選べます',
+    '欄が増えたぶん各列の幅を調整しました。画面が狭いときは表を横にスクロールできます',
+  ]},
   { version:'ver.20260805.69', date:'2026-08-07', notify:true, items:[
     '支援スケジュールに「📅 カレンダーに追加」を追加しました。ご自身のGoogleカレンダーに予定を登録できます',
     '予定の登録・編集画面の左下のボタンからは、入力中の内容でそのまま登録できます（保存前でも使えます）',
