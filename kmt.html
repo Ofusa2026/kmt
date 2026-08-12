@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260805.71 -->
+<!-- KMT_VERSION ver.20260805.72 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -385,7 +385,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.71</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.72</div>
     <div id="currentUserBadge" style="font-size:10px;color:#334e6d;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(15,32,64,.08);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <button onclick="showScreen('my_account')" title="自分のダッシュボード・設定を開く" style="margin-top:6px;width:100%;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:800;color:#111111;background:#FFFFFF;border:1px solid #B9D4EE;border-radius:6px;padding:6px 8px;cursor:pointer;">📊 マイページ</button>
     <div id="myAlertSummary" style="margin-top:6px;display:none;"></div>
@@ -6753,11 +6753,134 @@ async function deleteMyNote(id) {
   } catch(e) { showToast('❌ 削除に失敗: ' + e.message, 'error'); }
 }
 
-// マイページ内のタブ切り替え（担当・タスク／自分のノート／アカウント設定）
+// ===== マイページ: 支援カレンダー（自分がメイン／サブ担当のぶんだけ） =====
+// データは全体の支援スケジュールと同じ _supportSchedules を見るので、
+// どちらから登録・編集しても両方に反映される。
+let _myCalMonth = null;   // 表示中の月（Dateの1日）
+
+function _myCalKey(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+
+// この予定が自分のメイン／サブ担当か（チーム担当は含めない）
+function _myScheduleRole(s) {
+  const src = (_myDashData?.workers && _myDashData.workers.length) ? _myDashData.workers : (allWorkers || []);
+  const w = src.find(x => x.id === s.worker_id);
+  if (w) {
+    const role = _myRoleForWorker(w);
+    return (role === 'main' || role === 'sub') ? role : null;
+  }
+  // 人材が見つからない場合は企業の担当で判定する
+  const c = (allCompanies || []).find(x => x.id === s.company_id);
+  if (c) {
+    if (_chatStaffMatchesMe(c.main_staff) || _chatStaffMatchesMe(c.ofusa_staff)) return 'main';
+    if (_chatStaffMatchesMe(c.sub_staff)) return 'sub';
+  }
+  return null;
+}
+
+async function loadMyCalendar() {
+  // 全体カレンダーと同じデータを使う（未取得なら取りに行く）
+  if (!_supportSchedules || !_supportSchedules.length) {
+    try {
+      const d = await sbFetch('support_schedules?select=*,workers(id,name,nationality,company_id),companies(id,name)&order=scheduled_at.asc');
+      _supportSchedules = d || [];
+    } catch(e) {}
+  }
+  renderMyCalendar();
+}
+function myCalShiftMonth(diff) {
+  if (!_myCalMonth) _myCalMonth = new Date();
+  _myCalMonth = new Date(_myCalMonth.getFullYear(), _myCalMonth.getMonth() + diff, 1);
+  renderMyCalendar();
+}
+function myCalToday() { _myCalMonth = new Date(); renderMyCalendar(); }
+
+function renderMyCalendar() {
+  const box = document.getElementById('myCalendar');
+  if (!box) return;
+  if (!_myCalMonth) _myCalMonth = new Date();
+  const y = _myCalMonth.getFullYear(), m = _myCalMonth.getMonth();
+  const first = new Date(y, m, 1), last = new Date(y, m + 1, 0);
+  const start = new Date(first); start.setDate(1 - first.getDay());          // 週の頭(日)まで戻す
+  const end   = new Date(last);  end.setDate(last.getDate() + (6 - last.getDay()));
+
+  // 自分のメイン／サブ担当の予定だけを日付ごとにまとめる
+  const byDate = {};
+  let total = 0;
+  (_supportSchedules || []).forEach(s => {
+    const key = s.scheduled_at || s.completed_at;
+    if (!key) return;
+    const role = _myScheduleRole(s);
+    if (!role) return;
+    (byDate[key] = byDate[key] || []).push({ s, role });
+    total++;
+  });
+
+  const todayKey = _myCalKey(new Date());
+  const cells = [];
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const key = _myCalKey(d);
+    const inMonth = d.getMonth() === m;
+    const isToday = key === todayKey;
+    const items = (byDate[key] || []);
+    const dow = d.getDay();
+    const dcolor = dow === 0 ? '#dc2626' : dow === 6 ? '#2563eb' : 'var(--navy)';
+    cells.push(
+      '<div onclick="openScheduleModalPreset(null,null,\'' + key + '\')" title="この日に予定を登録" ' +
+        'style="min-height:74px;border:1px solid var(--gray-200);border-radius:6px;padding:4px;cursor:pointer;' +
+          'background:' + (isToday ? '#eff6ff' : inMonth ? 'white' : '#f8fafc') + ';' +
+          (isToday ? 'box-shadow:inset 0 0 0 2px #93c5fd;' : '') + '">' +
+        '<div style="font-size:10px;font-weight:700;color:' + (inMonth ? dcolor : '#cbd5e1') + ';margin-bottom:2px;">' + d.getDate() + '</div>' +
+        items.map(({s, role}) => {
+          const ev = SCHEDULE_EVENT_TYPES[s.event_type] || { icon:'📌', color:'#64748b', bg:'#f1f5f9', label:'予定' };
+          const nm = s.workers?.name || '';
+          const done = s.status === 'done';
+          return '<div onclick="event.stopPropagation();openScheduleModal(\'' + s.id + '\')" ' +
+            'title="' + esc((ev.label||'') + '：' + nm + (role==='main'?'（メイン担当）':'（サブ担当）')) + '" ' +
+            'style="display:flex;align-items:center;gap:3px;background:' + ev.bg + ';color:' + ev.color + ';' +
+              'border-left:3px solid ' + (role === 'main' ? '#1d4ed8' : '#94a3b8') + ';border-radius:3px;' +
+              'padding:1px 3px;margin-bottom:2px;font-size:9px;line-height:1.4;' + (done ? 'opacity:.55;' : '') + '">' +
+            '<span style="flex-shrink:0;">' + ev.icon + '</span>' +
+            '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(nm) + '</span></div>';
+        }).join('') +
+      '</div>');
+  }
+
+  const dows = ['日','月','火','水','木','金','土'];
+  box.innerHTML =
+    '<div style="background:white;border:1px solid var(--gray-200);border-radius:12px;box-shadow:var(--shadow);overflow:hidden;">' +
+      '<div style="padding:10px 14px;border-bottom:1px solid var(--gray-200);display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' +
+        '<span style="font-size:13px;font-weight:800;color:var(--navy);">📅 支援カレンダー</span>' +
+        '<span style="font-size:11px;color:var(--gray-400);">自分がメイン／サブ担当のぶんだけ表示</span>' +
+        '<div style="margin-left:auto;display:flex;align-items:center;gap:6px;">' +
+          '<button class="btn btn-outline" style="font-size:11px;padding:3px 9px;" onclick="myCalShiftMonth(-1)">◀ 前</button>' +
+          '<span style="font-size:13px;font-weight:800;color:var(--navy);min-width:96px;text-align:center;">' + y + '年' + (m+1) + '月</span>' +
+          '<button class="btn btn-outline" style="font-size:11px;padding:3px 9px;" onclick="myCalShiftMonth(1)">次 ▶</button>' +
+          '<button class="btn btn-outline" style="font-size:11px;padding:3px 9px;" onclick="myCalToday()">今日</button>' +
+          '<button class="btn btn-outline" style="font-size:11px;padding:3px 9px;" onclick="showScreen(\'support_schedules\')" title="全体の支援スケジュールを開く">全体を見る</button>' +
+        '</div>' +
+      '</div>' +
+      '<div style="padding:10px 14px;">' +
+        '<div style="display:flex;align-items:center;gap:10px;font-size:10px;color:var(--gray-400);margin-bottom:6px;flex-wrap:wrap;">' +
+          '<span><span style="display:inline-block;width:8px;height:8px;background:#1d4ed8;border-radius:2px;"></span> メイン担当</span>' +
+          '<span><span style="display:inline-block;width:8px;height:8px;background:#94a3b8;border-radius:2px;"></span> サブ担当</span>' +
+          '<span style="margin-left:auto;">この月以外も含め ' + total + '件</span>' +
+        '</div>' +
+        '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:3px;">' +
+          dows.map((w,i) => '<div style="text-align:center;font-size:10px;font-weight:700;color:' +
+            (i===0?'#dc2626':i===6?'#2563eb':'var(--gray-400)') + ';">' + w + '</div>').join('') +
+        '</div>' +
+        '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;">' + cells.join('') + '</div>' +
+        '<div style="font-size:10px;color:var(--gray-400);margin-top:6px;">日付をクリックすると予定を登録、予定をクリックすると編集できます（全体の支援スケジュールと同じデータです）</div>' +
+      '</div>' +
+    '</div>';
+}
+
+// マイページ内のタブ切り替え（担当・タスク／支援カレンダー／自分のノート／アカウント設定）
 let _myPageTab = 'dash';
 function setMyPageTab(tab) {
   _myPageTab = tab;
-  ['dash','notes','account'].forEach(t => {
+  if (tab === 'sched') loadMyCalendar();
+  ['dash','sched','notes','account'].forEach(t => {
     const p = document.getElementById('mpPanel_' + t);
     const b = document.getElementById('mpTab_' + t);
     if (p) p.style.display = (t === tab) ? '' : 'none';
@@ -6777,10 +6900,12 @@ function buildMyAccountScreen() {
   <div style="padding:8px 24px 0;">
     <div style="display:flex;gap:2px;border-bottom:1px solid var(--gray-200);margin-bottom:14px;flex-wrap:wrap;">
       ${tabBtn('dash','📊 担当・タスク', _myPageTab==='dash')}
+      ${tabBtn('sched','📅 支援カレンダー', _myPageTab==='sched')}
       ${tabBtn('notes','📝 自分のノート', _myPageTab==='notes')}
       ${tabBtn('account','⚙️ アカウント設定', _myPageTab==='account')}
     </div>
     <div id="mpPanel_dash" style="${_myPageTab==='dash'?'':'display:none;'}"><div id="myDashboard"></div></div>
+    <div id="mpPanel_sched" style="${_myPageTab==='sched'?'':'display:none;'}"><div id="myCalendar"></div></div>
     <div id="mpPanel_notes" style="${_myPageTab==='notes'?'':'display:none;'}"><div id="myNotesSection"></div></div>
   </div>
   <div id="mpPanel_account" style="${_myPageTab==='account'?'':'display:none;'}">
@@ -14666,6 +14791,7 @@ async function loadSupportSchedules() {
     populateScheduleFilters();
     renderSupportSchedules();
     updateSupportScheduleBadge();
+    renderMyCalendar();   // マイページの支援カレンダーも同じデータで描き直す
   } catch(e) {
     showToast('❌ スケジュール取得失敗: ' + e.message, 'error');
   }
@@ -20348,6 +20474,12 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260805.72', date:'2026-08-07', notify:true, items:[
+    'マイページに「📅 支援カレンダー」タブを追加しました（自分のノートの左隣です）',
+    '表示されるのは自分がメイン担当・サブ担当の予定だけです。左の色帯が濃い青ならメイン担当、グレーならサブ担当です',
+    'メインメニューの支援スケジュールと同じデータなので、どちらで登録・編集しても両方に反映されます。日付をクリックすると予定を登録、予定をクリックすると編集できます',
+    '「全体を見る」ボタンからメインメニューの支援スケジュールに移動できます',
+  ]},
   { version:'ver.20260805.71', date:'2026-08-07', notify:true, items:[
     '予定の新規登録を「＋ 登録してカレンダーに追加」の1つのボタンにまとめました。押すとシステムに登録され、続けてGoogleカレンダーの登録画面が開きます',
     '登録に失敗したときはカレンダーの画面は開きません。予定日が未入力のときも開きません（登録はできます）',
