@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260813.89 -->
+<!-- KMT_VERSION ver.20260813.90 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -430,17 +430,12 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260813.89</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260813.90</div>
     <div id="currentUserBadge" style="font-size:10px;color:#334e6d;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(15,32,64,.08);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <button onclick="showScreen('my_account')" title="自分のダッシュボード・設定を開く" style="margin-top:6px;width:100%;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:800;color:#111111;background:#FFFFFF;border:1px solid #B9D4EE;border-radius:6px;padding:6px 8px;cursor:pointer;">📊 マイページ</button>
     <div id="myAlertSummary" style="margin-top:6px;display:none;"></div>
     <div id="sidebarAlerts" style="margin-top:6px;display:none;flex-direction:column;gap:3px;"></div>
   </div>
-  <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;gap:4px;flex-wrap:nowrap;white-space:nowrap;overflow:hidden;" id="chatNavItem"><span id="chatNavLabel" style="flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;">💬 チャット</span>
-    <span id="chatMentionDirectBadge" class="chat-nav-badge" title="自分あての未読メンション" style="display:none;background:#ef4444;color:white;">@0</span>
-    <span id="chatMentionGroupBadge" class="chat-nav-badge" title="所属チームあての未読メンション" style="display:none;background:#f59e0b;color:#1e293b;">@0</span>
-    <span id="chatUnreadBadge" class="chat-nav-badge" title="未読の合計" style="display:none;background:#fda4af;color:#881337;font-weight:700;">0</span></div>
-  <div style="height:1px;background:#B9D4EE;margin:4px 16px 8px;"></div>
   <div class="sidebar-section">支援</div>
   <div class="nav-item" onclick="showScreen('companies')">🏢 所属機関</div>
   <div class="nav-item" onclick="showScreen('workers')">👤 外国人材</div>
@@ -472,6 +467,12 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="nav-item" id="navSysAdmin" onclick="showScreen('system_admin')" style="display:none;">🔒 システム管理</div>
   <div class="nav-item" onclick="showScreen('audit_log')">📋 操作ログ</div>
   <div class="nav-item" onclick="showScreen('ai_knowledge')">🧠 AI記憶</div>
+  <!-- 💬 チャットはメニューの一番下（左下）に置く -->
+  <div style="height:1px;background:#B9D4EE;margin:10px 16px 6px;"></div>
+  <div class="nav-item" onclick="showScreen('chat')" style="font-weight:800;margin:4px 8px;border-radius:6px;gap:4px;flex-wrap:nowrap;white-space:nowrap;overflow:hidden;" id="chatNavItem"><span id="chatNavLabel" style="flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;">💬 チャット</span>
+    <span id="chatMentionDirectBadge" class="chat-nav-badge" title="自分あての未読メンション" style="display:none;background:#ef4444;color:white;">@0</span>
+    <span id="chatMentionGroupBadge" class="chat-nav-badge" title="所属チームあての未読メンション" style="display:none;background:#f59e0b;color:#1e293b;">@0</span>
+    <span id="chatUnreadBadge" class="chat-nav-badge" title="未読の合計" style="display:none;background:#fda4af;color:#881337;font-weight:700;">0</span></div>
   <div class="sidebar-user">
     <div class="user-info">
       <div class="user-avatar" id="userAvatar">K</div>
@@ -7738,6 +7739,10 @@ async function loadChatScreen() {
       } catch(e) { _chatPinnedCompanyIds = new Set(); _chatPinnedRoomIds = new Set(); }
     }
     // chat_roomsテーブルから取得（人材チャット + 企業チャット）
+    // 求人チャットの見出しに求人コード・会社名を出すため、求人進捗を先に用意する
+    if (!(allJobProg||[]).length) {
+      try { allJobProg = await sbFetch('job_progress?select=*&order=src_row.asc') || []; } catch(e) {}
+    }
     const d = await sbFetch('chat_rooms?select=id,worker_id,company_id,job_src_row,group_id,status,completed_at,created_at,updated_at,workers(id,name,nationality,staff,management_no,apply_type,desired_visa,apply_status,status,drive_url,drive_url_kmt,photo_url,company_id,companies(id,name)),companies(id,name,drive_url,drive_url2,main_staff,sub_staff,team_staff)&is_deleted=eq.false&order=updated_at.desc');
     chatRooms = (d||[]).map(r => {
       const isJobChat = !r.worker_id && !r.company_id && r.job_src_row != null;
@@ -7750,7 +7755,7 @@ async function loadChatScreen() {
         is_company_chat: isCompanyChat,
         is_job_chat: isJobChat,
         job_src_row: r.job_src_row ?? null,
-        name: isJobChat ? ('求人 ' + (r.job_src_row ?? '')) : (isCompanyChat ? (directCompany?.name || '企業チャット') : (r.workers?.name || '')),
+        name: isJobChat ? (typeof _jpTitleOf === 'function' ? _jpTitleOf(r.job_src_row) : ('求人 ' + (r.job_src_row ?? ''))) : (isCompanyChat ? (directCompany?.name || '企業チャット') : (r.workers?.name || '')),
         subName: isJobChat ? '求人チャット' : (isCompanyChat ? '企業チャット' : (workerCompany?.name || '')),
         nationality: r.workers?.nationality || '',
         // 担当判定用の人材担当者
@@ -22158,6 +22163,10 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260813.90', date:'2026-08-13', notify:true, items:[
+    '左メニューの「💬 チャット」を一番下（ログイン中の名前のすぐ上）に移動しました。未読やメンションの件数表示はそのままです',
+    '求人チャットの見出しに求人コードと会社名が出るようになりました（今までは「求人 10」のような番号だけでした）',
+  ]},
   { version:'ver.20260813.89', date:'2026-08-13', notify:true, items:[
     '求人管理の「案件ごと」「国籍ごと」「分野ごと」「職種ごと」を横に一列で並べるようにしました（縦に積む表示をやめました）。4つとも同じ幅で並び、開閉の矢印は文字の左のままです',
   ]},
