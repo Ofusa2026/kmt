@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260805.70 -->
+<!-- KMT_VERSION ver.20260805.71 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -385,7 +385,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.70</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.71</div>
     <div id="currentUserBadge" style="font-size:10px;color:#334e6d;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(15,32,64,.08);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <button onclick="showScreen('my_account')" title="自分のダッシュボード・設定を開く" style="margin-top:6px;width:100%;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:800;color:#111111;background:#FFFFFF;border:1px solid #B9D4EE;border-radius:6px;padding:6px 8px;cursor:pointer;">📊 マイページ</button>
     <div id="myAlertSummary" style="margin-top:6px;display:none;"></div>
@@ -15141,11 +15141,20 @@ async function openScheduleModal(scheduleId) {
       '<div><label style="font-weight:600;color:#5f6368;display:block;margin-bottom:4px;">メモ</label>' +
         '<textarea id="schedNotes" rows="3" style="width:100%;padding:7px 10px;border:1px solid #dadce0;border-radius:6px;font-size:13px;font-family:inherit;box-sizing:border-box;resize:vertical;">' + esc(s?.notes||'') + '</textarea></div>' +
       // ボタン
-      '<div style="display:flex;gap:8px;align-items:center;margin-top:6px;">' +
-        '<button class="btn btn-outline" onclick="addScheduleFormToGoogleCalendar()" title="入力した内容でGoogleカレンダーの登録画面を開きます" style="font-size:12px;">📅 カレンダーに追加</button>' +
-        '<button class="btn btn-outline" style="margin-left:auto;" onclick="closeGenModal(\'scheduleModal\')">キャンセル</button>' +
-        '<button class="btn btn-primary" onclick="saveSchedule(' + (isEdit ? "'" + s.id + "'" : 'null') + ')">' + (isEdit?'💾 更新':'＋ 登録') + '</button>' +
-      '</div>' +
+      // 新規登録は「登録」だけでカレンダーまで開く。編集時は必要なときだけ押せるよう個別ボタンを残す
+      (isEdit
+        ? '<div style="display:flex;gap:8px;align-items:center;margin-top:6px;">' +
+            '<button class="btn btn-outline" onclick="addScheduleFormToGoogleCalendar()" title="入力した内容でGoogleカレンダーの登録画面を開きます" style="font-size:12px;">📅 カレンダーに追加</button>' +
+            '<button class="btn btn-outline" style="margin-left:auto;" onclick="closeGenModal(\'scheduleModal\')">キャンセル</button>' +
+            '<button class="btn btn-primary" onclick="saveSchedule(\'' + s.id + '\')">💾 更新</button>' +
+          '</div>'
+        : '<div style="margin-top:6px;">' +
+            '<div style="font-size:11px;color:var(--gray-400);margin-bottom:6px;">登録すると、続けてGoogleカレンダーの登録画面が開きます（予定日が未入力のときは開きません）</div>' +
+            '<div style="display:flex;gap:8px;justify-content:flex-end;">' +
+              '<button class="btn btn-outline" onclick="closeGenModal(\'scheduleModal\')">キャンセル</button>' +
+              '<button class="btn btn-primary" onclick="saveSchedule(null)">＋ 登録してカレンダーに追加</button>' +
+            '</div>' +
+          '</div>') +
     '</div>'
   );
 }
@@ -15181,6 +15190,13 @@ async function saveSchedule(scheduleId) {
   if (!worker_id) { showToast('⚠️ 人材を選択してください','error'); return; }
   if (!scheduled_at && !completed_at) { showToast('⚠️ 予定日か実施日のいずれかを入力してください','error'); return; }
 
+  // 新規登録は保存と同時にGoogleカレンダーも開く。
+  // 保存(await)の後に window.open するとブラウザにポップアップと判定されるので、
+  // クリック直後のこの時点で空タブを確保しておき、保存が済んでから中身を入れる。
+  const openCal = !scheduleId && !!scheduled_at;
+  let calWin = null;
+  if (openCal) { try { calWin = window.open('', '_blank'); } catch(e) {} }
+
   const payload = {
     event_type,
     event_method: event_type === 'periodic_meeting' ? event_method : null,
@@ -15210,7 +15226,13 @@ async function saveSchedule(scheduleId) {
         body: JSON.stringify(payload)
       });
       savedRow = Array.isArray(created) ? created[0] : created;
-      showToast('✅ 登録しました', 'success');
+      showToast('✅ 登録しました（Googleカレンダーを開きます）', 'success');
+    }
+
+    // 確保しておいたタブをGoogleカレンダーの登録画面にする
+    if (calWin) {
+      const url = googleCalendarUrl(savedRow || payload);
+      if (url) calWin.location.href = url; else calWin.close();
     }
 
     // 定期面談を「実施済」にしたら、自動で2ヶ月後の次回予定を作る
@@ -15220,7 +15242,10 @@ async function saveSchedule(scheduleId) {
 
     closeGenModal('scheduleModal');
     await loadSupportSchedules();
-  } catch(e) { showToast('❌ 保存失敗: ' + e.message, 'error'); }
+  } catch(e) {
+    if (calWin) { try { calWin.close(); } catch(err) {} }   // 保存できなければカレンダーも開かない
+    showToast('❌ 保存失敗: ' + e.message, 'error');
+  }
 }
 
 async function autoCreateNextPeriodicMeeting(worker_id, company_id, completed_at, prevScheduleId, currentSavedId) {
@@ -20323,6 +20348,11 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260805.71', date:'2026-08-07', notify:true, items:[
+    '予定の新規登録を「＋ 登録してカレンダーに追加」の1つのボタンにまとめました。押すとシステムに登録され、続けてGoogleカレンダーの登録画面が開きます',
+    '登録に失敗したときはカレンダーの画面は開きません。予定日が未入力のときも開きません（登録はできます）',
+    '既存の予定を編集するときは、これまで通り「📅 カレンダーに追加」を必要なときだけ押す形にしています（更新のたびにカレンダーが開いて重複するのを防ぐため）',
+  ]},
   { version:'ver.20260805.70', date:'2026-08-07', notify:true, items:[
     '人材詳細「10. 通算期間と過去の就労先」で、会社名と在留資格の間に「申請」の欄を追加しました。認定／変更／更新 から選べます',
     '欄が増えたぶん各列の幅を調整しました。画面が狭いときは表を横にスクロールできます',
