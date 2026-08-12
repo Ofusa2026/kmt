@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260813.95 -->
+<!-- KMT_VERSION ver.20260813.96 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -22,9 +22,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 #sidebarToggleBtn{position:fixed;top:50%;transform:translateY(-50%);left:220px;z-index:200;background:#1E293B;color:white;border:none;border-radius:0 6px 6px 0;padding:8px 6px;cursor:pointer;font-size:12px;line-height:1;transition:left 0.2s ease;}
 #sidebarToggleBtn.collapsed{left:0;}
 .sidebar-logo{padding:20px 16px 16px;}
-.logo-badge{background:#2563eb;color:white;font-size:11px;font-weight:800;padding:3px 8px;border-radius:4px;display:inline-block;margin-bottom:6px;letter-spacing:1px;}
-.logo-title{color:#0f2040;font-size:12px;font-weight:700;line-height:1.4;}
-.logo-ver{color:#527296;font-size:10px;margin-top:2px;}
+/* タイトル部分は見出しと同じ濃い青ボックス＋白文字（左右は見出しと同じ位置にそろえる） */
+.logo-head{background:#4479B0;border-radius:7px;padding:11px 10px;margin:0 -8px 8px;}
+.logo-badge{background:#FFFFFF;color:#1E4A75;font-size:11px;font-weight:800;padding:3px 8px;border-radius:4px;display:inline-block;margin-bottom:6px;letter-spacing:1px;}
+.logo-mark{display:block;max-width:100%;height:auto;margin-bottom:6px;}
+.logo-title{color:#FFFFFF;font-size:16px;font-weight:800;line-height:1.35;}
+.logo-ver{color:rgba(255,255,255,.82);font-size:10px;margin-top:2px;}
 /* What's New: アップデートのお知らせ */
 .whats-new-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:10010;display:none;align-items:center;justify-content:center;padding:24px 12px;overflow-y:auto;}
 .whats-new-bg.open{display:flex;}
@@ -440,9 +443,11 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
 <!-- ===== SIDEBAR ===== -->
 <div class="sidebar" id="sidebar">
   <div class="sidebar-logo">
-    <div class="logo-badge">KMT</div>
-    <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260813.95</div>
+    <div class="logo-head">
+      <div class="logo-badge">KMT</div>
+      <div class="logo-title">KMT案件管理システム</div>
+      <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260813.96</div>
+    </div>
     <div id="currentUserBadge" style="font-size:10px;color:#334e6d;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(15,32,64,.08);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <button onclick="showScreen('my_account')" title="自分のダッシュボード・設定を開く" style="margin-top:6px;width:100%;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:800;color:#111111;background:#FFFFFF;border:1px solid #B9D4EE;border-radius:6px;padding:6px 8px;cursor:pointer;">📊 マイページ</button>
     <div id="myAlertSummary" style="margin-top:6px;display:none;"></div>
@@ -22335,6 +22340,9 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260813.96', date:'2026-08-13', notify:true, items:[
+    '左メニューの一番上「KMT案件管理システム」を、見出しと同じ大きさの白い文字にして、濃い青の枠に入れました。枠の左右の位置も見出しとそろえています',
+  ]},
   { version:'ver.20260813.95', date:'2026-08-13', notify:true, items:[
     '左メニューの見出し（支援・社内・求人・人材紹介 など）を、白い文字＋濃い青の枠に変えました。選んでいる項目の水色とはっきり区別できます',
     '見出しの右にある件数バッジも、白地に青文字にして読みやすくしました',
