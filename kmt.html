@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260805.58 -->
+<!-- KMT_VERSION ver.20260805.59 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -379,7 +379,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.58</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260805.59</div>
     <div id="currentUserBadge" style="font-size:10px;color:#CBD5E1;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(255,255,255,.1);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <button onclick="showScreen('my_account')" title="自分のダッシュボード・設定を開く" style="margin-top:6px;width:100%;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:800;color:#0f172a;background:#e2e8f0;border:none;border-radius:6px;padding:6px 8px;cursor:pointer;">📊 マイページ</button>
     <div id="myAlertSummary" style="margin-top:6px;display:none;"></div>
@@ -403,11 +403,11 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="nav-item" onclick="showScreen('support_schedules')">📅 支援スケジュール <span id="supportScheduleBadge" style="display:none;background:#dc2626;color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;">0</span></div>
   <div class="nav-item" onclick="showScreen('candidates')">📋 候補者</div>
   <div class="nav-item" onclick="showScreen('jobs')">💼 求人管理</div>
-  <div class="nav-item" onclick="showScreen('intro_reg_orgs')">🏢 登録支援機関一覧</div>
+  <div class="nav-item" onclick="showScreen('intro_reg_orgs')">🏢 提携先登録支援機関一覧</div>
+  <div class="nav-item" onclick="showScreen('reg_support_tasks')">📑 登録支援機関業務</div>
   <div class="nav-item" onclick="showScreen('introductions')">🤝 紹介案件</div>
   <div class="sidebar-section">マスタ</div>
   <div class="nav-item" onclick="showScreen('sending')">✈️ 送り出し機関</div>
-  <div class="nav-item" onclick="showScreen('partners')">🏛️ 提携登録支援機関</div>
   <div class="sidebar-section">書類</div>
   <div class="nav-item" onclick="showScreen('resume')">📝 履歴書</div>
   <div class="sidebar-section">管理</div>
@@ -6890,7 +6890,7 @@ async function changePinCode() {
 // ==============================
 const AUDIT_TABLE_LABELS = {
   companies:'所属機関', workers:'外国人材', candidates:'候補者', job_openings:'求人',
-  introductions:'紹介案件', sending_orgs:'送り出し機関', partner_support_orgs:'提携支援機関', intro_reg_orgs:'登録支援機関一覧',
+  introductions:'紹介案件', sending_orgs:'送り出し機関', partner_support_orgs:'提携支援機関', intro_reg_orgs:'提携先登録支援機関一覧',
   support_fees:'支援委託費', sales_forecast:'売上', expenses:'立替', users:'ユーザー',
   ai_knowledge:'AI記憶', task_requests:'タスク', support_schedules:'支援スケジュール',
   chat_messages:'チャット', chat_rooms:'チャットルーム', chat_groups:'チャットグループ',
@@ -11308,7 +11308,8 @@ const SCREENS = {
   workers:   { title: '👤 外国人材', init: loadWorkers },
   candidates:{ title: '📋 候補者',   init: loadCandidates },
   jobs:      { title: '💼 求人管理', init: loadJobProgress },
-  intro_reg_orgs:{ title: '🏢 登録支援機関一覧', init: loadIntroRegOrgs },
+  intro_reg_orgs:{ title: '🏢 提携先登録支援機関一覧', init: loadIntroRegOrgs },
+  reg_support_tasks:{ title: '📑 登録支援機関業務', init: loadRegSupportTasks },
   introductions:{ title: '🤝 紹介案件', init: loadIntroductions },
   sending:   { title: '✈️ 送り出し機関', init: loadSending },
   partners:  { title: '🏛️ 提携登録支援機関', init: loadPartners },
@@ -11418,6 +11419,7 @@ function renderScreenContent(name) {
     candidates: buildCandidatesScreen(),
     jobs: buildJobsScreen(),
     intro_reg_orgs: buildIntroRegOrgsScreen(),
+    reg_support_tasks: buildRegSupportTasksScreen(),
     introductions: buildIntroductionsScreen(),
     sending: buildSendingScreen(),
     partners: buildPartnersScreen(),
@@ -18059,7 +18061,7 @@ function buildCandidatesScreen() {
   </table><div class="pagination-bar" id="candidatePagination"></div></div>`;
 }
 
-// ===== 登録支援機関一覧（紹介案件） =====
+// ===== 提携先登録支援機関一覧（紹介案件） =====
 let allIntroRegOrgs=[];
 function buildIntroRegOrgsScreen(){
   return `
@@ -18073,6 +18075,64 @@ function buildIntroRegOrgsScreen(){
   </div>
   <div id="introRegOrgArea"><div style="text-align:center;padding:40px;color:var(--gray-400);">読み込み中...</div></div>`;
 }
+// ===== 登録支援機関業務 =====
+// 各項目の中身（帳票の実体・リンク等）は後から設定する。ここでは項目の一覧だけを持つ。
+// kind: 'ledger' = 記録簿・管理簿 / 'form' = 入管庁の参考様式（直前の記録簿にぶら下げて表示）
+const REG_SUPPORT_TASKS = [
+  { no:1,  kind:'ledger', name:'支援実施体制管理簿' },
+  { no:2,  kind:'form',   name:'（支援委託契約書）参考様式第５－１０号（入管庁）' },
+  { no:3,  kind:'ledger', name:'支援対象者管理簿' },
+  { no:4,  kind:'form',   name:'（事前ガイダンスの確認書）参考様式第５－９号（入管庁）' },
+  { no:5,  kind:'ledger', name:'出入国送迎記録簿' },
+  { no:6,  kind:'ledger', name:'住居確保・生活契約支援記録簿' },
+  { no:7,  kind:'form',   name:'（生活ORTの確認書）参考様式第５－８号（入管庁）' },
+  { no:8,  kind:'ledger', name:'関係機関同行等支援記録簿' },
+  { no:9,  kind:'ledger', name:'日本語学習支援記録簿' },
+  { no:10, kind:'form',   name:'（相談記録書）参考様式第５－４号（入管庁）' },
+  { no:11, kind:'ledger', name:'日本人との交流促進支援記録簿' },
+  { no:12, kind:'ledger', name:'転職支援記録簿' },
+  { no:13, kind:'form',   name:'（定期面談報告書）参考様式第５－５号・第５－６号（入管庁）' },
+  { no:14, kind:'ledger', name:'支援不実施に係る申出記録書' },
+];
+
+function buildRegSupportTasksScreen(){
+  const rows = REG_SUPPORT_TASKS.map(t => {
+    const isForm = t.kind === 'form';
+    return '<div onclick="openRegSupportTask(' + t.no + ')" title="クリックして開く" ' +
+      'style="display:flex;align-items:center;gap:10px;padding:' + (isForm ? '8px 14px 8px 44px' : '11px 14px') + ';' +
+        'border-bottom:1px solid var(--gray-100);cursor:pointer;' + (isForm ? 'background:#fafbfc;' : '') + '">' +
+      '<span style="flex-shrink:0;font-size:10px;font-weight:700;color:var(--gray-400);min-width:20px;">' + t.no + '</span>' +
+      (isForm ? '<span style="flex-shrink:0;color:#94a3b8;font-size:12px;">↳</span>' : '<span style="flex-shrink:0;font-size:14px;">📘</span>') +
+      '<span style="flex:1;min-width:0;font-size:' + (isForm ? '12px' : '13px') + ';font-weight:' + (isForm ? '600' : '700') + ';' +
+        'color:' + (isForm ? 'var(--gray-600)' : 'var(--navy)') + ';">' + esc(t.name) + '</span>' +
+      (isForm ? '<span style="flex-shrink:0;font-size:9px;font-weight:700;color:#0891b2;background:#ecfeff;border-radius:8px;padding:2px 8px;">参考様式</span>' : '') +
+      '<span style="flex-shrink:0;font-size:10px;color:var(--gray-400);">未設定</span></div>';
+  }).join('');
+  return `
+  <div style="max-width:900px;">
+    <div style="background:#fffbeb;border-left:4px solid #f59e0b;border-radius:0 8px 8px 0;padding:10px 14px;font-size:12px;color:#92400e;line-height:1.6;margin-bottom:14px;">
+      登録支援機関として備える帳票の一覧です。各項目の中身（様式・記録の入力欄）はこれから設定します。
+    </div>
+    <div style="background:white;border:1px solid var(--gray-200);border-radius:12px;box-shadow:var(--shadow);overflow:hidden;">
+      <div style="padding:10px 14px;border-bottom:1px solid var(--gray-200);font-size:13px;font-weight:800;color:var(--navy);display:flex;align-items:center;gap:6px;">
+        📑 登録支援機関業務
+        <span style="margin-left:auto;font-size:11px;font-weight:700;color:var(--gray-400);">${REG_SUPPORT_TASKS.length}項目</span>
+      </div>
+      ${rows}
+    </div>
+  </div>`;
+}
+
+function openRegSupportTask(no){
+  const t = REG_SUPPORT_TASKS.find(x => x.no === no);
+  if (!t) return;
+  showToast('🚧「' + t.name + '」の中身はこれから設定します', 'success');
+}
+
+async function loadRegSupportTasks(){
+  // 画面はshowScreen側で描画済み。中身を設定したらここで読み込む
+}
+
 async function loadIntroRegOrgs(){
   showLoading(true);
   try{ const d=await sbFetch('intro_reg_orgs?select=*&order=no.asc'); allIntroRegOrgs=d||[]; _populateIntroRegFilters(); renderIntroRegOrgs(); }
@@ -20040,6 +20100,11 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260805.59', date:'2026-08-07', notify:true, items:[
+    'メニューの「登録支援機関一覧」を「提携先登録支援機関一覧」に名称変更しました（中身はこれまでと同じです）',
+    '内容が重複していたマスタの「提携登録支援機関」をメニューから外しました',
+    'メニューに「📑 登録支援機関業務」を追加しました。支援実施体制管理簿から支援不実施に係る申出記録書までの14項目が並びます。各項目の中身はこれから設定します',
+  ]},
   { version:'ver.20260805.58', date:'2026-08-07', notify:true, items:[
     '左メニューの「チャット」と件数のバッジが必ず横一列に並ぶようになりました。幅が足りないときは折り返さず、文字とすき間が自動で小さくなって収まります',
     '未読合計のバッジの色を赤からピンクに変えました。赤（自分あてメンション）と見分けやすくなります',
