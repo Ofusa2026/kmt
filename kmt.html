@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT案件管理システム</title>
-<!-- KMT_VERSION ver.20260813.82 -->
+<!-- KMT_VERSION ver.20260813.83 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -94,6 +94,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .jp-dup-chip{background:#fff;border:1px solid #FCD34D;border-radius:10px;padding:1px 8px;cursor:pointer;color:#92400e;font-weight:700;}
 .jp-dup-chip:hover{background:#FDE68A;}
 .jp-dup-chip i{font-style:normal;font-weight:400;color:#b45309;margin-left:4px;}
+/* 求人チャット一覧 */
+.jc-row{display:flex;align-items:center;gap:10px;padding:11px 14px;border:1px solid var(--gray-200);border-radius:8px;margin-bottom:6px;background:#fff;cursor:pointer;}
+.jc-row:hover{background:#F3F8FE;border-color:#93c5fd;}
+.jc-main{flex:1;min-width:0;}
+.jc-title{font-size:13px;font-weight:700;color:#1e3a5f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.jc-sub{font-size:11px;color:var(--gray-400);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.jc-right{display:flex;align-items:center;gap:5px;flex-shrink:0;}
+.jc-when{font-size:10px;color:var(--gray-400);white-space:nowrap;}
+.jc-tag{font-size:9px;font-weight:800;background:#1e3a5f;color:#fff;border-radius:8px;padding:1px 6px;margin-left:6px;}
+.jc-tag-i{background:#7c3aed;}
 #chatNavLabel{font-size:calc(13px * var(--chatNavScale));}
 .chat-nav-badge{flex:0 0 auto;font-size:calc(9px * var(--chatNavScale));font-weight:800;
   padding:calc(1px * var(--chatNavScale)) calc(5px * var(--chatNavScale));border-radius:8px;line-height:1.5;}
@@ -411,7 +421,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="sidebar-logo">
     <div class="logo-badge">KMT</div>
     <div class="logo-title">KMT案件管理システム</div>
-    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260813.82</div>
+    <div class="logo-ver" onclick="openWhatsNew()" title="クリックでアップデート履歴を表示" style="cursor:pointer;text-decoration:underline dotted;">ver.20260813.83</div>
     <div id="currentUserBadge" style="font-size:10px;color:#334e6d;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(15,32,64,.08);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <button onclick="showScreen('my_account')" title="自分のダッシュボード・設定を開く" style="margin-top:6px;width:100%;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:800;color:#111111;background:#FFFFFF;border:1px solid #B9D4EE;border-radius:6px;padding:6px 8px;cursor:pointer;">📊 マイページ</button>
     <div id="myAlertSummary" style="margin-top:6px;display:none;"></div>
@@ -436,6 +446,7 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   <div class="nav-item" onclick="showScreen('mail_list')">📧 メール送信</div>
   <div class="nav-item" onclick="showScreen('shift_kanri')">📅 シフト管理</div>
   <div class="sidebar-section">求人・人材紹介</div>
+  <div class="nav-item" onclick="showScreen('job_chat')" id="jobChatNavItem" style="gap:4px;flex-wrap:nowrap;white-space:nowrap;overflow:hidden;"><span style="flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;">💬 求人チャット</span><span id="jobChatMentionBadge" class="badge" style="display:none;background:#ef4444;margin-left:auto;flex:0 0 auto;"></span><span id="jobChatUnreadBadge" class="badge" style="display:none;background:#fda4af;color:#881337;margin-left:2px;flex:0 0 auto;"></span></div>
   <div class="nav-item" onclick="showScreen('candidates')">📋 候補者</div>
   <div class="nav-item" onclick="showScreen('jobs')">💼 求人管理</div>
   <div class="nav-item" onclick="showScreen('intro_reg_orgs')">🏢 提携先登録支援機関</div>
@@ -7718,8 +7729,9 @@ async function loadChatScreen() {
       } catch(e) { _chatPinnedCompanyIds = new Set(); _chatPinnedRoomIds = new Set(); }
     }
     // chat_roomsテーブルから取得（人材チャット + 企業チャット）
-    const d = await sbFetch('chat_rooms?select=id,worker_id,company_id,group_id,status,completed_at,created_at,updated_at,workers(id,name,nationality,staff,management_no,apply_type,desired_visa,apply_status,status,drive_url,drive_url_kmt,photo_url,company_id,companies(id,name)),companies(id,name,drive_url,drive_url2,main_staff,sub_staff,team_staff)&is_deleted=eq.false&order=updated_at.desc');
+    const d = await sbFetch('chat_rooms?select=id,worker_id,company_id,job_src_row,group_id,status,completed_at,created_at,updated_at,workers(id,name,nationality,staff,management_no,apply_type,desired_visa,apply_status,status,drive_url,drive_url_kmt,photo_url,company_id,companies(id,name)),companies(id,name,drive_url,drive_url2,main_staff,sub_staff,team_staff)&is_deleted=eq.false&order=updated_at.desc');
     chatRooms = (d||[]).map(r => {
+      const isJobChat = !r.worker_id && !r.company_id && r.job_src_row != null;
       const isCompanyChat = !r.worker_id && !!r.company_id;
       const directCompany = r.companies || null; // ルーム直結の企業（企業チャット）
       const workerCompany = r.workers?.companies || null;
@@ -7727,8 +7739,10 @@ async function loadChatScreen() {
         id: r.id,
         worker_id: r.worker_id,
         is_company_chat: isCompanyChat,
-        name: isCompanyChat ? (directCompany?.name || '企業チャット') : (r.workers?.name || ''),
-        subName: isCompanyChat ? '企業チャット' : (workerCompany?.name || ''),
+        is_job_chat: isJobChat,
+        job_src_row: r.job_src_row ?? null,
+        name: isJobChat ? ('求人 ' + (r.job_src_row ?? '')) : (isCompanyChat ? (directCompany?.name || '企業チャット') : (r.workers?.name || '')),
+        subName: isJobChat ? '求人チャット' : (isCompanyChat ? '企業チャット' : (workerCompany?.name || '')),
         nationality: r.workers?.nationality || '',
         // 担当判定用の人材担当者
         staffStr: r.workers?.staff || '',
@@ -8698,17 +8712,24 @@ async function loadChatUnread() {
       r.mentionDirect = directByRoom[r.id] || 0;
       r.mentionGroup  = groupByRoom[r.id] || 0;
     });
-    const total = Object.values(unreadByRoom).reduce((s,v) => s+v, 0);
+    // 求人チャットの分はサイドバーの「💬 チャット」には含めず、「💬 求人チャット」に出す
+    const _jobRoomIds = new Set(chatRooms.filter(r => r.is_job_chat).map(r => r.id));
+    const _sumExceptJob = obj => Object.entries(obj).reduce((s,[k,v]) => s + (_jobRoomIds.has(k) ? 0 : v), 0);
+    const _sumJobOnly   = obj => Object.entries(obj).reduce((s,[k,v]) => s + (_jobRoomIds.has(k) ? v : 0), 0);
+    updateJobChatNavBadges(_sumJobOnly(unreadByRoom), _sumJobOnly(mentionByRoom));
+    if (typeof renderJobChatList === 'function' && document.getElementById('jobChatList')) renderJobChatList();
+    const total = _sumExceptJob(unreadByRoom);
     // メンション未読をチェック（自分のメンションのみ、部分一致）
     const mentionCount = (msgs||[]).filter(m => {
       if (m.deleted_at) return false;
       if (m.sender_name === currentUser?.name) return false;
+      if (_jobRoomIds.has(m.chat_room_id)) return false; // 求人チャットは別カウント
       const readAt = readMap[m.chat_room_id];
       return isMentionForMe(m.mentions) && (!readAt || m.created_at > readAt);
     }).length;
     // 🔴自分あて / 🟡所属チームあて の合計（サイドバーのバッジと一覧の凡例で共有する）
-    _mentionDirectTotal = Object.values(directByRoom).reduce((s,v) => s+v, 0);
-    _mentionGroupTotal  = Object.values(groupByRoom).reduce((s,v) => s+v, 0);
+    _mentionDirectTotal = _sumExceptJob(directByRoom);
+    _mentionGroupTotal  = _sumExceptJob(groupByRoom);
     // メンションのバッジだけを脈動させる（未読合計は光らせない）
     const setMentionBadge = (el, cnt, glow) => {
       if (!el) return;
@@ -9107,7 +9128,7 @@ function renderGroupList() {
   const q = (document.getElementById('chatRoomSearch')?.value || '').toLowerCase();
 
   // 完了/進行中の絞り込みは廃止。全ルームを対象に、必要なら担当のみフィルタ。
-  let visibleRooms = chatRooms.slice();
+  let visibleRooms = chatRooms.filter(r => !r.is_job_chat); // 求人チャットは専用画面に出す
   if (_chatStaffOnly) visibleRooms = visibleRooms.filter(_chatIsMyRoom);
   if (_chatMentionOnly) visibleRooms = visibleRooms.filter(r => (r.mentionUnread || 0) > 0);
   if (_chatUnreadOnly) visibleRooms = visibleRooms.filter(r => (r.unread || 0) > 0);
@@ -9395,6 +9416,7 @@ function renderGroupRooms(companyId) {
   const cObj = (allCompanies || []).find(c => c.id === companyId);
   // この企業に属するルーム(進行中/完了の区別なし)
   const rooms = chatRooms.filter(r => {
+    if (r.is_job_chat) return false; // 求人チャットは専用画面に出す
     const key = r.company_id || '__none__';
     return key === companyId;
   });
@@ -10273,7 +10295,7 @@ async function chatSearch() {
   }
 
   // ルーム名マッチ
-  const roomMatches = chatRooms.filter(r => r.name.toLowerCase().includes(q) || (r.subName||'').toLowerCase().includes(q));
+  const roomMatches = chatRooms.filter(r => !r.is_job_chat && (r.name.toLowerCase().includes(q) || (r.subName||'').toLowerCase().includes(q)));
 
   // メッセージ全文検索（DBから）
   if (resultsEl) {
@@ -11588,6 +11610,7 @@ const SCREENS = {
   workers:   { title: '👤 外国人材', init: loadWorkers },
   candidates:{ title: '📋 候補者',   init: loadCandidates },
   jobs:      { title: '💼 求人管理', init: loadJobProgress },
+  job_chat:  { title: '💬 求人チャット', init: loadJobChatScreen },
   intro_reg_orgs:{ title: '🏢 提携先登録支援機関一覧', init: loadIntroRegOrgs },
   introductions:{ title: '🤝 紹介案件', init: loadIntroductions },
   sending:   { title: '✈️ 送り出し機関', init: loadSending },
@@ -11698,6 +11721,7 @@ function renderScreenContent(name) {
     workers: buildWorkersScreen(),
     candidates: buildCandidatesScreen(),
     jobs: buildJobsScreen(),
+    job_chat: buildJobChatScreen(),
     intro_reg_orgs: buildIntroRegOrgsScreen(),
     introductions: buildIntroductionsScreen(),
     sending: buildSendingScreen(),
@@ -17762,6 +17786,117 @@ function renderJobProgress() {
 }
 
 
+
+// ===== 💬 求人チャット（求人案件ごとのチャット一覧） =====
+// 求人ルームは chat_rooms.job_src_row で見分ける。
+// openChatRoom / 未読集計をそのまま使えるよう chatRooms には入れておき、
+// 既存のチャット一覧（企業グループ表示）からは is_job_chat で除外している。
+let _jobChatSearch = '';
+let _jobChatMineOnly = false;
+
+function buildJobChatScreen() {
+  return `
+  <div class="filter-bar" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px;">
+    <input class="search-input" id="jobChatSearch" placeholder="求人コード・会社名で検索..."
+      style="flex:1;min-width:200px" oninput="_jobChatSearch=this.value;renderJobChatList()">
+    <label style="font-size:12px;display:inline-flex;align-items:center;gap:5px;cursor:pointer;white-space:nowrap">
+      <input type="checkbox" id="jobChatMineOnly" onchange="_jobChatMineOnly=this.checked;renderJobChatList()"> 自分の担当のみ</label>
+    <button class="btn btn-outline" style="font-size:11px;padding:4px 10px" onclick="loadJobChatScreen()">🔄 更新</button>
+  </div>
+  <div id="jobChatList"></div>`;
+}
+
+async function loadJobChatScreen() {
+  showLoading(true);
+  try {
+    // 求人名を出すため求人進捗を先に用意する
+    if (!(allJobProg||[]).length) {
+      try { allJobProg = await sbFetch('job_progress?select=*&order=src_row.asc') || []; } catch(e) {}
+    }
+    // チャットルーム（未読数もここで載る）
+    if (!(chatRooms||[]).length) await loadChatScreen();
+    else await loadChatUnread();
+  } catch(e) { showToast('❌ ' + e.message, 'error'); }
+  renderJobChatList();
+  showLoading(false);
+}
+
+// この求人が自分の担当か（営業担当 / GLT担当 に自分の名前が入っているか）
+function _jobChatIsMine(srcRow) {
+  const r = _jpRowOf(srcRow);
+  if (!r || !currentUser?.name) return false;
+  const me = String(currentUser.name).replace(/[\s　]/g, '');
+  const surname = me.slice(0, 2);
+  return [r.sales_staff, r.glt_staff].some(s => {
+    const v = String(s || '').replace(/[\s　]/g, '');
+    return v && (v.includes(me) || v.includes(surname));
+  });
+}
+
+function renderJobChatList() {
+  const box = document.getElementById('jobChatList');
+  if (!box) return;
+  const q = (_jobChatSearch || '').toLowerCase();
+  let rooms = (chatRooms || []).filter(r => r.is_job_chat);
+  if (_jobChatMineOnly) rooms = rooms.filter(r => _jobChatIsMine(r.job_src_row));
+  if (q) rooms = rooms.filter(r => {
+    const j = _jpRowOf(r.job_src_row) || {};
+    return ((j.code||'') + ' ' + (j.company_name||'')).toLowerCase().includes(q);
+  });
+  // 未読の多い順 → 最終更新の新しい順
+  rooms.sort((a,b) => (b.unread||0)-(a.unread||0) || String(b.lastMsg?.created_at||'').localeCompare(String(a.lastMsg?.created_at||'')));
+
+  if (!rooms.length) {
+    box.innerHTML = `<div style="padding:40px;text-align:center;color:var(--gray-400);font-size:13px">
+      求人チャットはまだありません<br>
+      <span style="font-size:11px">求人管理 → 案件を開く → 右上の「💬 チャット」から始められます</span></div>`;
+    return;
+  }
+  box.innerHTML = rooms.map(r => {
+    const j = _jpRowOf(r.job_src_row) || {};
+    const last = r.lastMsg;
+    const preview = last ? esc(String(last.content||'').slice(0,60)) : '<span style="color:var(--gray-400)">まだメッセージがありません</span>';
+    const when = last?.created_at ? _fmtUpdatedAt(last.created_at) : '';
+    const mention = r.mentionUnread || 0, unread = r.unread || 0;
+    return `
+    <div class="jc-row" onclick="openJobChatRoom('${r.id}')">
+      <div class="jc-main">
+        <div class="jc-title">💼 ${esc(j.code||'')}${j.code?' / ':''}${esc(j.company_name||'求人'+r.job_src_row)}
+          ${j.kmt_flag?'<span class="jc-tag">KMT</span>':'<span class="jc-tag jc-tag-i">紹介</span>'}</div>
+        <div class="jc-sub">${esc(last?.sender_name?last.sender_name+'：':'')}${preview}</div>
+      </div>
+      <div class="jc-right">
+        ${mention?`<span class="badge" style="background:#ef4444">@${mention}</span>`:''}
+        ${unread?`<span class="badge" style="background:#fda4af;color:#881337">${unread}</span>`:''}
+        <span class="jc-when">${when}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// 求人チャットを開く（会話パネルは既存のチャット画面をそのまま使う）
+function openJobChatRoom(roomId) {
+  _pendingChatRoomId = roomId;
+  showScreen('chat');
+}
+
+// サイドバー「💬 求人チャット」のバッジ更新（loadChatUnread から呼ばれる）
+function updateJobChatNavBadges(unreadTotal, mentionTotal) {
+  const m = document.getElementById('jobChatMentionBadge');
+  if (m) {
+    m.textContent = '@' + mentionTotal;
+    m.style.display = mentionTotal > 0 ? '' : 'none';
+    m.style.animation = mentionTotal > 0 ? 'kmtBadgePulse 1.5s ease-in-out infinite' : '';
+    m.style.boxShadow = mentionTotal > 0 ? '0 0 0 3px rgba(239,68,68,0.35)' : '';
+  }
+  const u = document.getElementById('jobChatUnreadBadge');
+  if (u) {
+    u.textContent = unreadTotal;
+    u.style.display = unreadTotal > 0 ? '' : 'none';
+    u.title = unreadTotal > 0 ? `求人チャットの未読 ${unreadTotal}件` : '';
+  }
+}
+
 // ===== 求人案件: 求人詳細ノート / 候補者リスト / 求人チャット =====
 // 求人案件は job_progress（src_row が鍵）。候補者との紐付けは candidate_job_progress。
 // 「所属機関×外国人材」と同じ考え方だが、候補者は複数の求人に登録でき、重複も許す（重複先を表示する）。
@@ -21867,6 +22002,12 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260813.83', date:'2026-08-13', notify:true, items:[
+    '左メニューの「求人・人材紹介」の一番上に「💬 求人チャット」を追加しました。求人案件ごとのチャットがここに一覧で出ます',
+    '求人チャットの未読は、赤い「＠件数」（自分あてメンション）とピンクの件数（未読合計）で表示されます。この件数は今までの「💬 チャット」には含まれません（別々に数えます）',
+    '一覧は求人コード・会社名で検索でき、「自分の担当のみ」で営業担当／GLT担当が自分の案件だけに絞れます。未読の多い案件が上に来ます',
+    'チャットを始めるには 求人管理 → 案件を開く → 右上の「💬 チャット」を押してください',
+  ]},
   { version:'ver.20260813.82', date:'2026-08-13', notify:true, items:[
     '求人管理：各案件を開くと「📋 求人進捗 情報」「📝 求人詳細」「👥 候補者リスト」の3つのタブに分かれました',
     '「📝 求人詳細」に自由に書けるノートを追加しました。ノートは何枚でも増やせます。文字の大きさ・太字・斜体・下線・文字色・背景色を変えられ、「▦ 表」から行数と列数を指定して表も作れます',
