@@ -12448,6 +12448,14 @@ function buildWorkersScreen() {
       <span style="color:var(--gray-400);">〜</span>
       <input type="date" id="wFilterExpiryTo" onchange="applyWorkerFilters()" style="border:none;outline:none;font-size:11px;width:120px;background:transparent;" title="終了日">
     </div>
+    <select class="filter-select" id="wFilterPassport" onchange="applyWorkerFilters()" title="パスポート期限で絞り込み">
+      <option value="">全パスポート期限</option>
+      <option value="blank">✍️ 期限未記入</option>
+      <option value="expired">⛔ 期限切れ</option>
+      <option value="90">🔴 期限3か月以内</option>
+      <option value="180">🟠 期限6か月以内</option>
+      <option value="365">🟡 期限1年以内</option>
+    </select>
     <button class="btn btn-outline" id="wRetiredToggle" style="font-size:11px;padding:4px 10px" onclick="toggleRetired()">退職者等表示</button>
     <button class="btn btn-outline" style="font-size:11px;padding:4px 10px" onclick="clearWorkerFilters()">✕</button>
     <div id="wResultCount" style="background:linear-gradient(135deg,#1a73e8,#7c3aed);color:white;padding:6px 14px;border-radius:8px;font-size:13px;font-weight:800;box-shadow:0 2px 6px rgba(26,115,232,0.25);white-space:nowrap;">👥 0 名</div>
@@ -13204,6 +13212,7 @@ function applyWorkerFilters() {
   const mainStaff = document.getElementById('wFilterMainStaff')?.value||'';
   const subStaff = document.getElementById('wFilterSubStaff')?.value||'';
   const expiryFilter = document.getElementById('wFilterExpiry')?.value||'';
+  const passportFilter = document.getElementById('wFilterPassport')?.value||'';
   const expFromVal = document.getElementById('wFilterExpiryFrom')?.value||'';
   const expToVal = document.getElementById('wFilterExpiryTo')?.value||'';
   const expFrom = expFromVal ? new Date(expFromVal) : null;
@@ -13257,6 +13266,17 @@ function applyWorkerFilters() {
       if (expFrom && ve < expFrom) return false;
       if (expTo && ve > expTo) return false;
     }
+    // パスポート期限フィルタ
+    if (passportFilter) {
+      const pd = daysTo(w.passport_expiry);
+      if (passportFilter === 'blank') {
+        if (w.passport_expiry) return false;
+      } else if (passportFilter === 'expired') {
+        if (pd === null || pd >= 0) return false;
+      } else if (passportFilter === '90' || passportFilter === '180' || passportFilter === '365') {
+        if (pd === null || pd < 0 || pd > Number(passportFilter)) return false;
+      }
+    }
     return true;
   });
   workerPage = 1;
@@ -13283,7 +13303,7 @@ function toggleRetired() {
 }
 
 function clearWorkerFilters() {
-  ['wSearchInput','wFilterStatus','wFilterApplyStatus','wFilterNationality','wFilterKmt','wFilterVisa','wFilterMainStaff','wFilterSubStaff','wFilterExpiry','wFilterExpiryFrom','wFilterExpiryTo'].forEach(id => {
+  ['wSearchInput','wFilterStatus','wFilterApplyStatus','wFilterNationality','wFilterKmt','wFilterVisa','wFilterMainStaff','wFilterSubStaff','wFilterExpiry','wFilterExpiryFrom','wFilterExpiryTo','wFilterPassport'].forEach(id => {
     const el = document.getElementById(id); if(el) el.value='';
   });
   _showRetired = false;
