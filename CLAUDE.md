@@ -116,6 +116,8 @@ UI変更やロジック変更のときは実際に描画して確かめる。
 - 在職ステータスが **辞退/キャンセル** と **支援機関変更済み** の人材は全アラートの対象外。判定は `isAlertExcludedWorker(w)` の1箇所だけ
   （`computeGlobalWorkerAlerts` / `computeMyWorkerAlerts` / 期限カードの一覧 から呼んでいる）。
   表記ゆれを拾うため「辞退」「キャンセル」の部分一致で見ている
+- 必須項目の未入力アラートは `missingRequiredFields(w)` が唯一の算出元（パスポート期限・出入国の情報）。
+  パスポート期限の必須判定は `isPassportExpiryRequired(w)`（申請種別が「認定」以外で必須）
 - **判定条件を変えるときは `computeGlobalWorkerAlerts` だけを直せばよい**
 
 ### フッターのボタン配置（統一ルール）
