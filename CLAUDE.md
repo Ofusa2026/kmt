@@ -113,7 +113,7 @@ UI変更やロジック変更のときは実際に描画して確かめる。
   従来どおり一覧フィルターに追従する
 - `allWorkers` は画面によって軽量 select で上書きされることがある。
   判定に必要な列が無い場合は `_alertSourceWorkers()` が専用取得分（`_sidebarAlertData`）にフォールバックする
-- 在職ステータスが **辞退/キャンセル** の人材は全アラートの対象外。判定は `isAlertExcludedWorker(w)` の1箇所だけ
+- 在職ステータスが **辞退/キャンセル** と **支援機関変更済み** の人材は全アラートの対象外。判定は `isAlertExcludedWorker(w)` の1箇所だけ
   （`computeGlobalWorkerAlerts` / `computeMyWorkerAlerts` / 期限カードの一覧 から呼んでいる）。
   表記ゆれを拾うため「辞退」「キャンセル」の部分一致で見ている
 - **判定条件を変えるときは `computeGlobalWorkerAlerts` だけを直せばよい**
