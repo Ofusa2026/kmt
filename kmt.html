@@ -6876,9 +6876,12 @@ async function deleteAiKn(id) {
 let _myDashData = null; // { workers, tasks }
 
 async function loadMyDashboard() {
-  const box = document.getElementById('myDashboard');
-  if (!box) return;
-  box.innerHTML = '<div style="text-align:center;padding:30px;color:var(--gray-400);font-size:12px;">読み込み中...</div>';
+  const boxA = document.getElementById('myVisaAlerts');
+  const boxT = document.getElementById('myTaskDash');
+  if (!boxA && !boxT) return;
+  const loadingHtml = '<div style="text-align:center;padding:30px;color:var(--gray-400);font-size:12px;">読み込み中...</div>';
+  if (boxA) boxA.innerHTML = loadingHtml;
+  if (boxT) boxT.innerHTML = loadingHtml;
   try {
     if (!(allCompanies || []).length) { try { await loadCompanies(); } catch(e) {} }
     const [workers, tasks] = await Promise.all([
@@ -6886,55 +6889,64 @@ async function loadMyDashboard() {
       sbFetch('task_requests?select=id,worker_id,task_name,status,deadline,assigned_to,checker,is_urgent,updated_at,workers(id,name)&order=updated_at.desc'),
     ]);
     _myDashData = { workers: workers || [], tasks: tasks || [] };
-    renderMyDashboard();
+    renderMyAlertsPanel();
+    renderMyTaskPanel();
     loadMyNotes();   // 「自分のノート」タブ用（切り替え時に待たせない）
   } catch(e) {
-    box.innerHTML = '<div style="text-align:center;padding:30px;color:#dc2626;font-size:12px;">読み込みに失敗しました: ' + esc(e.message) + '</div>';
+    const errHtml = '<div style="text-align:center;padding:30px;color:#dc2626;font-size:12px;">読み込みに失敗しました: ' + esc(e.message) + '</div>';
+    if (boxA) boxA.innerHTML = errHtml;
+    if (boxT) boxT.innerHTML = errHtml;
   }
 }
 
-function renderMyDashboard() {
-  const box = document.getElementById('myDashboard');
+// マイページの担当・タスク系カードで使い回す表示ヘルパー(アラートタブ／タスクタブ両方から使う)
+function _myDashApplyBadge(w) {
+  const st = w.apply_status || '申請予定なし';
+  const cls = APPLY_STATUS_COLORS[st] || 'st-none';
+  return '<span class="st-badge ' + cls + '" style="font-size:9px;padding:1px 6px;flex-shrink:0;white-space:nowrap;">' + esc(st) + '</span>';
+}
+// 人材1件の行。showApply=true なら申請ステータスも出す
+function _myDashRow(item, extra, showApply) {
+  const w = item.w;
+  return '<div onclick="openWorkerModal(\'' + w.id + '\')" title="人材詳細を開く" ' +
+    'style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid var(--gray-100);cursor:pointer;font-size:12px;">' +
+    '<span style="font-weight:700;color:var(--navy);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
+      (w.management_no ? '<span style="color:var(--gray-400);font-weight:400;">[' + esc(w.management_no) + '] </span>' : '') + esc(w.name || '') + '</span>' +
+    (showApply ? _myDashApplyBadge(w) : '') +
+    '<span style="font-size:10px;color:var(--gray-400);flex-shrink:0;">' + esc(w.nationality || '') + '</span>' +
+    '<span style="font-size:11px;font-weight:700;flex-shrink:0;white-space:nowrap;">' + extra + '</span></div>';
+}
+function _myDashDayTxt(d) {
+  return d < 0 ? '<span style="color:#dc2626;">超過' + Math.abs(d) + '日</span>'
+    : '<span style="color:' + (d <= 30 ? '#dc2626' : d <= 60 ? '#ea580c' : '#d97706') + ';">残り' + d + '日</span>';
+}
+function _myDashSection(icon, title, color, items, render) {
+  if (!items.length) return '';
+  return '<div style="background:white;border:1px solid var(--gray-200);border-radius:10px;overflow:hidden;margin-bottom:10px;">' +
+    '<div style="background:' + color + ';color:white;padding:7px 12px;font-size:12px;font-weight:800;display:flex;align-items:center;gap:6px;">' +
+      icon + ' ' + title + '<span style="margin-left:auto;background:rgba(255,255,255,.25);border-radius:8px;padding:0 7px;">' + items.length + '件</span></div>' +
+    '<div>' + items.map(render).join('') + '</div></div>';
+}
+function _myDashCard(title, inner, extra) {
+  return '<div style="background:white;border:1px solid var(--gray-200);border-radius:12px;box-shadow:var(--shadow);overflow:hidden;">' +
+    '<div style="padding:10px 14px;border-bottom:1px solid var(--gray-200);font-size:13px;font-weight:800;color:var(--navy);display:flex;align-items:center;gap:6px;">' + title +
+      (extra ? '<span style="margin-left:auto;font-size:11px;font-weight:700;color:var(--gray-400);">' + extra + '</span>' : '') + '</div>' +
+    '<div style="max-height:420px;overflow-y:auto;">' + inner + '</div></div>';
+}
+
+// マイページ「🔔 アラート」タブ: 在留期限に関するアラートのみ(担当区分ごと)
+function renderMyAlertsPanel() {
+  const box = document.getElementById('myVisaAlerts');
   if (!box || !_myDashData) return;
   const a = computeMyWorkerAlerts(_myDashData.workers);
+  const row = _myDashRow, dayTxt = _myDashDayTxt, section = _myDashSection, card = _myDashCard;
 
-  // 申請ステータスのバッジ（一覧などと同じ色分け）
-  const applyBadge = w => {
-    const st = w.apply_status || '申請予定なし';
-    const cls = APPLY_STATUS_COLORS[st] || 'st-none';
-    return '<span class="st-badge ' + cls + '" style="font-size:9px;padding:1px 6px;flex-shrink:0;white-space:nowrap;">' + esc(st) + '</span>';
-  };
-  // 人材1件の行。showApply=true なら申請ステータスも出す
-  const row = (item, extra, showApply) => {
-    const w = item.w;
-    return '<div onclick="openWorkerModal(\'' + w.id + '\')" title="人材詳細を開く" ' +
-      'style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid var(--gray-100);cursor:pointer;font-size:12px;">' +
-      '<span style="font-weight:700;color:var(--navy);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
-        (w.management_no ? '<span style="color:var(--gray-400);font-weight:400;">[' + esc(w.management_no) + '] </span>' : '') + esc(w.name || '') + '</span>' +
-      (showApply ? applyBadge(w) : '') +
-      '<span style="font-size:10px;color:var(--gray-400);flex-shrink:0;">' + esc(w.nationality || '') + '</span>' +
-      '<span style="font-size:11px;font-weight:700;flex-shrink:0;white-space:nowrap;">' + extra + '</span></div>';
-  };
-  const dayTxt = d => d < 0 ? '<span style="color:#dc2626;">超過' + Math.abs(d) + '日</span>'
-    : '<span style="color:' + (d <= 30 ? '#dc2626' : d <= 60 ? '#ea580c' : '#d97706') + ';">残り' + d + '日</span>';
-
-  const section = (icon, title, color, items, render) => {
-    if (!items.length) return '';
-    return '<div style="background:white;border:1px solid var(--gray-200);border-radius:10px;overflow:hidden;margin-bottom:10px;">' +
-      '<div style="background:' + color + ';color:white;padding:7px 12px;font-size:12px;font-weight:800;display:flex;align-items:center;gap:6px;">' +
-        icon + ' ' + title + '<span style="margin-left:auto;background:rgba(255,255,255,.25);border-radius:8px;padding:0 7px;">' + items.length + '件</span></div>' +
-      '<div>' + items.map(render).join('') + '</div></div>';
-  };
-
-  // 1. アラート（担当区分ごとに別カード／在留期限4か月以内は優先度が低いので別カードにまとめる）
-  const urgentHtml = b =>
+  const expiryHtml = b =>
     section('🪪','在留期限 1か月以内','#dc2626', b.expiry1, i => row(i, dayTxt(i.days), true)) +
     section('🪪','在留期限 2か月以内','#ea580c', b.expiry2, i => row(i, dayTxt(i.days), true)) +
     section('🪪','在留期限 3か月以内','#d97706', b.expiry3, i => row(i, dayTxt(i.days), true)) +
-    section('⏳','特例期間に入っている人材','#b45309', b.tokurei, i => row(i, '<span style="color:#b45309;">特例あと' + i.tokureiDays + '日</span>', true)) +
-    section('📋','申請ステータス 未入力・要確認','#1d4ed8', b.applyCheck, i => row(i, '<span style="color:#1d4ed8;">' + esc(i.reason) + '</span>')) +
-    section('✍️','必須情報の未入力（在留情報）','#7c3aed', b.required, i => row(i, '<span style="color:#7c3aed;">未入力</span>'));
-  const urgentCount = b => b.total - b.expiry4.length;
+    section('⏳','特例期間に入っている人材','#b45309', b.tokurei, i => row(i, '<span style="color:#b45309;">特例あと' + i.tokureiDays + '日</span>', true));
+  const expiryCount = b => b.expiry1.length + b.expiry2.length + b.expiry3.length + b.tokurei.length;
 
   // 在留期限4か月以内は担当区分ごとの小見出しでまとめて1カードに
   const exp4Total = a.byRole.main.expiry4.length + a.byRole.sub.expiry4.length + a.byRole.team.expiry4.length;
@@ -6947,7 +6959,44 @@ function renderMyDashboard() {
     exp4Group('⚪ サブ担当',   '#6b7280', a.byRole.sub.expiry4) +
     exp4Group('🟣 チーム担当', '#7c3aed', a.byRole.team.expiry4);
 
-  // 2. 自分の担当リスト（担当一覧と同じ基準・メイン/サブ/チームで分ける）
+  box.innerHTML =
+    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;">' +
+      '<div style="font-size:15px;font-weight:800;color:var(--navy);">🔔 在留期限に関するアラート</div>' +
+      '<button class="btn btn-outline" style="font-size:11px;padding:3px 10px;margin-left:auto;" onclick="loadMyDashboard()">🔄 更新</button>' +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px;align-items:start;">' +
+      card('🔵 メイン担当の在留期限アラート',
+        (expiryCount(a.byRole.main) ? '<div style="padding:8px;">' + expiryHtml(a.byRole.main) + '</div>'
+          : '<div style="padding:18px;text-align:center;color:#16a34a;font-size:12px;">✅ 対応が必要なアラートはありません</div>'),
+        expiryCount(a.byRole.main) ? expiryCount(a.byRole.main) + '件' : '') +
+      (a.skipSub
+        ? card('⚪ サブ担当の在留期限アラート',
+            '<div style="padding:18px;text-align:center;color:var(--gray-400);font-size:12px;">営業チームのため、サブ担当ぶんのアラートは表示していません</div>', '')
+        : card('⚪ サブ担当の在留期限アラート',
+            (expiryCount(a.byRole.sub) ? '<div style="padding:8px;">' + expiryHtml(a.byRole.sub) + '</div>'
+              : '<div style="padding:18px;text-align:center;color:#16a34a;font-size:12px;">✅ 対応が必要なアラートはありません</div>'),
+            expiryCount(a.byRole.sub) ? expiryCount(a.byRole.sub) + '件' : '')) +
+      (expiryCount(a.byRole.team) ? card('🟣 チーム担当の在留期限アラート',
+        '<div style="padding:8px;">' + expiryHtml(a.byRole.team) + '</div>', expiryCount(a.byRole.team) + '件') : '') +
+      card('🗓️ 在留期限 4か月以内（先の予定）',
+        (exp4Total ? exp4Html : '<div style="padding:18px;text-align:center;color:var(--gray-400);font-size:12px;">該当なし</div>'),
+        exp4Total ? exp4Total + '件' : '') +
+    '</div>';
+}
+
+// マイページ「✅ タスク・担当リスト」タブ: 未入力アラート・通算期間精査・タスク一覧・自分の担当リスト
+function renderMyTaskPanel() {
+  const box = document.getElementById('myTaskDash');
+  if (!box || !_myDashData) return;
+  const a = computeMyWorkerAlerts(_myDashData.workers);
+  const row = _myDashRow, section = _myDashSection, card = _myDashCard;
+
+  const unfilledHtml = b =>
+    section('📋','申請ステータス 未入力・要確認','#1d4ed8', b.applyCheck, i => row(i, '<span style="color:#1d4ed8;">' + esc(i.reason) + '</span>')) +
+    section('✍️','必須情報の未入力（在留情報）','#7c3aed', b.required, i => row(i, '<span style="color:#7c3aed;">未入力</span>'));
+  const unfilledCount = b => b.applyCheck.length + b.required.length;
+
+  // 自分の担当リスト（担当一覧と同じ基準・メイン/サブ/チームで分ける）
   const me = currentUser?.name || '';
   const splitNames = v => (v||'').split(/[,、]/).map(s=>s.trim()).filter(Boolean);
   const isMe = v => splitNames(v).some(n => _chatStaffMatchesMe(n));
@@ -7012,34 +7061,26 @@ function renderMyDashboard() {
           '<span style="font-size:10px;font-weight:700;flex-shrink:0;color:' + (over ? '#dc2626' : 'var(--gray-400)') + ';">' + (t.deadline ? esc(t.deadline) : '期限なし') + '</span></div>'; }).join('')
     : '<div style="padding:14px;text-align:center;color:var(--gray-400);font-size:12px;">自分あてのタスクはありません</div>';
 
-  const card = (title, inner, extra) =>
-    '<div style="background:white;border:1px solid var(--gray-200);border-radius:12px;box-shadow:var(--shadow);overflow:hidden;">' +
-      '<div style="padding:10px 14px;border-bottom:1px solid var(--gray-200);font-size:13px;font-weight:800;color:var(--navy);display:flex;align-items:center;gap:6px;">' + title +
-        (extra ? '<span style="margin-left:auto;font-size:11px;font-weight:700;color:var(--gray-400);">' + extra + '</span>' : '') + '</div>' +
-      '<div style="max-height:420px;overflow-y:auto;">' + inner + '</div></div>';
-
   box.innerHTML =
     '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;">' +
-      '<div style="font-size:15px;font-weight:800;color:var(--navy);">📊 ' + esc(me) + ' さんのダッシュボード</div>' +
+      '<div style="font-size:15px;font-weight:800;color:var(--navy);">✅ ' + esc(me) + ' さんのタスク・担当リスト</div>' +
       '<button class="btn btn-outline" style="font-size:11px;padding:3px 10px;margin-left:auto;" onclick="loadMyDashboard()">🔄 更新</button>' +
     '</div>' +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px;align-items:start;">' +
-      // メイン担当・サブ担当・チーム担当はそれぞれ別カード（優先度の高いものだけ）
-      card('🔵 メイン担当のアラート',
-        (urgentCount(a.byRole.main) ? '<div style="padding:8px;">' + urgentHtml(a.byRole.main) + '</div>'
-          : '<div style="padding:18px;text-align:center;color:#16a34a;font-size:12px;">✅ 対応が必要なアラートはありません</div>'),
-        urgentCount(a.byRole.main) ? urgentCount(a.byRole.main) + '件' : '') +
+      // メイン担当・サブ担当・チーム担当の未入力アラートはそれぞれ別カード
+      card('🔵 メイン担当の未入力アラート',
+        (unfilledCount(a.byRole.main) ? '<div style="padding:8px;">' + unfilledHtml(a.byRole.main) + '</div>'
+          : '<div style="padding:18px;text-align:center;color:#16a34a;font-size:12px;">✅ 未入力はありません</div>'),
+        unfilledCount(a.byRole.main) ? unfilledCount(a.byRole.main) + '件' : '') +
       (a.skipSub
-        ? card('⚪ サブ担当のアラート',
+        ? card('⚪ サブ担当の未入力アラート',
             '<div style="padding:18px;text-align:center;color:var(--gray-400);font-size:12px;">営業チームのため、サブ担当ぶんのアラートは表示していません</div>', '')
-        : card('⚪ サブ担当のアラート',
-            (urgentCount(a.byRole.sub) ? '<div style="padding:8px;">' + urgentHtml(a.byRole.sub) + '</div>'
-              : '<div style="padding:18px;text-align:center;color:#16a34a;font-size:12px;">✅ 対応が必要なアラートはありません</div>'),
-            urgentCount(a.byRole.sub) ? urgentCount(a.byRole.sub) + '件' : '')) +
-      (a.byRole.team.total ? card('🟣 チーム担当のアラート',
-        (urgentCount(a.byRole.team) ? '<div style="padding:8px;">' + urgentHtml(a.byRole.team) + '</div>'
-          : '<div style="padding:18px;text-align:center;color:#16a34a;font-size:12px;">✅ 対応が必要なアラートはありません</div>'),
-        urgentCount(a.byRole.team) ? urgentCount(a.byRole.team) + '件' : '') : '') +
+        : card('⚪ サブ担当の未入力アラート',
+            (unfilledCount(a.byRole.sub) ? '<div style="padding:8px;">' + unfilledHtml(a.byRole.sub) + '</div>'
+              : '<div style="padding:18px;text-align:center;color:#16a34a;font-size:12px;">✅ 未入力はありません</div>'),
+            unfilledCount(a.byRole.sub) ? unfilledCount(a.byRole.sub) + '件' : '')) +
+      (unfilledCount(a.byRole.team) ? card('🟣 チーム担当の未入力アラート',
+        '<div style="padding:8px;">' + unfilledHtml(a.byRole.team) + '</div>', unfilledCount(a.byRole.team) + '件') : '') +
       // 通算期間の精査状況（自分の担当ぶん・全員精査済みなら出さない）
       (() => {
         const hv = computeHistoryVerifyStats(a.mine);
@@ -7058,14 +7099,8 @@ function renderMyDashboard() {
               '<span style="font-size:11px;font-weight:700;color:#dc2626;flex-shrink:0;">未精査</span></div>').join(''),
           hv.todo + '件未精査');
       })() +
-      // 在留期限4か月以内は先の話なので独立したカードにまとめる
-      card('🗓️ 在留期限 4か月以内（先の予定）',
-        (exp4Total
-          ? exp4Html
-          : '<div style="padding:18px;text-align:center;color:var(--gray-400);font-size:12px;">該当なし</div>'),
-        exp4Total ? exp4Total + '件' : '') +
-      card('🏢 自分の担当リスト', coHtml, (coMain.length + coSub.length + coTeam.length) ? (coMain.length + coSub.length + coTeam.length) + '社' : '') +
       card('✅ タスク一覧', taskHtml, myTasks.length ? myTasks.length + '件' : '') +
+      card('🏢 自分の担当リスト', coHtml, (coMain.length + coSub.length + coTeam.length) ? (coMain.length + coSub.length + coTeam.length) + '社' : '') +
     '</div>';
 }
 
@@ -7398,12 +7433,12 @@ function renderMyCalendar() {
     '</div>';
 }
 
-// マイページ内のタブ切り替え（担当・タスク／支援カレンダー／自分のノート／アカウント設定）
-let _myPageTab = 'dash';
+// マイページ内のタブ切り替え（アラート／タスク・担当リスト／支援カレンダー／自分のノート／アカウント設定）
+let _myPageTab = 'alerts';
 function setMyPageTab(tab) {
   _myPageTab = tab;
   if (tab === 'sched') loadMyCalendar();
-  ['dash','sched','notes','account'].forEach(t => {
+  ['alerts','tasks','sched','notes','account'].forEach(t => {
     const p = document.getElementById('mpPanel_' + t);
     const b = document.getElementById('mpTab_' + t);
     if (p) p.style.display = (t === tab) ? '' : 'none';
@@ -7422,12 +7457,14 @@ function buildMyAccountScreen() {
   return `
   <div style="padding:8px 24px 0;">
     <div style="display:flex;gap:2px;border-bottom:1px solid var(--gray-200);margin-bottom:14px;flex-wrap:wrap;">
-      ${tabBtn('dash','📊 担当・タスク', _myPageTab==='dash')}
+      ${tabBtn('alerts','🔔 アラート', _myPageTab==='alerts')}
+      ${tabBtn('tasks','✅ タスク・担当リスト', _myPageTab==='tasks')}
       ${tabBtn('sched','📅 支援カレンダー', _myPageTab==='sched')}
       ${tabBtn('notes','📝 自分のノート', _myPageTab==='notes')}
       ${tabBtn('account','⚙️ アカウント設定', _myPageTab==='account')}
     </div>
-    <div id="mpPanel_dash" style="${_myPageTab==='dash'?'':'display:none;'}"><div id="myAnnouncementAlerts" style="display:none;margin-bottom:14px;"></div><div id="myDashboard"></div></div>
+    <div id="mpPanel_alerts" style="${_myPageTab==='alerts'?'':'display:none;'}"><div id="myAnnouncementAlerts" style="display:none;margin-bottom:14px;"></div><div id="myVisaAlerts"></div></div>
+    <div id="mpPanel_tasks" style="${_myPageTab==='tasks'?'':'display:none;'}"><div id="myTaskDash"></div></div>
     <div id="mpPanel_sched" style="${_myPageTab==='sched'?'':'display:none;'}"><div id="myCalendar"></div></div>
     <div id="mpPanel_notes" style="${_myPageTab==='notes'?'':'display:none;'}"><div id="myNotesSection"></div></div>
   </div>
