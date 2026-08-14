@@ -9062,9 +9062,11 @@ function _tokuteiSyncHidden(){
 function renderTokuteiRows(){
   const box = document.getElementById('wf_tokutei_rows');
   if (!box) return;
+  // 「初回」は必須。1行だけ選ぶ項目なので、どの行も選ばれていないときだけ全部を薄い赤にする
+  const noFirst = _tokuteiRows.length > 0 && !_tokuteiRows.some(x => x.first);
   box.innerHTML = _tokuteiRows.map((r,i) => `
     <div style="display:grid;grid-template-columns:46px minmax(88px,1fr) 64px 100px 112px 38px 20px;gap:4px;align-items:center;margin-bottom:5px;">
-      <label style="display:flex;align-items:center;justify-content:center;gap:3px;font-size:10px;cursor:pointer;background:${r.first?'#dbeafe':'#f8fafc'};border:1px solid ${r.first?'#93c5fd':'var(--gray-200)'};border-radius:5px;padding:5px 2px;" title="特定技能の初回（5年満了日の起点）">
+      <label style="display:flex;align-items:center;justify-content:center;gap:3px;font-size:10px;cursor:pointer;background:${r.first?'#dbeafe':(noFirst?'#fff5f5':'#f8fafc')};border:1px solid ${r.first?'#93c5fd':(noFirst?'#fecaca':'var(--gray-200)')};border-radius:5px;padding:5px 2px;" title="${noFirst?'初回の就労先を1つ選んでください（5年満了日の起点）':'特定技能の初回（5年満了日の起点）'}">
         <input type="checkbox" ${r.first?'checked':''} onchange="setTokuteiFirst(${i}, this.checked)" style="margin:0;cursor:pointer;">初回
       </label>
       <input class="form-input" value="${esc(r.company||'')}" placeholder="会社名（指定書に記載のもの）" oninput="updateTokuteiRow(${i},'company',this.value)" style="font-size:12px;">
@@ -24776,7 +24778,8 @@ function _doForceReloadNow() {
 const WHATS_NEW = [
   { version:'ver.20260814.133', date:'2026-08-14', notify:true, items:[
     '外国人材「📋 基本情報」の薄い赤色を、必須項目の未記入だけに出すようにしました',
-    '必須項目は基本情報タブの全項目です。「10. 通算期間と過去の就労先」の会社名・申請・在留資格・指定書発行日・期間も対象です（「初回」のチェックと「詳細」ボタンには色が付きません）',
+    '必須項目は基本情報タブの全項目です。「10. 通算期間と過去の就労先」の会社名・申請・在留資格・指定書発行日・期間も対象です',
+    '「初回」も必須です。就労先の行があるのにどれも初回に選ばれていないと、初回のボタンが全部薄い赤になります。どれか1つを選ぶと元に戻ります',
     '事前ガイダンス実施日・オリエンテーション実施日も必須項目に入りました',
     '入国：出迎え日（上陸日）は在職ステータスが「在職中」「在職中(一時帰国中)」のときだけ必須になります（「国内変更」にチェックが入っているときは対象外）',
     '出国：見送り日（出国日）は在職ステータスが「退職済(帰国)」のときだけ必須になります',
