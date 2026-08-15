@@ -86,6 +86,36 @@ UI変更やロジック変更のときは実際に描画して確かめる。
 
 ### チャット
 
+#### ルームの取得は2系統に分かれている（絶対に1本化しない）
+
+チャットは画面が2つあり、**取得も完全に別々**にしてある。片方が失敗しても
+もう片方が巻き添えで消えないようにするため。
+
+| 系統 | 出る画面 | 対象ルーム | embed |
+|---|---|---|---|
+| `general` | 💬 チャット | `worker_id` か `company_id` を持つ | `workers(...)` / `companies(...)` |
+| `job` | 💬 求人チャット | 上記以外（`job_src_row` / `candidate_id`） | `candidates(...)` |
+
+- 定義は **`CHAT_FETCH_GROUPS` の1箇所だけ**。取得する列を足す・変えるときはここを直す
+- `_fetchChatRooms(key)` が ①詳細つき → ②embedなし → ③絞り込みもembedも無しの最小
+  の順に読み直す。**どこかが失敗しても一覧が空になることはない**
+- 取得に失敗した系統は `_chatFetchDegraded` に入り、`_chatDegradedNotice()` が
+  一覧の上に⚠️の注意書きを出す（黙って壊れないように）
+- 2系統の結果は `_mergeChatRoomRows()` で `chatRooms` 1本にまとめる。
+  以降の処理（未読集計・絞り込み・表示）は今まで通り `chatRooms` を見る
+
+> ⚠️ **過去の事故**: ver.20260814.143 で `candidates(...)` に存在しない列名
+> （`jp_level`／正しくは `jp_language_level`）を書いたところ、chat_rooms の取得が
+> まるごと400エラーになり、**チャットが1件も出なくなった**。
+> `node --check` は列名の間違いを検出できないので、
+> **embed に列を足したら必ず Supabase MCP の `execute_sql` で
+> `information_schema.columns` を引いて実在を確かめること。**
+>
+> ```sql
+> select column_name from information_schema.columns
+> where table_name='candidates' and column_name in ('足したい列名');
+> ```
+
 - **メンション**: `chat_messages.mentions`（jsonb の名前配列）。`isMentionForMe()` が部分一致で判定し、
   一覧の @バッジ・「@メンション」絞り込み・ブラウザ通知に使われる。
   返信（↩インライン／🧵スレッド）は `_withReplyMention()` で相手の名前を mentions に自動追加する（自分宛は除外）
