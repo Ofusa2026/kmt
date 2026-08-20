@@ -172,6 +172,20 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   `toggleJpOrgPicker()` が区分の変更で連動させる（登録支援機関検索もこの配列に入っている）
 - 発注書の対象ステータスは `OFUSA_ORDER_STATUSES`（内定・決定）。増やすときはここだけ直す
 
+### 労働局指定項目（求人受理票）
+
+- 求人案件（`job_progress`）の必須項目。定義は **`JP_LABOR_FIELDS` の1箇所だけ**
+  （担当者連絡先電話番号／受付年月日／有効期間（終了日）／雇用期間）
+- ＊マークと薄赤（`field-empty`）は `updateJpEmptyMarks` / `initJpEmptyMarks` が付ける。
+  新規登録・詳細のどちらでも効く
+- **未記入でも保存できる**。`saveJobProgress` は confirm で知らせるだけ、
+  `saveJobProgressNew` は `JP_RECOMMENDED`（`JP_LABOR_FIELDS` を含む）で知らせる
+- アラートの算出元は **`missingJpLaborFields(r)` の1箇所だけ**。
+  求人・候補者アラートの「労働局指定項目（求人受理票）が未入力の求人案件」に出る
+- 求人オーダー票（`buildJobOrderSheet`）の **(9) 求人受理票** が同じ項目を印刷する。
+  (8) の下に入るので、以降は (10)確認事項／(11)よくある質問／(12)写真。
+  **番号を足すときは (9) の位置と以降の採番をまとめて直すこと**
+
 ### 求人ヒアリングフォーム
 
 - `#hearing` のリンクで**ログインなしで開ける**（`initLogin` の先頭で分岐）。外に渡せる
