@@ -321,7 +321,14 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   **既定はどちらも出す**＝ `false` がはっきり入っているときだけ隠す。
   チェック欄は `resumeFormFieldsHtml()` の中（ロゴはいちばん上の「🏢 履歴書の見た目」）
 - 履歴書のロゴはヘッダーの `<img class="logo-mark">` を `_kmtLogoSrc()` で流用する
-  （画像を二重に持たない。求人票の透かしと同じやり方）
+  （画像を二重に持たない。求人票の透かしと同じやり方）。
+  置き場所は `.resume-head`（左＝ロゴ／右＝日付）の1行
+- **印刷・PDF・Excel に出すページは `RESUME_PAGES` の1箇所**で定義する
+  （`main` / `docs`＝`.resume-doc-page` / `iv1`＝`.resume-iv1-page`）。
+  選択は `_resumePageSel`、出力時のふるい落としは `_resumeFilterPages()`。
+  **先頭に残ったページの改ページは外す**（白紙が1枚できるため）。
+  画面のプレビューは `_applyResumePageSel()` が display で隠す
+  （`previewResume()` は毎回描き直すので、最後に必ず呼ぶこと）
 
 #### 📎 人材資料保存（履歴書の2ページ目）
 
