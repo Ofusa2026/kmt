@@ -336,6 +336,20 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - ページを組み立てるのは `_resumeDocPageHtml()`。`buildResumeHTML` の最後に足すので、
   画面・印刷・PDF・Excel のどれにも同じものが出る
 
+#### 🗣️ 一次面接（履歴書の3ページ目）
+
+- 質問（項目名）は**全社共通のマスタ `interview_questions`**（`label` / `sort_order` / `is_active`）。
+  初回アクセス時に `INTERVIEW1_SEED` の14問を自動投入する
+- 回答は候補者ごとに `candidates.interview1`（jsonb）＝ `{ company_name, answers:{ 質問id: 回答 } }`
+- **回答は誰でも入れられるが、質問の書き替え・追加・削除は管理者だけ。**
+  判定は `isAdminUser()` / `requireAdmin()` の1箇所を使う（UIも管理者のときだけ出す）
+- **質問の削除は行を消さず `is_active=false`**（入力済みの回答を残すため）
+- ページは `_interview1PageHtml()`。左＝前半／右＝後半の2列で、番号は表示時に振る
+  （マスタの `label` に番号は入れない）
+- 候補者モーダルの【履歴書作成】タブのフッターは **「📄 履歴書を表示」だけ**。
+  印刷・PDF・Excel はその画面（`openResumePreview`）から出す。
+  出力の向き先は `_resumeExportHtml()` が決める（表示中のモーダル → 画面のプレビュー → 入力値から組み立て）
+
 ### 📝 フリーノート（求人案件・候補者で共通）
 
 - 接続先は **`NOTE_SCOPES` の1箇所だけ**（`job` → `job_notes` / `candidate` → `candidate_notes`）。
