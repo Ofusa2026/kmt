@@ -243,11 +243,25 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   `linkStale`（`JOB_LINK_STALE_DAYS`=30日以上 未回答）。
   「✅ 確認済みにする」で `seen_at` が入り、アラートから消える
 
-### 労働局指定項目（求人受理票）
+### 労働局指定項目・求人管理簿
 
-- 入力欄は「📄 求人票＋よくある質問」タブの (9) 求人受理票。実体は `JOB_SHEET_GROUPS` の
-  `req:true` が付いた項目で、`JP_LABOR_FIELDS` はそこから作る（定義は1箇所）
-- **未記入でも保存できる**。`saveJobSheet` が confirm で知らせるだけ
+- 定義は **`JP_LABOR_INFO_FIELDS`（情報タブぶん）＋ `JOB_SHEET_GROUPS` の `req:true`（求人票タブぶん）**。
+  この2つを合わせたものが `JP_LABOR_FIELDS`。項目を足すときはどちらか片方だけを直す
+- 欄の下の赤い注記は `_laborNote()`。**＊マークと注記はセットで付ける**
+- **未記入でも保存できる**。`saveJobProgress` / `saveJobSheet` が confirm で知らせるだけ
+- アラートは `missingJpLaborFields(r)` の1箇所。候補者リストが空の案件は
+  「求職者（候補者リスト）」も未入力として数える（`allCjpLinks` を見るので、
+  `loadJobProgress` で必ず取っておくこと）
+
+#### 労働局 求人管理簿（`_jpView === 'ledger'`）
+
+- 求人管理の右上「表示」で `KMT管理リスト` ⇄ `労働局 求人管理簿` を切り替える（`setJobView`）
+- 様式そのままの並び（①〜⑪＋備考）。**列順は様式なので勝手に変えない**
+- ⑪ 職業紹介の取扱状況は `candidate_job_progress` から作る（`_ledgerCandRows`）。
+  候補者が複数いれば行が分かれ、左側は rowspan でまとめる
+- 日付は令和表記（`_ledgerYmd`）、賃金は `_ledgerWage`。未記入は赤字の「未記入」
+- 印刷（A4横）と Excel出力あり（`printJobLedger` / `exportJobLedgerExcel`）。
+  **いま絞り込んでいる行だけ**を出す
 - アラートの算出元は **`missingJpLaborFields(r)` の1箇所だけ**。
   求人・候補者アラートの「労働局指定項目（求人受理票）が未入力の求人案件」に出る
 - 求人票の表示は `openJobSheetPreview(srcRow)`（求人票タブのフッター「📄 求人票を表示」）。
