@@ -356,6 +356,13 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - `companies.industries`（jsonb）が業種の配列。旧 `industry`（単一）との互換は
   `getCompanyIndustries()` が吸収する。選択肢マスタは `industry_options` テーブル（全社共有）
 - 申請記録は Googleシート直読み（gviz CSV）＋編集値を `apply_record_edits` に upsert
+- 履歴書の保有資格は `candidates.licenses`（jsonb）。いまの形は
+  `{ items:[{name, has}], other:'…' }` で、**項目名も候補者ごとに変えられる**（最大 `RESUME_LIC_MAX`=10・2列）。
+  旧データ（`{career_up_card:true,…}` の決め打ち6項目）との互換は **`_licItems()` の1箇所**が吸収する。
+  入力欄は `renderResumeLicInputs` / `addResumeLic` / `removeResumeLic` / `updateResumeLic`。
+  **入力中に一覧を作り直さない**（`updateResumeLic` は値だけ更新してプレビューを描き直す。
+  作り直すとフォーカスが飛んで文字が打てなくなる）。
+  **名前が空の項目も消さずに残す**（履歴書に空の枠として出て、手書きで足せるようにするため）
 - 他画面から人材チャットへ飛ぶときは `_pendingChatRoomId` に入れて `showScreen('chat')`。
   チャット画面の初期化完了後に自動で `openChatRoom()` される
   （`showScreen` → `openChatRoom` を直接続けて呼ぶと初期化に上書きされるので注意）
