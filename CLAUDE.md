@@ -356,6 +356,11 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   `loadNotes(scope)` / `renderNotes(scope)` / `addNote(scope)` / `saveNote(scope,id)` / `deleteNote(scope,id)`
 - `loadJobNotes()` などの旧い名前は `'job'` を渡すだけの包みとして残してある
 - 書式ツール（`jnExec` / `jnInsertTable` / `markJobNoteDirty`）はノートidで動くので scope 不要
+- **添付ファイル**: `job_notes.attachments` / `candidate_notes.attachments`（jsonb の
+  `[{url,name,size,mimeType,at,by}]`）。実体はチャットの添付と同じ Drive フォルダー
+  （`CHAT_DRIVE_URL_DEFAULT`／設定の `kmt_chat_only_drive_url`）に GAS 経由で入れる。
+  表示は**リンクだけ**（`_noteAttachHtml`）。追加・削除したら `saveNote` まで自動で走らせる
+  （アップロードしたのに保存し忘れる事故を防ぐため）
 
 ### 求人ヒアリングフォーム
 
