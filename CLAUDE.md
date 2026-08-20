@@ -138,8 +138,15 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - 接続先は `OFUSA_SB_URL` / `OFUSA_SB_KEY`（大房の公開ページに埋まっているのと同じ publishable キー）。
   `OFUSA_AGENCY_NAME` は大房の `agency_master` に登録されている KMT の機関名
 - **書き込むテーブルは `intake_requests` だけ。** 大房の他のテーブルには触らない
-- 行を作るのは **`ofusaIntakeRow(f)` の1箇所だけ**。決定報告（③）も内定後の発注書（④）もここを通す。
+- 行を作るのは **`ofusaIntakeRow(f)` の1箇所だけ**。決定報告も内定後の発注書もここを通す。
   列の一覧は `OFUSA_INTAKE_MAP` に日本語の対応表がある
+- **送信できるのは決定報告の「他社支援（紹介）」と「企業単独（人材紹介）」だけ。**
+  KMT案件は既存の「スプレッドシートに送信」の経路があるので、大房への直接送信は付けていない
+  （重複対策は未設定。KMT案件も直送に寄せるときはここを見直す）
+- 2つのフォームの追加項目は `ofusaSendSectionHtml(prefix, opt)` / `ofusaSectionValues(prefix)` で共通化。
+  行の組み立ては `buildOfusaRowsFromOther()` / `buildOfusaRowsFromSolo()`
+- 他社支援は人材名が複数行のことがあるので、**1名につき1行**を作って配列でINSERTする（大房は1案件＝1名）
+- `delivery_method` は画面で選んだ交付方法をそのまま渡す。認定を電子交付に倒すのは大房側が案件登録時にやる
 
 > ⚠️ **`ofusaIntakeRow` に列を足すときは、必ず大房DBの `information_schema.columns` で実在を確かめること。**
 > 存在しない列が1つ混ざるだけで INSERT がまるごと400で落ちる（chat_rooms のときと同じ事故になる）。
@@ -154,7 +161,6 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 
 | 送信元 | 記録先 |
 |---|---|
-| 決定報告 | `workers.ofusa_intake_id` / `ofusa_sent_at` |
 | 発注書（内定後） | `candidate_job_progress.ofusa_intake_id` / `ofusa_sent_at` |
 | 求人案件 | `job_progress.ofusa_intake_id` / `ofusa_sent_at` / `ofusa_flag` |
 
