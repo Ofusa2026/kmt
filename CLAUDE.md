@@ -252,6 +252,9 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - 定義は **`JP_LABOR_INFO_FIELDS`（情報タブぶん）＋ `JOB_SHEET_GROUPS` の `req:true`（求人票タブぶん）**。
   この2つを合わせたものが `JP_LABOR_FIELDS`。項目を足すときはどちらか片方だけを直す
 - 欄の下の赤い注記は `_laborNote()`。**＊マークと注記はセットで付ける**
+- 未記入の欄が薄赤（`.field-empty`）になるのは `JP_MARK_FIELDS()` に入っているものだけ。
+  情報タブ・求人票タブの両方の労働局指定項目を見るので、**`req:true` を付ければ薄赤も付いてくる**
+  （求人票タブは `switchJpTab('sheet')` の中で `initJpEmptyMarks()` を呼んで反映している）
 - **未記入でも保存できる**。`saveJobProgress` / `saveJobSheet` が confirm で知らせるだけ
 - アラートは `missingJpLaborFields(r)` の1箇所。候補者リストが空の案件は
   「求職者（候補者リスト）」も未入力として数える（`allCjpLinks` を見るので、
