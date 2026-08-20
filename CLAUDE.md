@@ -189,6 +189,20 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   - 行の分割は3段階（全角コロン等 → 半角コロン（ラベルに空白なし）→ 空白区切り）。
     「始業 8:00」の時刻と区切りのコロンを取り違えないための順番なので、崩さないこと
 
+### 求人票の写真（作業場・寮等）
+
+- 実体は `job_progress.photos`（`[{url,name,at,by}]`）。実ファイルは
+  **GAS経由で Google Drive の共有フォルダ**に入れる（チャットの添付と同じ経路）。
+  置き場は `JOB_PHOTO_DRIVE_URL` の1箇所だけ
+- 最大 `JOB_PHOTO_MAX`(8) 枚。求人票では `JOB_PHOTO_PER_PAGE`(4) 枚ずつ並べるので**写真ページは最大2ページ**
+- 貼る欄は `jobPhotoBoxHtml()` / `renderJobPhotos()` / `addJobPhotoFiles()`。
+  **社内の求人票タブと外部の記入フォームで同じ部品を使う**（`_jobPhotos` が共用の入れ物）
+- 求人票のページは `_jobPhotoPagesHtml(photos)` が作り、`buildJobOrderSheet` の
+  page1 + page2 の後ろに足す。**ページ1に (11)(12) の空欄は置かない**
+  （よくある質問はページ2の一覧、写真は3ページ目以降の専用ページ）
+- (10) 確認事項・追加事項は `job_progress.order_memo`。未記入なら
+  `_jpToFlyerJob` が `progress_note`（案件担当のコメント）にフォールバックする
+
 ### 求人票の外部記入リンク
 
 企業（先方）に求人票の項目を直接書いてもらう仕組み。
