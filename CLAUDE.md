@@ -298,6 +298,34 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   (8) の下に入るので、以降は (10)確認事項／(11)よくある質問／(12)写真。
   **番号を足すときは (9) の位置と以降の採番をまとめて直すこと**
 
+### 候補者モーダル（2タブ）と履歴書
+
+| タブ | 中身 | 保存 |
+|---|---|---|
+| 📋 候補者情報 | これまでの項目（労働局指定項目・基本情報・希望条件・求人への紐付け） | `saveCandidate` |
+| 📝 履歴書作成 | メモ（`candidate_notes`）→ 履歴書の項目 → 印刷／PDF／Excel | `saveResume` |
+
+- **どちらのタブも同じ `candidates` の行を見る。** 同じ列の欄（`cf_xxx` と `rf_xxx`）は
+  タブを移るときに `_syncCandidateResumeFields()` が写すので、どちらから直しても食い違わない
+  （選択肢の並びが違う select は、同じ選択肢があるときだけ写す）
+- 2つのタブは**両方DOMに置いたまま** `display` で切り替える（写すために両方必要）
+- 履歴書の入力項目は **`resumeFormFieldsHtml()` の1箇所**。
+  履歴書作成の画面（`buildResumeScreen`）とこのタブで共用する。idは必ず `rf_` 始まり
+- **履歴書作成の画面を開いている間は、このタブは案内文だけにする**（`rf_*` のidが二重になるため）
+- 新規候補者（未保存）のときも案内文だけ。メモも履歴書も保存後から
+- 出力は `_resumeExportHtml()` が元になる。画面ではプレビューをそのまま、
+  モーダルでは入力中の値から `buildResumeHTML()` で組み立てる（モーダルにプレビュー欄が無いため）。
+  PDFはブラウザの印刷ダイアログ任せ（求人票と同じ）
+- 履歴書に「出す／出さない」を選べる項目は `candidates.resume_opts`（jsonb）。
+  いまは靴サイズだけ（`_resumeShowShoe()`）。**既定は出す**＝ `false` が入っているときだけ隠す
+
+### 📝 フリーノート（求人案件・候補者で共通）
+
+- 接続先は **`NOTE_SCOPES` の1箇所だけ**（`job` → `job_notes` / `candidate` → `candidate_notes`）。
+  `loadNotes(scope)` / `renderNotes(scope)` / `addNote(scope)` / `saveNote(scope,id)` / `deleteNote(scope,id)`
+- `loadJobNotes()` などの旧い名前は `'job'` を渡すだけの包みとして残してある
+- 書式ツール（`jnExec` / `jnInsertTable` / `markJobNoteDirty`）はノートidで動くので scope 不要
+
 ### 求人ヒアリングフォーム
 
 - `#hearing` のリンクで**ログインなしで開ける**（`initLogin` の先頭で分岐）。外に渡せる
