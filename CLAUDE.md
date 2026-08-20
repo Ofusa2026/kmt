@@ -323,6 +323,19 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - 履歴書のロゴはヘッダーの `<img class="logo-mark">` を `_kmtLogoSrc()` で流用する
   （画像を二重に持たない。求人票の透かしと同じやり方）
 
+#### 📎 人材資料保存（履歴書の2ページ目）
+
+- 在留カード・資格証などの写真を貼る台紙。**枠の定義は `RESUME_DOC_SLOTS` ＋ `RESUME_DOC_OTHER` の1箇所だけ**
+- 実体は `candidates.resume_docs`（jsonb）＝ `{ キー: [{url,name,at,by}] }`。
+  読み替えは **`_resumeDocList()` の1箇所**（配列でない古い形・多すぎる分の切り捨てもここ）
+- 枠は様式どおり。上＝在留カード（表/裏）、真ん中＝評価調書／技能試験、下＝その他。
+  上と真ん中は1枠 `RESUME_DOC_SLOT_MAX`(4) 枚まで（在留カードは更新のたびに増えるため）、
+  その他は `RESUME_DOC_OTHER_MAX`(6) 枠。**写真が無い枠も空の枠のまま出す**（あとから貼れるように）
+- 実ファイルは求人票の写真と同じ GAS → Google Drive。置き場は `_resumeDocDriveUrl()` の1箇所
+  （`JOB_PHOTO_DRIVE_URL` はこの下で定義されるので、const ではなく関数にしてある）
+- ページを組み立てるのは `_resumeDocPageHtml()`。`buildResumeHTML` の最後に足すので、
+  画面・印刷・PDF・Excel のどれにも同じものが出る
+
 ### 📝 フリーノート（求人案件・候補者で共通）
 
 - 接続先は **`NOTE_SCOPES` の1箇所だけ**（`job` → `job_notes` / `candidate` → `candidate_notes`）。
