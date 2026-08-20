@@ -127,6 +127,52 @@ UI変更やロジック変更のときは実際に描画して確かめる。
   それ以外はファイルリンク。表示に失敗したら `_chatImgFallback()` がリンクに戻す
 - 入力欄での画像貼り付けは `initChatPasteImage()`（document の paste を拾って `addChatFiles()` に渡す）
 
+### 大房行政書士法人 案件システムとの連携
+
+KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕組み。
+
+- 大房は**別のSupabaseプロジェクト**（`ehwlgbwpycglmopiqyty`）。受信トレイの実体は
+  **`intake_requests` テーブル**で、`status='pending'` が未確認として並ぶ
+- 従来は KMT → 依頼スプレッドシート → 大房のGAS巡回 → `intake_requests` だったので反映が遅かった。
+  いまは `ofusaFetch()` で同じ行を直接 INSERT している（スプレッドシート送信も従来どおり残してある）
+- 接続先は `OFUSA_SB_URL` / `OFUSA_SB_KEY`（大房の公開ページに埋まっているのと同じ publishable キー）。
+  `OFUSA_AGENCY_NAME` は大房の `agency_master` に登録されている KMT の機関名
+- **書き込むテーブルは `intake_requests` だけ。** 大房の他のテーブルには触らない
+- 行を作るのは **`ofusaIntakeRow(f)` の1箇所だけ**。決定報告（③）も内定後の発注書（④）もここを通す。
+  列の一覧は `OFUSA_INTAKE_MAP` に日本語の対応表がある
+
+> ⚠️ **`ofusaIntakeRow` に列を足すときは、必ず大房DBの `information_schema.columns` で実在を確かめること。**
+> 存在しない列が1つ混ざるだけで INSERT がまるごと400で落ちる（chat_rooms のときと同じ事故になる）。
+>
+> ```sql
+> -- project_id は ehwlgbwpycglmopiqyty
+> select column_name from information_schema.columns
+> where table_name='intake_requests' and column_name in ('足したい列名');
+> ```
+
+送信済みの記録は3か所に残す（どれも二重送信のチェックと「送信済」表示に使う）:
+
+| 送信元 | 記録先 |
+|---|---|
+| 決定報告 | `workers.ofusa_intake_id` / `ofusa_sent_at` |
+| 発注書（内定後） | `candidate_job_progress.ofusa_intake_id` / `ofusa_sent_at` |
+| 求人案件 | `job_progress.ofusa_intake_id` / `ofusa_sent_at` / `ofusa_flag` |
+
+- **「大房関係」の判定は `isOfusaJob(r)` の1箇所だけ。** 会社名の文字列一致では絶対に判定しない
+  （大房側の実データに `株式会社KMT` / `株式会社ＫＭＴ` / `KMT(82)` のような表記ゆれがある）。
+  `ofusa_flag` が唯一の正で、発注書を送った案件は自動で立つ
+- 発注書の対象ステータスは `OFUSA_ORDER_STATUSES`（内定・決定）。増やすときはここだけ直す
+
+### 求人ヒアリングフォーム
+
+- `#hearing` のリンクで**ログインなしで開ける**（`initLogin` の先頭で分岐）。外に渡せる
+- 送ると `job_progress` に `progress='詳細確認中'` / `source='hearing'` で登録される。
+  **別テーブルを作らない**（＝「直でKMTシステムに反映」がそのまま成立する）
+- 精査もれは求人・候補者アラートの「ヒアリングフォームから届いた未精査の案件」に出る
+- **LINEグループはKMT側では作れない**（LINE基盤は大房側にしかない）。
+  `requestJobLineGroup()` が求人チャットに作成依頼を投稿し、作った人が
+  求人案件の `line_group_name` に書き戻す運用。募集中なのに空の案件はアラートに出る
+
 ### 外国人材アラート（サイドバーと画面上部バナー）
 
 **`computeGlobalWorkerAlerts(list)` が唯一の算出元。判定ロジックをここ以外に書かない。**
