@@ -259,6 +259,9 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - 様式そのままの並び（①〜⑪＋備考）。**列順は様式なので勝手に変えない**
 - ⑪ 職業紹介の取扱状況は `candidate_job_progress` から作る（`_ledgerCandRows`）。
   候補者が複数いれば行が分かれ、左側は rowspan でまとめる
+- **③ 連絡担当者は `client_contact_name`（企業側の担当者）。**
+  所属機関の `main_staff`（社内のメイン担当）ではないので、そこから取らないこと
+- 各行の「✏️ 編集」で `openJobProgressDetail(src_row)` を開き、その場で直せる
 - 日付は令和表記（`_ledgerYmd`）、賃金は `_ledgerWage`。未記入は赤字の「未記入」
 - 印刷（A4横）と Excel出力あり（`printJobLedger` / `exportJobLedgerExcel`）。
   **いま絞り込んでいる行だけ**を出す
