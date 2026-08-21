@@ -116,6 +116,11 @@ UI変更やロジック変更のときは実際に描画して確かめる。
 > where table_name='candidates' and column_name in ('足したい列名');
 > ```
 
+- **KMTドライブのリンク**: そのチャットの「元の欄」に書き戻す。人材＝`workers.drive_url_kmt`／
+  求人＝`job_progress.drive_url_kmt`（求人進捗 情報タブ）／候補者＝`candidates.drive_url_kmt`（候補者情報タブ）。
+  **どこに書くかは `_chatDriveTarget()` の1箇所だけ。** こうしておくと、画面の欄とチャットの
+  「📁 KMT」ボタンが必ず同じものを指す（片方だけズレない）。
+  大房側ドライブは人材チャット・企業チャットだけ（求人・候補者はKMT側のみ）
 - **メンション**: `chat_messages.mentions`（jsonb の名前配列）。`isMentionForMe()` が部分一致で判定し、
   一覧の @バッジ・「@メンション」絞り込み・ブラウザ通知に使われる。
   返信（↩インライン／🧵スレッド）は `_withReplyMention()` で相手の名前を mentions に自動追加する（自分宛は除外）
