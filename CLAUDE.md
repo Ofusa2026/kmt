@@ -312,6 +312,12 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - 未記入は薄赤（`updateCandEmptyMarks` / `initCandEmptyMarks`）。
   **未記入でも保存できる**＝ `saveCandidate` は confirm で知らせるだけ（止めない）
 - ステータスは空（`－（未設定）`）にもできる。新規登録のときだけ `新規登録` を初期選択する
+- **現在地（`domestic_overseas`）で日本住所の必須が変わる。** 選択肢は `CAND_LOCATIONS` の1箇所
+  （日本国内／海外。古い `国内` `国外` は `_candLocationNorm()` が読み替える）
+  - 日本国内 → 本国住所＋日本住所（在留者）の両方が必須
+  - 海外 → 本国住所だけ必須。「いまいる国」（`overseas_country`）の欄が出る
+  - 連動は `onCandLocationChange()` の1箇所（国の欄の出し入れ・日本住所の＊と注記・薄赤）。
+    必須の判定は `CAND_LABOR_FIELDS` の `when` に書く
 
 ### 候補者のステータス
 
