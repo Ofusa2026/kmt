@@ -489,6 +489,9 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   凡例を押すと `setScheduleTypeFilter()` でその種別だけに絞れ、
   下に `renderScheduleTypeList()` が「その種別の人材・企業」の一覧を出す（行を押すとその予定が開く）
 - マイページの支援カレンダーも同じ数え方だが、**自分がメイン／サブ担当のぶんだけ**
+- 「📍 今日」（`schedCalThis`）は期間を今日に戻すだけでなく、`_schedScrollToToday()` が
+  **今日の列（月表示は `.sched-today-cell`）まで横スクロールして光らせる**。
+  すでに今日の週を見ていると押しても変化が無く「効いていない」ように見えるため、合図は必ず出す
 - **サイドバーの赤いバッジは出さない**（何の件数か分かりにくかったため。
   `updateSupportScheduleBadge` / `refreshSupportScheduleBadge` は空の関数として残してある）
 
