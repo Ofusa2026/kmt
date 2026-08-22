@@ -669,6 +669,13 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   登録支援機関は `job_progress.org_code` → `allIntroRegOrgs` で名前を引く（名前の列は無い）
 - **選択肢の全角／半角の数字違いは同じものとして扱う**（`_drMatchOption()`）。
   候補者は「技能実習２号」、決定報告は「技能実習2号」で表記がそろっていないため
+- **決定報告の行き先は `_drProceed()` の1箇所**（①KMT案件／②紹介案件の並びは `DR_ROUTES`）。
+  内定の案内ダイアログからも、候補者のステータス欄に残るボタンからも同じものを通す
+- **「あとで」を押しても、①②のボタンは候補者情報タブのステータスの下に残る**
+  （`_cndRenderDrPanel()`。ステータスが内定のあいだはずっと出る）。
+  ボタンの隣の（済）は `candidates.dr_done`（jsonb `{kmt:{done,at,by}, intro:{...}}`）に
+  **押したその場で** `setDrDone()` が書く（モーダルの保存は要らない）。
+  軽いSELECTで開いたときは `dr_done` が無いので、その1行だけ取り直してから描き直す
 - ステータスが**内定になった瞬間**に `offerDecisionReport()` が案内を出す
   （①KMT案件の決定報告へ ②（紹）決定者リストに入れてから紹介案件の決定報告へ）。
   入口は `onCandidateStatusChange` / `cjSetLinkStatus` / `jpUpdateLinkStatus` の3つで、
