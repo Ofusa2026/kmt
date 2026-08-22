@@ -731,3 +731,19 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   ログイン中のユーザー名から「`【テスト】<名前>用`」（接頭辞は `TEST_CAND_PREFIX`）を探して
   `openCandidateModal()` を開く。見つからなければ候補者一覧を開いて「【テスト】」で検索した状態にする
 - アナウンス詳細（`#annDetailModal`）は生DOMなので、閉じるのは `remove()`（`closeGenModal` ではない）
+
+### 📘 登録支援機関業務の記録簿 ← 人材情報の反映
+
+- 様式の定義は **`REG_FORM_DEFS` の1箇所**（項目の一覧は `REG_SUPPORT_TASKS`）
+- **人材情報にすでにある内容をそのまま出す欄は、フィールド定義の `from` の1箇所だけ**
+  （`from` ＝ `workers` の列名／`fromL` ＝ 人材情報での欄の名前。注記に出す）。
+  例：出入国送迎記録簿（no.5）は `entry_date` / `entry_pickup_staff` /
+  `departure_date` / `departure_staff` の4つ
+- `from` を書くと3つが同時に付いてくる
+  1. 記入フォームで人材を選んだとき自動で入る（`_regApplyWorkerFill()`。
+     **すでに入っている欄は上書きしない**。［📥 人材情報から取り込む］＝`regFillFromWorker()` のときだけ入れ直す）
+  2. 一覧の**未記入の行にもその値が出る**（緑文字＋「人材情報あり」の印）
+  3. 画面上の［📥 人材情報から一括反映］（`regBulkFillFromWorkers()`）でまとめて記録を作れる。
+     **すでにある記録には触らない**／いま絞り込んでいる範囲だけが対象
+- 一覧・フォームで読む人材の列は **`REG_WORKER_SELECT_COLS`**（`from` の列を自動で含める）。
+  1つでも欠けていたら `loadRegTaskRecords()` が取り直すので、`from` を足すだけでよい
