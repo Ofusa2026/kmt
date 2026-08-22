@@ -439,7 +439,8 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - カレンダーの上の凡例は `renderScheduleLegend()`。**表示中の期間（週／月）の件数を種別ごとに出す**。
   数え方は `_schedPassCommon()`（企業・人材・担当・フリーワード）＋ `_schedInRange()` で、
   **種別の絞り込みだけは外して数える**（何件あるか分からなくなるため）。
-  凡例を押すと `setScheduleTypeFilter()` でその種別だけに絞れる
+  凡例を押すと `setScheduleTypeFilter()` でその種別だけに絞れ、
+  下に `renderScheduleTypeList()` が「その種別の人材・企業」の一覧を出す（行を押すとその予定が開く）
 - マイページの支援カレンダーも同じ数え方だが、**自分がメイン／サブ担当のぶんだけ**
 - **サイドバーの赤いバッジは出さない**（何の件数か分かりにくかったため。
   `updateSupportScheduleBadge` / `refreshSupportScheduleBadge` は空の関数として残してある）
