@@ -354,6 +354,10 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   - 履歴書作成＝`resumeFormFieldsHtml({external:true})`（1・2ページ目）。
     **社内用の欄は `ext` で出さない**＝ 履歴書の見た目（KMTロゴ・靴サイズの「履歴書に出す」）／
     🗣️ 一次面接／📝 担当者記入欄（担当者の感想・企業面接メモ）
+  - **ご記入者と氏名は別物**なので、それぞれ下に説明を出す。
+    ご本人が書いているときは「記入者名と同じ」（`rfNameSameAsBy`）にチェックすると
+    `cndFormBy` の値が `rf_name` に入り、チェック中は氏名を直接いじれない
+    （`onCandFormNameSame` / `onCandFormByInput` / `_cndFormCopyBy` の1組）
   - **職歴は空の1欄目を最初から出す**（`_ensureOneWorkHistoryRow()`）。
     2件目からは本人が［＋ 追加］で増やす。**何も書かれなかった行は送信時に落とす**
     （社内側は今までどおり0欄から。増やすのは外部フォームだけ）
@@ -410,6 +414,11 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   メモ `memo` ↔ 企業面接メモ `interview_memo` ／
   評価コメント `jp_eval_note` ↔ 本人からの質問 `candidate_questions`
 - **外部フォームにも出さない**（本人には関係がないため）
+- **証明写真（顔写真）は `resumePhotoBoxHtml()` / `addResumePhotoFile()` の1箇所**。
+  URLを貼るのではなく、その場でファイルを選ぶ。実体は人材資料と同じ GAS → Google Drive
+  （置き場は `_resumeDocDriveUrl()`）。値は今までどおり `candidates.photo_url`＝隠しの `rf_photo_url` に入るので、
+  保存・読み込みは触らなくてよい。**履歴書に出すときは必ず `driveImageUrl()` を通す**
+  （Driveの共有URLはそのままでは画像として表示できない）
 - 履歴書の入力項目は **`resumeFormFieldsHtml()` の1箇所**。
   履歴書作成の画面（`buildResumeScreen`）とこのタブで共用する。idは必ず `rf_` 始まり
 - **履歴書作成の画面を開いている間は、このタブは案内文だけにする**（`rf_*` のidが二重になるため）
