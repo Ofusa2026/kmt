@@ -464,6 +464,13 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - 在職ステータスが **辞退/キャンセル** と **支援機関変更済み** の人材は全アラートの対象外。判定は `isAlertExcludedWorker(w)` の1箇所だけ
   （`computeGlobalWorkerAlerts` / `computeMyWorkerAlerts` / 期限カードの一覧 から呼んでいる）。
   表記ゆれを拾うため「辞退」「キャンセル」の部分一致で見ている
+- 🧾 通算期間の精査状況は `computeHistoryVerifyStats()` が算出元（`done` / `todo` の件数と両方の一覧）。
+  外国人材ページは数字を押すとその一覧、マイページは `setMyHvTab()` で切り替える。
+  **全員精査済みでも表示は残す**（精査済みの一覧を見られるようにするため）
+- ⚠️【要確認】通算期間不明（`workers.history_unknown`）は `isHistoryUnknown(w)` の1箇所で判定し、
+  一覧の「5年満了日」に `historyUnknownBadge()` を出す（人材一覧・更新状況リストの2か所）。
+  アラート欄にも一覧が出る（`toggleHistoryUnknownList`）。
+  **軽いSELECTでも読めるよう `WORKER_ALERT_SELECT_COLS` に列を入れてある**
 - 必須項目の未入力アラートは `missingRequiredFields(w)` が唯一の算出元（パスポート期限・出入国の情報）。
   パスポート期限の必須判定は `isPassportExpiryRequired(w)`（申請種別が「認定」以外で必須）
 - **判定条件を変えるときは `computeGlobalWorkerAlerts` だけを直せばよい**
