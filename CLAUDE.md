@@ -654,3 +654,24 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   （`renderWorkHistoryInputs` などの末尾から呼んでいる）
 - 選んだ言語は `localStorage`（`kmt_extform_lang`）に覚える
 - 紺色の見出しと青いボタンの中だけ、訳の色をCSSで白系にしている（青のままだと読めない）
+
+### 👤 候補者 → 決定報告
+
+- 決定報告の3フォーム（KMT案件／他社支援／企業単独）に「👤 候補者から自動入力」を出す。
+  **出る候補者は `DR_CAND_PICK_STATUSES`（結果待ち・内定）だけ**
+- **どの欄に何を入れるかは `DR_CAND_FILL` の1箇所だけ**（フォームが増えたらここに足す）。
+  すでに値が入っている欄は上書きしない（氏名だけは必ず入れる）
+- 企業名・分野・登録支援機関は、その候補者に紐付いた求人案件（`_drJobOfCandidate()`）から取る。
+  登録支援機関は `job_progress.org_code` → `allIntroRegOrgs` で名前を引く（名前の列は無い）
+- **選択肢の全角／半角の数字違いは同じものとして扱う**（`_drMatchOption()`）。
+  候補者は「技能実習２号」、決定報告は「技能実習2号」で表記がそろっていないため
+- ステータスが**内定になった瞬間**に `offerDecisionReport()` が案内を出す
+  （①KMT案件の決定報告へ ②（紹）決定者リストに入れてから紹介案件の決定報告へ）。
+  入口は `onCandidateStatusChange` / `cjSetLinkStatus` / `jpUpdateLinkStatus` の3つで、
+  判定は `_maybeOfferDecisionReport()`（前の値が内定なら出さない）
+- （紹）決定者リストには「📋 決定報告に進む」がある。**保存だけ押されたときは
+  `saveIntroDecision` が1回たずねる**（進む／進まない）。進む先は他社支援か企業単独を選ぶ
+- 画面を移ってから流し込むので、`goDecisionReport(type, candId)` が `_drPendingType/_drPendingCand`
+  に入れ、`loadDecisionReport()` の最後で `pickDrCandidate()` する
+- 2〜3択のダイアログは **`askChoice()` の1箇所**（Promiseで押したキーが返る）。
+  ほかのモーダルの上に出すため `#choiceModal` だけ z-index を上げてある
