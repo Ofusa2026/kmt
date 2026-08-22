@@ -675,3 +675,21 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   に入れ、`loadDecisionReport()` の最後で `pickDrCandidate()` する
 - 2〜3択のダイアログは **`askChoice()` の1箇所**（Promiseで押したキーが返る）。
   ほかのモーダルの上に出すため `#choiceModal` だけ z-index を上げてある
+
+### ⚖️ 求職管理簿（候補者管理のタブ）
+
+- 労働局に出す様式そのままの一覧。**中身は候補者一覧と同じ `candidates` の行**なので、
+  どちらで直しても両方に出る（別テーブルを作らない）
+- 列順は様式なので**勝手に変えない**（①②③氏名・住所・生年月日／④希望職種／⑤受付年月日／
+  ⑥有効期間／⑦職業紹介の取扱状況／備考）
+- **セルをクリックするとその項目の編集画面が開く。** 対応表は **`CAND_LEDGER_EDIT` の1箇所だけ**。
+  入口は `candLedgerEdit(candId, col)` →`openCandidateModal(id, focusId)` →`_cndFocusField()`
+  （`rf_` 始まりなら履歴書タブを開く）。文字を選んでいる間は開かない
+- ⑦は `candidate_job_progress` から作る（`_candLedgerJobRows`）。紐付けが複数あれば行が分かれ、
+  左側は rowspan でまとめる。**採否結果は候補者のステータスから決める**
+  （内定＝採用／見送り・辞退＝不採用。`_candLedgerResult()` の1箇所）
+- **求人管理の「⚖️ 労働局 求人管理簿」と行き来できる。**
+  求職管理簿の求人受理番号・企業名 → その求人案件（`candLedgerOpenJob`）／
+  求人管理簿の求職者氏名 → その候補者（`_ledgerCandLink`）
+- 転職勧奨禁止期間・6か月以内の離職状況は**手書き用の空欄**（DBに列を持たせていない）
+- 印刷（A4横）と Excel出力あり（`printCandLedger` / `exportCandLedgerExcel`）
