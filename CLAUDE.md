@@ -712,3 +712,11 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   手数料管理（単価・見込人数・金額）を `_feeLedgerJobBasis()` が1行足す
 - 「第二種特別加入保険料」と「備考」の空欄は**手書き用**（DBに列を持たせていない）
 - 列順は様式なので**勝手に変えない**。印刷（A4横）と Excel出力あり
+
+### 📢 アナウンスから自分のテスト候補者へ飛ぶ
+
+- アナウンス本文（`announcements.content_html`）は `innerHTML` で挿し込むので、**中に `onclick` を書ける**
+- 「👉 自分のテスト候補者を開く」は `openMyTestCandidate()` の1箇所。
+  ログイン中のユーザー名から「`【テスト】<名前>用`」（接頭辞は `TEST_CAND_PREFIX`）を探して
+  `openCandidateModal()` を開く。見つからなければ候補者一覧を開いて「【テスト】」で検索した状態にする
+- アナウンス詳細（`#annDetailModal`）は生DOMなので、閉じるのは `remove()`（`closeGenModal` ではない）
