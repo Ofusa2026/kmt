@@ -332,23 +332,32 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   名簿が未読込なら `_cndFillStaffSelect()` が取り直して作り直す。
   いまの値が一覧に無いときは、その値も選択肢に残す
 
-### 候補者の外部記入リンク（応募者登録／履歴書作成）
+### 候補者の外部記入リンク（履歴書作成リンク）
 
-- 実体は **`candidate_form_links`**（`kind`: `info`=応募者登録 / `resume`=履歴書作成）。
+- 実体は **`candidate_form_links`**。
   **`#candform=<token>` でログインなしに開ける**（`initLogin` の先頭で分岐）
-- **ルールは求人票の外部記入リンクと同じ。** 有効なリンクは**種類ごとに1本まで**
-  （判定は `_openCandFormLink(kind)`）、発行時に確認、`closed` にしたものだけ削除できる
-- 種類ごとの文言は **`CAND_FORM_KINDS` の1箇所**（パネルのid・案内文もここ）
+- **本人へ渡すリンクは1種類だけ＝「履歴書作成リンク」（`CAND_FORM_KIND`）。**
+  発行できるのは **【📝 履歴書作成】タブの1箇所だけ**（候補者情報タブには置かない）。
+  候補者情報の項目は重複ぶん（`CAND_SYNC_FIELDS`）が自動反映されるので、リンクを分ける必要がない
+- `kind:'info'`（旧・応募者登録リンク）は **すでに渡したぶんを開く／無効にするためだけに残してある**。
+  `CAND_FORM_KINDS.info.retired = true` が目印で、パネルの一覧では「応募者登録リンク（旧）」と出る。
+  **新しく発行することはない**（`createCandFormLink` は kind を無視して `CAND_FORM_KIND` にする）
+- **ルールは求人票の外部記入リンクと同じ。** 有効なリンクは**候補者につき1本まで**
+  （種類は問わない。判定は `_openCandFormLink()`）、発行時に確認、`closed` にしたものだけ削除できる
+- 文言は **`CAND_FORM_KINDS` の1箇所**（パネルのid・案内文もここ）。パネルは1枚だけ
+  （`renderCandLinkPanels()` → `cndResumeLinkPanel`。旧リンクも同じ一覧に並べる）
 - 外部フォームの中身は**社内と同じ部品を使い回す**（項目の定義は1箇所のまま）
-  - 応募者登録＝`_cndSecBasic` + `_cndSecNat` + `_cndSecJp` + `_cndSecWish`
-    （ステータス・企業面接・担当・求人への紐付けは社内用なので出さない）
   - 履歴書作成＝`resumeFormFieldsHtml({external:true})`（1・2ページ目。
     見た目の設定と一次面接は社内用なので出さない）
+  - 旧・応募者登録＝`_cndSecBasic` + `_cndSecNat` + `_cndSecJp` + `_cndSecWish`
+    （ステータス・企業面接・担当・求人への紐付けは社内用なので出さない）
 - 送信時、履歴書のほうは `interview1` / `resume_opts` を**送らない**
   （外部フォームに出していない項目を空で上書きしないため）
-- **登録前の候補者にもリンクだけ先に渡せる**（新規登録モーダルの「＋ 新規リンクのみ発行」＝
-  `createCandFormLinkNew()`）。`candidates.name` は必須なので `CAND_LINK_PLACEHOLDER` の行を作り、
-  外部フォームでは氏名を空欄で出す（本人が書く）
+- **外部フォームには「＊自動反映」の青い注記を出さない**（本人には関係がないため）
+- **登録前の候補者にもリンクだけ先に渡せる**（新規登録モーダルの【📝 履歴書作成】タブにある
+  「＋ 新規リンクのみ発行」＝ `createCandFormLinkNew()`）。`candidates.name` は必須なので
+  `CAND_LINK_PLACEHOLDER` の行を作り、外部フォームでは氏名を空欄で出す（本人が書く）。
+  **`CAND_LINK_PLACEHOLDER` の文字列は変えない**（既存の行の判定に使っているため）
 - 発行の履歴は候補者画面の「🔗 リンク発行履歴」タブ（`loadCandLinkLog` / `renderCandLinkLog`）。
   いつ・だれが・どこへ・回答の有無が並ぶ。「記入待ち（未登録）だけ」で絞れる
 
@@ -368,10 +377,28 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 | 📋 候補者情報 | これまでの項目（労働局指定項目・基本情報・希望条件・求人への紐付け） | `saveCandidate` |
 | 📝 履歴書作成 | メモ（`candidate_notes`）→ 履歴書の項目 → 印刷／PDF／Excel | `saveResume` |
 
-- **どちらのタブも同じ `candidates` の行を見る。** 同じ列の欄（`cf_xxx` と `rf_xxx`）は
-  タブを移るときに `_syncCandidateResumeFields()` が写すので、どちらから直しても食い違わない
-  （選択肢の並びが違う select は、同じ選択肢があるときだけ写す）
 - 2つのタブは**両方DOMに置いたまま** `display` で切り替える（写すために両方必要）
+
+#### 🔄 2つのタブで重複している項目（自動反映）
+
+- **どちらのタブも同じ `candidates` の行を見る。** 同じ列を出している欄（`cf_xxx` と `rf_xxx`）は
+  **打った先からもう片方へ写る**。どちらのタブで直しても、本人が外部リンクから送ってきても、両方そろう
+- **重複している項目の一覧は `CAND_SYNC_FIELDS` の1箇所だけ**（いま24項目）。
+  欄の下に出る青い「＊自動反映」の注記（`_candSyncNote()` / `_applyCandSyncNotes()`）も
+  ここから作るので、**足せば両方のタブに注記まで付いてくる**
+- 写す本体は `_cndCopyField(id)`。**候補者モーダルの中だけ**を見る
+  （履歴書作成の画面を開いていると `rf_*` が二重になるため、`getElementById` では引かない）。
+  選択肢の並びが違う select は、同じ選択肢があるときだけ写す
+- 入力のたびの反映は `_bindCandSyncFields()`（document に1回だけ付ける委任リスナー）。
+  タブを移るときは `_syncCandidateResumeFields(from)` がまとめて写す
+- **食い違ったときは履歴書作成が残る**＝ `saveCandidateAll()` が候補者情報 → 履歴書の順に書く。
+  履歴書タブの読み込み（`_cndLoadResumeTab`）もDBの最新を取り直してから `rf` → `cf` に写す
+- 似ているが**別の列**なので写らないもの（このままにする）:
+  実務経験 `experience` ↔ 職歴 `work_history`・退職理由 `resignation_note` ／
+  メモ `memo` ↔ 企業面接メモ `interview_memo` ／
+  評価コメント `jp_eval_note` ↔ 本人からの質問 `candidate_questions`
+- 履歴書作成の画面（`loadResume`）でも同じ注記を出す（`_applyCandSyncNotes(formBody)`）。
+  **外部フォームには出さない**
 - 履歴書の入力項目は **`resumeFormFieldsHtml()` の1箇所**。
   履歴書作成の画面（`buildResumeScreen`）とこのタブで共用する。idは必ず `rf_` 始まり
 - **履歴書作成の画面を開いている間は、このタブは案内文だけにする**（`rf_*` のidが二重になるため）
