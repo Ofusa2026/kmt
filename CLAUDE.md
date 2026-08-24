@@ -747,6 +747,19 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - 「第二種特別加入保険料」と「備考」の空欄は**手書き用**（DBに列を持たせていない）
 - 列順は様式なので**勝手に変えない**。印刷（A4横）と Excel出力あり
 
+### 📢 アナウンスの「自分の確認状況」
+
+- 確認 → 対応中 → 完了 は **押した時点では画面だけ**変わり、［💾 保存］で書き込む
+  （未保存ぶんは `_annPending`。表示は保存済みと重ねた `_annMyConfirm()` を見る）
+- 保存先は `announcement_confirmations`（`announcement_id` ＋ `user_id` で1行）。
+  **必ず upsert（`resolution=merge-duplicates`）で書く。**
+  以前は PATCH だけだったので、行が無い人（あとから対象に足した人・
+  SQLで作ったアナウンス）は押しても保存されず、開き直すと未確認に戻っていた
+- 未保存のまま**画面を移る／詳細を閉じる／リロードする**とリマインドが出る
+  （`annUnsavedPrompt()` ／ `showScreen` の中の `annHasUnsaved()` ／ `beforeunload`）
+- 詳細を開き直す `_annRefresh()` は **await して返す**（閉じる処理と重なると、
+  閉じたあとに開き直しが走ってモーダルが残るため）
+
 ### 📢 アナウンスから自分のテスト候補者へ飛ぶ
 
 - アナウンス本文（`announcements.content_html`）は `innerHTML` で挿し込むので、**中に `onclick` を書ける**
