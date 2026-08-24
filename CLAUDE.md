@@ -821,8 +821,22 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 | 🏢 提携先情報 | 登録した項目をその場で直せる入力欄 | `saveIntroRegOrg`（フッターの💾保存） |
 | 🔖 求人・コード管理 | コード管理（最後に使ったコード・次の候補・重複）＋そのコードの求人一覧 | 読むだけ |
 
-- **項目の一覧は `intro_reg_org_fields` テーブルの1箇所**（初期値は `IRO_FIELD_SEED`。
-  初回アクセス時に自動投入する）。`col` が保存先
+- **項目の一覧は `IRO_FIELD_SEED` の1箇所**（ラベル・並び・入力の種類 `ftype`）。
+  ラベルと並びは `intro_reg_org_fields` テーブルにも入れて、管理者が変えられるようにしてある
+  （初回アクセス時に自動投入）。`col` が保存先
+- `ftype` は text / textarea / url / select / multi / contacts / fstaff / request
+  - `multi`（区分・主な職種）… 複数選択。値は「、」でつないで既存のテキスト列に入れる。
+    もともと入っている値で選択肢に無いものは「その他（記入）」の欄に残す（`_iroSplit` / `_iroMultiValue`）
+  - `contacts`（担当者）… 1名ずつ（担当者名・メール・電話・その他連絡ツール）を
+    `intro_reg_orgs.contacts`（jsonb）へ。**contacts が空のときは `contact_name` を1名ずつに分けて出す**。
+    保存時は一覧・検索用に `contact_name` にも名前を並べて書く
+  - `fstaff`（外国籍スタッフ情報）… `foreign_staff`（jsonb `{count, memo, list:[{name,nationality,contact}]}`）。
+    **「外国籍スタッフ在籍＝あり」のときだけ出す**（`onIroForeignChange`）。
+    前のデータの「有／無／確認中」は `_iroForeignNorm()` が あり／なし／要確認 に読み替える
+  - `request`（依頼内容）… 選択（`request_type`）＋費用の記入欄（`request_fee`）
+- **担当者・外国籍スタッフの行を足すときは、その欄だけ描き直す**
+  （`_iroRenderContacts` / `_iroRenderFstaff`）。タブ全体を描き直すと、
+  ほかの欄の入力中の値が消える（実際に消えた）
 - **既存の列（`IRO_BASE_COLS`）はそのまま、あとから足した項目は `intro_reg_orgs.extra`（jsonb）** に入る。
   値を読むのは `_iroValue()` の1箇所
 - **項目名の変更・追加・削除は管理者だけ**（`requireAdmin()`）。「⚙️ 項目を編集」を押すと
