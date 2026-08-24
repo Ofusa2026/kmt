@@ -169,6 +169,9 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 | 発注書（内定後） | `candidate_job_progress.ofusa_intake_id` / `ofusa_sent_at` |
 | 求人案件 | `job_progress.ofusa_intake_id` / `ofusa_sent_at` / `ofusa_flag` |
 
+- 求人管理の上のタブは3つ（**`JP_BUCKETS` の1箇所**）＝ 💼 現在の求人 ／ 🏢 大房側の求人 ／ 📦 過去の求人。
+  枠に入るかどうかは **`_jpInBucket()` の1箇所**。大房側の求人は `isOfusaJob(r)` が true で
+  過去に移っていないもの（過去に移ったものは 📦 のほうだけに出す）
 - **「大房側の案件」の判定は `isOfusaJob(r)` の1箇所だけ。** 会社名の文字列一致では絶対に判定しない
   （大房側の実データに `株式会社KMT` / `株式会社ＫＭＴ` / `KMT(82)` のような表記ゆれがある）。
   `ofusa_flag` が唯一の正で、発注書を送った案件は自動で立つ
