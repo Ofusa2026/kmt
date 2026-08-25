@@ -878,3 +878,18 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   各項目に［✏️ 名前］［🗑］が出る。**削除は行を消さず `is_active=false`**（入力済みの内容を残すため）
 - 保存すると `updated_at` / `updated_by` を書き、`renderSaveMeta('sm_iro', …)` で
   「✓ 最終更新 日時（ユーザー名）」を出す
+
+### 💴 支援委託費の表（人材 × 月）
+
+- セルの操作は2つ。**クリック＝確定の付け外し／ダブルクリック＝編集**。
+  クリックはダブルクリックと重なるので `_fmClickTimer` で少し待ってから実行する
+  （待っている間にダブルクリックが来たら取り消す）
+- **確定＝濃字**（`.fmcell.fixed`）／**未確定＝淡字**（`.fmcell.unfixed`）。CSSはこの2つの1箇所
+- 実体は `worker_fee_overrides`（`management_no` ＋ `billing_month` で1行）。
+  1セル＝ `{ amount, text_value, confirmed }`
+  - `amount` … 金額（数字を入れたとき）。`null` なら計算値のまま
+  - `text_value` … **数字以外を入れたとき**（例「2号申請」）。金額は0であつかう
+  - 数字かどうかの判定は `fmSaveOverride` の中の1箇所（全角数字・カンマ・円・万に対応）
+- 画面での読み方は **`_fmOvOf()` / `_fmOvHasValue()` / `_fmOvAmount()` の3つ**を通す
+  （古い「数値だけ」の形も読めるようにしてある）
+- 確定を外したときに金額も文字も無い行は消す（`fmToggleConfirm`）
