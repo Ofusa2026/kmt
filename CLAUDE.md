@@ -773,6 +773,15 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - 「第二種特別加入保険料」と「備考」の空欄は**手書き用**（DBに列を持たせていない）
 - 列順は様式なので**勝手に変えない**。印刷（A4横）と Excel出力あり
 
+### 📢 アナウンスの出る場所
+
+- **ログイン時のお知らせ**（`showAnnouncementLoginNotice`）は、［✅ 確認しました］を押した
+  アナウンスを `localStorage`（`kmt_ann_notice_seen_<user_id>`）に覚えて、**次からは出さない**。
+  新しいアナウンスが来たときだけまた出る（覚えるのは `_annNoticeMarkSeen()` の1箇所）
+- **バッジは完了にするまで出続ける**（`renderAnnouncementAlerts` の4か所）＝
+  サイドバー `announcementAlerts` ／ 💬 チャットの上 `announcementBanner` ／
+  💬 求人チャットの上 `announcementBannerJob` ／ マイページ `myAnnouncementAlerts`
+
 ### 📢 アナウンスの「自分の確認状況」
 
 - 確認 → 対応中 → 完了 は **押した時点では画面だけ**変わり、［💾 保存］で書き込む
