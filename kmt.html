@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT業務管理システム</title>
-<!-- KMT_VERSION ver.20260822.257 -->
+<!-- KMT_VERSION ver.20260822.258 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -481,8 +481,10 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   .fmx .fz1{left:0;min-width:190px;max-width:190px;}
   .fmx .fz2{left:190px;min-width:180px;max-width:180px;}
   .fmx .fz3{left:370px;min-width:64px;max-width:64px;}
-  .fmx .fz4{left:434px;min-width:82px;max-width:82px;box-shadow:2px 0 0 var(--gray-200);}
-  .fmx th.stcol,.fmx td.stcol{min-width:58px;max-width:76px;overflow:hidden;}
+  .fmx .fz4{left:434px;min-width:82px;max-width:82px;}
+  /* 在職ステータスまでは横スクロールしても固定 */
+  .fmx .fz5{left:516px;box-shadow:2px 0 0 var(--gray-200);}
+  .fmx th.stcol,.fmx td.stcol{min-width:70px;max-width:76px;overflow:hidden;}
   .fmx .mo{padding-left:5px;padding-right:5px;font-size:10.5px;min-width:0;}
   .fmx tbody tr:hover .fz{background:#f8fafc;}
   .fmcell{text-align:right;font-variant-numeric:tabular-nums;font-size:11.5px;}
@@ -495,6 +497,12 @@ tbody td{padding:9px 12px;font-size:13px;vertical-align:middle;}
   .fmcell.unfixed{color:#b6c2d1 !important;font-weight:400 !important;}
   .fmcell.fixed{color:var(--navy) !important;font-weight:800 !important;background:#f0fdf4;box-shadow:inset 0 -2px 0 #16a34a;}
   .fmcell.fixed.note{color:var(--orange) !important;}
+  /* ⚠️ 今月ぶんでまだ確定していないセルは赤字 */
+  .fmcell.todo{color:#dc2626 !important;font-weight:800 !important;background:#fef2f2;}
+  /* 今月の列は少し色を付けて分かるようにする */
+  .fmx th.mo.thism{background:#eef6ff;color:var(--blue);font-weight:800;}
+  .fmx td.thism{background:#f8fbff;}
+  .fmx tbody tr.fmtot td.thism{background:#dbeafe;}
   .fmcell.ed:hover{outline:1.5px solid var(--blue);outline-offset:-1.5px;background:var(--blue-light);}
   .fmcell.ov{color:var(--blue);font-weight:700;box-shadow:inset 0 -2px 0 var(--blue);}
   .fmrowtot{text-align:right;font-weight:700;background:var(--gray-100);font-variant-numeric:tabular-nums;}
@@ -22141,14 +22149,13 @@ async function saveJob() {
 // === 追加復元関数 ===
 
 async function initFeesScreen() {
-  // 支援委託費 管理（人材×月マトリクス）
-  feeMgmtYear = new Date().getFullYear();
+  // 支援委託費 管理（人材×月マトリクス）。年で切り替えず、横スクロールで前後を見る
+  _fmScrolled = false;
   if (!allCompanies.length) { try { await loadCompanies(); } catch(e){} }
   await loadFeeMgmt();
 }
 
 /* ===== 支援委託費 管理（人材×月マトリクス）===== */
-let feeMgmtYear = new Date().getFullYear();
 let feeMgmtWorkers = [];
 /* セルの手入力・確定の入れ物。1セル ＝ { amount, text, confirmed }
    ・amount … 金額（数字を入れたとき）。null なら計算値のまま
@@ -22193,6 +22200,30 @@ function fmWEnd(w){
   return '';
 }
 function fmWorkerActiveYear(w,year){ const s=fmWStart(w),e=fmWEnd(w),ys=year+'-01',ye=year+'-12'; return (!s||s<=ye)&&(!e||e>=ys); }
+/* 表に出す期間。**年で切り替えず、横スクロールで見る**。
+   ・既定の表示は「1年前の同月 〜 今月」（開いたときその位置までスクロールする）
+   ・前後はスクロールで見られるように、24か月前〜12か月先まで作っておく */
+const FEE_MONTHS_BACK = 24, FEE_MONTHS_FWD = 12, FEE_DEFAULT_BACK = 12;
+function fmThisMonth(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+function fmAddMonth(ym,n){ const [y,m]=String(ym).split('-').map(Number); const d=new Date(y,(m-1)+n,1);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+function fmMonthList(){
+  const now=fmThisMonth(); const out=[];
+  for(let i=-FEE_MONTHS_BACK;i<=FEE_MONTHS_FWD;i++) out.push(fmAddMonth(now,i));
+  return out;
+}
+/* ✅ 確定のきまり。
+   ・そのセルに記録（行）があれば、その `confirmed` が正
+   ・記録が無いときは **`FEE_CONFIRMED_UNTIL`（2026-07）までは確定ずみ**あつかい（濃字）
+   判定はこの関数の1箇所だけ */
+const FEE_CONFIRMED_UNTIL = '2026-07';
+function fmIsFixed(mno,m){
+  const ov=mno?_fmOvOf(mno,m):null;
+  if(ov) return !!ov.confirmed;
+  return m <= FEE_CONFIRMED_UNTIL;
+}
+// その人材が期間のどこかに関わるか（月の範囲で見る）
+function fmWorkerActiveRange(w,from,to){ const s=fmWStart(w),e=fmWEnd(w); return (!s||s<=to)&&(!e||e>=from); }
 function fmFmt(n){ return n?Math.round(n).toLocaleString('ja-JP'):'·'; }
 function fmYen(n){ return '¥'+Math.round(n||0).toLocaleString('ja-JP'); }
 function fmNumKey(s){ return (String(s==null?'':s).match(/\d+/g)||[]).map(Number); }
@@ -22369,15 +22400,18 @@ function fmFillStaffFilters(cm){
 
 function renderFeeMgmt(){
   const T=document.getElementById('feeMatrixTable'); if(!T) return;
-  const yl=document.getElementById('feeMgmtYearLab'); if(yl) yl.textContent=feeMgmtYear+'年';
+
   const note=document.getElementById('feeMgmtNote');
   if(note) note.innerHTML='人材 × 月の委託費（退職済でも請求のある人材を含む）。'
     +'<b>クリックで確定（濃字）／もう一度クリックで解除（淡字）</b>、<b>ダブルクリックで編集</b>（数字以外も入れられます）。'
+    +'<b>'+FEE_CONFIRMED_UNTIL+' までは確定ずみ</b>としてあります。<b style="color:#dc2626;">今月ぶんで確定していないセルは赤字</b>です。'
+    +'月は<b>横スクロール</b>で前後を見られます（［📍 今月へ］で戻ります）。'
     +'不要な人材は氏名の<b>✕</b>で表から削除でき（集計対象からも除外）、「除外者を表示」から元に戻せます。単位: 円。';
   const cm=fmCompMap();
   fmFillStaffFilters(cm);
-  const months=[]; for(let m=1;m<=12;m++) months.push(feeMgmtYear+'-'+String(m).padStart(2,'0'));
-  const colTot=months.map(()=>0); let gTot=0;
+  const months=fmMonthList();
+  const thisM=fmThisMonth();
+  const colTot=months.map(()=>0);
   const msF=document.getElementById('feeMgFilterMain')?.value||'';
   const subF=document.getElementById('feeMgFilterSub')?.value||'';
   const q=(document.getElementById('feeMgSearch')?.value||'').toLowerCase();
@@ -22387,16 +22421,20 @@ function renderFeeMgmt(){
     // 手動除外者は既定で非表示（「除外者も表示」ONのときのみ表示）。退職済は自動除外しない
     if(isExcluded && !showExcluded) return false;
     if(!isExcluded && showExcluded) return false;
-    if(!fmWorkerActiveYear(w,feeMgmtYear))return false;
+    if(!fmWorkerActiveRange(w,months[0],months[months.length-1]))return false;
     const c=cm[w.company_id]||{};
     if(msF&&(c.main_staff||'')!==msF)return false;
     if(subF&&!(c.sub_staff||'').split(/[,、]/).map(s=>s.trim()).includes(subF))return false;
     if(q){ const hay=((w.name||'')+' '+(w.management_no||'')+' '+(c.name||'')).toLowerCase(); if(!hay.includes(q))return false; }
     return true;
   }).slice().sort((a,b)=>fmCmpNo(a.management_no,b.management_no));
-  let head='<thead><tr><th class="fz fz1">氏名 / 管理番号 / 国籍</th><th class="fz fz2">企業名 / メイン / サブ</th><th class="fz fz3 r">委託費</th><th class="fz fz4">支払サイクル</th><th class="stcol">在職</th>'+months.map(m=>'<th class="r mo">'+(+m.slice(5))+'月</th>').join('')+'<th class="r">年計</th></tr></thead>';
+  // 在職ステータスまでは横スクロールしても固定（fz5）
+  let head='<thead><tr><th class="fz fz1">氏名 / 管理番号 / 国籍</th><th class="fz fz2">企業名 / メイン / サブ</th><th class="fz fz3 r">委託費</th><th class="fz fz4">支払サイクル</th><th class="fz fz5 stcol">在職</th>'
+    +months.map(m=>'<th class="r mo'+(m===thisM?' thism':'')+'" data-m="'+m+'">'
+      +(m.slice(5)==='01'||m===months[0]?'<div style="font-size:9px;color:var(--gray-400);">'+m.slice(0,4)+'</div>':'')
+      +(+m.slice(5))+'月</th>').join('')+'</tr></thead>';
   let body='<tbody>';
-  if(!ws.length){ body+='<tr><td colspan="'+(months.length+6)+'" style="text-align:center;padding:40px;color:var(--gray-400)">対象の人材がいません</td></tr>'; }
+  if(!ws.length){ body+='<tr><td colspan="'+(months.length+5)+'" style="text-align:center;padding:40px;color:var(--gray-400)">対象の人材がいません</td></tr>'; }
   ws.forEach(w=>{
     const c=cm[w.company_id]||{}; const unit=c.fee_per_person||0; const N=fmCycleN(c.billing_cycle);
     const s=fmWStart(w),e=fmWEnd(w); const act=FEE_ACTUALS[w.management_no]||null; let rowTot=0;
@@ -22418,25 +22456,47 @@ function renderFeeMgmt(){
       else if(!active){ val=0; kind='off'; }
       else{ const bill=s?(fmMonthDiff(s,m)%N===0):true; val=bill?unit*(s?N:1):0; kind=bill?'sched':'nobill'; }
       rowTot+=val; colTot[i]+=val;
-      // ✅ 確定＝濃字（fixed）／未確定＝淡字。色分け（手入力・実績など）はこれまでどおり
-      const fixed=!!(ov&&ov.confirmed);
+      /* ✅ 確定＝濃字（fixed）／未確定＝淡字。
+         **当月でまだ確定していないセルは赤字**（todo）にして、やり残しが見えるようにする */
+      const fixed=mno?fmIsFixed(mno,m):false;
+      const todo=!!mno&&!fixed&&m===thisM;
       const cls='fmcell'+(mno?' ed':'')+(hasOv&&!note?' ov':kind==='actual'?' actual':kind==='note'?' note':kind==='sched'?' sched':' zero')
-        +(mno?(fixed?' fixed':' unfixed'):'');
+        +(mno?(fixed?' fixed':' unfixed'):'')+(todo?' todo':'')+(m===thisM?' thism':'');
       const disp=note?esc(note):(val?fmFmt(val):(active?'–':'·'));
-      const tip=(note?esc(note)+' ／ ':'')+(fixed?'確定（クリックで解除／ダブルクリックで編集）':'未確定（クリックで確定／ダブルクリックで編集）');
+      const tip=(note?esc(note)+' ／ ':'')+(fixed?'確定（クリックで解除／ダブルクリックで編集）'
+        :(todo?'⚠️ 今月ぶんがまだ確定していません（クリックで確定／ダブルクリックで編集）':'未確定（クリックで確定／ダブルクリックで編集）'));
       return '<td class="'+cls+'"'+(mno?' data-mno="'+esc(mno)+'" data-m="'+m+'" data-val="'+val+'" title="'+tip+'">'+disp+'</td>':'>'+disp+'</td>');
     }).join('');
-    gTot+=rowTot;
     const _mno=w.management_no||'';
     const _ctrl = FEE_EXCLUDED.has(_mno)
       ? '<span title="表に戻す" onclick="event.stopPropagation();fmRestoreWorker(\''+esc(_mno)+'\')" style="cursor:pointer;color:var(--blue);font-size:12px;margin-right:5px;">↩</span>'
       : '<span title="表から削除" onclick="event.stopPropagation();fmExcludeWorker(\''+esc(_mno)+'\')" style="cursor:pointer;color:#cbd5e1;font-size:12px;margin-right:5px;">✕</span>';
-    body+='<tr'+(FEE_EXCLUDED.has(_mno)?' style="opacity:.6"':'')+'><td class="fz fz1"><div class="fmname" title="'+esc(w.name||'')+'">'+_ctrl+esc(w.name||'(無名)')+'</div>'+((w.management_no||w.nationality)?'<div class="fmmeta fmnat"><span>'+esc(w.management_no||'')+'</span><span>'+esc(w.nationality||'')+'</span></div>':'')+'</td><td class="fz fz2"><div class="fmname" title="'+esc(c.name||'')+'">'+esc(c.name||'')+'</div>'+((c.main_staff||c.sub_staff)?'<div class="fmmeta">'+esc(c.main_staff||'')+(c.sub_staff?' / '+esc(c.sub_staff):'')+'</div>':'')+'</td><td class="fz fz3 fmmeta r">'+(unit?fmFmt(unit):'-')+'</td><td class="fz fz4 fmmeta"><div>'+esc(c.billing_cycle||'-')+'</div>'+(c.billing_timing?'<div style="font-size:10px;color:var(--gray-400)" title="'+esc(c.billing_timing)+'">'+esc(c.billing_timing)+'</div>':'')+'</td><td class="stcol">'+fmStBadge(w.status)+'</td>'+cells+'<td class="fmrowtot">'+fmYen(rowTot)+'</td></tr>';
+    body+='<tr'+(FEE_EXCLUDED.has(_mno)?' style="opacity:.6"':'')+'><td class="fz fz1"><div class="fmname" title="'+esc(w.name||'')+'">'+_ctrl+esc(w.name||'(無名)')+'</div>'+((w.management_no||w.nationality)?'<div class="fmmeta fmnat"><span>'+esc(w.management_no||'')+'</span><span>'+esc(w.nationality||'')+'</span></div>':'')+'</td><td class="fz fz2"><div class="fmname" title="'+esc(c.name||'')+'">'+esc(c.name||'')+'</div>'+((c.main_staff||c.sub_staff)?'<div class="fmmeta">'+esc(c.main_staff||'')+(c.sub_staff?' / '+esc(c.sub_staff):'')+'</div>':'')+'</td><td class="fz fz3 fmmeta r">'+(unit?fmFmt(unit):'-')+'</td><td class="fz fz4 fmmeta"><div>'+esc(c.billing_cycle||'-')+'</div>'+(c.billing_timing?'<div style="font-size:10px;color:var(--gray-400)" title="'+esc(c.billing_timing)+'">'+esc(c.billing_timing)+'</div>':'')+'</td><td class="fz fz5 stcol">'+fmStBadge(w.status)+'</td>'+cells+'</tr>';
   });
   body+='</tbody>';
-  const topRow='<tr class="fmtot"><td class="fz fz1">合計</td><td class="fz fz2"></td><td class="fz fz3"></td><td class="fz fz4"></td><td class="stcol"></td>'+colTot.map(v=>'<td class="r">'+fmFmt(v)+'</td>').join('')+'<td class="r">'+fmYen(gTot)+'</td></tr>';
+  const topRow='<tr class="fmtot"><td class="fz fz1">合計</td><td class="fz fz2"></td><td class="fz fz3"></td><td class="fz fz4"></td><td class="fz fz5 stcol"></td>'
+    +colTot.map((v,i)=>'<td class="r'+(months[i]===thisM?' thism':'')+'">'+fmFmt(v)+'</td>').join('')+'</tr>';
   body=body.replace('<tbody>','<tbody>'+topRow);
   T.innerHTML=head+body;
+  fmScrollToDefault();
+}
+/* 開いたときは「1年前の同月」が左に来るところまで横スクロールする
+   （既定の見え方＝1年前〜今月。前後はそのままスクロールで見られる） */
+let _fmScrolled=false;
+function fmScrollToDefault(force){
+  const wrap=document.getElementById('feeMatrixTable')?.closest('.table-wrap');
+  if(!wrap) return;
+  if(_fmScrolled&&!force) return;
+  const ths=document.querySelectorAll('#feeMatrixTable thead th.mo');
+  const idx=FEE_MONTHS_BACK-FEE_DEFAULT_BACK;      // 1年前の同月
+  const th=ths[idx];
+  if(!th) return;
+  /* 固定している列（在職まで）のすぐ右に、その月が来るところまで動かす。
+     いま見えている位置から測るので、テーブルの入れ子や余白に左右されない */
+  const fixedRight=document.querySelector('#feeMatrixTable thead th.fz5')?.getBoundingClientRect().right;
+  const cur=th.getBoundingClientRect().left;
+  if(fixedRight!=null) wrap.scrollLeft = Math.max(0, wrap.scrollLeft + (cur - fixedRight));
+  _fmScrolled=true;
 }
 
 /* セルの操作は2つ。**クリック＝確定の付け外し／ダブルクリック＝編集**。
@@ -22465,14 +22525,17 @@ function fmCellEdit(e){
   inp.addEventListener('blur',()=>finish(true));
   inp.addEventListener('dblclick',ev=>ev.stopPropagation());
 }
-// ✅ 確定／解除。手入力が無いセルでも確定できる（行は作るが金額は計算値のまま）
+/* ✅ 確定／解除。手入力が無いセルでも確定できる（行は作るが金額は計算値のまま）。
+   いまの状態は `fmIsFixed()` で見る（記録が無い月は FEE_CONFIRMED_UNTIL までが確定ずみ）。
+   **既定と同じ状態に戻すだけなら行を消す**（余計な行を残さない） */
 async function fmToggleConfirm(mno,m,td){
   const ov=_fmOvOf(mno,m);
-  const next=!(ov&&ov.confirmed);
+  const next=!fmIsFixed(mno,m);
   const now=new Date().toISOString();
+  const sameAsDefault = (next === (m <= FEE_CONFIRMED_UNTIL));
   try{
-    if(!next && !_fmOvHasValue(ov)){
-      // 確定を外すだけの行（金額も文字も無い）は消しておく
+    if(!_fmOvHasValue(ov) && sameAsDefault){
+      // 金額も文字も無く、既定どおりの状態に戻るだけなら行は要らない
       await sbFetch('worker_fee_overrides?management_no=eq.'+encodeURIComponent(mno)+'&billing_month=eq.'+encodeURIComponent(m),{method:'DELETE',prefer:'return=minimal'});
       if(FEE_OVERRIDES[mno]) delete FEE_OVERRIDES[mno][m];
     }else{
@@ -32664,9 +32727,8 @@ function buildFeesScreen() {
     <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--gray-700);cursor:pointer;white-space:nowrap;"><input type="checkbox" id="feeShowExcluded" onchange="renderFeeMgmt()" style="cursor:pointer;">除外者を表示</label>
     <div style="flex:1"></div>
     <button class="btn btn-outline" onclick="loadFeeMgmt()">🔄 更新</button>
-    <button class="btn btn-outline" style="padding:4px 11px" onclick="feeMgmtYear--;renderFeeMgmt();" title="前の年">◀</button>
-    <span id="feeMgmtYearLab" style="font-weight:800;min-width:62px;text-align:center;font-size:15px;color:var(--navy)"></span>
-    <button class="btn btn-outline" style="padding:4px 11px" onclick="feeMgmtYear++;renderFeeMgmt();" title="次の年">▶</button>
+    <button class="btn btn-outline" style="padding:4px 11px;font-size:11.5px;" onclick="fmScrollToDefault(true)"
+      title="1年前〜今月の位置に戻します">📍 今月へ</button>
   </div>
 
   <!-- 説明 -->
@@ -32677,7 +32739,7 @@ function buildFeesScreen() {
     <table class="fmx" id="feeMatrixTable" onclick="fmCellClick(event)" ondblclick="fmCellEdit(event)"></table>
   </div>
   <div style="margin-top:8px;font-size:11px;color:var(--gray-400)">
-    <span style="color:var(--navy);font-weight:800;background:#f0fdf4;box-shadow:inset 0 -2px 0 #16a34a;padding:0 4px;">濃字</span>＝確定（クリックで確定／もう一度クリックで解除）　／　<span style="color:#b6c2d1;">淡字</span>＝未確定　／　<b>ダブルクリック</b>で編集（「2号申請」のような文字も入れられます。空欄で保存すると計算値に戻ります）
+    <span style="color:var(--navy);font-weight:800;background:#f0fdf4;box-shadow:inset 0 -2px 0 #16a34a;padding:0 4px;">濃字</span>＝確定（クリックで確定／もう一度クリックで解除）　／　<span style="color:#b6c2d1;">淡字</span>＝未確定　／　<span style="color:#dc2626;font-weight:800;background:#fef2f2;padding:0 4px;">赤字</span>＝今月ぶんが未確定　／　<b>ダブルクリック</b>で編集（「2号申請」のような文字も入れられます。空欄で保存すると計算値に戻ります）
   </div>
   `;
 }
@@ -34861,6 +34923,12 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260822.258', date:'2026-08-22', notify:true, items:[
+    '💴 支援委託費の表を「1年前の同月〜今月」が最初に見える形にしました。年の切り替えボタンはやめて、月は横スクロールで前後を見ます（［📍 今月へ］で戻れます）。',
+    '✅ 2026-07 までは確定ずみ（濃字）としてあります。クリックで解除もできます。',
+    '🔴 今月ぶんでまだ確定していないセルは赤字で出ます。',
+    '📌 氏名から在職ステータスまでの列は、横スクロールしても固定で表示されます。年計の列は外しました。',
+  ]},
   { version:'ver.20260822.257', date:'2026-08-22', notify:true, items:[
     '💴 支援委託費の表の使い方を変えました。セルを<b>クリックすると確定</b>（濃字＋緑の線）、<b>もう一度クリックで解除</b>（淡字）になります。',
     '✏️ <b>ダブルクリックで編集</b>できます。金額だけでなく「2号申請」のような文字も入れられます（文字のときは金額0であつかいます）。',
