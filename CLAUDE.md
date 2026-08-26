@@ -883,10 +883,19 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 ### 📘 登録支援機関業務の記録簿 ← 人材情報の反映
 
 - 様式の定義は **`REG_FORM_DEFS` の1箇所**（項目の一覧は `REG_SUPPORT_TASKS`）
-- **人材情報にすでにある内容をそのまま出す欄は、フィールド定義の `from` の1箇所だけ**
-  （`from` ＝ `workers` の列名／`fromL` ＝ 人材情報での欄の名前。注記に出す）。
-  例：出入国送迎記録簿（no.5）は `entry_date` / `entry_pickup_staff` /
-  `departure_date` / `departure_staff` の4つ
+- **自動で入る欄は、フィールド定義の3つのキーの1箇所だけ**で決める
+
+  | キー | 入る値 | 例 |
+  |---|---|---|
+  | `from` | `workers` の列 | 出入国送迎記録簿（no.5）の `entry_date` など |
+  | `fromCo` | `companies` の列（`from` と両方なら人材が空のときの控え） | 5-10号の委託料＝`fee_per_person` |
+  | `fromFn(w, co, d)` | 計算して入れる | 5-10号の契約期間（終了）＝就労開始日の1年後 |
+
+  `fromL` / `fromCoL` / `fromNote` は欄の下の注記に出す文字。
+  `syncTo` を書くと、その欄を直したとき相手の欄（1年後）も付いてくる（`onRegPeriodFromChange`）
+- **1年後の計算と裁判所の既定値は `_regPlusOneYear()` / `REG_DEFAULT_COURT` の1箇所**
+- 読む列は `REG_WORKER_SELECT_COLS`（`from`）と `REG_COMPANY_SELECT_COLS`（`fromCo`）が
+  定義から自動で作る。**キーを足すだけで取得も追従する**
 - `from` を書くと3つが同時に付いてくる
   1. 記入フォームで人材を選んだとき自動で入る（`_regApplyWorkerFill()`。
      **すでに入っている欄は上書きしない**。［📥 人材情報から取り込む］＝`regFillFromWorker()` のときだけ入れ直す）
