@@ -124,9 +124,13 @@ UI変更やロジック変更のときは実際に描画して確かめる。
 - **メンション**: `chat_messages.mentions`（jsonb の名前配列）。`isMentionForMe()` が部分一致で判定し、
   一覧の @バッジ・「@メンション」絞り込み・ブラウザ通知に使われる。
   返信（↩インライン／🧵スレッド）は `_withReplyMention()` で相手の名前を mentions に自動追加する（自分宛は除外）
-  - 🔴自分あて（`mentionDirect`）／🟡所属チームあて（`mentionGroup`）の分け方は
-    「本文に @自分の名前 が書かれている・自分の投稿への返信」かどうか。合計は
-    `_mentionDirectTotal` / `_mentionGroupTotal`
+  - **@全員 / @all / @everyone の判定は `isMentionToAll(content)` の1箇所だけ。**
+    送信時は全員の名前に展開して `mentions` に入れるが、**大房側から直接入るメッセージは
+    `mentions` が空のまま届く**ので、本文からも見る（これが無いと @全員 が拾えない）
+  - 🔴自分あて（`mentionDirect`）／🔵全体あて（`mentionAll`）／🟡所属チームあて（`mentionGroup`）
+    の分け方は **未読集計の1箇所だけ**。本文に @自分の名前 or 自分の投稿への返信＝自分あて、
+    @全員＝全体あて、それ以外＝所属チームあて。合計は
+    `_mentionDirectTotal` / `_mentionAllTotal` / `_mentionGroupTotal`
   - 一覧の上の凡例（`updateMentionLegend`）の**件数を押すとその内訳だけに絞れる**
     （`setChatMentionKind`。もう一度押すと解除）。絞り方は `_chatMentionKind`
     （`''` 両方／`'direct'`／`'group'`）で、**見るのは `renderChatRooms` の中の1箇所だけ**。
