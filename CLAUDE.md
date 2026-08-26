@@ -869,6 +869,12 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 ### 📢 アナウンスから自分のテスト候補者へ飛ぶ
 
 - アナウンス本文（`announcements.content_html`）は `innerHTML` で挿し込むので、**中に `onclick` を書ける**
+- テスト用のページは2つ。**探し方は同じ**（`【テスト】<ログイン中の名前>用`）
+  | ボタン | 関数 | 実体 | 担当の列 |
+  |---|---|---|---|
+  | 👉 自分のテスト候補者を開く | `openMyTestCandidate()` | `candidates.name` | `staff`（人材担当） |
+  | 👉 自分のテスト求人案件を開く | `openMyTestJob()` | `job_progress.company_name` | `sales_staff` / `glt_staff` |
+  見つからないときは、その一覧を開いて「【テスト】」で検索した状態にする
 - 「👉 自分のテスト候補者を開く」は `openMyTestCandidate()` の1箇所。
   ログイン中のユーザー名から「`【テスト】<名前>用`」（接頭辞は `TEST_CAND_PREFIX`）を探して
   `openCandidateModal()` を開く。見つからなければ候補者一覧を開いて「【テスト】」で検索した状態にする
