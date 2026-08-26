@@ -910,10 +910,25 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   **`allWorkers` は画面によって軽いSELECTで上書きされるので当てにしない**
 - 一覧に出す名前は **`expWorkerNameOf()` / `expCompanyNameOf()` の2つだけ**
   （選んだ人材・企業か、手入力ぶんか）
-- モーダルは**自動保存**（`_AUTOSAVE_MAP.expenseModal`）。欄を描き直したあとは
-  `_expBindAuto()` で付け直す（新しく作った input は未バインドのため）。
-  候補から選んだときは input イベントが出ないので `_expTouch()` で保存を予約する。
-  一覧の取り直しは**閉じたときだけ**（`closeGenModal` の中。保存のたびだとちらつく）
+- モーダルは**手動保存**（`_manualSave.expenseModal` ／ 接頭辞 `ef_` ／ `sm_expense`）。
+  ［💾 保存］を押すまで書かない。保存しても**モーダルは閉じない**（最終更新をその場で見せる）。
+  ピッカーや領収書の追加・削除は input イベントが出ないので `_expTouch()` で未保存の印を付ける
+- 🗑 削除は**論理削除**（`is_deleted` / `deleted_at` / `deleted_by`）。
+  入口は一覧の右端（`deleteExpenseRow`）とフッター右端（`deleteExpense`）の2つで、
+  中身は **`_expDeleteRow()` の1箇所**。消す前に `_confirmDeleteTwice()` で2回たずねる。
+  取得には `is_deleted=not.eq.true` を付ける
+
+#### 📎 領収書の添付
+
+- 実体は `expenses.receipts`（jsonb の `[{url,name,mimeType,size,at,by}]`）。
+  実ファイルは**GAS → Google Drive**（チャットの添付・求人票の写真と同じ経路）。
+  **置き場は `EXPENSE_RECEIPT_DRIVE_URL` の1箇所だけ**。最大 `EXPENSE_RECEIPT_MAX`(6) 件
+- **Drive でのファイル名は「利用日(yyyymmdd) 名目 金額」**（例 `20260825 航空券代 52000.pdf`）。
+  名前を作るのは **`_expReceiptBaseName()` の1箇所**。2件目からは末尾に `(2)` `(3)` を付ける
+- **利用日・名目・金額のどれかが空だと添付させない**（ファイル名が作れないため。
+  赤字で「先に入れてください」と出す）
+- 名前は**添付した時点**で決まる。あとから利用日や金額を直しても Drive のファイル名は変わらない
+- 添付・削除しただけでは確定しない（`_expTouch()` で未保存の印 →［💾 保存］で `receipts` を書く）
 
 ### 💰 売上管理 月別シートの合計行
 
