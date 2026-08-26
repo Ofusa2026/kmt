@@ -879,6 +879,42 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - 保存すると `updated_at` / `updated_by` を書き、`renderSaveMeta('sm_iro', …)` で
   「✓ 最終更新 日時（ユーザー名）」を出す
 
+### 💸 立替管理（立替登録）
+
+- **選択肢は5つの const の1箇所だけ**。増やす・並べ替えるときはここを直せば
+  登録画面・一覧・絞り込みが同時に追従する
+
+  | const | 中身 |
+  |---|---|
+  | `EXPENSE_STATUSES` | 未請求／請求済／入金済 |
+  | `EXPENSE_BILL_TO` | 人材／企業／登録支援機関 |
+  | `EXPENSE_ITEMS` | 名目（航空券代・宿泊代・試験代（2号試験）・試験代（ビジネスキャリア検定）・JITCO保険・セントラルインシュランス保険） |
+  | `EXPENSE_PAY_METHODS` | 支払（決済）方法＝AMEX／ANA／振込／現金 |
+  | `EXPENSE_PAID_METHODS` | 入金方法＝振込／現金 |
+
+- 名目は選択肢に無いものを「その他（記入）」の欄に書く。**保存先は今までどおり `item_name` の1列**
+  （古いデータも `EXPENSE_ITEMS` に無ければ自動で「その他」の欄に出る）
+- **ステータスで出る欄が変わる**（`renderExpenseStatusFields()` の1箇所）。
+  請求済＝請求者・請求日／入金済＝＋入金確認者・入金日・入金方法。
+  **切り替えたときだけ**空欄に「自分＋今日」を入れる（`onExpenseStatusChange()`。開いただけでは入れない）
+- **請求先で出る欄が変わる**（`renderExpenseBillToFields()` の1箇所）
+  - 人材 … 人材を選ぶ → **企業はその人材の所属で決まる**（選ばせない・読み取り専用で出す）
+  - 企業 … 企業を選ぶ → 人材は**その企業の人材から選ぶ**か手入力（`worker_name_custom`）
+  - 登録支援機関 … `org_name` / `company_name_custom` / `worker_name_custom` の3つとも手入力
+- **人材名・企業名は打つと候補が出る欄**（`_expPickHtml` / `expPickOpen` / `expPickChoose`）。
+  選んだ結果は隠しの `ef_worker_id` / `ef_company_id` に入り、**この2つが唯一の正**
+  （表示の文字は毎回 id から引き直すので、名前だけ書き換わることがない）
+- **使わない列は保存時に必ず `null` で書く**（`saveExpense`）。
+  請求先を切り替えたときに前の内容が残らないようにするため
+- 候補の人材・企業は `_expEnsureMasters()` が専用に取っておく。
+  **`allWorkers` は画面によって軽いSELECTで上書きされるので当てにしない**
+- 一覧に出す名前は **`expWorkerNameOf()` / `expCompanyNameOf()` の2つだけ**
+  （選んだ人材・企業か、手入力ぶんか）
+- モーダルは**自動保存**（`_AUTOSAVE_MAP.expenseModal`）。欄を描き直したあとは
+  `_expBindAuto()` で付け直す（新しく作った input は未バインドのため）。
+  候補から選んだときは input イベントが出ないので `_expTouch()` で保存を予約する。
+  一覧の取り直しは**閉じたときだけ**（`closeGenModal` の中。保存のたびだとちらつく）
+
 ### 💰 売上管理 月別シートの合計行
 
 - 明細表の一番下（`<tfoot class="sale-total-row">`）に **いま絞り込んでいる `rows` の合計**を出す。
