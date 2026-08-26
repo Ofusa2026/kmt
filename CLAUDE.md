@@ -164,6 +164,14 @@ UI変更やロジック変更のときは実際に描画して確かめる。
   画像（`isChatImageAttachment()` が true）は `driveImageUrl(url, 800)` でサムネイル化してチャット内に直接表示、
   それ以外はファイルリンク。表示に失敗したら `_chatImgFallback()` がリンクに戻す
 - 入力欄での画像貼り付けは `initChatPasteImage()`（document の paste を拾って `addChatFiles()` に渡す）
+- **本文のURLのリンク化**: 見つけ方は **`CHAT_URL_RE` の1箇所だけ**（`renderMessageContent`）。
+  - **URLに使う文字は半角だけ**にしてある。全角・日本語まで拾うと
+    「（https://…/x）を見てください」の後ろの文章までリンクに入る（実際に入った）
+  - 末尾の `.` `,` `)` などは `CHAT_URL_TAIL_RE` で落とす（「…/view です。」対策）
+  - **メンションの色付けとは分けて処理する**＝ URL のところで文字列を切り、
+    URL 以外の断片にだけ `_mentionHtml()` を掛ける。まとめて replace すると
+    `.../@user` の @ をメンションと間違えたり、作った `<a>` の中をメンションが壊す
+  - リンクの色は自分の吹き出し（濃い青）だけ明るくする（`renderMessageContent(text, isMine)`）
 
 #### 🙋 大房側ドライブURLの記入依頼（外国人材の【4. ドライブリンク】）
 
