@@ -124,6 +124,13 @@ UI変更やロジック変更のときは実際に描画して確かめる。
 - **メンション**: `chat_messages.mentions`（jsonb の名前配列）。`isMentionForMe()` が部分一致で判定し、
   一覧の @バッジ・「@メンション」絞り込み・ブラウザ通知に使われる。
   返信（↩インライン／🧵スレッド）は `_withReplyMention()` で相手の名前を mentions に自動追加する（自分宛は除外）
+  - 🔴自分あて（`mentionDirect`）／🟡所属チームあて（`mentionGroup`）の分け方は
+    「本文に @自分の名前 が書かれている・自分の投稿への返信」かどうか。合計は
+    `_mentionDirectTotal` / `_mentionGroupTotal`
+  - 一覧の上の凡例（`updateMentionLegend`）の**件数を押すとその内訳だけに絞れる**
+    （`setChatMentionKind`。もう一度押すと解除）。絞り方は `_chatMentionKind`
+    （`''` 両方／`'direct'`／`'group'`）で、**見るのは `renderChatRooms` の中の1箇所だけ**。
+    ［@メンション］のチェックは今までどおり両方まとめて（`_chatMentionKind` は空に戻す）
 - **ピン留め**: `chat_pins` テーブル。`room_id` が入っていれば個別チャットのピン、
   無ければ企業カードのピン（`_chatPinnedCompanyIds` / `_chatPinnedRoomIds`）。
   個別ピンは企業内リストで先頭に並び、`_prependPinnedRoomSection()` が一覧最上部にも表示する
@@ -351,6 +358,21 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - 人材担当（`cf_staff`）は**チームが `GLT` のユーザーから選ぶ**（`gltStaffOptionsHtml`）。
   名簿が未読込なら `_cndFillStaffSelect()` が取り直して作り直す。
   いまの値が一覧に無いときは、その値も選択肢に残す
+
+#### 🕌 宗教（選択式）
+
+- **選択肢は `CAND_RELIGIONS` の1箇所だけ**（仏教／ヒンズー教／イスラム教／キリスト教）。
+  欄を作るのは `religionFieldHtml(prefix, cur)` の1箇所で、候補者情報タブ（`cf_`）・
+  履歴書作成（`rf_`）・外部の履歴書作成リンクが同時に追従する
+- 選択肢に無いものは「その他（記入）」（`CAND_RELIGION_OTHER`）の欄に残す。
+  **保存先は今までどおり `candidates.religion` の1列**（`religion_other` という列は無い）
+  - 読み書きは **`_religionValue(prefix)` / `_religionSet(prefix, val)` の2つだけ**を通す
+  - 旧・応募者登録リンクは `cf_*` を総なめして保存するので、`_cndFormValues()` で
+    `religion` / `religion_other` を除いてから `_religionValue('cf')` で組み立てる
+    （でないと存在しない列が混ざって保存がまるごと落ちる）
+- 2つのタブで写すため `CAND_SYNC_FIELDS` に `religion` と `religion_other` の両方を入れてある。
+  写したあとの記入欄の出し入れは `_cndCopyField` の中で `onCandReligionChange()` を呼んで合わせる
+- 外部フォームの訳は `EXT_FORM_I18N` に選択肢ぶんも入れてある（`option` は「日本語 / 訳」になる）
 
 #### 📢 冒頭の案内（はじめにお読みください）
 
