@@ -135,6 +135,21 @@ UI変更やロジック変更のときは実際に描画して確かめる。
     （`setChatMentionKind`。もう一度押すと解除）。絞り方は `_chatMentionKind`
     （`''` 両方／`'direct'`／`'group'`）で、**見るのは `renderChatRooms` の中の1箇所だけ**。
     ［@メンション］のチェックは今までどおり両方まとめて（`_chatMentionKind` は空に戻す）
+- **🔕 チャットの離脱（管理者の承認つき）**: `chat_leave_requests` テーブル。
+  全社員が全チャットに入っているので、関係のないチャットは通知を止められる
+  - 申請の単位は2つ（**`CHAT_LEAVE_SCOPES` の1箇所**）＝ `room`（チャット1件）／`company`（企業まるごと）。
+    **どちらも同じ1テーブルで持つ**（`room_id` か `company_id` のどちらかが入る）
+  - **承認されると通知だけ止まる。一覧には残す**（あとから読めるようにするため）＝
+    未読・メンションの数を0にし、ブラウザ通知の対象からも外す
+  - **離脱しているかの判定は `_chatIsLeftRoom(r)` の1箇所だけ**
+    （チャット単位で承認されたぶん＋その企業ごと承認されたぶん）。
+    未読集計では `_leftRoomIds` を作って合計からも外す（バッジと一覧で必ず同じ数になる）
+  - 入口は2つ。企業カードの🔔（`_leaveBtn`）と、チャットのヘッダーの🔔（`_chatLeaveHeadBtn`）。
+    **同じボタンで取り消し・解除もできる**（`requestChatLeave` が状態を見て切り替える）
+  - **onclick に名前を埋め込まない**。表示用の名前は `_chatLeaveName()` で引く
+    （企業名に `"` が入ると属性が壊れるため）
+  - 承認は**管理者のマイページ【✅ 承認】**（`renderChatLeaveApprovals`）。
+    承認待ちの件数はサイドバーとマイページのアラート欄にも出す（`updateApproveAlerts`）
 - **ピン留め**: `chat_pins` テーブル。`room_id` が入っていれば個別チャットのピン、
   無ければ企業カードのピン（`_chatPinnedCompanyIds` / `_chatPinnedRoomIds`）。
   個別ピンは企業内リストで先頭に並び、`_prependPinnedRoomSection()` が一覧最上部にも表示する
