@@ -1191,6 +1191,9 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   - 対応者の役職 … **`users.support_role`**（`_meetStaffRole()` の1箇所。
     `allUsers` は画面によって軽いSELECTで上書きされるので `loadSupportRoles()` が対応表を別に持つ）
   - 監督者（5-6号）… **`companies.supervisor_name` / `supervisor_title` / `supervisor_dept`**
+- **⚠️ 日付が足りない人材を直す画面は `openMeetDateFix(companyId)` の1箇所**
+  （企業ごとに並べて配属日・退職日を入れ、`saveMeetDateFix()` が**直した欄だけ**を workers に書く）。
+  入口は2つ＝画面の［⚠️ 日付が足りない人材］（全体）と、一覧の「⚠️日付なし◯名」（その企業だけ）
 - **［📥 この四半期をまとめて作成］は `reg13BulkCreate()` の1箇所**。
   その四半期に在籍していた人材がいる企業ぶんを一度に作る。**すでにある記録には触らない**
   （過去の四半期をそろえるための入口）
