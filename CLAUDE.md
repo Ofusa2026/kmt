@@ -753,6 +753,12 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
       「【要対応】各担当 ◯月◯日（◯曜日）までに処理してください！」が出て、色が赤系になる。
       **空にすると期限の表示だけ消える**（お知らせ自体は残る）。
       **⏰ 面談記録の記入待ちも同じ期限を使う**（`updateMeetingAlerts` / `openMeetingTodoList`）
+    - **期限を過ぎたら赤く点滅する**（アナウンスの未確認と同じ `kmtAnnBlinkRed`）。
+      **過ぎたかの判定は `_meetDueOver()` の1箇所だけ**で、見た目を作るのは
+      `_meetDueTag()`（【要対応】／【期限超過】の印）・`_meetDueTagText()`（モーダルの見出し用の文字）・
+      `_meetDueLine(inline)`（案内の1行。`inline` はお知らせの中に入れるとき）の3つ。
+      サイドバーのチップは `_alertChipHtml(..., cls)` の最後の引数に `due-over` を渡す。
+      **点滅のCSSは `.due-over` の1箇所**
     - サイドバー・マイページの並びは **📅 報告書の日付 → ⏰ 面談記録の記入待ち**
       （`meetDateAlerts` / `meetingAlerts` の並び順。マイページは `my` 付きの同じ2つ）
   - **`MEETING_TODO_WATCHERS` に書いた人だけは全社ぶんが出る**（いまは ニサ）。
