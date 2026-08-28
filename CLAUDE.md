@@ -741,6 +741,12 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   - **担当かどうかの判定は `_meetingTodoIsMine()` の1箇所**＝ その企業のメイン／サブ担当・
     **人材の担当（`workers.staff`）**・予定の担当者（`staff_names`）のどれかに自分がいること。
     関係のない人には出さない
+  - **📅 定期面談報告書に必要な日付（配属日・退職日）が空の人材**のお知らせは別もの＝
+    `loadMeetDateTodos()` → `updateMeetDateAlerts()`（サイドバー `meetDateAlerts` ／
+    マイページ `myMeetDateAlerts`）。押すと `openMeetDateFix('mine')` が開く
+    - **出すのは GLT の担当だけ**（営業には出さない）。**判定は `_meetDateFixStaff()` の1箇所**
+      ＝ その企業のメイン・サブ・チーム担当と人材の担当のうち、**チームが GLT の人**
+    - 人材は**足りないものだけを引く**（退職済で退職日が空／配属日が空）ので、全人材は読まない
   - **`MEETING_TODO_WATCHERS` に書いた人だけは全社ぶんが出る**（いまは ニサ）。
     確認と全員への共有のためで、見出しに「（全体）」、一覧に🙋担当者名が付く（`_meetingTodoStaffText()`）。
     やめるときはこの配列を空にする
@@ -1017,6 +1023,10 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - `users.full_name` ＝ **フルネーム**（**書類を作るときだけ**使う。空ならユーザー名のまま出る）
 - **引くのは `fullNameOf(name)` の1箇所だけ**。`allUsers` に `full_name` が無い画面でも引けるよう、
   `loadFullNames()` が `name → full_name` の対応表を別に持つ（1回だけ読む）
+- ⚠️ **所属機関の担当欄には「蛭田」「白井」のように名字だけが入っている**。
+  名前からユーザーを引くのは **`_userByName()` の1箇所だけ**で、ぴったり合わなければ
+  **1人だけに絞れるときに限って**前方一致・部分一致でも拾う（2人以上に当たるときは拾わない）。
+  `fullNameOf()` / `_meetTeamOf()`（GLT・営業の判定）/ `_meetStaffRole()` は全部これを通す
 - 書類でフルネームにする欄は **`REG_DOC_FULLNAME_KEYS` の1箇所**（担当者名が入る欄）。
   差し替えるのは `regRunDocExport` の中の `_regApplyFullNames()` の1回だけ
 - ⚠️ **`openRegDocExport` は記録の `data` をコピーしてから使う**（そのまま使うと、
