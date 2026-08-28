@@ -116,6 +116,18 @@ UI変更やロジック変更のときは実際に描画して確かめる。
 > where table_name='candidates' and column_name in ('足したい列名');
 > ```
 
+#### 💬 求人チャットの絞り込み・凡例（💬 チャットとは別の入れ物）
+
+- メンションの状態と合計は **`_jobChatMentionOnly` / `_jobChatMentionKind` /
+  `_jobMentionDirectTotal` ほかの専用の変数**で持つ。
+  **💬 チャット（人材・企業）の `_chatMentionKind` / `_mentionDirectTotal` には絶対にさわらない**
+  （共用にすると、片方で絞ったときにもう片方まで絞られる）
+- 合計を作るのは未読集計の中の `_sumJobOnly()`（求人ぶんだけを足す）。
+  凡例は `updateJobMentionLegend()`、絞り込みは `setJobChatMentionKind()` / `setJobChatMentionFilter()`
+- 並びは **📌ピン → 未読の多い順 → 最終更新の新しい順**
+- ピンのボタンは `toggleChatRoomPin()` を共用する。**そのあと描き直すのは開いている一覧だけ**
+  （`#chatRoomList` があれば `renderChatRooms`、`#jobChatList` があれば `renderJobChatList`）
+
 - **KMTドライブのリンク**: そのチャットの「元の欄」に書き戻す。人材＝`workers.drive_url_kmt`／
   求人＝`job_progress.drive_url_kmt`（求人進捗 情報タブ）／候補者＝`candidates.drive_url_kmt`（候補者情報タブ）。
   **どこに書くかは `_chatDriveTarget()` の1箇所だけ。** こうしておくと、画面の欄とチャットの
@@ -156,10 +168,21 @@ UI変更やロジック変更のときは実際に描画して確かめる。
   - **onclick に名前を埋め込まない**。表示用の名前は `_chatLeaveName()` で引く
     （企業名に `"` が入ると属性が壊れるため）
   - 承認は**管理者のマイページ【✅ 承認】**（`renderChatLeaveApprovals`）。
-    承認待ちの件数はサイドバーとマイページのアラート欄にも出す（`updateApproveAlerts`）
+    承認待ちの件数はサイドバーとマイページのアラート欄にも出す（`updateApproveAlerts`）。
+    ⚠️ アラートから開くときの画面キーは **`my_account`**（`myaccount` では開かない。実際に開かなかった）
+  - **💼 求人チャット・🧑 候補者チャットは別あつかい**（`kind='job'`）
+    - **担当かどうかに関係なく必ず承認が要る**（`_chatLeaveNeedsApproval` の中で
+      `is_job_chat` / `is_candidate_chat` を見て先に true を返す）。理由の記入も必須
+    - **承認できるのは `CHAT_LEAVE_JOB_APPROVERS` の人だけ**（いまは ニサ）。
+      ほかの管理者の【✅ 承認】には出さない。ふるいは **`_chatLeavePendingForMe()` の1箇所**で、
+      一覧の件数もアラートの件数もこれを見る（必ず同じ数になる）
+    - 求人ぶんかどうかは**申請したときに入れる `kind` の1つ**で見分ける
+      （`_chatLeaveKind()`。あとから部屋を引き直さなくていいように列に持たせている）
+    - **人材・企業のチャットは今までどおり**（`kind='general'`。担当外はその場で承認なし）
 - **ピン留め**: `chat_pins` テーブル。`room_id` が入っていれば個別チャットのピン、
   無ければ企業カードのピン（`_chatPinnedCompanyIds` / `_chatPinnedRoomIds`）。
-  個別ピンは企業内リストで先頭に並び、`_prependPinnedRoomSection()` が一覧最上部にも表示する
+  個別ピンは企業内リストで先頭に並び、`_prependPinnedRoomSection()` が一覧最上部にも表示する。
+  **求人チャットのピンも同じテーブル**（💬 チャットの一覧は求人ぶんを最初から外しているので混ざらない）
 - **添付**: `chat_messages.attachments`（`[{url,name,mimeType,size}]`）。実体は GAS 経由で Google Drive にアップロード。
   画像（`isChatImageAttachment()` が true）は `driveImageUrl(url, 800)` でサムネイル化してチャット内に直接表示、
   それ以外はファイルリンク。表示に失敗したら `_chatImgFallback()` がリンクに戻す
