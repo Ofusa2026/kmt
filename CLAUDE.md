@@ -738,7 +738,12 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - 手で入れた定期面談も、**同じ企業・`MEETING_MATCH_DAYS`(3)日以内の予定があれば自動で結び付ける**
   （`_meetingMatchSchedule()`。これが無いと記入待ちが消えない）
 - **担当者へのお知らせ**。数えるのは **`_meetingTodoMine()` の1箇所だけ**
-  （その企業のメイン／サブ担当か、予定の担当者（`staff_names`）に自分がいるぶんだけ）
+  - **担当かどうかの判定は `_meetingTodoIsMine()` の1箇所**＝ その企業のメイン／サブ担当・
+    **人材の担当（`workers.staff`）**・予定の担当者（`staff_names`）のどれかに自分がいること。
+    関係のない人には出さない
+  - **`MEETING_TODO_WATCHERS` に書いた人だけは全社ぶんが出る**（いまは ニサ）。
+    確認と全員への共有のためで、見出しに「（全体）」、一覧に🙋担当者名が付く（`_meetingTodoStaffText()`）。
+    やめるときはこの配列を空にする
   - 出る場所は3つ＝ サイドバー `meetingAlerts` ／ マイページ `myMeetingAlerts`
     （どちらも `updateMeetingAlerts()`）／ 面談記録の一覧の上のバナー（`renderMeetingList`）
   - ブラウザ通知は `_meetingNotify()`。**同じ日に何度も出さない**（`localStorage` に日付を覚える）
