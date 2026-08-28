@@ -1100,6 +1100,13 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   中身は **`_expDeleteRow()` の1箇所**。消す前に `_confirmDeleteTwice()` で2回たずねる。
   取得には `is_deleted=not.eq.true` を付ける
 
+#### 💵 現金小口のボタン
+
+- 立替管理の［🔄 更新］の左。**リンクは `PETTY_CASH_SHEET_URL` の1箇所だけ**で、
+  開くのは `openPettyCashSheet()`（`requireAdmin()` を通す）
+- **ボタンは誰にも見えるが、押せるのは管理者だけ**（管理者以外は 🔒 を付けて薄くし、
+  押すとトーストで知らせる）。シート自体の閲覧権限は Google 側で決まる
+
 #### 📎 領収書の添付
 
 - 実体は `expenses.receipts`（jsonb の `[{url,name,mimeType,size,at,by}]`）。
