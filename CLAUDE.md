@@ -942,6 +942,18 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   `openCandidateModal()` を開く。見つからなければ候補者一覧を開いて「【テスト】」で検索した状態にする
 - アナウンス詳細（`#annDetailModal`）は生DOMなので、閉じるのは `remove()`（`closeGenModal` ではない）
 
+### 📛 ユーザー名とフルネーム
+
+- `users.name` ＝ **ユーザー名**（チャット・各一覧・入力欄はすべてこれ。今までどおり）
+- `users.full_name` ＝ **フルネーム**（**書類を作るときだけ**使う。空ならユーザー名のまま出る）
+- **引くのは `fullNameOf(name)` の1箇所だけ**。`allUsers` に `full_name` が無い画面でも引けるよう、
+  `loadFullNames()` が `name → full_name` の対応表を別に持つ（1回だけ読む）
+- 書類でフルネームにする欄は **`REG_DOC_FULLNAME_KEYS` の1箇所**（担当者名が入る欄）。
+  差し替えるのは `regRunDocExport` の中の `_regApplyFullNames()` の1回だけ
+- ⚠️ **`openRegDocExport` は記録の `data` をコピーしてから使う**（そのまま使うと、
+  書類用の書き替え（フルネーム・署名画像）が記録に残ってしまう）
+- ⚠️ **フルネームはリポジトリに書かない**（個人情報）。DBの `users.full_name` にだけ持つ
+
 ### 📘 登録支援機関業務の記録簿 ← 人材情報の反映
 
 - 様式の定義は **`REG_FORM_DEFS` の1箇所**（項目の一覧は `REG_SUPPORT_TASKS`）
