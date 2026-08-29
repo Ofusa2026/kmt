@@ -807,6 +807,46 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   DBは移行済みだが、取りこぼしがあってもバッジ・件数・絞り込み・選択欄で新しい名前になる
 - **名前を変えるときは `workers.renewal_status` の移行も一緒にやること**
   （表示だけ変えると、絞り込みの件数と一覧が食い違う）
+- `decide:true` … 更新決定チェックの［決定］ボタンに出すもの（4つ）。
+  申請依頼済み・完了は決定の対象ではないので付けていない
+
+#### 📝 更新決定のしくみ（チェック → 決定 → 承認 → チャット → 毎月のサイクル）
+
+- **確認事項（質問・選択肢・出す条件・必須かどうか）は `REN_CHECK_ITEMS` の1箇所だけ。**
+  `when` を書いた欄はその条件のときだけ出て、出ていない欄は未入力に数えない（`_renCheckVisible`）
+  - 実体は **`renewal_checks`**（人材 × 対象月で1件）。対象月を決めるのは **`_renTargetYm(w)` の1箇所**
+    ＝ 在留期限の `REN_TARGET_MONTHS_AHEAD`(4) か月前の月
+  - **一時帰国日は人材情報にも書き戻す**（対応は **`REN_CHECK_TO_WORKER` の1箇所**＝
+    `temp_return_date`→`return_home_date` / `temp_return_back_date`→`return_jp_date`）。
+    欄とチェックシートが必ず同じものを指すようにするため
+  - 記入できるのは**メイン／サブ担当と管理者**（`_renCheckCanEdit()` の1箇所）
+  - **1つでも空いていると決定のボタンは押せない**（`_renCheckMissing()` の1箇所）
+  - 収入印紙費用の負担パターンの説明は **`REN_FEE_PATTERNS` の1箇所**（`desc` に入れると画面に出る）
+- **`workers.renewal_status` を書くのは `_renWriteStatus()` の1箇所だけ。**
+  入口は `applyRenewalStatus()` で、人材詳細の選択欄（`onRenewalStatusChange`）も
+  チェックシートの決定（`decideRenewalFromCheck`）も必ずここを通る＝**履歴が必ず残る**
+  - 履歴は **`renewal_status_log`**（いつ・だれが・何から何へ・承認者）。
+    人材詳細（`renderWorkerRenLog`）とチェックシート（`renderRenewalLog`）に出る
+  - ⚠️ 人材詳細の選択欄は、承認が要るときは**元の値に戻す**（DBと画面が食い違わないように）
+- **承認が要る組み合わせは `REN_APPROVAL_MATRIX` の1箇所だけ**（左＝いまの値／右＝変えたい値）。
+  判定は **`_renNeedsApproval()` の1箇所**で、**一度も決定していない人材（初回）は承認なし**
+  - 申請は **`renewal_status_requests`**（チャット離脱の承認と同じ作り）。**理由の記入が必須**
+  - 承認できるのは **`REN_APPROVERS` の1箇所**（いまは ニサ・白井）。
+    管理者のマイページ【✅ 承認】にチャット離脱の承認と**並べて**出す（`renderRenewalApprovals`）。
+    承認待ちの件数（`updateApproveAlerts`）は両方を足したもの
+  - **承認されるとその人材のチャットに `@全員` で投稿する**（文面は `_renPostStatusChat()` の1箇所）。
+    `mentions` には全員の名前を展開して入れる
+- **毎月のサイクル**。日付を出すのは **`_renCycleDates(ym)` の1箇所**
+  ＝ その月の最終営業日（期限）と、その `REN_CYCLE_LEAD_DAYS`(14) 日前の営業日（開始）。
+  土日だけを見て祝日は見ない（ほかの平日計算と同じ）
+  - 段階は **`_renCycleState()` の1箇所**（before／admin＝管理者が依頼をかける番／open／over）
+  - 依頼をかけられるのは **`REN_CYCLE_ADMINS` の1箇所**（ニサ・白井）。
+    押した記録は `renewal_month_meta.requested_at` / `requested_by`
+  - 対象は **在留期限が「サイクル月＋4か月」の人材**（`_renCycleTargets`）。
+    **全員決まるまでアラートは消えない**。期限を過ぎたら `.due-over` で赤く点滅
+  - アラートの置き場はサイドバー `renCycleAlerts` ／ マイページ `myRenCycleAlerts`
+- **手順の文章と図は `REN_GUIDE_STEPS` / `_renGuideSvg()` の1箇所だけ**（`openRenewalGuide`）。
+  図は SVG を直に書く（ライブラリを増やさない）。仕組みを変えたらここも直すこと
 
 ### 外国人材アラート（サイドバーと画面上部バナー）
 
