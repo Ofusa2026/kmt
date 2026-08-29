@@ -167,7 +167,15 @@ UI変更やロジック変更のときは実際に描画して確かめる。
     **同じボタンで取り消し・解除もできる**（`requestChatLeave` が状態を見て切り替える）
   - **onclick に名前を埋め込まない**。表示用の名前は `_chatLeaveName()` で引く
     （企業名に `"` が入ると属性が壊れるため）
-  - 承認は**管理者のマイページ【✅ 承認】**（`renderChatLeaveApprovals`）。
+  - **管理者ではないが「承認だけ」できる人は `APPROVE_ONLY_USERS` の1箇所だけ**（いまは アヒュ）。
+  できるのは **🔕 チャット離脱の承認**（`canApproveChatLeave()` の1箇所で判定）と
+  **🔁 更新の承認・依頼**（`REN_APPROVERS`）だけ。`isAdminUser()` / `requireAdmin()` は変えていないので、
+  **ほかの管理者向けの画面（設定・アナウンス作成・電子印など）は使えないまま**
+  - 離脱の承認は4か所で見る＝`loadChatLeavePending` / `renderChatLeaveApprovals` /
+    `updateApproveAlerts` の件数 / `decideChatLeave`。**全部 `canApproveChatLeave()` を通す**
+  - 💼 求人チャットぶんは今までどおり `CHAT_LEAVE_JOB_APPROVERS`（ニサ）だけ。
+    `_chatLeavePendingForMe()` がふるうので、ほかの承認者の一覧には出ない
+- 承認は**管理者のマイページ【✅ 承認】**（`renderChatLeaveApprovals`）。
     承認待ちの件数はサイドバーとマイページのアラート欄にも出す（`updateApproveAlerts`）。
     ⚠️ アラートから開くときの画面キーは **`my_account`**（`myaccount` では開かない。実際に開かなかった）
   - **💼 求人チャット・🧑 候補者チャットは別あつかい**（`kind='job'`）
@@ -845,8 +853,7 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   ③どの人材のチェックシートでも記入できる。**更新の件だけ**で、ほかの管理者向け画面には効かない
   - 判定は **`_renNameIn()` の1箇所**。名簿が「白井　美紗」でここが「白井」のように
     **名字だけ／フルネームのどちらでも合うよう前方一致でも見る**（完全一致だけだと外れる。実際に外れた）
-  - マイページの【✅ 承認】タブは `isAdminUser() || _renIsApprover()` で出す。
-    **システム管理者でない人にはチャット離脱の承認は出さない**（`renderChatLeaveApprovals` で空にする）
+  - マイページの【✅ 承認】タブは `canApproveChatLeave() || _renIsApprover()` で出す
   - サイドバーの承認待ちのお知らせ（`updateApproveAlerts`）は、中身に合わせて見出しを変える
     （更新だけ／離脱だけ／両方）
 - **承認が要る組み合わせは `REN_APPROVAL_MATRIX` の1箇所だけ**（左＝いまの値／右＝変えたい値）。
