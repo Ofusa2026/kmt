@@ -870,8 +870,15 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   - 段階は **`_renCycleState()` の1箇所**（before／admin＝管理者が依頼をかける番／open／over）
   - 依頼をかけられるのは **`REN_CYCLE_ADMINS` の1箇所**（ニサ・白井）。
     押した記録は `renewal_month_meta.requested_at` / `requested_by`
-  - 対象は **在留期限が「サイクル月＋4か月」の人材**（`_renCycleTargets`）。
-    **全員決まるまでアラートは消えない**。期限を過ぎたら `.due-over` で赤く点滅
+  - **対象の決め方は `REN_TARGET_MONTHS_AHEAD` まわりの一かたまりだけ**（`_renCycleTargets`）
+    - メイン … 在留期限が「サイクル月 ＋ `REN_TARGET_MONTHS_AHEAD`(5) か月」の人材。
+      **決定から在留期限まで4か月以上あける**ための5か月
+    - 繰り越し … 前の `REN_CARRY_MONTHS`(1) か月ぶんのうち、**まだ申請が動いていないもの**
+      （`REN_CARRY_VISA`＝特定技能1号 ／ `REN_CARRY_APPLY`＝空か「申請予定なし」）は
+      次の回にも残す。判定は **`_renIsCarry()` の1箇所**で、行には `_carry` の印が付く
+    - 繰り越しは**前に決めていても「残り」に入れる**（決め直しが要るため）。
+      うるさければ `REN_CARRY_SKIP_REN` に更新ステータスを足せば外れる（いまは空）
+  - **全員決まるまでアラートは消えない**。期限を過ぎたら `.due-over` で赤く点滅
   - アラートの置き場はサイドバー `renCycleAlerts` ／ マイページ `myRenCycleAlerts`
 - **手順の文章と図は `REN_GUIDE_STEPS` / `_renGuideSvg()` の1箇所だけ**（`openRenewalGuide`）。
   図は SVG を直に書く（ライブラリを増やさない）。仕組みを変えたらここも直すこと
