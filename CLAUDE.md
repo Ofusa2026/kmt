@@ -835,8 +835,9 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   `when` を書いた欄はその条件のときだけ出て、出ていない欄は未入力に数えない（`_renCheckVisible`）
   - 実体は **`renewal_checks`**（人材 × 対象月で1件）。対象月を決めるのは **`_renTargetYm(w)` の1箇所**
     ＝ 在留期限の `REN_TARGET_MONTHS_AHEAD`(4) か月前の月
-  - **一時帰国日は人材情報にも書き戻す**（対応は **`REN_CHECK_TO_WORKER` の1箇所**＝
-    `temp_return_date`→`return_home_date` / `temp_return_back_date`→`return_jp_date`）。
+  - **退職予定日と一時帰国日は人材情報にも書き戻す**（対応は **`REN_CHECK_TO_WORKER` の1箇所**＝
+    `resign_expected_date`→`expected_leave_date` / `temp_return_date`→`return_home_date` /
+    `temp_return_back_date`→`return_jp_date`）。
     欄とチェックシートが必ず同じものを指すようにするため
   - 記入できるのは**メイン／サブ担当と管理者**（`_renCheckCanEdit()` の1箇所）
   - **1つでも空いていると決定のボタンは押せない**（`_renCheckMissing()` の1箇所）
@@ -880,13 +881,13 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
       うるさければ `REN_CARRY_SKIP_REN` に更新ステータスを足せば外れる（いまは空）
   - **全員決まるまでアラートは消えない**。期限を過ぎたら `.due-over` で赤く点滅
   - アラートの置き場はサイドバー `renCycleAlerts` ／ マイページ `myRenCycleAlerts`
-- 🧪 **デモ用の人材は氏名が `DEMO_WORKER_PREFIX`（`【デモ】`）で始まる行**。
-  **判定は `_isDemoWorker()` の1箇所だけ**で、本番にさわらずに流れを試すためのもの
+- 🧪 **テスト用の人材は氏名が `TEST_WORKER_PREFIX`（`【テスト】`）で始まる行**。
+  **判定は `_isTestWorker()` の1箇所だけ**で、本番にさわらずに流れを試すためのもの
   - **だれでも記入・決定できる**（`_renCheckCanEdit` の先頭）／**だれのリストにも出る**（`_renCycleMine`）
   - 承認後のチャットは **@全員 にしない**（`_renPostStatusChat` の中で宛先を申請者と承認者だけにする）
-  - `resetRenewalDemo()` でステータス・チェックシート・記録・申請を消して何度でも試せる。
-    **消すのはデモ用の人材のぶんだけ**（`worker_id` で絞る）
-  - 実体は本物の `workers` の行（`【デモ】更新デモ 太郎`／`【デモ】更新テスト社`）。
+  - `resetRenewalTest()` でステータス・チェックシート・記録・申請を消して何度でも試せる。
+    **消すのはテスト用の人材のぶんだけ**（`worker_id` で絞る）
+  - 実体は本物の `workers` の行（`【テスト】更新テスト 太郎`／`【テスト】更新テスト社`）。
     アラートに出ないよう必須項目は埋めてある
 - **手順の文章と図は `REN_GUIDE_STEPS` / `_renGuideSvg()` の1箇所だけ**（`openRenewalGuide`）。
   図は SVG を直に書く（ライブラリを増やさない）。仕組みを変えたらここも直すこと
