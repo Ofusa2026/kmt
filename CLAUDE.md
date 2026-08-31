@@ -1052,6 +1052,9 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 
 - **年数は `TOKUTEI_YEARS`(5) / `TOKUTEI_YEARS_SIX`(6) の1箇所だけ**。
   `calcTokuteiSummary(rows, { sixYear })` が満了日の計算に使い、`s.years` を画面のラベルに出す
+- **満了日は5年ぶんと6年ぶんを両方返す**（`s.byYear[5]` / `s.byYear[6]`。作るのは `mk()` の1箇所）。
+  画面では2つ並べて、いま効いているほうに【★いまの設定】、もう一方に（参考）を付ける
+  ＝ 5年と6年の違いがその場で分かる。`s.expiry5` / `s.over` / `s.remain` は**効いているほう**の値
 - 保存先は **`workers.tokutei_six_year`**（boolean）。読むのは **`isTokutei6y(w)` の1箇所**で、
   `worker5yExpiry(w)` と一覧のバッジ（`tokutei6yBadge()`）が同じものを見る。
   軽いSELECTでも読めるよう `WORKER_ALERT_SELECT_COLS` に列を入れてある
