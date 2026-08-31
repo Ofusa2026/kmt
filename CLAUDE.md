@@ -1180,6 +1180,25 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - 「見た」は `localStorage`（`kmt_role_notice_seen_<user_id>`）に `key` ごとに覚える。
   **新しいお知らせを出したいときは `key` を変えて足すだけ**
 
+### 🗒️ MTG議事録（社内共有事項の【🗒️ MTG議事録】タブ）
+
+- 画面は **📋 共有事項 → 🗒️ MTG議事録 → 📢 アナウンス** の3タブ（`switchNoticeTab`）。
+  実体は **`meeting_minutes`** テーブル（1件＝1回のMTG）
+- **選択肢は2つの1箇所だけ**
+  - `MTG_KINDS` … 週次MTG／随時MTG／緊急MTG／全体MTG／チームMTG／その他（アイコンと色もここ）
+  - `MTG_TARGETS` … KMT全体／GLT／総務／各チーム／グループ全体。
+    **`team:true` を付けたものを選んだときだけ**下に `MTG_TEAMS`（国名）の欄が出る
+    （出し入れは `_mtgNeedsTeam()` の1箇所。共有事項の「グループ → カテゴリー」と同じ考え方）
+- **メモと添付は共有事項と同じ**（textarea ＋ ドラッグ＆ドロップ／貼り付け／クリックの入れ物）。
+  実ファイルはチャット・ノートと同じ Drive フォルダーへ GAS 経由で入れる
+- **ToDo は `todos`（jsonb）**＝ `[{text, who, due, done}]`。
+  残っている件数を数えるのは **`_mtgTodoLeft()` の1箇所**で、一覧のバッジと
+  「☑️ ToDoが残っているものだけ」の絞り込みが同じ数を見る
+- 絞り込みは5つ＝ 検索／MTG種類／対象（＋チーム）／開催日の期間／ToDoが残っているものだけ。
+  **ふるいは `renderMinutes()` の1箇所**
+- 「各チーム」以外を選んだときは **保存で `target_team` を null にする**（前の値が残らないように）
+- 削除は**論理削除**（`is_deleted`）で、消す前に `_confirmDeleteTwice()` で2回たずねる
+
 ### 📢 アナウンスの出る場所
 
 - **ログイン時のお知らせ**（`showAnnouncementLoginNotice`）は、［✅ 確認しました］を押した
