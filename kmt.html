@@ -35683,6 +35683,12 @@ function renderRegSupportNav(){
 const REG_ORG_OPTS = ['株式会社KMT', '一般社団法人KMT'];
 /* 乙（登録支援機関）の住所と代表者。**この1箇所だけ**。
    `REG_ORG_OPTS` と同じ名前で引く（機関を選ぶと契約書の署名欄に自動で入る） */
+/* 別紙に出す「登録支援機関氏名又は名称」。記録に入っていれば（5-10号の乙など）それ、
+   無ければ REG_ORG_INFO の先頭。**引くのはこの1箇所だけ** */
+function _regOrgNameOf(d){
+  const v = String((d || {}).org2_name || (d || {}).agent_office || '').trim();
+  return v || Object.keys(REG_ORG_INFO)[0] || '';
+}
 const REG_ORG_INFO = {
   '株式会社KMT':     { addr:'東京都大田区蒲田5丁目11－10 FUNDES 蒲田 8階',        rep:'代表取締役　小森　健' },
   '一般社団法人KMT': { addr:'東京都大田区蒲田5丁目4番1号 グランイーグル蒲田1103号室', rep:'' },
@@ -35889,6 +35895,25 @@ function _meetQNow(){
    ・おわり　＝退職日（`left_date`。無ければ退職予定日・出国日）
    区分は 新規配属（四半期の中で始まった）／退職（四半期の中で終わった）／在職中 */
 const MEET_WORKER_KINDS = { new:'新規配属', left:'退職', stay:'在職中' };
+/* 参考様式第５－５号 別紙（＝第４－３号 別紙と同じ様式）の「支援実施状況」。
+   **選択肢はこの1箇所だけ**。**既定は「問題なし」**（基本ここにチェックし、必要なときだけ変える） */
+const MEET_SUPPORT_STATUSES = ['問題なし','問題あり（定期面談報告書写しを添付）'];
+const MEET_SUPPORT_DEFAULT  = MEET_SUPPORT_STATUSES[0];
+const MEET_UNIMPL_OPTS = ['', 'あり'];   // 未実施の支援項目がある
+/* 別紙に出す1人ぶんの情報。**記録に入っていない項目は人材情報から引く（この1箇所だけ）**。
+   氏名・在留カード番号しか入っていない古い記録でも、開き直さずに正しく出せる */
+function _meetMemberInfo(m){
+  const o = m || {};
+  const w = (allWorkers || []).find(x => (o.id && x.id === o.id) || (!o.id && x.name && x.name === o.name)) || {};
+  return {
+    name: o.name || w.name || '', card: o.card || w.residence_card || '',
+    gender: o.gender || w.gender || '', birth: o.birth || w.birthdate || '',
+    nat: o.nat || w.nationality || '', addr: o.addr || w.jp_address || '',
+    tel: o.tel || w.phone || w.cel_phone || '',
+    sup: o.sup || MEET_SUPPORT_DEFAULT, unimpl: o.unimpl || '',
+    kind: o.kind || '', date: o.date || '',
+  };
+}
 function _meetWorkerStart(w){ return w.joined_date || w.work_start_date || null; }
 function _meetWorkerEnd(w){ return w.left_date || w.expected_leave_date || w.departure_date || null; }
 // 退職済み系のステータス（退職日が無いと、いつ辞めたか分からない）
@@ -35912,7 +35937,9 @@ function _meetReportWorkers(companyId, y, q){
     const kind = (st && st >= r.from && st <= r.to) ? MEET_WORKER_KINDS.new
                : (en && en >= r.from && en <= r.to) ? MEET_WORKER_KINDS.left
                : MEET_WORKER_KINDS.stay;
-    return { id:w.id, name:w.name || '', card:w.residence_card || '', kind:kind, no_start: !st };
+    return { id:w.id, name:w.name || '', card:w.residence_card || '', kind:kind, no_start: !st,
+             gender:w.gender || '', birth:w.birthdate || '', nat:w.nationality || '',
+             addr:w.jp_address || '', tel:w.phone || w.cel_phone || '' };
   }).sort((a, b) => String(a.name).localeCompare(String(b.name), 'ja'));
 }
 /* ⚠️ 日付が足りなくて、その四半期に居たか分からない人材。**判定はこの1箇所だけ**
@@ -36773,7 +36800,9 @@ const REG_FORM_DEFS = {
         note:'配属日・退職日から、その四半期に在籍していた人が並びます。面談日は人ごとに入れられます（空のときは下の「面談日」を使います）' },
       cols:[{k:'name',l:'氏名'},{k:'card',l:'在留カード番号'},
         {k:'kind',l:'区分',opts:Object.values(MEET_WORKER_KINDS)},
-        {k:'date',l:'面談日',t:'date'}]},
+        {k:'date',l:'面談日',t:'date'},
+        {k:'sup',l:'支援実施状況（別紙）',opts:MEET_SUPPORT_STATUSES},
+        {k:'unimpl',l:'未実施の支援項目',opts:MEET_UNIMPL_OPTS}]},
     {k:'meet_date',l:'１③ 面談日（全員まとめて行った日）',type:'date',
       fromNote:'面談記録の定期面談の日が入ります。人ごとに違うときは上の欄に入れてください'},
     {k:'method',l:'１④ 方式',type:'select',opts:REG_MEET_METHODS,fromNote:'面談記録の実施方法が入ります'},
@@ -36886,6 +36915,8 @@ function _regFillNote(f){
 // 一覧・フォームで使う人材の列（`from` の列も必ず入れる）
 const REG_WORKER_SELECT_COLS = [...new Set([
   'id','name','birthdate','nationality','gender','residence_card','status','company_id','entry_domestic_change',
+  // 定期面談報告書 第５－５号 別紙（支援対象者名簿）に出す住居地・連絡先
+  'jp_address','phone','cel_phone',
   // 定期面談報告書：その四半期に在籍していたかを見るための日付
   'joined_date','work_start_date','left_date','expected_leave_date','departure_date',
   ...Object.keys(REG_FORM_DEFS).flatMap(no => _regFillFields(Number(no)).map(f => f.from).filter(Boolean)),
@@ -37530,7 +37561,10 @@ function reg13FillMembers(force){
   if (!force && cur.length) return;
   d.members = _meetReportWorkers(cid, _reg13Year(), _reg13QuarterNo()).map(m => {
     const old = cur.find(x => x && x.name === m.name) || {};
-    return { name:m.name, card:m.card, kind:m.kind, date: old.date || '' };
+    // 支援実施状況は**入れ直しても前の選択を残す**（既定は「問題なし」）
+    return { id:m.id, name:m.name, card:m.card, kind:m.kind, date: old.date || '',
+             gender:m.gender, birth:m.birth, nat:m.nat, addr:m.addr, tel:m.tel,
+             sup: old.sup || MEET_SUPPORT_DEFAULT, unimpl: old.unimpl || '' };
   });
   regRenderRows('members');
   if (force) showToast('📥 ' + d.members.length + '名を入れました', 'success');
@@ -38588,23 +38622,48 @@ function buildRegTaskDocHtml(no, d){
         '<td style="border:none;padding-top:14px;font-size:12px;">' +
           und('面談実施者の氏名', fullNameOf(staffOf(key)), 190) + '</td>' +
       '</tr></table>';
-    // 別紙（その日の対象者が2名以上のとき）
+    /* 別紙（その日の対象者が2名以上のとき）。
+       **様式は「１号特定技能外国人支援対象者名簿」（参考様式第４－３号 別紙と同じ形）**。
+       氏名・性別・生年月日・国籍地域・在留カード番号・住居地は**人材情報から入る**
+       （`_meetMemberInfo()` の1箇所）。支援実施状況は既定が「問題なし」 */
+    const chk = on => (on ? '☑' : '□');
+    const gsex = v => {
+      const t = String(v || '');
+      const on = 'display:inline-block;border:1px solid #333;border-radius:50%;padding:0 3px;';
+      return '<span style="' + (/女/.test(t) ? '' : (/男/.test(t) ? on : '')) + '">男</span>・' +
+             '<span style="' + (/女/.test(t) ? on : '') + '">女</span>';
+    };
+    const supCell = m =>
+      '<span style="white-space:nowrap;">・未実施の支援項目がある　→　' + chk(m.unimpl === 'あり') + '</span><br>' +
+      '・定期面談の問題の有無<br>' +
+      '　' + chk(m.sup === MEET_SUPPORT_STATUSES[1]) + '　問題あり(定期面談報告書写しを添付)<br>' +
+      '　' + chk(m.sup !== MEET_SUPPORT_STATUSES[1]) + '　問題なし';
     const besshi = g =>
       '<div style="page-break-before:always;">' +
         '<div style="text-align:left;font-size:11px;">参考様式第５－５号　別紙</div>' +
-        T('面談対象者一覧') +
-        '<p style="font-size:12px;">特定技能所属機関：' + val(d.company_name, 200) +
-          '　／　対象期間：' + esc(String(d.year || '')) + '年 ' + esc(String(d.quarter || '')) +
+        T('１号特定技能外国人支援対象者名簿') +
+        '<p style="font-size:11.5px;margin:2px 0;">登録支援機関氏名又は名称：' + val(_regOrgNameOf(d), 200) + '</p>' +
+        '<p style="font-size:11.5px;margin:2px 0;">特定技能所属機関の氏名又は名称：' + val(d.company_name, 200) + '</p>' +
+        '<p style="font-size:10.5px;color:#444;margin:2px 0 6px;">対象期間：' +
+          esc(String(d.year || '')) + '年 ' + esc(String(d.quarter || '')) +
           '　／　面談日：' + (g.day ? _regFmtD(g.day) : blank(110)) + '</p>' +
-        '<table class="g"><tr>' + th2('8%', 'No') + th2('', '氏名') + th2('22%', '在留カード番号') +
-          th2('16%', '区分') + th2('18%', '面談日') + '</tr>' +
-          g.list.map((m, i) => '<tr><td style="text-align:center;">' + (i + 1) + '</td>' +
+        '<table class="g" style="font-size:10px;"><tr>' +
+          th2('4%', '') + th2('', '氏名（ローマ字）') + th2('7%', '性別') + th2('13%', '生年月日') +
+          th2('10%', '国籍・地域') + th2('12%', '在留カード番号') + th2('17%', '住居地') +
+          th2('26%', '支援実施状況') + '</tr>' +
+          g.list.map((m0, i) => { const m = _meetMemberInfo(m0); return (
+            '<tr><td style="text-align:center;">' + (i + 1) + '</td>' +
             '<td style="word-break:break-word;">' + txt(m.name) + '</td>' +
+            '<td style="text-align:center;white-space:nowrap;">' + gsex(m.gender) + '</td>' +
+            '<td style="text-align:center;white-space:nowrap;">' + (m.birth ? _regFmtD(m.birth) : '年　　月　　日') + '</td>' +
+            '<td style="text-align:center;">' + txt(m.nat) + '</td>' +
             '<td style="text-align:center;">' + txt(m.card) + '</td>' +
-            '<td style="text-align:center;">' + txt(m.kind) + '</td>' +
-            '<td style="text-align:center;">' + ((m.date || g.day) ? _regFmtD(m.date || g.day) : '　') + '</td></tr>').join('') +
+            '<td style="font-size:9px;line-height:1.45;">' + txt(m.addr) +
+              (m.tel ? '<br>（' + esc(m.tel) + '）' : '') + '</td>' +
+            '<td style="font-size:9px;line-height:1.55;text-align:left;">' + supCell(m) + '</td></tr>'); }).join('') +
         '</table>' +
-        '<p class="note">※ 参考様式第５－５号の「①特定技能外国人の氏名」に対応する一覧です。</p>' +
+        '<p class="note">（注１）「未実施の支援項目がある」を選択した場合には、実施していない支援項目とその理由を記載した理由書（参考様式第５－１３号）を添付すること。</p>' +
+        '<p class="note">（注２）定期面談で「問題あり」を選択した場合には、定期面談報告書（参考様式第５－５号、５－６号）を添付すること。</p>' +
       '</div>';
     // 第５－５号（1号特定技能外国人用）
     const page55 = (g, br) => {
