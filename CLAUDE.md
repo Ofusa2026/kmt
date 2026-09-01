@@ -916,7 +916,28 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
     欄とチェックシートが必ず同じものを指すようにするため
   - 記入できるのは**メイン／サブ担当と管理者**（`_renCheckCanEdit()` の1箇所）
   - **1つでも空いていると決定のボタンは押せない**（`_renCheckMissing()` の1箇所）
-  - 収入印紙費用の負担パターンの説明は **`REN_FEE_PATTERNS` の1箇所**（`desc` に入れると画面に出る）
+  - 収入印紙費用の負担パターンは **`VISA_FEE_PATTERNS` の1箇所**（下の節）。
+    `REN_FEE_PATTERNS` はそこから作るだけ
+
+### 💴 入管申請費用（収入印紙代）の負担パターン
+
+- **選択肢は `VISA_FEE_PATTERNS` の1箇所だけ**（A＝受け入れ企業全額負担 ／
+  B＝特定技能人材の自己負担（本人へ直接請求）／C＝受け入れ企業にて全額お支払い後、本人負担分を回収）。
+  **保存するのは `A` / `B` / `C` の1文字**（更新チェックシートに入っている値と同じ）
+- 画面に出す文字（「パターンA：【…】」）を作るのは **`visaFeePatternText(v)` の1箇所**、
+  選択欄を作るのは `visaFeePatternOptionsHtml(cur)` の1箇所
+- 出る場所は3つ。**どれも同じ選択肢**
+  | 画面 | 欄のid | 保存先 |
+  |---|---|---|
+  | 所属機関の詳細（🏢 KMT担当の上） | `co_visa_fee_pattern` / `co_visa_fee_note` | `companies.visa_fee_pattern` / `visa_fee_note` |
+  | 決定報告（請求条件の下・3つのフォームすべて） | `dr_` / `ot_` / `sl_` + `_visa_fee_pattern` / `_visa_fee_note` | 報告テキストとコメント欄に出す |
+  | 更新チェックシート | `fee_pattern`（`REN_FEE_PATTERNS`） | `renewal_checks` |
+- ⚠️ **所属機関の欄は画面に直に書いてある `<select>`** なので、選択肢は
+  `fillVisaFeeSelects()` が入れる（`class="visa-fee-sel"` を見る）。
+  **`openCompanyModal` の先頭で `fillCoForm` より前に呼ぶこと**（後だと選んだ値が入らない）。
+  決定報告はテンプレートで作るので `${visaFeePatternOptionsHtml('')}` を直接書いている
+- 決定報告は**大房の `intake_requests` には送らない**（列が無い。存在しない列を混ぜるとINSERTが落ちる）。
+  報告テキストとコメント欄にだけ入れる
 - **`workers.renewal_status` を書くのは `_renWriteStatus()` の1箇所だけ。**
   入口は `applyRenewalStatus()` で、人材詳細の選択欄（`onRenewalStatusChange`）も
   チェックシートの決定（`decideRenewalFromCheck`）も必ずここを通る＝**履歴が必ず残る**
