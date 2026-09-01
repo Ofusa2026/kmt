@@ -1763,6 +1763,30 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   中身は **`_expDeleteRow()` の1箇所**。消す前に `_confirmDeleteTwice()` で2回たずねる。
   取得には `is_deleted=not.eq.true` を付ける
 
+### 💳 カード決済報告
+
+- 立替管理と同じ作り（一覧＋手動保存のモーダル＋論理削除）。実体は **`card_payments`** テーブル
+- **選択肢は3つの1箇所だけ**
+
+  | const | 中身 |
+  |---|---|
+  | `CARD_ITEMS` | 名目＝航空券代・宿泊代・レンタカー代・印鑑代・広告料（＋その他は記入） |
+  | `CARD_LIST` | 利用カード＝AMEX（KOTA TAKAMURA／KEN KOMORI／TUNNISA FAUZIA／AKIRA OFUSA）・ANA（KEN KOMORI） |
+  | `CARD_PURPOSES` | 目的＝配属・定期面談・本帰国（＋その他は記入） |
+
+- 名目・目的の「その他」は**選択肢に無い文字をそのまま列に入れる**（`item_name` / `uses[].purpose_other`）
+- **利用目的は「対象企業 × 目的」の行を何社ぶんでも足せる**＝ `card_payments.uses`（jsonb の
+  `[{company_id, company_name, purpose, purpose_other}]`）。読み書きは **`_cardUseList()` /
+  `cardUsesValue()` の2つだけ**を通し、描くのは `renderCardUses()` の1箇所
+  - 対象企業は **`<datalist>`（`cardCoList`）** なので、打つと候補が絞られ、**名簿に無い企業も手入力できる**。
+    候補から選べたときだけ `company_id` も入れる（あとで集計できるように）
+  - 一覧に出す文字を作るのは **`_cardUseText()` の1箇所**（「企業名：目的」）
+- モーダルは**手動保存**（`_manualSave.cardModal` ／ 接頭辞 `kp_` ／ `sm_card`）。
+  保存してもモーダルは閉じない。行の追加・削除は input が出ないので `_cardTouch()` で未保存の印を付ける
+  - ⚠️ 接頭辞に `cf_`（候補者）や `ef_`（立替）を使い回さないこと
+- 🗑 削除は**論理削除**（`is_deleted` / `deleted_at` / `deleted_by`）。消す前に `_confirmDeleteTwice()` で
+  2回たずねる。取得には `is_deleted=not.eq.true` を付ける
+
 #### 💵 現金小口のボタン
 
 - 立替管理の［🔄 更新］の左。**リンクは `PETTY_CASH_SHEET_URL` の1箇所だけ**で、

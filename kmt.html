@@ -720,6 +720,7 @@ tfoot tr.sale-total-row td{padding:9px 12px;font-size:13px;font-weight:800;color
   <div class="nav-item" onclick="showScreen('fees')">💴 支援委託費</div>
   <div class="nav-item" onclick="showScreen('sales')">📊 売上管理</div>
   <div class="nav-item" onclick="showScreen('expenses')">💸 立替管理</div>
+  <div class="nav-item" onclick="showScreen('card_payments')">💳 カード決済報告</div>
   <div class="sidebar-section">設定</div>
   <div class="nav-item" onclick="showScreen('users')">⚙️ ユーザー設定</div>
   <div class="nav-item" onclick="showScreen('chat_teams')">💬 チャットグループ</div>
@@ -17083,6 +17084,7 @@ const SCREENS = {
   fees:      { title: '💴 支援委託費', init: initFeesScreen },
   sales:     { title: '📊 売上管理', init: initSalesScreen },
   expenses:  { title: '💸 立替管理', init: loadExpenses },
+  card_payments:{ title: '💳 カード決済報告', init: loadCardPayments },
   users:     { title: '⚙️ ユーザー設定', init: loadUsers },
   system_admin:{ title: '🔒 システム管理', init: loadSystemAdmin },
   shift_kanri:{ title: '📅 シフト管理', init: loadShiftKanri },
@@ -17175,6 +17177,7 @@ function updateTopbarButtons(name) {
     expenses:     `<button class="btn btn-outline" onclick="openPettyCashSheet()"
                      title="${isAdminUser() ? '現金小口のシートを開きます' : '管理者のみ開けます'}"
                      style="${isAdminUser() ? '' : 'opacity:.5;'}">${isAdminUser() ? '' : '🔒 '}💵 現金小口</button><button class="btn btn-outline" onclick="loadExpenses()">🔄 更新</button><button class="btn btn-primary" onclick="openExpenseModal(null)">＋ 立替登録</button>`,
+    card_payments:`<button class="btn btn-outline" onclick="loadCardPayments()">🔄 更新</button><button class="btn btn-primary" onclick="openCardModal(null)">＋ カード決済登録</button>`,
     users:        `<button class="btn btn-outline" onclick="loadUsers()">🔄 更新</button>${isAdminUser() ? '<button class="btn btn-primary" onclick="openUserModal(null)">＋ ユーザー追加</button>' : ''}`,
     decision_report: ``,
     staff_list:   `<button class="btn btn-outline" onclick="loadStaffList()">🔄 更新</button><button id="staffListToggleBtn" class="btn btn-outline" onclick="toggleStaffCompanyList()" style="margin-left:4px;">📋 企業一覧を隠す</button>`,
@@ -17205,6 +17208,7 @@ function renderScreenContent(name) {
     fees: buildFeesScreen(),
     sales: buildSalesScreen(),
     expenses: buildExpensesScreen(),
+    card_payments: buildCardPaymentsScreen(),
     users: buildUsersScreen(),
     system_admin: buildSystemAdminScreen(),
     shift_kanri: buildShiftKanriScreen(),
@@ -25662,6 +25666,79 @@ const EXPENSE_ITEM_OTHER   = '__other__';
 /* 📎 領収書の置き場は **この1箇所だけ**（GAS 経由で Google Drive の共有フォルダに入れる） */
 const EXPENSE_RECEIPT_DRIVE_URL = 'https://drive.google.com/drive/folders/1QWXe5cT2dr63GlaMIyAygEEBa0jVnEsk';
 const EXPENSE_RECEIPT_MAX = 6;
+/* ===== 💳 カード決済報告 =====
+   会社のカードで払ったものを1件ずつ残す。**選択肢はこの3つの1箇所だけ**で、
+   登録画面・一覧・絞り込みが同時に追従する（立替管理と同じ作り） */
+const CARD_ITEMS    = ['航空券代','宿泊代','レンタカー代','印鑑代','広告料'];
+const CARD_LIST     = ['AMEX（KOTA TAKAMURA）','AMEX（KEN KOMORI）','AMEX（TUNNISA FAUZIA）','AMEX（AKIRA OFUSA）','ANA（KEN KOMORI）'];
+const CARD_PURPOSES = ['配属','定期面談','本帰国'];
+const CARD_ITEM_OTHER = '__other__';
+const CARD_PURPOSE_OTHER = 'その他';
+/* 利用目的の行（対象企業＋目的）。**1件に何社ぶんでも足せる**（`uses` の配列）。
+   読み書きは `_cardUses` を通し、保存のときに `cardUsesValue()` で1本にまとめる */
+let _cardUses = [];
+let allCardPayments = [], cardPaymentPage = 1, cardPaymentTotal = 0, editingCardId = null;
+function _cardUseRow(u){
+  u = u || {};
+  return { company_id:u.company_id || '', company_name:u.company_name || '',
+           purpose:u.purpose || '', purpose_other:u.purpose_other || '' };
+}
+function _cardUseList(v){ return (Array.isArray(v) ? v : []).map(_cardUseRow); }
+// 目的の見た目（その他は書いた文字を出す）。**この1箇所だけ**
+function _cardPurposeText(u){
+  const o = _cardUseRow(u);
+  return o.purpose === CARD_PURPOSE_OTHER ? (o.purpose_other || 'その他') : o.purpose;
+}
+function _cardUseText(u){
+  const o = _cardUseRow(u);
+  return [o.company_name, _cardPurposeText(o)].filter(Boolean).join('：');
+}
+function cardUsesValue(){
+  return _cardUses.map(_cardUseRow).filter(u => u.company_name || u.purpose);
+}
+// 対象企業の候補（打つと絞られる。名簿に無い企業は手で書ける）
+function _cardCompanyDatalist(){
+  return '<datalist id="cardCoList">' +
+    (_expCompanies || []).map(c => '<option value="' + esc(c.name || '') + '"></option>').join('') +
+    '</datalist>';
+}
+function renderCardUses(){
+  const box = document.getElementById('kp_uses');
+  if (!box) return;
+  box.innerHTML = _cardUses.map((u0, i) => {
+    const u = _cardUseRow(u0);
+    const other = u.purpose === CARD_PURPOSE_OTHER;
+    return '<div style="display:grid;grid-template-columns:1fr 130px ' + (other ? '1fr ' : '') + '26px;gap:6px;align-items:center;margin-bottom:6px;">' +
+      '<input class="form-input" list="cardCoList" value="' + esc(u.company_name) + '" placeholder="対象企業（打つと候補が出ます・手入力も可）"' +
+        ' oninput="updateCardUse(' + i + ',\'company_name\',this.value)" style="font-size:12px;">' +
+      '<select class="form-select" onchange="updateCardUse(' + i + ',\'purpose\',this.value)" style="font-size:12px;">' +
+        '<option value="">目的...</option>' +
+        CARD_PURPOSES.map(x => '<option' + (u.purpose === x ? ' selected' : '') + '>' + esc(x) + '</option>').join('') +
+        '<option' + (other ? ' selected' : '') + '>' + CARD_PURPOSE_OTHER + '</option>' +
+      '</select>' +
+      (other ? '<input class="form-input" value="' + esc(u.purpose_other) + '" placeholder="目的を記入"' +
+        ' oninput="updateCardUse(' + i + ',\'purpose_other\',this.value)" style="font-size:12px;">' : '') +
+      '<button type="button" onclick="removeCardUse(' + i + ')" title="この行を削除"' +
+        ' style="background:none;border:none;color:#9ca3af;font-size:15px;cursor:pointer;padding:0;line-height:1;">✕</button>' +
+    '</div>';
+  }).join('') || '<div style="font-size:11px;color:var(--gray-400);padding:4px 2px;">未入力（「＋ 対象企業」から足してください）</div>';
+}
+function addCardUse(){ _cardUses.push(_cardUseRow()); renderCardUses(); _expTouch(); }
+function removeCardUse(i){ _cardUses.splice(i, 1); renderCardUses(); _expTouch(); }
+function updateCardUse(i, key, val){
+  if (!_cardUses[i]) return;
+  _cardUses[i][key] = val;
+  // 企業名から企業を引けたら id も持っておく（あとで集計できるように）
+  if (key === 'company_name') {
+    const c = (_expCompanies || []).find(x => (x.name || '') === val);
+    _cardUses[i].company_id = c ? c.id : '';
+  }
+  if (key === 'purpose') renderCardUses();   // その他の記入欄を出し入れする
+  _cardTouch();
+}
+// ピッカーや行の追加は input が出ないので、未保存の印を手で付ける
+function _cardTouch(){ const cfg = _manualSave.cardModal; if (cfg) cfg.dirty = true; }
+
 /* 💵 現金小口のシート。**リンクはこの1箇所だけ**。
    開けるのは管理者だけ（`requireAdmin`）。シート自体の閲覧権限は Google 側で決まる */
 const PETTY_CASH_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1svFPjHQhf0ZKJaztcz5DsmKiIWFu00lg/edit?gid=211608501#gid=211608501';
@@ -26766,6 +26843,172 @@ async function loadExpenses(page) {
   showLoading(false);
 }
 
+async function loadCardPayments(page){
+  if (page) cardPaymentPage = page;
+  showLoading(true);
+  try {
+    let q = 'select=*&is_deleted=not.eq.true&order=use_date.desc';
+    const item = document.getElementById('kpFilterItem')?.value || '';
+    if (item) q += '&item_name=eq.' + encodeURIComponent(item);
+    const card = document.getElementById('kpFilterCard')?.value || '';
+    if (card) q += '&card=eq.' + encodeURIComponent(card);
+    const { data, total } = await sbFetchPage('card_payments', q, cardPaymentPage, PAGE_SIZE);
+    allCardPayments = data || [];
+    cardPaymentTotal = total;
+    renderCardPaymentTable();
+    _expEnsureMasters();   // 対象企業の候補を先に取っておく（登録画面をすぐ開けるように）
+  } catch(e) { showToast('❌ ' + e.message, 'error'); }
+  showLoading(false);
+}
+function clearCardPaymentFilters(){
+  ['kpSearchInput','kpFilterItem','kpFilterCard'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  loadCardPayments(1);
+}
+function renderCardPaymentTable(){
+  const tbody = document.getElementById('cardPaymentTbody'); if (!tbody) return;
+  const q = (document.getElementById('kpSearchInput')?.value || '').toLowerCase();
+  const rows = q ? allCardPayments.filter(e =>
+    [e.payee, e.item_name, e.staff, e.card, _cardUseList(e.uses).map(_cardUseText).join(' ')]
+      .some(v => String(v || '').toLowerCase().includes(q))) : allCardPayments;
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--gray-400)">データなし</td></tr>';
+    const pag = document.getElementById('cardPaymentPagination'); if (pag) pag.innerHTML = '';
+    return;
+  }
+  tbody.innerHTML = rows.map(e => {
+    const uses = _cardUseList(e.uses);
+    return `<tr onclick="openCardModal('${e.id}')">
+      <td style="font-size:12px;white-space:nowrap;">${e.use_date ? formatDate(e.use_date) : '-'}</td>
+      <td style="font-size:12px">${esc(e.staff || '-')}</td>
+      <td style="font-size:12px">${esc(e.payee || '-')}</td>
+      <td style="font-size:12px">${esc(e.item_name || '-')}</td>
+      <td style="font-weight:700;white-space:nowrap;">${e.amount ? Number(e.amount).toLocaleString() + '円' : '-'}</td>
+      <td style="font-size:11.5px">${esc(e.card || '-')}</td>
+      <td style="font-size:11.5px">${uses.length
+        ? uses.map(u => '<div>' + esc(_cardUseText(u)) + '</div>').join('')
+        : '<span style="color:var(--gray-400)">-</span>'}</td>
+      <td style="text-align:center" onclick="event.stopPropagation();deleteCardRow('${e.id}')"><span title="削除" style="cursor:pointer;color:#dc2626;font-size:14px;padding:2px 6px;">🗑</span></td>
+    </tr>`;
+  }).join('');
+  renderGenPagination('cardPaymentPagination', cardPaymentTotal, cardPaymentPage, p => loadCardPayments(p));
+}
+
+/* 💳 カード決済の登録画面。手動保存（💾保存を押すまで書かない）で、
+   保存してもモーダルは閉じない（最終更新をその場で見せる） */
+function buildCardModalBody(e){
+  e = e || {};
+  const isOther = !!e.item_name && !CARD_ITEMS.includes(e.item_name);
+  const itemSel = isOther ? CARD_ITEM_OTHER : (e.item_name || '');
+  return `<div class="form-grid">
+    <div class="section-title">カード決済情報</div>
+    <div class="form-group"><label class="form-label">利用日</label>
+      <input class="form-input" id="kp_date" type="date" value="${e.use_date || ''}"></div>
+    <div class="form-group"><label class="form-label">担当者</label>
+      <select class="form-select" id="kp_staff">${expStaffOptionsHtml(e.staff || '')}</select></div>
+    <div class="form-group full"><label class="form-label">支払先（店舗名・サービス名）</label>
+      <input class="form-input" id="kp_payee" value="${esc(e.payee || '')}" placeholder="例: 全日空／◯◯ホテル／ニッポンレンタカー"></div>
+
+    <div class="section-title">内容</div>
+    <div class="form-group"><label class="form-label">名目</label>
+      <select class="form-select" id="kp_item_sel" onchange="renderCardItemOther()">
+        <option value="">選択...</option>
+        ${CARD_ITEMS.map(x => `<option${itemSel === x ? ' selected' : ''}>${esc(x)}</option>`).join('')}
+        <option value="${CARD_ITEM_OTHER}"${isOther ? ' selected' : ''}>その他（記入）</option>
+      </select></div>
+    <div class="form-group" id="kp_item_other_wrap" style="display:none;"><label class="form-label">その他の名目</label>
+      <input class="form-input" id="kp_item_other" value="${esc(isOther ? e.item_name : '')}" placeholder="名目を記入"></div>
+    <div class="form-group"><label class="form-label">金額（税込・円）</label>
+      <input class="form-input" id="kp_amount" type="number" value="${e.amount ?? ''}"></div>
+    <div class="form-group"><label class="form-label">利用カード</label>
+      <select class="form-select" id="kp_card">${_expOpts(CARD_LIST, e.card || '', '選択...')}</select></div>
+
+    <div class="section-title">利用目的</div>
+    <div class="form-group full">
+      <div style="font-size:10.5px;color:var(--gray-400);margin-bottom:6px;">対象企業と目的を入れます。1件で何社ぶんでも足せます</div>
+      ${_cardCompanyDatalist()}
+      <div id="kp_uses"></div>
+      <button type="button" onclick="addCardUse()" style="margin-top:4px;font-size:11px;color:#1d4ed8;background:none;border:1px dashed #93c5fd;border-radius:4px;padding:4px 12px;cursor:pointer;width:100%;">＋ 対象企業</button>
+    </div>
+    <div class="form-group full"><label class="form-label">備考</label>
+      <textarea class="form-textarea" id="kp_notes">${esc(e.notes || '')}</textarea></div>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-200)">
+    <span id="sm_card" style="font-size:11px;color:#94a3b8;white-space:nowrap;margin-right:4px;"></span>
+    <button class="btn btn-primary" onclick="saveCard()" style="padding:8px 28px;font-size:14px;">💾 保存</button>
+    <button class="btn btn-outline" onclick="closeGenModal('cardModal')">閉じる</button>
+    <div style="flex:1;"></div>
+    <button class="btn" id="kpDeleteBtn" onclick="deleteCard()" style="display:${e.id ? '' : 'none'};border:1px solid #dc2626;color:#dc2626;background:white;">🗑 削除</button>
+  </div>`;
+}
+function renderCardItemOther(){
+  const wrap = document.getElementById('kp_item_other_wrap');
+  if (wrap) wrap.style.display = (document.getElementById('kp_item_sel')?.value === CARD_ITEM_OTHER) ? '' : 'none';
+}
+async function openCardModal(id){
+  const e = id ? allCardPayments.find(x => x.id === id) : null;
+  editingCardId = id || null;
+  _cardUses = _cardUseList(e?.uses);
+  if (!_cardUses.length) _cardUses = [_cardUseRow()];   // 1行目は最初から出しておく
+  _manualSave.cardModal.dirty = false;
+  showLoading(true); await _expEnsureMasters(); showLoading(false);
+  showGenModal('cardModal', id ? '💳 カード決済の詳細' : '💳 カード決済登録', buildCardModalBody(e));
+  renderCardItemOther();
+  renderCardUses();
+  setTimeout(() => { bindDirtyTracking('cardModal'); renderSaveMeta('sm_card', e?.updated_at, e?.updated_by); }, 120);
+}
+async function saveCard(){
+  const g = id => { const el = document.getElementById(id); const v = el ? String(el.value).trim() : ''; return v || null; };
+  const itemSel = g('kp_item_sel');
+  const data = {
+    use_date: g('kp_date'), staff: g('kp_staff'), payee: g('kp_payee'),
+    item_name: itemSel === CARD_ITEM_OTHER ? g('kp_item_other') : itemSel,
+    amount: document.getElementById('kp_amount')?.value ? parseInt(document.getElementById('kp_amount').value, 10) : null,
+    card: g('kp_card'), uses: cardUsesValue(), notes: g('kp_notes'),
+    updated_at: new Date().toISOString(), updated_by: _curUserName(),
+  };
+  showLoading(true);
+  try {
+    if (editingCardId) {
+      await sbFetch('card_payments?id=eq.' + editingCardId, { method:'PATCH', body: JSON.stringify(data) });
+      showToast('✅ 更新', 'success');
+    } else {
+      data.created_at = new Date().toISOString();
+      data.created_by = _curUserName();
+      const _r = await sbFetch('card_payments', { method:'POST', body: JSON.stringify(data), prefer:'return=representation' });
+      if (_r && _r[0] && _r[0].id) editingCardId = _r[0].id;
+      showToast('✅ 登録', 'success');
+    }
+    afterManualSave('cardModal');
+    const del = document.getElementById('kpDeleteBtn'); if (del) del.style.display = editingCardId ? '' : 'none';
+    await loadCardPayments();
+  } catch (e) { showToast('❌ ' + e.message, 'error'); showLoading(false); return false; }
+  showLoading(false);
+  return true;
+}
+/* 🗑 削除。**消す前に2回たずねる**（`_confirmDeleteTwice`）。
+   実体は残す論理削除なので、取得は必ず is_deleted=not.eq.true を付ける */
+async function _cardDeleteRow(id){
+  const e = (allCardPayments || []).find(x => x.id === id) || {};
+  const label = [e.use_date ? formatDate(e.use_date) : '', e.item_name || 'カード決済',
+                 e.amount ? Number(e.amount).toLocaleString() + '円' : ''].filter(Boolean).join(' / ') || 'このカード決済';
+  const detail = [e.payee, e.card, _cardUseList(e.uses).map(_cardUseText).join('／')].filter(Boolean).join(' / ');
+  if (!await _confirmDeleteTwice(label, detail)) return false;
+  showLoading(true);
+  try {
+    await sbFetch('card_payments?id=eq.' + id, { method:'PATCH', body: JSON.stringify({
+      is_deleted:true, deleted_at:new Date().toISOString(), deleted_by:_curUserName() }) });
+    showToast('✅ 削除しました', 'success');
+    await loadCardPayments();
+  } catch (err) { showToast('❌ 削除に失敗: ' + err.message, 'error'); showLoading(false); return false; }
+  showLoading(false);
+  return true;
+}
+async function deleteCardRow(id){ if (id) await _cardDeleteRow(id); }
+async function deleteCard(){
+  if (!editingCardId) return;
+  if (await _cardDeleteRow(editingCardId)) forceCloseModal('cardModal');
+}
+
 async function loadIntroductions() {
   showLoading(true);
   try {
@@ -27646,6 +27889,7 @@ const _manualSave = {
   saleModal:     { dirty:false, prefix:'saf_', save:()=>saveSale(),   metaSlot:'sm_sale',      label:'売上' },
   myNoteModal:   { dirty:false, prefix:'mn_', save:()=>saveMyNote(),  metaSlot:'sm_mynote',    label:'自分メモ' },
   expenseModal:  { dirty:false, prefix:'ef_', save:()=>saveExpense(), metaSlot:'sm_expense',   label:'立替' },
+  cardModal:     { dirty:false, prefix:'kp_', save:()=>saveCard(),    metaSlot:'sm_card',      label:'カード決済' },
 };
 // 外国人材・所属機関はスナップショット比較を dirty の正とする（実際に値が変わった時だけリマインド）
 Object.defineProperty(_manualSave.workerModal, 'dirty', {
@@ -34662,6 +34906,17 @@ function buildExpensesScreen(){return `<div style="display:flex;gap:10px;margin-
 </tr></thead><tbody id="expenseTbody"><tr><td colspan="10" style="text-align:center;padding:40px;color:var(--gray-400)">読み込み中...</td></tr></tbody></table>
 <div class="pagination-bar" id="expensePagination"></div></div>`;}
 
+function buildCardPaymentsScreen(){return `<div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+  <input class="search-input" id="kpSearchInput" placeholder="支払先・名目・担当者・カード・対象企業で検索..." oninput="renderCardPaymentTable()" style="flex:1;min-width:220px;">
+  <select class="filter-select" id="kpFilterItem" onchange="loadCardPayments(1)"><option value="">全名目</option>${CARD_ITEMS.map(s=>`<option>${s}</option>`).join('')}</select>
+  <select class="filter-select" id="kpFilterCard" onchange="loadCardPayments(1)"><option value="">全カード</option>${CARD_LIST.map(s=>`<option>${s}</option>`).join('')}</select>
+  <button class="btn btn-outline" style="font-size:11px;padding:4px 10px" onclick="clearCardPaymentFilters()">✕</button>
+</div>
+<div class="table-wrap"><table><thead><tr>
+  <th>利用日</th><th>担当者</th><th>支払先</th><th>名目</th><th>金額（税込）</th><th>利用カード</th><th>利用目的</th><th style="width:34px"></th>
+</tr></thead><tbody id="cardPaymentTbody"><tr><td colspan="8" style="text-align:center;padding:40px;color:var(--gray-400)">読み込み中...</td></tr></tbody></table>
+<div class="pagination-bar" id="cardPaymentPagination"></div></div>`;}
+
 function buildCandidatesScreen() {
   return `
   <!-- 候補者一覧 と （紹）決定者リスト の切り替え -->
@@ -39973,7 +40228,7 @@ function ensureModals(targetId) {
   // targetId指定があればそれだけ、無ければ既知の全モーダルを生成
   const ids = targetId ? [targetId] : [
     'newRequestModal','aiKnModal','drivePickerModal','workerModal','candidateModal',
-    'companyModal','saleModal','userModal','partnerModal','sendingModal','expenseModal',
+    'companyModal','saleModal','userModal','partnerModal','sendingModal','expenseModal','cardModal',
     'introductionModal','feeModal','resumeModal','meetingModal','taskModal','auditDetailModal'
   ];
   ids.forEach(id=>{
@@ -41117,7 +41372,7 @@ async function deleteUser(){if(!requireAdmin('ユーザーの削除は管理者�
 
 // モーダルID → 保存関数名のマップ（自動保存対象）
 const _AUTOSAVE_MAP = {
-  expenseModal: null /* 手動保存のため無効化 */, partnerModal: 'savePartner', feeModal: 'saveFee',
+  expenseModal: null /* 手動保存のため無効化 */, cardModal: null /* 手動保存のため無効化 */, partnerModal: 'savePartner', feeModal: 'saveFee',
   saleModal: null /* 手動保存のため無効化 */, userModal: 'saveUser', sendingModal: 'saveSending',
   aiKnModal: 'saveAiKn', candidateModal: null /* 手動保存のため無効化 */, jobModal: null /* 手動保存のため自動保存を無効化 */,
   introModal: 'saveIntro', scheduleModal: null /* 引数必須のため除外 */,
@@ -43830,6 +44085,7 @@ const UPDATE_SCREEN_KEYS = {
   fees:       ['支援委託費'],
   sales:      ['売上管理','売上リスト','売上内訳'],
   expenses:   ['立替管理','立替登録','領収書','現金小口'],
+  card_payments:['カード決済報告','カード決済登録'],
   users:      ['ユーザー設定'],
   my_account: ['マイページ'],
   shift_kanri:['シフト管理'],
