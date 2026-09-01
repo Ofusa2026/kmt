@@ -1656,6 +1656,9 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   （`file_url` の列だけ用意してある。保存フォルダーは未設定）
 - 一覧は `renderRegDocHistory(no)`（検索は `regDocQ_<no>`）。行を押すと元の記録が開き
   （`regDocHistoryOpen`）、🗑 は**論理削除**（`is_deleted`）
+- **記入フォームの中にも「📄 この記録で作成済みの書類」を出す**（`renderRegDocRecPanel()`。
+  いま開いているフォームは `_regDocRecFor` の1箇所に持つ）。**見るのは同じ `_regDocHist`** なので
+  一覧と必ず同じ内容になる。**保存前（新規）のときは出さない**（記録に結び付けられないため）
 - 読み込みは `loadRegDocHistory(no)`。`loadRegTaskRecords(no)` の先頭から呼ぶので、
   画面を開けばタブの件数までそろう
 
