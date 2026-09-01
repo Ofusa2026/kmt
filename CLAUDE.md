@@ -919,6 +919,21 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   - 収入印紙費用の負担パターンは **`VISA_FEE_PATTERNS` の1箇所**（下の節）。
     `REN_FEE_PATTERNS` はそこから作るだけ
 
+### 🔁 所属機関の担当の変更履歴（引継ぎの記録）
+
+- 場所は **所属機関の詳細【基本情報】タブ → 🏢 KMT担当 → 社内メモの上**
+- 実体は **`companies.staff_handovers`**（jsonb の配列。別テーブルを作らない＝企業の保存と一緒に入る）。
+  1行＝1回の引継ぎで、`{date, kind, from, to, method, note, at, by}`
+- **選択肢は `HANDOVER_KINDS`（区分）／`HANDOVER_METHODS`（引継ぎ方法）の1箇所だけ**。
+  前の担当・新しい担当は `<input list="coStaffDl">` なので**名簿の候補から選べて手入力もできる**
+  （候補を作るのは `_coStaffDatalistHtml()` の1箇所＝`KMT_STAFF_ROSTER` ＋ `TEAM_STAFF_DEFAULTS`）
+- 読み書きは **`renderCoHandovers()` / `getCoHandovers()` の2つだけ**。並びは**引継ぎ日の新しい順**、
+  **中身が何も入っていない行は保存時に落とす**。［＋ 引継ぎを追加］は先頭に今日の日付で1行足す
+- **担当の最終更新（日時・ユーザー名）は `loadCoStaffMeta()` の1箇所**が
+  **`company_change_log`** から引く（`CO_STAFF_LOG_FIELDS` ＝ メイン／サブ／チーム内サブ／引継ぎ予定）。
+  **列を別に持たない**ので、【変更履歴】タブの内容と必ず一致する。
+  出すのは チーム内サブ担当の下（`co_staff_meta`）で、モーダルを開いたときと保存したあとに描き直す
+
 ### 💴 入管申請費用（収入印紙代）の負担パターン
 
 - **選択肢は `VISA_FEE_PATTERNS` の1箇所だけ**（A＝受け入れ企業全額負担 ／
