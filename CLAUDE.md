@@ -1587,12 +1587,16 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
     **既定は `MEET_SUPPORT_DEFAULT`（問題なし）**。「未実施の支援項目がある」は別のチェック
     （`MEET_UNIMPL_OPTS`）。どちらも記入フォームの【対象の外国人材】の行で変えられる
   - **別紙のページだけ横向きにする**（表が横に長いため）。囲むのは
-    **`REG_DOC_LS_START` / `REG_DOC_LS_END` の印の1箇所だけ**で、
-    `buildRegWordHtml()` がそこを `WordSection2`（もう一方の向き）に切り替える
-    - ⚠️ **効くのは Word だけ。** 印刷・PDF・Excel は**ページごとに向きを変えられない**ので、
-      書類全体が `REG_DOC_ORIENT` / 出力設定で選んだ向きのまま出る
-    - 印（`<!--REG_LS_...-->`）はコメントなので、Word 以外の出力では**そのまま消える**
-      （画面・印刷に文字として出ない）
+    **`REG_DOC_LS_START` / `REG_DOC_LS_END` の印の1箇所だけ**で、出力ごとに置き換える
+    | 出力 | やり方 |
+    |---|---|
+    | Word | `buildRegWordHtml()` が `WordSection2`（もう一方の向き）に切り替える |
+    | 印刷・PDF | **名前つきページ**＝ `_regDocPrintHtml()` が `.reg-ls` の入れ物にし、`_regLsPrintCss()` が `@page ls{size:…}` ＋ `.reg-ls{page:ls;}` を出す |
+    - ⚠️ **Excel だけは、ページごとに向きを変えられない**ので書類全体が
+      `REG_DOC_ORIENT` / 出力設定で選んだ向きのまま出る。
+      **no.13 の既定は Excel（`REG_DOC_FMT`）なので、別紙を横で出したいときは PDF か Word にする**
+    - 印（`<!--REG_LS_...-->`）はコメントなので、置き換えない出力では**そのまま消える**
+      （画面・Excel に文字として出ない）
 - 自動で入るもの（**きまりは `REG_MEET_ROLES` の下の1かたまり**にまとめてある）
   - 対象の人材 … `reg13FillMembers()`（`_meetReportWorkers` の結果）
   - **面談日** … 面談記録があればその日。無ければ **`_meetAssignDates()` の1箇所**が

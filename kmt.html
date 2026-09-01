@@ -38771,10 +38771,26 @@ function _regDocOpts(no){
 }
 // 用紙サイズを cm で返す（向きに応じて縦横を入れ替える）
 /* 📄 ここからここまでは**用紙を横**にする印。**この2つの1箇所だけ**。
-   Word はセクションを分けて向きを変えられるので、囲んだところだけ横になる。
-   ⚠️ 印刷・PDF・Excel は「ページごとの向き」を扱えないので、書類全体の向きのままになる */
+   ・Word … セクションを分ける（`WordSection2`）
+   ・印刷・PDF … **名前つきページ**（`@page ls` ＋ `.reg-ls{page:ls;}`）
+   囲んだところだけ向きが変わり、そのあとは元の向きに戻る。
+   ⚠️ Excel だけは「ページごとの向き」を扱えないので、書類全体の向きのままになる */
 const REG_DOC_LS_START = '<!--REG_LS_START-->';
 const REG_DOC_LS_END   = '<!--REG_LS_END-->';
+/* 印刷・PDF用の本文（横にする印を、実際の入れ物 `.reg-ls` に変える） */
+function _regDocPrintHtml(no, d){
+  return buildRegTaskDocHtml(no, d)
+    .split(REG_DOC_LS_START).join('<div class="reg-ls">')
+    .split(REG_DOC_LS_END).join('</div>');
+}
+/* 印刷・PDFで「そこだけ向きを変える」ためのCSS。**作るのはこの1箇所だけ** */
+function _regLsPrintCss(o){
+  const other = o.orient === 'landscape' ? 'portrait' : 'landscape';
+  const [w2, h2] = _regPaperSize(o.paper, other);
+  return '@page ls{size:' + w2 + 'cm ' + h2 + 'cm;margin:12mm 10mm;}' +
+    '.reg-ls{page:ls;break-before:page;break-after:page;}' +
+    '.reg-ls > div{page-break-before:auto;}';   // 中の改ページ指定と二重にしない
+}
 function _regPaperSize(paper, orient){
   const [a, b] = REG_PAPER_CM[paper] || REG_PAPER_CM.A4;
   return orient === 'landscape' ? [b, a] : [a, b];
@@ -38852,10 +38868,10 @@ function printRegTaskDoc(no, d, o){
   const win = window.open('', '_blank');
   if (!win) { showToast('❌ ポップアップがブロックされました', 'error'); return; }
   win.document.write('<!doctype html><html><head><meta charset="utf-8"><title>' + esc(_regDocFileName(no, d, '').replace(/\.$/,'')) + '</title><style>' +
-    '@page{size:' + w + 'cm ' + h + 'cm;margin:18mm 16mm;}' +
+    '@page{size:' + w + 'cm ' + h + 'cm;margin:18mm 16mm;}' + _regLsPrintCss(o) +
     _regDocBodyCss() + 'body{margin:18mm 16mm;}' +
     '@media print{ body{margin:0;} }</style></head><body>' +
-    buildRegTaskDocHtml(no, d) + '</body></html>');
+    _regDocPrintHtml(no, d) + '</body></html>');
   win.document.close();
   win.document.title = _regDocFileName(no, d, '').replace(/\.$/,'');
   setTimeout(() => { try { win.focus(); win.print(); } catch(e) {} }, 400);
