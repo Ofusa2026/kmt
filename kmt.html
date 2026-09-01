@@ -36934,6 +36934,7 @@ const REG_COMPANY_SELECT_COLS = [...new Set([
 
 // ===== 一覧 =====
 async function loadRegTaskRecords(no){
+  if (_regDocHistoryOn(no)) loadRegDocHistory(no).catch(()=>{});   // 📄 作成済みの書類の件数
   if (no === 13) { loadSupportRoles().catch(() => {}); loadUserTeams().catch(() => {}); }   // 役職・チームを引けるように
   // 選択肢用に人材・企業をそろえる
   // main_staff も読む（人材の担当が空のとき、所属機関のメイン担当を入れるため）
@@ -38638,7 +38639,10 @@ function buildRegTaskDocHtml(no, d){
       '・定期面談の問題の有無<br>' +
       '　' + chk(m.sup === MEET_SUPPORT_STATUSES[1]) + '　問題あり(定期面談報告書写しを添付)<br>' +
       '　' + chk(m.sup !== MEET_SUPPORT_STATUSES[1]) + '　問題なし';
+    /* 別紙は列が多いので**このページだけ用紙を横**にする（Word のセクション分け）。
+       印刷・PDF・Excel はページごとに向きを変えられないので、出力設定の向きのままになる */
     const besshi = g =>
+      REG_DOC_LS_START +
       '<div style="page-break-before:always;">' +
         '<div style="text-align:left;font-size:11px;">参考様式第５－５号　別紙</div>' +
         T('１号特定技能外国人支援対象者名簿') +
@@ -38647,7 +38651,7 @@ function buildRegTaskDocHtml(no, d){
         '<p style="font-size:10.5px;color:#444;margin:2px 0 6px;">対象期間：' +
           esc(String(d.year || '')) + '年 ' + esc(String(d.quarter || '')) +
           '　／　面談日：' + (g.day ? _regFmtD(g.day) : blank(110)) + '</p>' +
-        '<table class="g" style="font-size:10px;"><tr>' +
+        '<table class="g" style="font-size:10.5px;"><tr>' +
           th2('4%', '') + th2('', '氏名（ローマ字）') + th2('7%', '性別') + th2('13%', '生年月日') +
           th2('10%', '国籍・地域') + th2('12%', '在留カード番号') + th2('17%', '住居地') +
           th2('26%', '支援実施状況') + '</tr>' +
@@ -38664,7 +38668,7 @@ function buildRegTaskDocHtml(no, d){
         '</table>' +
         '<p class="note">（注１）「未実施の支援項目がある」を選択した場合には、実施していない支援項目とその理由を記載した理由書（参考様式第５－１３号）を添付すること。</p>' +
         '<p class="note">（注２）定期面談で「問題あり」を選択した場合には、定期面談報告書（参考様式第５－５号、５－６号）を添付すること。</p>' +
-      '</div>';
+      '</div>' + REG_DOC_LS_END;
     // 第５－５号（1号特定技能外国人用）
     const page55 = (g, br) => {
       const F = REG_MEET_FORMS['5-5'];
@@ -38764,6 +38768,11 @@ function _regDocOpts(no){
   return o;
 }
 // 用紙サイズを cm で返す（向きに応じて縦横を入れ替える）
+/* 📄 ここからここまでは**用紙を横**にする印。**この2つの1箇所だけ**。
+   Word はセクションを分けて向きを変えられるので、囲んだところだけ横になる。
+   ⚠️ 印刷・PDF・Excel は「ページごとの向き」を扱えないので、書類全体の向きのままになる */
+const REG_DOC_LS_START = '<!--REG_LS_START-->';
+const REG_DOC_LS_END   = '<!--REG_LS_END-->';
 function _regPaperSize(paper, orient){
   const [a, b] = REG_PAPER_CM[paper] || REG_PAPER_CM.A4;
   return orient === 'landscape' ? [b, a] : [a, b];
@@ -38802,12 +38811,21 @@ function _regDownloadFile(name, mime, html){
 // Word（HTML形式の .doc）。@page WordSection1 で用紙サイズ・向きを指定する
 function buildRegWordHtml(no, d, o){
   const [w, h] = _regPaperSize(o.paper, o.orient);
+  // もう一方の向き（REG_DOC_LS_START〜END で囲んだところだけこちらになる）
+  const other = o.orient === 'landscape' ? 'portrait' : 'landscape';
+  const [w2, h2] = _regPaperSize(o.paper, other);
+  const brk = '<br clear="all" style="page-break-before:always;mso-break-type:section-break">';
+  const body = buildRegTaskDocHtml(no, d)
+    .split(REG_DOC_LS_START).join('</div>' + brk + '<div class="WordSection2">')
+    .split(REG_DOC_LS_END).join('</div>' + brk + '<div class="WordSection1">');
   return '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" ' +
       'xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8">' +
     '<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->' +
     '<style>@page WordSection1{size:' + w + 'cm ' + h + 'cm;mso-page-orientation:' + o.orient + ';margin:18mm 16mm;}' +
-    'div.WordSection1{page:WordSection1;}' + _regDocBodyCss() + '</style></head>' +
-    '<body><div class="WordSection1">' + buildRegTaskDocHtml(no, d) + '</div></body></html>';
+    'div.WordSection1{page:WordSection1;}' +
+    '@page WordSection2{size:' + w2 + 'cm ' + h2 + 'cm;mso-page-orientation:' + other + ';margin:12mm 10mm;}' +
+    'div.WordSection2{page:WordSection2;}' + _regDocBodyCss() + '</style></head>' +
+    '<body><div class="WordSection1">' + body + '</div></body></html>';
 }
 // Excel（HTML形式の .xls）。x:WorksheetOptions で用紙サイズ・向きを指定する
 function buildRegExcelHtml(no, d, o){
@@ -38842,6 +38860,122 @@ function printRegTaskDoc(no, d, o){
 }
 
 // 🖨️書類ボタン → 出力設定のダイアログ
+/* ===== 📄 作成済みの書類（生成履歴） =====
+   【書類を生成】で「出力＋履歴に残す」を選ぶと `reg_doc_history` に1件残り、
+   各記録簿の【📄 作成済みの書類】タブに出る。
+   **履歴を残せる様式は `REG_DOC_HISTORY_TASKS` の1箇所だけ**（`def.doc` があるものすべて） */
+const REG_DOC_HISTORY_TASKS = null;   // null＝書類生成に対応している様式すべて
+function _regDocHistoryOn(no){
+  if (Array.isArray(REG_DOC_HISTORY_TASKS)) return REG_DOC_HISTORY_TASKS.includes(no);
+  return !!(REG_FORM_DEFS[no] || {}).doc;
+}
+/* 履歴に出す「何年何期分か」。**作るのはこの1箇所だけ**
+   （四半期の様式は 年＋四半期／年月の様式は 年月／それ以外は主な日付） */
+function _regDocPeriodLabel(no, d){
+  d = d || {};
+  if (d.year && d.quarter) return String(d.year) + '年 ' + String(d.quarter);
+  if (d.ym) return (typeof _regYmText === 'function' ? _regYmText(d.ym) : String(d.ym));
+  const dt = d.meet_date || d.period_from || d.date || d.contract_from || '';
+  return dt ? _regFmtD(dt) : '';
+}
+let _regDocHist = {};        // 様式番号 → 履歴の行
+let _regView = {};           // 様式番号 → 'list'（記録の一覧）/ 'docs'（作成済みの書類）
+function _regViewOf(no){ return _regView[no] || 'list'; }
+async function loadRegDocHistory(no){
+  try {
+    _regDocHist[no] = await sbFetch('reg_doc_history?select=*&task_no=eq.' + no +
+      '&is_deleted=not.eq.true&order=created_at.desc') || [];
+  } catch(e) { _regDocHist[no] = []; }
+  renderRegDocHistory(no);
+  const b = document.getElementById('regDocsTabCount_' + no);
+  if (b) b.textContent = (_regDocHist[no] || []).length;
+}
+function renderRegDocHistory(no){
+  const box = document.getElementById('regDocList_' + no);
+  if (!box) return;
+  const rows = _regDocHist[no] || [];
+  const q = (document.getElementById('regDocQ_' + no)?.value || '').toLowerCase().trim();
+  const list = q ? rows.filter(r => [r.company_name, r.worker_name, r.period_label, r.created_by, r.file_name]
+    .some(v => String(v || '').toLowerCase().includes(q))) : rows;
+  if (!list.length) {
+    box.innerHTML = '<div style="padding:26px;text-align:center;color:var(--gray-400);font-size:12px;">' +
+      (rows.length ? '見つかりません' : 'まだありません。書類を作るときに［💾 出力＋履歴に残す］を押すと、ここに残ります') + '</div>';
+    return;
+  }
+  const fmtLabel = { word:'📘 Word', excel:'📗 Excel', pdf:'📕 PDF', print:'🖨️ 印刷' };
+  const th = t => '<th style="padding:6px 10px;font-size:11px;color:var(--gray-400);text-align:left;white-space:nowrap;">' + t + '</th>';
+  box.innerHTML =
+    '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">' +
+    '<thead><tr style="border-bottom:1px solid var(--gray-200);background:#fafbfc;">' +
+      th('生成日時') + th('生成した人') + th('対象') + th('対象期間') + th('形式') + th('ファイル名') +
+      '<th style="width:34px;"></th></tr></thead><tbody>' +
+    list.map(r => {
+      const who = [r.company_name, r.worker_name].filter(Boolean).join(' / ') || '-';
+      const td = (v, st) => '<td style="padding:7px 10px;font-size:12px;border-bottom:1px solid var(--gray-100);' + (st || '') + '">' + v + '</td>';
+      return '<tr style="cursor:pointer;" onclick="regDocHistoryOpen(\'' + r.id + '\')" title="もう一度この書類を作ります">' +
+        td(r.created_at ? esc(_fmtUpdatedAt(r.created_at)) : '-', 'white-space:nowrap;') +
+        td(esc(r.created_by || '-')) +
+        td(esc(who)) +
+        td(esc(r.period_label || '-'), 'white-space:nowrap;') +
+        td(esc(fmtLabel[r.fmt] || r.fmt || '-'), 'white-space:nowrap;') +
+        td('<span style="font-size:11px;color:var(--gray-500);word-break:break-all;">' + esc(r.file_name || '-') + '</span>') +
+        '<td style="text-align:center;border-bottom:1px solid var(--gray-100);" onclick="event.stopPropagation();regDocHistoryDelete(\'' + r.id + '\',' + no + ')">' +
+          '<span title="この履歴を消す" style="cursor:pointer;color:#dc2626;font-size:14px;padding:2px 6px;">🗑</span></td>' +
+      '</tr>';
+    }).join('') + '</tbody></table></div>';
+}
+// 履歴の行を押したら、その記録の書類をもう一度作れるようにする
+function regDocHistoryOpen(id){
+  const r = Object.values(_regDocHist).flat().find(x => x && x.id === id);
+  if (!r) return;
+  if (!r.record_id) { showToast('⚠️ 元の記録が分かりません（記入画面から作られた書類です）', 'error'); return; }
+  openRegDocExport(r.task_no, r.record_id);
+}
+async function regDocHistoryDelete(id, no){
+  const r = (_regDocHist[no] || []).find(x => x && x.id === id) || {};
+  if (!await _confirmDeleteTwice('この生成履歴',
+    [r.company_name, r.worker_name, r.period_label, r.file_name].filter(Boolean).join(' / '))) return;
+  showLoading(true);
+  try {
+    await sbFetch('reg_doc_history?id=eq.' + id, { method:'PATCH', body: JSON.stringify({
+      is_deleted:true, deleted_at:new Date().toISOString(), deleted_by:_curUserName() }) });
+    await loadRegDocHistory(no);
+    showToast('✅ 履歴を消しました', 'success');
+  } catch(e) { showToast('❌ ' + e.message, 'error'); }
+  showLoading(false);
+}
+// 記録の一覧 ⇄ 作成済みの書類
+function setRegView(no, v){
+  _regView[no] = v;
+  ['list','docs'].forEach(k => {
+    const panel = document.getElementById('regPanel_' + k + '_' + no);
+    const tab = document.getElementById('regTab_' + k + '_' + no);
+    if (panel) panel.style.display = (k === v) ? '' : 'none';
+    if (tab) {
+      tab.style.color = (k === v) ? 'var(--blue)' : 'var(--gray-400)';
+      tab.style.borderBottomColor = (k === v) ? 'var(--blue)' : 'transparent';
+      tab.style.fontWeight = (k === v) ? '800' : '600';
+    }
+  });
+  if (v === 'docs') loadRegDocHistory(no);
+}
+/* 生成した書類を履歴に残す。**書き込むのはこの1箇所だけ** */
+async function _regSaveDocHistory(no, d, o, fileName){
+  try {
+    await sbFetch('reg_doc_history', { method:'POST', body: JSON.stringify({
+      task_no: no,
+      record_id: _regDocPending?.id || null,
+      company_id: d.company_id || null, company_name: d.company_name || null,
+      worker_id: d.worker_id || null,   worker_name: d.worker_name || null,
+      period_label: _regDocPeriodLabel(no, d),
+      fmt: o.fmt, paper: o.paper, orient: o.orient, file_name: fileName || null,
+      created_at: new Date().toISOString(), created_by: _curUserName(),
+    })});
+    if (_regViewOf(no) === 'docs' || document.getElementById('regDocList_' + no)) await loadRegDocHistory(no);
+    showToast('💾 作成済みの書類に残しました', 'success');
+  } catch(e) { showToast('⚠️ 履歴の保存に失敗: ' + e.message, 'error'); }
+}
+
 function openRegDocExport(no, id){
   let d;
   // ⚠️ 記録の data をそのまま使わない（書類用の書き替えが記録に残るため）。必ずコピーを作る
@@ -38853,7 +38987,7 @@ function openRegDocExport(no, id){
     const l = _regSignOf(rid);
     if (l && l.signature) d._sign_img = l.signature;
   }
-  _regDocPending = { no, d };
+  _regDocPending = { no, d, id: id || _regTaskEditing?.id || null };
   if (no === 2) loadRegOrgSeals();   // 🖋️ 電子印（管理者のときだけ読む）を先に用意しておく
   const o = _regDocOpts(no);
   const t = REG_SUPPORT_TASKS.find(x => x.no === no);
@@ -38896,13 +39030,16 @@ function openRegDocExport(no, id){
         '<div style="display:flex;gap:8px;align-items:center;padding:12px 18px;border-top:1px solid var(--gray-200);">' +
           '<span style="font-size:10px;color:var(--gray-400);">設定は次回も引き継がれます</span>' +
           '<button class="btn btn-outline" style="margin-left:auto;" onclick="document.getElementById(\'regDocExportModal\').remove()">キャンセル</button>' +
-          '<button class="btn btn-primary" onclick="regRunDocExport()">出力する</button>' +
+          '<button class="btn btn-outline" onclick="regRunDocExport(false)" title="書類を作るだけです（履歴には残りません）">📄 書類生成のみ</button>' +
+          (_regDocHistoryOn(no)
+            ? '<button class="btn btn-primary" onclick="regRunDocExport(true)" title="書類を作って、【📄 作成済みの書類】にも残します">💾 書類生成＋履歴保存</button>'
+            : '<button class="btn btn-primary" onclick="regRunDocExport(false)">出力する</button>') +
         '</div>' +
       '</div>' +
     '</div>');
 }
 
-async function regRunDocExport(){
+async function regRunDocExport(saveHistory){
   if (!_regDocPending) return;
   if (_regDocPending.no === 2) await loadRegOrgSeals();   // 電子印を入れてから作る
   // 📛 担当者の欄は、書類のときだけフルネームにする
@@ -38920,16 +39057,21 @@ async function regRunDocExport(){
     localStorage.setItem(REG_DOC_OPT_KEY, JSON.stringify(save));
   } catch(e) {}
   document.getElementById('regDocExportModal')?.remove();
+  let fileName = '';
   if (o.fmt === 'word') {
-    _regDownloadFile(_regDocFileName(no, d, 'doc'), 'application/msword', buildRegWordHtml(no, d, o));
+    fileName = _regDocFileName(no, d, 'doc');
+    _regDownloadFile(fileName, 'application/msword', buildRegWordHtml(no, d, o));
     showToast('📘 Wordファイルをダウンロードしました', 'success');
   } else if (o.fmt === 'excel') {
-    _regDownloadFile(_regDocFileName(no, d, 'xls'), 'application/vnd.ms-excel', buildRegExcelHtml(no, d, o));
+    fileName = _regDocFileName(no, d, 'xls');
+    _regDownloadFile(fileName, 'application/vnd.ms-excel', buildRegExcelHtml(no, d, o));
     showToast('📗 Excelファイルをダウンロードしました', 'success');
   } else {
     printRegTaskDoc(no, d, o);
     if (o.fmt === 'pdf') showToast('印刷画面の「送信先」で「PDFに保存」を選んでください', 'success');
   }
+  // 💾 履歴に残す（【📄 作成済みの書類】に出る）
+  if (saveHistory && _regDocHistoryOn(no)) await _regSaveDocHistory(no, d, o, fileName);
 }
 
 // 各項目の画面（管理リスト）
@@ -38987,8 +39129,28 @@ function buildRegSupportTaskScreen(key){
         <button class="btn btn-primary" style="${(_regFillFields(t.no).length && mode === 'worker') || def.period ? '' : 'margin-left:auto;'}font-size:12px;" onclick="openRegTaskForm(${t.no}, null)">＋ 新規作成</button>
         <button class="btn btn-outline" style="font-size:12px;" onclick="loadRegTaskRecords(${t.no})">🔄</button>
       </div>
+      ${def.doc ? `
+      <!-- 📝 記録の一覧 ⇄ 📄 作成済みの書類 -->
+      <div style="display:flex;gap:0;border-bottom:1px solid var(--gray-200);padding:0 12px;">
+        <button id="regTab_list_${t.no}" onclick="setRegView(${t.no},'list')"
+          style="padding:8px 16px;font-size:12.5px;font-weight:800;border:none;background:none;cursor:pointer;color:var(--blue);border-bottom:2px solid var(--blue);">📝 記録の一覧</button>
+        <button id="regTab_docs_${t.no}" onclick="setRegView(${t.no},'docs')"
+          style="padding:8px 16px;font-size:12.5px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--gray-400);border-bottom:2px solid transparent;">📄 作成済みの書類
+          <span id="regDocsTabCount_${t.no}" style="background:var(--gray-100);color:var(--gray-600);border-radius:8px;padding:1px 7px;font-size:10px;margin-left:3px;">-</span></button>
+      </div>
+      <div id="regPanel_docs_${t.no}" style="display:none;">
+        <div style="padding:9px 18px;border-bottom:1px solid var(--gray-200);background:#fafbfc;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <input id="regDocQ_${t.no}" placeholder="企業名・人材名・期間・生成した人で検索..." oninput="renderRegDocHistory(${t.no})"
+            style="flex:1;min-width:200px;font-size:12px;padding:5px 10px;border:1px solid #dadce0;border-radius:6px;">
+          <button class="btn btn-outline" style="font-size:11px;padding:4px 12px;" onclick="loadRegDocHistory(${t.no})">🔄 更新</button>
+        </div>
+        <div style="font-size:11px;color:var(--gray-400);padding:7px 18px 0;">行を押すと、その記録の書類をもう一度作れます</div>
+        <div id="regDocList_${t.no}"><div style="padding:24px;text-align:center;color:var(--gray-400);font-size:12px;">読み込み中...</div></div>
+      </div>
+      <div id="regPanel_list_${t.no}">` : ''}
       ${filterBar}
       <div id="regTaskList_${t.no}"><div style="padding:24px;text-align:center;color:var(--gray-400);font-size:12px;">読み込み中...</div></div>
+      ${def.doc ? '</div>' : ''}
       ${forms.length ? `
       <div style="border-top:1px solid var(--gray-200);padding:10px 18px;background:#fafbfc;">
         <div style="font-size:11px;font-weight:800;color:var(--navy);margin-bottom:6px;">📄 この帳票で使う参考様式</div>
