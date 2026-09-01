@@ -1000,6 +1000,23 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
       うるさければ `REN_CARRY_SKIP_REN` に更新ステータスを足せば外れる（いまは空）
   - **全員決まるまでアラートは消えない**。期限を過ぎたら `.due-over` で赤く点滅
   - アラートの置き場はサイドバー `renCycleAlerts` ／ マイページ `myRenCycleAlerts`
+#### ⏰ 申請依頼まち（更新決定のまま止まっている人材）
+
+- **在留期限まで `REN_APPLY_ALERT_DAYS`(75)日を切っているのに、更新ステータスが
+  【更新決定】のまま**＝まだ【申請依頼済み】になっていない人材を知らせる（依頼もれ・変えもれの防止）
+- **判定は `_renApplyLate(w)` の1箇所だけ**。対象の状態は **`REN_APPLY_LATE_FROM` の1箇所**
+  （更新決定（通常）／更新決定（優先度高め）だけ。申請依頼済み・完了・更新なし・要確認は出さない）。
+  旧い値（`更新決定` / `優先度高め`）も `_renStatusNorm()` を通すので拾える
+- 期限を過ぎているものも出す（`_renDaysToExpiry()` がマイナスを返す）。
+  **30日を切っている人がいると赤く点滅する**（`.due-over`）
+- 出す相手は**自分がメイン／サブ担当（または人材の担当）のぶん**（`_renApplyLateMine()`）。
+  0名のときだけ、更新の管理者（`REN_APPROVERS`）に全体を出す
+- 置き場はサイドバー `renApplyAlerts` ／ マイページ `myRenApplyAlerts`（`updateRenApplyAlerts()`）。
+  一覧は `openRenApplyLate()`、行を押すとその人材の詳細が開く
+- ブラウザ通知は `_renApplyNotify()`。**同じ日に何度も出さない**（面談記録の記入待ちと同じ作り）
+- 数え直すのは 起動時（`loadRenewalCycle`）と **ステータスを書いたとき（`_renWriteStatus`）**
+- 🧪 テスト用の人材と、辞退・支援機関変更済みの人材（`isAlertExcludedWorker`）は出さない
+
 - 🧪 **テスト用の人材は氏名が `TEST_WORKER_PREFIX`（`【テスト】`）で始まる行**。
   **判定は `_isTestWorker()` の1箇所だけ**で、本番にさわらずに流れを試すためのもの
   - **だれでも記入・決定できる**（`_renCheckCanEdit` の先頭）／**だれのリストにも出る**（`_renCycleMine`）
