@@ -1662,8 +1662,9 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
       Word なら中身がそのまま見え、開いてPDFにもできる
   - 印刷・PDF用のHTMLは **`buildRegPrintHtml()` の1箇所**（画面の印刷に使う）
   - **Driveに入らなくても履歴は残す**（`file_url` が空になるだけ）。黙って消えないようトーストで知らせる
-  - 一覧・記入フォームの**ファイル名を押すと開く**。作るのは `_regDocFileLink(r)` の1箇所で、
-    `file_url` が無い行（保存先を決める前に作ったぶん）はただの文字にする
+  - 一覧・記入フォームの**ファイル名を押すと開く**。作るのは `_regDocFileLink(r)` の1箇所
+  - **作り直したほうがよい行かは `_regDocNeedsRemake(r)` の1箇所**
+    （ドライブに入っていない／`.html` で入っている古いぶん）。⚠️ を付けて［📄 作り直す］を出す
 - 一覧は `renderRegDocHistory(no)`（検索は `regDocQ_<no>`）。行を押すと元の記録が開き
   （`regDocHistoryOpen`）、🗑 は**論理削除**（`is_deleted`）
 - **記入フォームの中にも「📄 この記録で作成済みの書類」を出す**（`renderRegDocRecPanel()`。
