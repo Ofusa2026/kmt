@@ -36348,6 +36348,7 @@ async function createRegSignLink(no, recordId) {
     catch(e) { prompt('このリンクをご本人へ送ってください', url); }
     await loadRegSignLinks(no);
     renderRegSignPanel(no, recordId);
+    renderRegSignList(no);
   } catch(e) { showToast('❌ リンクを発行できませんでした: ' + e.message, 'error'); }
   showLoading(false);
 }
@@ -36361,6 +36362,7 @@ async function closeRegSignLink(no, recordId) {
       body: JSON.stringify({ status:'closed', updated_at:new Date().toISOString(), updated_by:_curUserName() }) });
     await loadRegSignLinks(no);
     renderRegSignPanel(no, recordId);
+    renderRegSignList(no);
     showToast('🔒 無効にしました', 'success');
   } catch(e) { showToast('❌ ' + e.message, 'error'); }
   showLoading(false);
@@ -36958,7 +36960,7 @@ async function loadRegTaskRecords(no){
     _regTaskRecords[no] = d || [];
   } catch(e) { _regTaskRecords[no] = []; }
   // ✍️ 署名リンク（一覧の「署名済み」表示と書類に使う）
-  if ((REG_FORM_DEFS[no] || {}).sign) await loadRegSignLinks(no);
+  if ((REG_FORM_DEFS[no] || {}).sign) { await loadRegSignLinks(no); renderRegSignList(no); }
   renderRegTaskList(no);
 }
 
@@ -38889,6 +38891,8 @@ async function loadRegDocHistory(no){
   renderRegDocHistory(no);
   const b = document.getElementById('regDocsTabCount_' + no);
   if (b) b.textContent = (_regDocHist[no] || []).length;
+  // ✍️ 署名一覧の「回答後の書類」も同じ元データを見るので、そろえておく
+  if ((REG_FORM_DEFS[no] || {}).sign) renderRegSignList(no);
 }
 function renderRegDocHistory(no){
   const box = document.getElementById('regDocList_' + no);
@@ -38944,10 +38948,96 @@ async function regDocHistoryDelete(id, no){
   } catch(e) { showToast('❌ ' + e.message, 'error'); }
   showLoading(false);
 }
-// 記録の一覧 ⇄ 作成済みの書類
+/* ===== ✍️ 署名リンクの一覧（`sign:true` の様式＝5-9号・5-8号） =====
+   ① リンクの発行（いつ・だれが）→ ② ご本人の回答（署名）→ ③ 回答のあとに作った書類
+   を1つの表で追えるようにする。**元は `reg_sign_links` と `reg_doc_history` の2つだけ**
+   （署名の状態を決めるのは `_regSignState()` の1箇所） */
+const REG_SIGN_STATES = {
+  signed: { l:'✅ 署名済み', c:'#15803d', bg:'#dcfce7' },
+  open:   { l:'⏳ 署名待ち', c:'#b45309', bg:'#fef3c7' },
+  closed: { l:'🔒 無効',    c:'#5f6368', bg:'#f1f3f4' },
+};
+function _regSignState(l){
+  if (l && l.signature) return 'signed';
+  return (l && l.status === 'closed') ? 'closed' : 'open';
+}
+/* その記録の書類のうち、**署名のあとに作ったもの**（＝回答後の書類）。
+   まだ署名されていないリンクは空 */
+function _regSignDocs(no, l){
+  if (!l || !l.record_id || !l.signed_at) return [];
+  return (_regDocHist[no] || []).filter(r => r.record_id === l.record_id &&
+    String(r.created_at || '') >= String(l.signed_at));
+}
+let _regSignOnly = {};   // 様式番号 → 「署名待ちだけ」に絞るか
+function toggleRegSignOnly(no, on){ _regSignOnly[no] = !!on; renderRegSignList(no); }
+async function loadRegSignList(no){
+  await loadRegSignLinks(no);
+  renderRegSignList(no);
+}
+function renderRegSignList(no){
+  const box = document.getElementById('regSignList_' + no);
+  const badge = document.getElementById('regSignTabCount_' + no);
+  const rows = (_regSignLinks || []).slice();
+  if (badge) badge.textContent = rows.filter(l => _regSignState(l) === 'open').length;
+  if (!box) return;
+  const q = (document.getElementById('regSignQ_' + no)?.value || '').toLowerCase().trim();
+  let list = rows;
+  if (_regSignOnly[no]) list = list.filter(l => _regSignState(l) === 'open');
+  if (q) list = list.filter(l => {
+    const rec = _regFindRec(no, l.record_id) || {}; const d = rec.data || {};
+    return [l.worker_name, d.company_name, l.created_by, l.doc_title]
+      .some(v => String(v || '').toLowerCase().includes(q));
+  });
+  if (!list.length) {
+    box.innerHTML = '<div style="padding:26px;text-align:center;color:var(--gray-400);font-size:12px;">' +
+      (rows.length ? '見つかりません' : 'まだ署名リンクを発行していません。記録を開いて［🔗 署名リンクを発行］すると、ここに並びます') + '</div>';
+    return;
+  }
+  const th = (t, w) => '<th style="padding:6px 10px;font-size:11px;color:var(--gray-400);text-align:left;white-space:nowrap;' +
+    (w ? 'width:' + w + ';' : '') + '">' + t + '</th>';
+  const td = (v, st) => '<td style="padding:7px 10px;font-size:12px;border-bottom:1px solid var(--gray-100);vertical-align:top;' + (st || '') + '">' + v + '</td>';
+  const btn = (label, oc, col) => '<button type="button" class="btn btn-outline" style="font-size:10.5px;padding:2px 9px;' +
+    (col ? 'color:' + col + ';border-color:' + col + '44;' : '') + '" onclick="event.stopPropagation();' + oc + '">' + label + '</button>';
+  box.innerHTML =
+    '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">' +
+    '<thead><tr style="border-bottom:1px solid var(--gray-200);background:#fafbfc;">' +
+      th('対象') + th('リンクの発行', '18%') + th('状態', '10%') + th('ご本人の回答', '20%') +
+      th('回答後の書類', '16%') + th('', '20%') + '</tr></thead><tbody>' +
+    list.map(l => {
+      const rec = _regFindRec(no, l.record_id) || {}; const d = rec.data || {};
+      const st = REG_SIGN_STATES[_regSignState(l)] || REG_SIGN_STATES.open;
+      const docs = _regSignDocs(no, l);
+      const url = regSignUrl(l.token);
+      return '<tr style="cursor:pointer;" onclick="openRegTaskForm(' + no + ',\'' + esc(l.record_id || '') + '\')" title="この記録を開きます">' +
+        td('<div style="font-weight:700;color:var(--navy);">' + esc(l.worker_name || '（人材未設定）') + '</div>' +
+           (d.company_name ? '<div style="font-size:10.5px;color:var(--gray-500);">' + esc(d.company_name) + '</div>' : '')) +
+        td('<div style="white-space:nowrap;">' + esc(_fmtUpdatedAt(l.created_at)) + '</div>' +
+           '<div style="font-size:10.5px;color:var(--gray-500);">' + esc(l.created_by || '-') + '</div>') +
+        td('<span style="font-size:10.5px;font-weight:700;color:' + st.c + ';background:' + st.bg +
+           ';border-radius:8px;padding:2px 8px;white-space:nowrap;">' + st.l + '</span>') +
+        td(l.signature
+            ? '<img src="' + l.signature + '" alt="署名" style="height:34px;background:#fff;border:1px solid var(--gray-200);border-radius:5px;">' +
+              '<div style="font-size:10.5px;color:#15803d;white-space:nowrap;">' + esc(_fmtUpdatedAt(l.signed_at)) + '</div>'
+            : '<span style="font-size:11.5px;color:var(--gray-400);">まだ回答がありません</span>') +
+        td(docs.length
+            ? '<div style="font-size:11.5px;color:#15803d;font-weight:700;">✅ ' + docs.length + '件</div>' +
+              '<div style="font-size:10px;color:var(--gray-500);word-break:break-all;">' + esc(docs[0].file_name || '') + '</div>'
+            : (l.signature ? '<span style="font-size:11.5px;color:#b45309;">未作成</span>'
+                           : '<span style="font-size:11.5px;color:var(--gray-400);">-</span>')) +
+        td('<div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;">' +
+           (l.status === 'open'
+             ? btn('📋 コピー', 'navigator.clipboard.writeText(\'' + url + '\').then(()=>showToast(\'✅ コピーしました\',\'success\'))') +
+               btn('🔒 無効に', 'closeRegSignLink(' + no + ',\'' + esc(l.record_id || '') + '\')', '#dc2626')
+             : '') +
+           (l.signature ? btn('📄 書類', 'openRegDocExport(' + no + ',\'' + esc(l.record_id || '') + '\')', '#1d4ed8') : '') +
+           '</div>', 'text-align:right;') +
+      '</tr>';
+    }).join('') + '</tbody></table></div>';
+}
+// 記録の一覧 ⇄ 作成済みの書類 ⇄ 署名リンク
 function setRegView(no, v){
   _regView[no] = v;
-  ['list','docs'].forEach(k => {
+  ['list','docs','signs'].forEach(k => {
     const panel = document.getElementById('regPanel_' + k + '_' + no);
     const tab = document.getElementById('regTab_' + k + '_' + no);
     if (panel) panel.style.display = (k === v) ? '' : 'none';
@@ -38958,6 +39048,7 @@ function setRegView(no, v){
     }
   });
   if (v === 'docs') loadRegDocHistory(no);
+  if (v === 'signs') loadRegSignList(no);
 }
 /* 生成した書類を履歴に残す。**書き込むのはこの1箇所だけ** */
 async function _regSaveDocHistory(no, d, o, fileName){
@@ -39137,7 +39228,23 @@ function buildRegSupportTaskScreen(key){
         <button id="regTab_docs_${t.no}" onclick="setRegView(${t.no},'docs')"
           style="padding:8px 16px;font-size:12.5px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--gray-400);border-bottom:2px solid transparent;">📄 作成済みの書類
           <span id="regDocsTabCount_${t.no}" style="background:var(--gray-100);color:var(--gray-600);border-radius:8px;padding:1px 7px;font-size:10px;margin-left:3px;">-</span></button>
+        ${def.sign ? `<button id="regTab_signs_${t.no}" onclick="setRegView(${t.no},'signs')"
+          style="padding:8px 16px;font-size:12.5px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--gray-400);border-bottom:2px solid transparent;">✍️ 署名リンク
+          <span id="regSignTabCount_${t.no}" style="background:#fef3c7;color:#b45309;border-radius:8px;padding:1px 7px;font-size:10px;margin-left:3px;" title="署名待ちの件数">-</span></button>` : ''}
       </div>
+      ${def.sign ? `
+      <div id="regPanel_signs_${t.no}" style="display:none;">
+        <div style="padding:9px 18px;border-bottom:1px solid var(--gray-200);background:#fafbfc;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <input id="regSignQ_${t.no}" placeholder="人材名・企業名・発行した人で検索..." oninput="renderRegSignList(${t.no})"
+            style="flex:1;min-width:200px;font-size:12px;padding:5px 10px;border:1px solid #dadce0;border-radius:6px;">
+          <label style="font-size:11.5px;display:flex;align-items:center;gap:4px;cursor:pointer;white-space:nowrap;">
+            <input type="checkbox" onchange="toggleRegSignOnly(${t.no}, this.checked)"> ⏳ 署名待ちだけ</label>
+          <button class="btn btn-outline" style="font-size:11px;padding:4px 12px;" onclick="loadRegSignList(${t.no})">🔄 更新</button>
+        </div>
+        <div style="font-size:11px;color:var(--gray-400);padding:7px 18px 0;">
+          リンクの発行 → ご本人の回答（署名）→ 回答のあとに作った書類 の順に並びます。行を押すとその記録が開きます</div>
+        <div id="regSignList_${t.no}"><div style="padding:24px;text-align:center;color:var(--gray-400);font-size:12px;">読み込み中...</div></div>
+      </div>` : ''}
       <div id="regPanel_docs_${t.no}" style="display:none;">
         <div style="padding:9px 18px;border-bottom:1px solid var(--gray-200);background:#fafbfc;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           <input id="regDocQ_${t.no}" placeholder="企業名・人材名・期間・生成した人で検索..." oninput="renderRegDocHistory(${t.no})"
