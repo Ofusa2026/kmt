@@ -725,6 +725,15 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   `loadNotes(scope)` / `renderNotes(scope)` / `addNote(scope)` / `saveNote(scope,id)` / `deleteNote(scope,id)`
 - `loadJobNotes()` などの旧い名前は `'job'` を渡すだけの包みとして残してある
 - 書式ツール（`jnExec` / `jnInsertTable` / `markJobNoteDirty`）はノートidで動くので scope 不要
+- **表の大きさを変えるのは `_jnHitEdge()` ＋ `_jnInitResize()` の1組だけ**（`.jn-table`）
+  - **罫線をドラッグ**＝列幅（縦の罫線）／行の高さ（横の罫線）。掴める距離は **`JN_EDGE` の1箇所**
+  - **表の右下の［⇔］をドラッグ**＝表全体の幅（列の比率はそのまま）。目印は `_jnShowGrip()`、
+    いま動かす罫線を示す青い線は `_jnGuide()`
+  - 列幅は `<colgroup>` に入れる（`_jnEnsureColgroup()`）。`table-layout:fixed` が要る
+  - **`pointer` イベントで書く**（マウスも指も同じ処理。タブレットでも動く）
+  - ⚠️ **`#jnGrip` / `#jnGuide` は `document.body` に置くので z-index を最大にする**。
+    モーダル（99999 まである）より下だと、つまみが隠れて掴めない（実際に掴めなかった）
+  - 動かしたら `markJobNoteDirty()` で「未保存」にする（保存し忘れの防止）
 - **添付ファイル**: `job_notes.attachments` / `candidate_notes.attachments`（jsonb の
   `[{url,name,size,mimeType,at,by}]`）。実体はチャットの添付と同じ Drive フォルダー
   （`CHAT_DRIVE_URL_DEFAULT`／設定の `kmt_chat_only_drive_url`）に GAS 経由で入れる。
