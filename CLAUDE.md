@@ -2005,6 +2005,21 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - 🗑 削除は**論理削除**（`is_deleted` / `deleted_at` / `deleted_by`）。消す前に `_confirmDeleteTwice()` で
   2回たずねる。取得には `is_deleted=not.eq.true` を付ける
 
+#### 📎 領収書（立替管理・カード決済報告で共通）
+
+- 実体は `expenses.receipts` / `card_payments.receipts`（jsonb の `[{url,name,mimeType,size,at,by}]`）。
+  **Drive に入れるのは `_uploadReceiptToDrive()` の1箇所だけ**（GAS 経由。両方ここを通る）
+- 置き場は **`EXPENSE_RECEIPT_DRIVE_URL`（立替）／`CARD_RECEIPT_DRIVE_URL`（カード決済）の1箇所ずつ**
+  - カード決済は**カード名のフォルダ**に入れる。フォルダのURLが分かったら
+    **`CARD_DRIVE_FOLDERS`（カード名 → フォルダURL）に足すだけ**。空なら親フォルダに入る
+    （GAS には `subFolder` にカード名を渡している。対応していないときは親に入る）
+- ファイル名はどちらも **「利用日(yyyymmdd) 名目 金額」**（`_expReceiptBaseName` / `_cardReceiptBaseName`）。
+  **3つそろっていないと添付させない**（カード決済は利用カードも要る＝保存先が決まらないため）
+- 一覧の「領収書」欄と「経理チェック」欄を作るのは
+  **`_rcptCellHtml()` / `_acctCellHtml()` の2つだけ**（立替もカード決済も同じ見た目）
+- 経理チェックは**押したその場で保存する**（`toggleAcctChecked()` の1箇所。
+  `acct_checked` / `acct_checked_at` / `acct_checked_by`。だれがいつ付けたかは ✔ の隣とツールチップに出る）
+
 #### 💵 現金小口のボタン
 
 - 立替管理の［🔄 更新］の左。**リンクは `PETTY_CASH_SHEET_URL` の1箇所だけ**で、
