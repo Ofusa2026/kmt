@@ -959,7 +959,16 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
     **そろえ方は `_drCoNorm()` の1箇所だけ**（会社の種類・記号・全半角を落とす）。
     大房へは種類を落とした名前で `ilike` して、返ってきたものを `_drCoNorm` で絞り込む
   - 状態の言い換えは **`DR_HIST_STATUS` の1箇所**（pending／registered／rejected）
-- 行を押すと中身を確認できる（`openCoDecisionDetail`）。**出す項目は `DR_HIST_DETAIL` の1箇所だけ**
+- 行を押すと中身を確認できる（`openCoDecisionDetail`）。上に**そのときの決定報告の文面**、
+  下に受信トレイの中身（**出す項目は `DR_HIST_DETAIL` の1箇所だけ**）
+- **文面は `decision_report_log` に控える**（KMT側の新テーブル）。
+  **書き込むのは `_saveDecisionReportLog()` の1箇所だけ**で、
+  スプレッドシート送信／大房送信が**成功したあとに1件足すだけ**。送り先も紐づけも何も変えていない
+  - 文面は `buildKmtReportText()` ／ `copyOtherReport(true)` ／ `copySoloReport(true)`。
+    引数 `true` を渡すと**コピーせず文面だけ返す**（コピーボタンの動きは今までどおり）
+  - 受信トレイの1件と控えを結び付けるのは **`_drLogFor(r)` の1箇所**（人材名＋受付日が近いもの）
+  - **控えが無い古い分は `_drRebuildReportText(r)` が受信トレイの内容から組み立てて出す**
+    （請求条件・雇用条件はシートにしか無いので、元の依頼シートへのリンクも出す）
 - 読み込みは `loadCoDecisionHistory()`。**タブを開いたときだけ**引き、同じ企業なら2回目は引き直さない
   （［🔄 更新］で取り直す）
 
