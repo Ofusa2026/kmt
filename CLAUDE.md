@@ -798,6 +798,9 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   - **保存すると「▶ 次の人材を記録する」**が出て、共通項目（項目・年度・期間・面談日・実施方法・
     面談相手・対応者）を引き継いだ空のフォームが開く。**引き継ぐ中身は `_meetingCarry` の1箇所**。
     同じ日の記録がもう入っている人材には ✔ を出す（`_meetingDoneWorkerIds()`）
+  - ⚠️ **保存したあとの一覧の取り直し（`_meetingAfterChange`）は待たない。**
+    先に `showLoading(false)` を呼んでから確認のダイアログを出す
+    （待つと「読み込み中」が出たままになり、［▶ 次の人材を記録する］が押せなくなる）
   - 描くのは **`renderMeetingList(side)` の1箇所**（`side` は `co`＝所属機関 / `wk`＝外国人材）。
     保存・削除のあとの取り直しは `_meetingAfterChange()`（開いているほうを両方とも取り直す）
 - **項目（種類）と、その項目で出す欄は `MEETING_KINDS` の1箇所だけ**
@@ -1406,6 +1409,8 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - 画面を移ってから流し込むので、`goDecisionReport(type, candId)` が `_drPendingType/_drPendingCand`
   に入れ、`loadDecisionReport()` の最後で `pickDrCandidate()` する
 - 2〜3択のダイアログは **`askChoice()` の1箇所**（Promiseで押したキーが返る）。
+  ⚠️ **出す前に必ず `showLoading(false)` を呼ぶ**（`askChoice` の先頭でやっている）。
+  「読み込み中」の覆いが残っているとボタンが押せず、リロードするしかなくなる（実際になった）。
   ほかのモーダルの上に出すため `#choiceModal` だけ z-index を上げてある
 
 ### ⚖️ 求職管理簿（候補者一覧の中の表示切り替え）
