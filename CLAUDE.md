@@ -2017,6 +2017,15 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 
 - 実体は `expenses.receipts` / `card_payments.receipts`（jsonb の `[{url,name,mimeType,size,at,by}]`）。
   **Drive に入れるのは `_uploadReceiptToDrive()` の1箇所だけ**（GAS 経由。両方ここを通る）
+  - ⚠️ **GASへ送る中身は、うまく動いているチャットの添付・求人票の写真とまったく同じ形にする**
+    （`action` / `driveUrl` / `fileName` / `fileData` / `mimeType` の5つだけ）。
+    以前はカード決済だけ `subFolder` にカード名を足していたが、カードごとのフォルダを直に指しているので要らない。
+    ほかの経路が送っていないものを1つ足すと、うまくいかないときに切り分けられなくなる
+  - ⚠️ **ドライブに書きにいくのは `kmt@k-m-t.jp`**（`RECEIPT_GAS_ACCOUNT`）。
+    保存先のフォルダをこのアカウントと**編集者**で共有していないと
+    「アクセスが拒否されました: DriveApp。」になる。
+    言い換えるのは `_receiptErrText()`、画面に出すのは `_receiptSayError()` の1箇所ずつ
+    （フォルダを開くリンクを付けて、共有の設定を直しにいけるようにする）
 - 置き場は **`EXPENSE_RECEIPT_DRIVE_URL`（立替）／`CARD_RECEIPT_DRIVE_URL`（カード決済）の1箇所ずつ**
   - カード決済は**カード名のフォルダ**に入れる。フォルダのURLが分かったら
     **`CARD_DRIVE_FOLDERS`（カード名 → フォルダURL）に足すだけ**。空なら親フォルダに入る
