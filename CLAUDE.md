@@ -1808,6 +1808,12 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   - 印刷・PDF用のHTMLは **`buildRegPrintHtml()` の1箇所**（画面の印刷に使う）
   - **Driveに入らなくても履歴は残す**（`file_url` が空になるだけ）。黙って消えないようトーストで知らせる
   - 一覧・記入フォームの**ファイル名を押すと開く**。作るのは `_regDocFileLink(r)` の1箇所
+  - ⚠️ **ドライブのURLは `driveFileViewUrl()` を必ず通す（直すのはこの1箇所だけ）。**
+    `.doc` / `.xls` を入れると `docs.google.com/document/d/<id>/edit?…rtpof=true` が返ることがあり、
+    これは**Googleドキュメントの編集画面**のURLなので、中身が変換されていない生のファイルは
+    「現在、ファイルを開くことができません。」になる（実際になった）。
+    `drive.google.com/file/d/<id>/view` に直せば開ける。入れたときと出すときの両方で通すので、
+    すでに入っている古い記録もそのまま開ける
   - **作り直したほうがよい行かは `_regDocNeedsRemake(r)` の1箇所**
     （ドライブに入っていない／`.html` で入っている古いぶん）。⚠️ を付けて［📄 作り直す］を出す
 - 一覧は `renderRegDocHistory(no)`（検索は `regDocQ_<no>`）。行を押すと元の記録が開き
