@@ -1097,6 +1097,12 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
     `resign_expected_date`→`expected_leave_date` / `temp_return_date`→`return_home_date` /
     `temp_return_back_date`→`return_jp_date`）。
     欄とチェックシートが必ず同じものを指すようにするため
+  - ⚠️ **同じ人材・同じ対象月のシートは1件だけ**（`worker_id` + `target_ym` が一意）。
+    保存（`saveRenewalCheck`）は**すでにある行を PATCH で書き替える**。
+    いつも POST していると2回目の保存が
+    「duplicate key value violates unique constraint」で落ちる（実際に落ちた）。
+    まだ無いときの POST にも **`?on_conflict=worker_id,target_ym` を必ず付ける**
+    （付けないと id のほうで重複を見るので同じエラーになる）
   - 記入できるのは**メイン／サブ担当と管理者**（`_renCheckCanEdit()` の1箇所）
   - **1つでも空いていると決定のボタンは押せない**（`_renCheckMissing()` の1箇所）
   - 収入印紙費用の負担パターンは **`VISA_FEE_PATTERNS` の1箇所**（下の節）。
