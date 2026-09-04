@@ -1117,9 +1117,41 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - **毎月のサイクル**。日付を出すのは **`_renCycleDates(ym)` の1箇所**
   ＝ その月の最終営業日（期限）と、その `REN_CYCLE_LEAD_DAYS`(14) 日前の営業日（開始）。
   土日だけを見て祝日は見ない（ほかの平日計算と同じ）
-  - 段階は **`_renCycleState()` の1箇所**（before／admin＝管理者が依頼をかける番／open／over）
+  - 段階を決めるのは **`_renCycleInfo(ym)` の1箇所**（before／admin＝管理者が依頼をかける番／open／over）。
+    `_renCycleState()` は今月ぶんを返すだけの包み
+    - ⚠️ **依頼をかけたら、開始日より前でも `open` にする。**
+      依頼＝担当者への合図なので、これが無いと**依頼したのにだれにもお知らせが出ない**
+      （実際に 2026年8月・9月ぶんの依頼が誰にも届いていなかった）
+  - **どの回を見るかは `_renOpenCycles()` の1箇所だけ**。
+    依頼がかかっている回は、**まだ決まっていない人が残っているかぎり出し続ける**
+    （前の月の回も消えない）。`REN_CYCLE_BACK_MONTHS`(12) か月より古い回は見ない
   - 依頼をかけられるのは **`REN_CYCLE_ADMINS` の1箇所**（ニサ・白井）。
-    押した記録は `renewal_month_meta.requested_at` / `requested_by`
+    押した記録は `renewal_month_meta.requested_at` / `requested_by`。
+    ⚠️ **書いたあとに `loadRenewalMonthMeta()` で読み直して確かめる**
+    （画面のメモリだけ書き替えると、保存に失敗しても「依頼済み」に見えてしまう）
+  - **🔴メイン／🟡サブ の判定は `_renRoleOf(w, ym, me)` の1箇所だけ**。
+    自分が決めるぶんを回をまたいで1人1件にまとめるのは `_renMyCycleRows()`、
+    件数の内訳（main／sub／asked）は **`_renMyCounts()` の1箇所**で、
+    サイドバー・マイページ・一覧が同じ数を見る。色は `REN_ROLE_STYLE` の1箇所
+
+##### 🙋 更新決定をサブ担当にお願いする（委任）
+
+- メイン担当が「この決定はサブ担当にお願いしたい」ときに使う。実体は **`renewal_delegations`**
+  （1回×1人材で1件。`ym` ＋ `worker_id` で一意）
+- **お願いされた人は「メインと同じ赤」であつかう**（`_renRoleOf` の中で先に見る）。
+  お願いした側は赤から外し、**🙋 お願い済み**として別に数える（放りっぱなしにしないため一覧には残す）
+- お願いすると、**その人材のチャットに相手を @メンションして投稿する**（`_renPostDelegChat()` の1箇所）。
+  `mentions` に相手の名前を入れるので通知が届く
+- 入口は一覧の［🙋 サブ担当にお願いする］（`askRenDelegate` → `saveRenDelegate` ／ 取り消しは `cancelRenDelegate`）。
+  相手の選択肢は `workerStaffOptionsHtml()` を共用する
+- 担当ごとの残りを数える **`_renCycleStaffBreak(ym)`** も、お願いされた人をメインとして数える
+
+##### 📋 依頼の履歴と対応状況
+
+- `openRenCycleHistory()`。回ごとに「いつ・だれが依頼をかけたか／期限／残り・進捗／担当ごとの内訳／
+  🙋 お願いの記録」を出す。**数え方は `_renCycleTargets` / `_renCycleUndecided` を使う**ので、
+  お知らせの件数と必ず同じになる
+- 入口は3つ＝ 更新決定の一覧の上と下のボタン、依頼をかけたあと
   - **対象の決め方は `REN_TARGET_MONTHS_AHEAD` まわりの一かたまりだけ**（`_renCycleTargets`）
     - メイン … 在留期限が「サイクル月 ＋ `REN_TARGET_MONTHS_AHEAD`(5) か月」の人材。
       **決定から在留期限まで4か月以上あける**ための5か月
