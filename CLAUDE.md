@@ -1111,6 +1111,11 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
     「duplicate key value violates unique constraint」で落ちる（実際に落ちた）。
     まだ無いときの POST にも **`?on_conflict=worker_id,target_ym` を必ず付ける**
     （付けないと id のほうで重複を見るので同じエラーになる）
+  - 🔁 **更新ステータスは「選ぶ」と「反映する」を分ける。**
+    ボタンは選ぶだけ（`renRcPickStatus()`。選んだ値は `_renCheck.pickStatus` の1つだけ／
+    もう一度押すと解除）で、**書き込むのは［💾 保存］＝`saveRenewalCheckAll()` のときだけ**。
+    押し間違いをそのまま反映しないため。選んでいるものは**その色で塗って ✓** を付ける
+    （塗っていないものは白地に色枠）＝どれを選んでいるかがひと目で分かる
   - 記入できるのは**メイン／サブ担当と管理者**（`_renCheckCanEdit()` の1箇所）
   - **1つでも空いていると決定のボタンは押せない**（`_renCheckMissing()` の1箇所）
   - 収入印紙費用の負担パターンは **`VISA_FEE_PATTERNS` の1箇所**（下の節）。
