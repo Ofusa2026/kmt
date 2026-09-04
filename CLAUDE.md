@@ -95,6 +95,18 @@ UI変更やロジック変更のときは実際に描画して確かめる。
 
 ## 7. 主要な仕組み
 
+### 🏢 担当（メイン／サブ）を所属機関から引く
+
+- **引くのは `coOfRow(row)` の1箇所だけ**（人材の行でも予定の行でも同じ）
+- ⚠️ 人材や予定は `companies(id,name)` のような**名前だけの embed** を持っていることがある。
+  `row.companies || allCompanies.find(...)` と書くと**名前だけの embed が勝ってしまい、
+  `main_staff` / `sub_staff` が無いので担当がだれにも当たらない**（実際に当たらなかった）。
+  `coOfRow()` は担当の列（`CO_STAFF_COLS`）が入っている embed だけを使い、
+  無ければ `allCompanies` から引き直す
+- ⚠️ **`allCompanies` は起動直後はまだ空**のことがある。担当で数えるお知らせは
+  `ensureCompaniesLoaded()` / `ensureAlertWorkersLoaded()` を待ってから数え、
+  **あとから届いたときも数え直す**（数え直さないと 0件 のまま出なくなる）
+
 ### 手動保存と未保存リマインド
 
 - レジストリ `_manualSave`（modalId → `{dirty, prefix, save, metaSlot, label}`）
@@ -1203,6 +1215,11 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
     自分が決めるぶんを回をまたいで1人1件にまとめるのは `_renMyCycleRows()`、
     件数の内訳（main／sub／asked）は **`_renMyCounts()` の1箇所**で、
     サイドバー・マイページ・一覧が同じ数を見る。色は `REN_ROLE_STYLE` の1箇所
+  - ⚠️ **数える前に「担当（所属機関）」と「在留期限（人材）」がそろっているか確かめる**＝
+    `loadRenewalCycle()` が `ensureCompaniesLoaded()` / `ensureAlertWorkersLoaded()` を待つ。
+    **待たないと 0名 と数えてしまい、依頼をかけてもだれのサイドバーにも出ない**
+    （実際に出なかった。起動直後は `allCompanies` がまだ空で、しかも数え直していなかった）。
+    あとから届いたときも数え直す（`refreshSidebarAlerts()` の最後と、起動時の所属機関の読み込みの後）
 
 ##### 🙋 更新決定をサブ担当にお願いする（委任）
 
