@@ -89,6 +89,14 @@ UI変更やロジック変更のときは実際に描画して確かめる。
 
 - スキーマ変更・データ確認は Supabase MCP（`execute_sql`）または管理画面から
 - 新テーブルは既存に合わせて `DISABLE ROW LEVEL SECURITY` ＋ `GRANT ALL TO anon, authenticated, service_role`
+- ⚠️ **upsert（`Prefer: resolution=merge-duplicates`）は `on_conflict` が要る。**
+  PostgREST は書かないと**主キー**で重複を見るので、「主キーとは別の一意制約」があるテーブルは
+  `duplicate key value violates unique constraint …` で**保存がまるごと落ちる**
+  （更新決定チェックとアナウンスの確認状況で実際に落ちた）
+  - **テーブル → 一意のキー を書くのは `SB_UPSERT_KEYS` の1箇所だけ**。`sbFetch` が自動で付けるので、
+    呼ぶ側は今までどおりでよい（すでに `?on_conflict=` を書いてあるものは二重に付けない）
+  - **主キーとは別の一意制約を付けたら、必ず `SB_UPSERT_KEYS` にも足すこと**
+    （主キーがそのまま一意のテーブル＝`app_settings.key` などは書かなくてよい）
 - アプリ→Supabase はブラウザから通るので、大量データの初期投入は
   「アプリ埋め込みシード＋初回アクセス時に自動投入」方式が使える（`JOB_PROGRESS_SEED` が実例）
 - 更新者は各テーブルの `updated_by` に記録する（`_curUserName()` を使う）
