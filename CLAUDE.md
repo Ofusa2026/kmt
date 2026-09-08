@@ -1937,13 +1937,19 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   サイドバー「登録支援機関業務」の**いちばん上**（`renderRegSupportNav` の1箇所）
 - ⚠️ **管理者以外にはサイドバーにも出さないし、画面も開けない**
   （出すかどうかは `isAdminUser()`、画面の中身は `renderRegAuditScreen()` の先頭で見る）
-- **中身は `AUDIT_OVERVIEW`（01 概要）と `AUDIT_DOCS`（02 書類）の2箇所だけ**。
-  文章もリンクもここだけを直せば画面が追従する
-  - `AUDIT_OVERVIEW` … `{ h:見出し, lead:前置き, items:[{ q:聞かれること, a:答え方 }] }`。
-    入管庁の「質問票」の並び（1 制度の理解 → 2 事前ガイダンス → 3 生活オリエンテーション →
-    4 定期面談）に合わせてある
+- **中身は `AUDIT_META` / `AUDIT_OVERVIEW` / `AUDIT_FOOTER`（01 概要）と
+  `AUDIT_DOCS`（02 書類）の1かたまりだけ**。文章もリンクもここだけを直せば画面が追従する
+  - `AUDIT_OVERVIEW` … 入管庁の「質問票」に沿った 00〜07 の節。
+    `parts` に**出す順**で入っていて、種類は次の6つ
+    | `t` | 中身 |
+    |---|---|
+    | `q` | 質問（`id` / `q` / `ans` / `blocks`。`blocks` は `items`＝箇条書き／`text`／`links`） |
+    | `warn` | 赤い注意書き ／ `note` … 青い補足（`links` を付けられる） |
+    | `flow` | 処分の流れ（`steps`。`bad:true` は赤） |
+    | `table` | 表（`cols` / `rows`） ／ `linkgroups` … リンク集（`groups`） |
+  - ⚠️ **文中で使ってよいタグは `<b>` と `<a href>` だけ**（そのまま `innerHTML` に入れる）
+  - 出すのは `_auditPartHtml(p)` の1箇所（`t` で振り分ける）。目次の飛び先は `auditGo(n)`
   - `AUDIT_DOCS` … `{ name, url }`。新しいタブで開くだけ（閲覧権限は Google 側）
-- 文中の `**…**` は太字になる（`_auditMd()` の1箇所）
 - 画面キーは **`AUDIT_KEY`（`reg_audit`）**。`SCREENS` への登録・`renderScreenContent` の
   振り分け・サイドバーの3箇所がこの定数を見る
 
