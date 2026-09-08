@@ -1837,6 +1837,21 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - **1件ずつ入れる方式なので、あとから期限を直してもカレンダー側は変わらない**。
   自動で追従させるなら別途 ICS の購読リンク（GAS で配信）が要る
 
+### ✉️ メール送信（テンプレート・印刷）
+
+- **テンプレートの並び順は `MAIL_TPL_SORTS` の1箇所だけ**（🕘 新しい順／古い順／🔤 名前 あ→ん／ん→あ）。
+  既定は「新しい順」＝いちばん最近つくったものが一番上。選んだ並びは `localStorage`
+  （`kmt_mail_tpl_sort`）に覚える。**並べ替えも検索も `renderMailTemplateOptions()` の1箇所**
+  （検索は名前・件名・本文から。本文はタグを落としてから見る）
+- 📎 **添付はテンプレートにも保存する**（`mail_templates.attachments` ＝ `[{name,url}]`）。
+  入れ物は2つ＝ `_mailAttachSaved`（すでに Drive にあるぶん。**上げ直さない**）と
+  `<input type="file">`（これから選んだぶん）。
+  `uploadMailAttachments()` が両方を返し、保存は `_mailTplAttachments()` の1箇所を通る
+- 🖨️ **印刷は `_mailPrintDocHtml()` の1箇所だけ**が組み立てる（プレビューと実際の印刷が
+  必ず同じになる）。**1社＝1ページ**で、送信時と同じ「〇〇 御中」を差し込む。
+  用紙の余白は `@page{margin:0}` ＋ `.mp-page` の padding
+  （こうしないとブラウザが上下にURL・日付・ページ番号を刷り込む）
+
 ### ✅ 権限のお知らせ（その人だけに1回出る）
 
 - **中身は `ROLE_GRANT_NOTICES` の1箇所だけ**（`key` / `users` / `title` / `lead` / `items` / `note`）。
