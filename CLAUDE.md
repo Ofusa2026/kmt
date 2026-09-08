@@ -1321,10 +1321,20 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - **どちらを出すかは `_renCycleView` の1箇所だけ**（`''`＝自分のぶん／`'all'`＝全体）。
   切り替えは一覧の上のボタン（`setRenCycleView`）。**管理者で自分の担当ぶんが1件も無いときは
   はじめから全体**（`openRenewalCycle(view)`）
-- **決まっているかの判定は `_renDecidedOf(w)` の1箇所だけ**。
+- **決まっているかの判定は `_renDecidedOf(w)` の1箇所だけ**＝ **更新ステータスが入っているか**。
   🧪 テストと 🔁 繰り越しは決め直しが要るので「未対応」にする
-- 決定者・日時は `renewal_status_log` の最新1件（`loadRenCycleLog()` → `_renCycleLog`）。
-  **管理者が一覧を開いたときに裏で読み、届いたら描き直す**（待たせない）
+- ⚠️ **対応状況の欄に更新ステータスの中身（「完了」など）を出さないこと。**
+  出すと**対応状況そのものが完了に見える**（実際に「なぜ完了になっているのか」と聞かれた）。
+  欄は ✅ 決定ずみ ／ ⏳ 未対応 だけにして、**中身は「更新ステータス」の列**に出す
+- **決定者・日時を決めるのは `_renDecidedInfo(w)` の1箇所だけ**。上から順に
+  ① `renewal_status_log` の最新1件 ② `renewal_checks` の `decided_by` / `decided_at`
+  ③ `workers.updated_by` / `updated_at` ④ どれも無い、を見る
+  （読むのは `loadRenCycleLog()` → `_renCycleLog` / `_renCycleChk`。
+  **管理者が一覧を開いたときに裏で読み、届いたら描き直す**＝待たせない）
+  - ③④ は**この回で決めたものではない**（CSV取込のときから入っている値など）ので、
+    **`REN_DEC_SRC` の1箇所**が「※ 人材情報の更新」と注意書きを出す
+  - `workers.updated_at` / `updated_by` は **`WORKER_ALERT_SELECT_COLS` に入れてある**
+    （軽いSELECTでも読めるようにするため）
 - **担当ごとに数えるのは `_renStaffTally(ym, list)` の1箇所だけ**。
   `_renCycleStaffBreak()`（残りだけ）も `_renStaffProgress()`（決定ずみ／未対応）もここを通るので、
   一覧の上の内訳と［📋 依頼の履歴と対応状況］が必ず同じ数になる
