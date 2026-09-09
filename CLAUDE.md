@@ -2537,7 +2537,8 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   `isMappableAddress()` が true のとき（都道府県＋市区町村があり、そのあとに番地が続く）だけで、
   足りないときは「都道府県から市区町村・番地まで入れると地図のリンクが出ます」と出す
   - リンクは2つ＝ 🗺️ Googleマップで開く（`mapsUrl`）／🚗 KMTからの経路（`mapsRouteUrl`）。
-    **経路の出発地は `KMT_OFFICE_ADDRESS` の1箇所**
+    **経路の出発地＝KMTの本社は `KMT_OFFICE_ADDRESS` の1箇所だけ**
+    （いまは `東京都大田区蒲田5-11-10 FUNDES蒲田8階`。**移転したらここだけ直せば全部の経路が変わる**）
   - 描き直すのは `updateAddrMap(id)`（本社・就業場所）と `updateAddrMapEl(el)`（追加の就業場所。
     id を振れないので入力欄の隣の `.addr-map` を見る）
 
