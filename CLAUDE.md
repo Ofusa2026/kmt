@@ -638,6 +638,12 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   回答が上書きし合うため。判定は `_openJobSheetLink()` の1箇所。
   `createJobSheetLink` は毎回 `loadJobSheetLinks` で取り直してから見る
   （別の人が先に発行しているかもしれないので、ボタンのdisabledだけに頼らない）
+- 📧 **企業へ送る案内文は `JOB_LINK_MSG` の1箇所だけ**（✉️ メール用 ／ 💬 チャット・LINE用＝`JOB_LINK_MSG_KINDS`）。
+  リンクの行の［📧 案内文］（`openJobLinkMsg`）で開く
+  - 差し込む中身を作るのは **`_jobLinkMsgCtx()` の1箇所**＝ 企業名・リンク・お名前・名乗り・期限。
+    **名乗りは求人票の種類に合わせる**（`FLYER_HEAD` を使う。🌏＝登録支援機関KMT／🎓📋＝株式会社KMT）
+  - 期限のめやすは **`JOB_LINK_MSG_DUE_DAYS`(7) の1箇所**（土日なら翌営業日）
+  - 開いた画面で直せるが、**直した内容はどこにも保存しない**（コピーするだけ）
 - アラートは2つ。`extAnswered`（回答が届いて `seen_at` が無い）と
   `linkStale`（`JOB_LINK_STALE_DAYS`=30日以上 未回答）。
   「✅ 確認済みにする」で `seen_at` が入り、アラートから消える
