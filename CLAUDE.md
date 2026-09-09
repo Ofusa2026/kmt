@@ -2609,9 +2609,9 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   請求済＝請求者・請求日／入金済＝＋入金確認者・入金日・入金方法。
   **切り替えたときだけ**空欄に「自分＋今日」を入れる（`onExpenseStatusChange()`。開いただけでは入れない）
 - **請求先で出る欄が変わる**（`renderExpenseBillToFields()` の1箇所）
-  - 人材 … 人材を選ぶ → **企業はその人材の所属で決まる**（選ばせない・読み取り専用で出す）
-  - 企業 … 企業を選ぶ → 人材は**その企業の人材から選ぶ**か手入力（`worker_name_custom`）
-  - 登録支援機関 … `org_name` / `company_name_custom` / `worker_name_custom` の3つとも手入力
+  - 人材 … 人材を**1名**選ぶ → **企業はその人材の所属で決まる**（選ばせない・読み取り専用で出す）
+  - 企業 … 企業を**1社**選ぶ → 人材は**何名でも足せる**
+  - 登録支援機関 … `org_name` は手入力／**企業も人材も何件でも足せる**
 - **人材名・企業名は打つと候補が出る欄**（`_expPickHtml` / `expPickOpen` / `expPickChoose`）。
   選んだ結果は隠しの `ef_worker_id` / `ef_company_id` に入り、**この2つが唯一の正**
   （表示の文字は毎回 id から引き直すので、名前だけ書き換わることがない）
@@ -2619,8 +2619,26 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   請求先を切り替えたときに前の内容が残らないようにするため
 - 候補の人材・企業は `_expEnsureMasters()` が専用に取っておく。
   **`allWorkers` は画面によって軽いSELECTで上書きされるので当てにしない**
-- 一覧に出す名前は **`expWorkerNameOf()` / `expCompanyNameOf()` の2つだけ**
-  （選んだ人材・企業か、手入力ぶんか）
+- 一覧に出す名前は **`expWorkerNames()` / `expCompanyNames()` の2つだけ**
+  （複数のときは「1件目 ＋ 他◯名」。残りはマウスを乗せると出る）。
+  `expWorkerNameOf()` / `expCompanyNameOf()` はそれを「、」でつないだもの（検索・削除の確認に使う）
+
+#### 👥 人材・企業を「＋」で何件でも足す
+
+- 実体は **`expenses.worker_list` / `company_list`**（jsonb の `[{id,name}]`）。**別テーブルを作らない**
+- **読み書きは `_expList()` / `_expListOf()` の1組だけ**を通す。
+  **`_expListOf()` が古い記録も吸収する**＝ `worker_list` が空なら
+  `worker_id`（embed の名前）か `worker_name_custom` から1件だけの形を作るので、
+  **これまでの記録もそのまま出るし、開いて保存すればその1件が新しい形にそろう**
+- 画面の行は `_expWorkerRows` / `_expCompanyRows` に持ち、描くのは **`renderExpRows(kind)` の1箇所**
+  （`addExpRow` / `removeExpRow` / `updateExpRow`。人材も企業も `kind` で切り替えるだけの同じ作り）
+- **候補（datalist）を決めるのは `_expCandidates(kind)` の1箇所**＝
+  **請求先が【企業】のときの人材は、その企業の人材だけ**。一覧に無い名前はそのまま手入力できる
+  （名前で1人／1社に決まるときだけ `id` も持つ。同名が2件以上なら `id` は空のまま）
+- **1件目は今までどおり `worker_id` / `company_id`（一覧に無い名前は `*_name_custom`）にも書く**
+  （`saveExpense` の `first()`）。一覧の embed と古い記録との行き来のため。
+  ⚠️ **列名は `workers` / `companies` にしない**（`select=*,workers(name),companies(name)` の embed とぶつかる）
+- 行を1つも足していないときは、開いた時点で**空の行を1つ**出す（＋を押さなくても書ける）
 - モーダルは**手動保存**（`_manualSave.expenseModal` ／ 接頭辞 `ef_` ／ `sm_expense`）。
   ［💾 保存］を押すまで書かない。保存しても**モーダルは閉じない**（最終更新をその場で見せる）。
   ピッカーや領収書の追加・削除は input イベントが出ないので `_expTouch()` で未保存の印を付ける
