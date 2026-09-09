@@ -2086,6 +2086,24 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
     `openRegTaskForm`（開いた最後）と `onRegWorkerPick`（人材を選んだあと）の2か所
   - 機関名・説明者・署名日は 5-9号と同じ（説明者＝`_regGltStaffOf()`、署名日＝`orientation_date`）
 
+#### 🧪 テストページ（4. 事前ガイダンス ／ 7. 生活オリエンテーション）
+
+本番の人材にさわらずに、**記入 → ✍️ 署名リンク → ご本人の署名 → 📄 書類生成**まで
+ひととおり試すためのもの。画面の見出しの下に紫の案内と2つのボタンが出る。
+
+- **試せる様式は `REG_TEST_TASKS`（いまは `[4, 7]`）の1箇所だけ**。判定は `_regTestOn(no)`、
+  案内を出すのは `_regTestBannerHtml(no)`（`buildRegSupportTaskScreen` の見出しの直後に1回）
+- **使う人材は 🧪 テスト用の人材1名**（`TEST_WORKER_PREFIX`＝`【テスト】` で始まる行）。
+  **🔁 更新決定のテストと同じ人材**を使う＝テスト用のデータを増やさない。
+  引くのは **`_regTestWorker()` の1箇所**（`allWorkers` に無ければDBから1件だけ取り直す）
+- 一覧では 🧪 の印が付く（`renderRegTaskList` の `entLink` の中。`_isTestWorker()` を通す）
+- ［🧪 テストを始める］（`startRegTest`）… その様式のテスト用の記録があれば開き、無ければ
+  人材を入れた新規の記入フォームを開く
+- ［🔄 テストをやり直す］（`resetRegTest`）… **消すのは「その様式 × その人材」ぶんだけ**
+  （`reg_sign_links` / `reg_doc_history` / `reg_support_records` を
+  `?task_no=eq.<no>&worker_id=eq.<id>` で DELETE）。
+  **ほかの様式・本番の人材には触らない**。消す前に確認を出す
+
 #### 📄 相談記録書（5-4号 ／ no.10 ／ 表示も「10.」）
 
 - **企業と人材の一覧＋書類生成**（`type:'worker'` の欄があるので一覧は人材ごと）
