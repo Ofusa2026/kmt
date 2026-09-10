@@ -1527,7 +1527,15 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - 置き場はサイドバー `renApplyAlerts` ／ マイページ `myRenApplyAlerts`（`updateRenApplyAlerts()`）。
   一覧は `openRenApplyLate()`、行を押すとその人材の詳細が開く
 - ブラウザ通知は `_renApplyNotify()`。**同じ日に何度も出さない**（面談記録の記入待ちと同じ作り）
-- 数え直すのは 起動時（`loadRenewalCycle`）と **ステータスを書いたとき（`_renWriteStatus`）**
+- 数え直すのは 起動時（`loadRenewalCycle`）／**ステータスを書いたとき（`_renWriteStatus`）**／
+  **人材を読み直したとき（`loadWorkers` の中の1箇所）**
+  - ⚠️ **人材詳細の 💾保存（`saveWorker`）は `renewal_status` を直接書く**（`_renWriteStatus` を通らない）。
+    `loadWorkers()` で数え直さないと、**ステータスを変えたのにお知らせが古い件数のまま残る**（実際に残った）
+- ⚠️ **ステータスを書いたら、手元のどの人材リストにも同じ値を入れること。
+  そろえるのは `_renSyncStatusMem(workerId, to)` の1箇所だけ**
+  （`allWorkers` / `_sidebarAlertData` / `filteredWorkers` / `_renCheck.w`）。
+  お知らせが見るのは `_alertSourceWorkers()` ＝ **`allWorkers` が軽いSELECTのときは `_sidebarAlertData` のほう**なので、
+  `allWorkers` だけ直しても**お知らせが消えない**（実際に消えなかった）
 - 🧪 テスト用の人材と、辞退・支援機関変更済みの人材（`isAlertExcludedWorker`）は出さない
 
 - 🧪 **テスト用の人材は氏名が `TEST_WORKER_PREFIX`（`【テスト】`）で始まる行**。
@@ -1574,9 +1582,17 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
     対象の人材は先頭に赤枠で並べる（残りが短い順）
 - `allWorkers` は画面によって軽量 select で上書きされることがある。
   判定に必要な列が無い場合は `_alertSourceWorkers()` が専用取得分（`_sidebarAlertData`）にフォールバックする
-- 在職ステータスが **辞退/キャンセル** と **支援機関変更済み** の人材は全アラートの対象外。判定は `isAlertExcludedWorker(w)` の1箇所だけ
-  （`computeGlobalWorkerAlerts` / `computeMyWorkerAlerts` / 期限カードの一覧 から呼んでいる）。
+- 在職ステータスが **辞退/キャンセル** と **支援機関変更済み** の人材は全アラートの対象外。判定は `isAlertExcludedWorker(w)` の1箇所だけ。
   表記ゆれを拾うため「辞退」「キャンセル」の部分一致で見ている
+  - 呼ぶのは4か所＝ `computeGlobalWorkerAlerts` ／ `computeMyWorkerAlerts` ／
+    `missingRequiredFields` ／ **`renderWorkerAlerts` の中の「一覧フィルターに追従するぶん」のループ**
+  - ⚠️ **最後の1つを書き忘れていて、期限カード・脱退一時金・退職予定日超過・在留情報未入力の
+    4つにだけ辞退／キャンセルの人材が出ていた**（実際に出ていた）。
+    アラートを数えるループを足したら、**必ず `isAlertExcludedWorker(w)` を先頭に入れること**
+- 🚫 **未記入アラートの対象にしない項目は `WORKER_REQUIRED_FIELDS` から外す**（薄い赤も同時に消える）。
+  いま外してあるのは **在留カード履歴（`residence_card_history`）** と
+  **大房側ドライブURL（`drive_url`）**＝ どちらも本人・KMT側だけでは埋められない欄のため
+  （記入そのものは今までどおりできる）
 - 10番「通算期間と過去の就労先」の**自動計算した5年満了日は、8番の `wf_tg2_expiry` に自動で入る**
   （`syncTokuteiExpiryToForm()` の1箇所。`renderTokuteiCalc` から毎回呼ぶので2つの欄がズレない）。
   モーダルを開いたときの反映はスナップショットより前に走るので、開いただけでは未保存あつかいにならない
