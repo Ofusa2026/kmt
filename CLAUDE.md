@@ -87,6 +87,19 @@ UI変更やロジック変更のときは実際に描画して確かめる。
 
 ## 6. Supabase
 
+### ⚠️ 1回のGETは1000件まで（`sbFetch` が自動でページ送りする）
+
+- Supabase（PostgREST）は**1回のGETで既定1000件までしか返さない**。
+  そのまま取ると**並び順のうしろがまるごと消える**
+  （人材が1004名になったとき、氏名順の最後の4名が一覧に出てこなくなった。実際に起きた。
+   「登録されていない」と思われて、同じ人材が3件登録された）
+- **ページ送りは `sbFetch` の1箇所で自動でやる**（`SB_PAGE`=1000 ／ `SB_PAGE_GUARD`=60ページ）。
+  1ページが1000件未満になったら終わりなので、**ふつうの表は今までどおり1回のGETで終わる**
+  - 自分で `limit` / `offset` を書いている呼び出しと、件数つき（`opts.count`）はそのまま通す
+  - **新しく一覧を足すときも、`limit` を書かなければ自動で全件**取れる
+  - ⚠️ **`&limit=1` を付けた「1件だけ引く」呼び出しはそのまま**（ページ送りに入らない）
+- `_fetchAllSchedules()` の自前のループはやめて、`sbFetch` に任せている（実装を2つ持たない）
+
 - スキーマ変更・データ確認は Supabase MCP（`execute_sql`）または管理画面から
 - 新テーブルは既存に合わせて `DISABLE ROW LEVEL SECURITY` ＋ `GRANT ALL TO anon, authenticated, service_role`
 - ⚠️ **upsert（`Prefer: resolution=merge-duplicates`）は `on_conflict` が要る。**
@@ -1664,6 +1677,19 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   パスポート期限の必須判定は `isPassportExpiryRequired(w)`（申請種別が「認定」以外で必須）
 - **判定条件を変えるときは `computeGlobalWorkerAlerts` だけを直せばよい**
 
+### 👥 人材登録の二重登録チェック
+
+- 一覧に出てこないと「まだ登録されていない」と思って何度も登録してしまうので、
+  **新規登録の前に同じ氏名の人材がいないか必ず聞く**（実際に同じ人が3件できた）
+- **氏名くらべは `_dupNameKey()` の1箇所だけ**（前後・途中の空白と大文字小文字を無視する）
+- **探すのは `_findDupWorkers()` の1箇所**。⚠️ **手元の `allWorkers` ではなくDBに聞く**
+  （画面によっては軽いSELECTで上書きされていたり、読み込みが終わっていないことがあるため）。
+  取得に失敗したときの控えとして `allWorkers` も見る
+- 確認の文面は **`_confirmDupWorker()` の1箇所**（管理番号・企業・在職ステータス・登録日を並べて出す）。
+  ［やめる］が既定で、［それでも新しく登録する］を押したときだけ進む
+- 保存したあと、**一覧に入ったかその場で確かめる**（`_justRegisteredWorkerId`）。
+  出ていなければトーストで知らせる＝「登録したのに出ない」を黙って起こさない
+
 ### 📦 外国人材の3区分（🤝 支援人材 ／ ➖ 支援外人材 ／ 📦 過去の人材）
 
 - **どの枠かを決めるのは `workerBucket(w)` の1箇所だけ**（タブの人数も一覧の絞り込みも同じものを見る）
@@ -1830,6 +1856,7 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 | 所属機関一覧・詳細 | `renderTable` / `openCompanyModal` / `fillCoForm` / `getCoFormData` / `saveCompany` |
 | 業種（複数選択） | `getCompanyIndustries` / `industryOptionList` / `renderIndustryChips` / `commitNewIndustry` |
 | 外国人材詳細 | `openWorkerModal` / `buildWorkerModalBody` / `saveWorker` |
+| 人材の二重登録チェック | `_dupNameKey` / `_findDupWorkers` / `_confirmDupWorker` |
 | 申請記録タブ | `renderApplyRecords` / `loadApplyRecords` / `saveApplyRecord` / `sortApplyRecords` |
 | 求人進捗 | `buildJobsScreen` / `loadJobProgress` / `renderJobProgress` / `saveJobProgress` |
 | 決定報告（KMT案件） | `buildKmtReportText` / `getDrOrgChange` / `copyKmtReport` / `submitDecisionReport` |
