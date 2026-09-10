@@ -117,6 +117,24 @@ UI変更やロジック変更のときは実際に描画して確かめる。
   削除ずみを見たい画面は `is_deleted=eq.true` と書けばよい
 - 呼ぶ側に `is_deleted=not.eq.true` が残っていても二重に付かない（そのまま動く）
 
+### 🗑 ゴミ箱（⚙️ 設定 → 🗑 ゴミ箱 ／ 画面キー `trash`）
+
+- 論理削除したものはここに入る。**開けるのも・復元も・完全に削除するのも管理者だけ**
+  （サイドバーの項目は `_refreshTrashNav()` が出し入れし、画面は `renderTrash()` の先頭で見る。
+  操作は `requireAdmin()` を通す）
+- **出す表と1件の見せ方は `TRASH_TABLES` の1箇所だけ**（`name`＝主な名前の列／`sub`＝下の小さい文字）。
+  ⚠️ **`SB_SOFT_DELETE_TABLES` と必ずそろえること**（`is_deleted` を足したら両方に足す）
+- **保管日数は `TRASH_KEEP_DAYS`(90＝3か月) の1箇所だけ**。
+  期限かどうかは **`_trashDaysLeft()` / `_trashExpired()` の1箇所**
+  - ⚠️ **`deleted_at` が入っていないものは期限切れにしない**（いつ消したか分からないため、
+    「保管期限なし」と出して残す）
+- 操作は3つ＝ `restoreTrash()`（↩ 復元。`is_deleted`・`deleted_at`・`deleted_by` を消す）／
+  `purgeTrash()`（🗑 行ごと DELETE）／`purgeExpiredTrash()`（🧹 期限切れをまとめて）。
+  **完全削除は必ず `_confirmDeleteTwice()` で2回たずねる**（もう戻せないため）
+- ⚠️ 取得は `is_deleted=eq.true` と**自分で書く**ので、`sbFetch` の自動除外は掛からない
+- ⚠️ 削除するときは **`deleted_at` / `deleted_by` も必ず書くこと**（書かないとゴミ箱で
+  「いつ・だれが」が出ず、保管期限も効かない）
+
 - スキーマ変更・データ確認は Supabase MCP（`execute_sql`）または管理画面から
 - 新テーブルは既存に合わせて `DISABLE ROW LEVEL SECURITY` ＋ `GRANT ALL TO anon, authenticated, service_role`
 - ⚠️ **upsert（`Prefer: resolution=merge-duplicates`）は `on_conflict` が要る。**
@@ -1644,6 +1662,14 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   - ⚠️ **期限超過（`.due-over`）は透明度を点滅させるだけ**なので担当の色は消えない。
     期限超過を赤に塗り替えないこと（だれの仕事かが分からなくなる）。
     知らせるのは点滅と【期限超過】【至急】の文字で足りる
+- 🗂 **並び順は `ALERT_OWNERS` に書いてある順そのもの**＝ 全体 → 総務 → 企業担当 → GLT。
+  `ALERT_OWNER_ORDER = Object.keys(ALERT_OWNERS)` なので**別に持たない**（ずれない）。
+  **並べ替えたいときは `ALERT_OWNERS` の並びを入れ替えるだけ**
+  - 外国人材のアラートは `renderWorkerAlerts` の中で `addBlock(キー, バナー, 一覧の入れ物)` に
+    ためてから、最後にこの順でまとめて並べる。**同じ担当の中は足した順のまま**
+  - ⚠️ **バナーと、その下に開く一覧の入れ物は必ず1組で `addBlock` に渡す**
+    （離れると開いた一覧が別の場所に出る）
+  - 凡例（`alertOwnerLegendHtml()`）も同じ並びを見る
 - **凡例は `alertOwnerLegendHtml()` の1箇所**（外国人材のアラート欄のいちばん上に出る）。
   マークと同じ言葉は繰り返さない（「全体 全体」にならないように）
 - 📏 **マークの大きさは `ALERT_MARK_PX`(26) / `ALERT_MARK_PX_SM`(17) の1箇所だけ。全部そろえる**
