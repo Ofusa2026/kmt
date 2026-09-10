@@ -100,6 +100,23 @@ UI変更やロジック変更のときは実際に描画して確かめる。
   - ⚠️ **`&limit=1` を付けた「1件だけ引く」呼び出しはそのまま**（ページ送りに入らない）
 - `_fetchAllSchedules()` の自前のループはやめて、`sbFetch` に任せている（実装を2つ持たない）
 
+### 🗑 論理削除（`is_deleted`）も `sbFetch` が自動で除く
+
+- ⚠️ 取得口ごとに `is_deleted=not.eq.true` を書いて回っていたので、
+  **書き忘れた画面にだけ削除ずみが出続けていた**
+  （所属機関の【人材】タブに、消したはずの人材が何度消しても出ていた。実際に起きた）
+- **除くのは `sbFetch` の中の `_sbHideDeleted()` の1箇所だけ**。GET のときに
+  `is_deleted=not.eq.true` を自動で付ける
+- **対象の表は `SB_SOFT_DELETE_TABLES` の1箇所だけ**（DBに `is_deleted` 列がある表）。
+  **列を足したら必ずここにも足すこと**
+  ```sql
+  select table_name from information_schema.columns
+  where column_name='is_deleted' and table_schema='public';
+  ```
+- **自分で `is_deleted` を書いた呼び出しはそのまま通す**＝
+  削除ずみを見たい画面は `is_deleted=eq.true` と書けばよい
+- 呼ぶ側に `is_deleted=not.eq.true` が残っていても二重に付かない（そのまま動く）
+
 - スキーマ変更・データ確認は Supabase MCP（`execute_sql`）または管理画面から
 - 新テーブルは既存に合わせて `DISABLE ROW LEVEL SECURITY` ＋ `GRANT ALL TO anon, authenticated, service_role`
 - ⚠️ **upsert（`Prefer: resolution=merge-duplicates`）は `on_conflict` が要る。**
@@ -211,9 +228,24 @@ UI変更やロジック変更のときは実際に描画して確かめる。
     送信時は全員の名前に展開して `mentions` に入れるが、**大房側から直接入るメッセージは
     `mentions` が空のまま届く**ので、本文からも見る（これが無いと @全員 が拾えない）
   - 🔴自分あて（`mentionDirect`）／🔵全体あて（`mentionAll`）／🟡所属チームあて（`mentionGroup`）
-    の分け方は **未読集計の1箇所だけ**。本文に @自分の名前 or 自分の投稿への返信＝自分あて、
-    @全員＝全体あて、それ以外＝所属チームあて。合計は
+    の分け方は **未読集計の1箇所だけ**。合計は
     `_mentionDirectTotal` / `_mentionAllTotal` / `_mentionGroupTotal`
+    - ⚠️ **見る順番がそのまま優先順位。入れ替えないこと**
+      ① 本文に @自分の名前（`_mentionNamedInText()`）→ 🔴自分あて
+      ② @全員（`isMentionToAll()`）→ 🔵全体あて
+      ③ 自分の投稿への↩返信 → 🔴自分あて
+      ④ それ以外（@チーム名の展開）→ 🟡所属チームあて
+    - ⚠️ **③を②より先に見てはいけない。** 本文が「@全員」だけの投稿でも、
+      それがだれかの投稿への返信だとその人に🔴が付き、
+      **本文には @全員 しか無いのに自分あて**になる（実際にそう見えて指摘された）
+  - 📛 **本文から「@…」を取り出すのは `mentionTokens()` の1箇所だけ**。
+    1つの `@` につき `{ head, full }` の2つを返す
+    - `head` … 空白の手前まで（「@全員 よろしく」→ `全員`）＝**合言葉（全員/all…）はこっち**
+    - `full` … 区切り記号の手前まで（空白は残して、くらべるときに落とす）＝**名前はこっち**
+    - ⚠️ 空白で切るだけだと **「@神出　紘陽」のような全角スペース入りの名前が切れる**
+    - ⚠️ 逆に空白を無視して全部つなぐと **「@全員、○○さんの件」の文中の名前を拾ってしまう**。
+      だから2つに分けてあり、名前は**必ず「@のすぐ後ろが自分の名前で始まる」**ことだけを見る
+    - ⚠️ 次の `@` の手前で必ず切る（1行に2つ書かれても両方拾えるように）
   - 一覧の上の凡例（`updateMentionLegend`）の**件数を押すとその内訳だけに絞れる**
     （`setChatMentionKind`。もう一度押すと解除）。絞り方は `_chatMentionKind`
     （`''` 両方／`'direct'`／`'group'`）で、**見るのは `renderChatRooms` の中の1箇所だけ**。
