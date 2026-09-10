@@ -315,6 +315,23 @@ UI変更やロジック変更のときは実際に描画して確かめる。
 - **添付**: `chat_messages.attachments`（`[{url,name,mimeType,size}]`）。実体は GAS 経由で Google Drive にアップロード。
   画像（`isChatImageAttachment()` が true）は `driveImageUrl(url, 800)` でサムネイル化してチャット内に直接表示、
   それ以外はファイルリンク。表示に失敗したら `_chatImgFallback()` がリンクに戻す
+  - 📁 **アップロード先のURL → フォルダIDは `_driveFolderId(url)` の1箇所だけ**。
+    送るときは **`_driveFolderUrl(url)` で `https://drive.google.com/drive/folders/<id>` にそろえる**
+    （古い `open?id=…` / `folderview?id=…` / IDだけ もここで拾う）
+    - ⚠️ **欄には URL 以外の文字が入っている**（`なし` `-` `？` `無し` `（デモ用）` など。実際に56件あった）。
+      そのまま GAS に渡すと、ドライブが
+      **「指定した ID のアイテムは見つかりませんでした」**で落ちて**送信そのものが失敗していた**
+      （本文も添付も消えた。実際に起きた）。
+      **IDが取れないものは「未設定」としてあつかう**＝ `updateChatUploadTargetUI()` が
+      そのチェックを押せなくし、**チェックも必ず外す**（外さないと押せないのに入ったままになる）
+  - ⚠️ **1つのドライブが失敗しても throw しない。** 失敗した先を `uploadFails` にためて、
+    **1件も入らなかったときだけ**「本文だけ送りますか？」とたずねる（`askChoice`）。
+    片方に入っていればそのまま送る＝**書いた本文を絶対に捨てない**
+  - ⚠️ 領収書と同じで、**`fileUrl` が返っていれば `success:false` でも入ったものとしてあつかう**
+  - **エラーの言い換えは `_chatDriveErrText(err, label, url)` の1箇所だけ**
+    （領収書の `_receiptErrText` と対になるもの）＝
+    「指定した ID …」→ フォルダが消えている／`RECEIPT_GAS_ACCOUNT` に共有されていない ／
+    「アクセスが拒否…」→ `RECEIPT_SHARE_HINT`。そのフォルダを開くリンクも一緒に出す
 - 入力欄での画像貼り付けは `initChatPasteImage()`（document の paste を拾って `addChatFiles()` に渡す）
 - **本文のURLのリンク化**: 見つけ方は **`CHAT_URL_RE` の1箇所だけ**（`renderMessageContent`）。
   - **URLに使う文字は半角だけ**にしてある。全角・日本語まで拾うと
