@@ -779,6 +779,11 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   - ①②③ と ⑦ は1セルに複数項目が入っているので、**セルではなく中の `<div>` ごと**に当たり判定を付ける
   - ⑪ の欄は `cands` を渡して候補者リストのタブを開くだけ（個別の入力欄には飛ばさない）
   - ✏️ 編集ボタンは `event.stopPropagation()` を入れてある（セルのクリックと二重に発火しないように）
+- **見出しを押すと並べ替えができる（もう一度押すと逆順）。** 使うのは**KMT管理リストと同じ `jpSort(key)` / `_jpSort` の1組**
+  （`JP_SORT_VALUE` に値の取り方をまとめてある）。管理簿だけの列（`client_contact_name` / `contact_phone` /
+  `reception_date` / `valid_until` / `location` / `employment_period_type` / `salary_amount` / `comment`）は
+  `JP_SORT_VALUE` に足してある。⑪の候補者ぶんは `cand_date` / `cand_name` / `cand_result` / `cand_hired`
+  （`_ledgerCandRows(r.src_row)` の**1件目**の内容。候補者が複数いても行の先頭は1件目なので見た目とそろう）
 - 日付は令和表記（`_ledgerYmd`）、賃金は `_ledgerWage`。未記入は赤字の「未記入」
 - 印刷（A4横）と Excel出力あり（`printJobLedger` / `exportJobLedgerExcel`）。
   **いま絞り込んでいる行だけ**を出す
@@ -2203,6 +2208,15 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - **求人管理の「⚖️ 労働局 求人管理簿」と行き来できる。**
   求職管理簿の求人受理番号・企業名 → その求人案件（`candLedgerOpenJob`）／
   求人管理簿の求職者氏名 → その候補者（`_ledgerCandLink`）
+- **⑦の「雇用期間」も押すと編集できる**（`candLedgerOpenJob(j.src_row, 'jsf_employment_period_type')`）。
+  実体は求人案件の `job_progress.employment_period_type`（候補者側の列ではない）なので、
+  求人管理簿の⑨雇用期間と必ず同じ値になる。**新しく選ぶときの既定は【有期】**
+  （`JOB_SHEET_GROUPS` の `opts` の1箇所＝先頭を `有期` にしてあるだけ。選び直せば変えられる）
+- **見出しを押すと並べ替えができる（もう一度押すと逆順）。** 持つのは `_candLedgerSort.key`/`.dir` の1組だけで、
+  値の取り方は **`CAND_LEDGER_SORT_VALUE` の1箇所**（候補者の列＝`name`/`address`/`birthdate`/
+  `job_category`/`reception_date`/`valid_until`/`memo`、⑦の求人ぶん＝`j_date`/`j_code`/`j_company`/
+  `j_result`/`j_hired`/`j_period`。⑦は**1件目の求人**で見る。日付は生の値（`date_raw`/`hired_raw`）で
+  くらべる＝令和表記の文字列だと月の大小が逆転するため）
 - 転職勧奨禁止期間・6か月以内の離職状況は**手書き用の空欄**（DBに列を持たせていない）
 - 印刷（A4横）と Excel出力あり（`printCandLedger` / `exportCandLedgerExcel`）
 
