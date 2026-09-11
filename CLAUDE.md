@@ -2374,8 +2374,15 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   名前からユーザーを引くのは **`_userByName()` の1箇所だけ**で、ぴったり合わなければ
   **1人だけに絞れるときに限って**前方一致・部分一致でも拾う（2人以上に当たるときは拾わない）。
   `fullNameOf()` / `_meetTeamOf()`（GLT・営業の判定）/ `_meetStaffRole()` は全部これを通す
-- 書類でフルネームにする欄は **`REG_DOC_FULLNAME_KEYS` の1箇所**（担当者名が入る欄）。
-  差し替えるのは `regRunDocExport` の中の `_regApplyFullNames()` の1回だけ
+- 書類でフルネームにする欄は **`REG_DOC_FULLNAME_KEYS` の1箇所**（担当者名・説明者名が入る欄）。
+  差し替えるのは **`_regDocData()` の中の `_regApplyFullNames()` の1回だけ**
+  ＝ 👁 プレビューも 🖨️ 出力も同じ `_regDocData()` を通るので**必ず同じ名前が出る**
+  - ⚠️ 以前は出力（`regRunDocExport`）の中だけで差し替えていたので、
+    **プレビューにはユーザー名のまま出ていた**（5-8号の説明者が「アヒュ」のまま。実際に指摘された）。
+    差し替えを出力側に戻さないこと
+  - 名簿（`name → full_name`）は `loadFullNames()` が持つ。`_regDocData()` は同期なので、
+    呼ぶ側（`regDocPreview` / `openRegDocExport`）が**先に `await loadFullNames()` する**
+    （読めていなくてもユーザー名のまま出るだけで、書類は作れる）
 - ⚠️ **`openRegDocExport` は記録の `data` をコピーしてから使う**（そのまま使うと、
   書類用の書き替え（フルネーム・署名画像）が記録に残ってしまう）
 - ⚠️ **フルネームはリポジトリに書かない**（個人情報）。DBの `users.full_name` にだけ持つ
