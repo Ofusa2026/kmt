@@ -1990,6 +1990,19 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - **並べ直すのは日付を直したときだけ**（`updateTokuteiRow` の `key === 'date'`）。
   会社名は `oninput` で入ってくるので、そこで描き直すとフォーカスが飛んで打てなくなる
 
+### 🟢 だれがいま使っているか（在席／プレゼンス）
+
+- 実体は **`user_presence`**（`user_id` ＋ `user_name` ／ `status`＝`active`/`away` ／ `last_seen_at`）。
+  `startPresenceHeartbeat()` が**60秒ごと**に自分の状態を upsert し、`loadAllPresence()` が全員ぶんを
+  `userPresence`（`user_id` → 行）に入れる。**`last_seen_at` が5分より古いものは `offline` に読み替える**
+- 出る場所は2つ＝ 💬 チャットの相手の丸い印（`renderChatMessages` の中）と、
+  ⚙️ ユーザー設定の一覧の印（`renderTeamUsers`）
+- **ユーザー設定の印を作るのは `_userPresenceBadgeHtml(u, isMe)` ＋ `USER_PRESENCE_BADGE` の1箇所だけ**
+  （🟢 オンライン／🟡 離席。自分の行は「🟢 ログイン中」）
+  - ⚠️ **オフラインの人には何も出さない。** 全員に灰色の印を出すと、かえって誰がいるのか分からなくなる
+  - `loadUsers()` は画面を描く前に `loadAllPresence()` を待ち、`loadAllPresence()` は
+    ユーザー設定を開いていれば描き直す＝**60秒ごとに自動で最新になる**
+
 ### フッターのボタン配置（統一ルール）
 
 `最終更新 → 💾保存 → （チャット開始）→ 閉じる │ 余白 │ 🗑削除`
