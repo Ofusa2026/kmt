@@ -2318,7 +2318,7 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 | 人材の二重登録チェック | `_dupNameKey` / `_findDupWorkers` / `_confirmDupWorker` |
 | 申請記録タブ | `renderApplyRecords` / `loadApplyRecords` / `saveApplyRecord` / `sortApplyRecords` |
 | 求人進捗 | `buildJobsScreen` / `loadJobProgress` / `renderJobProgress` / `saveJobProgress` |
-| 決定報告（KMT案件） | `buildKmtReportText` / `getDrOrgChange` / `copyKmtReport` / `submitDecisionReport` |
+| 決定報告（KMT案件） | `sendKmtDecisionAll`（入口）/ `buildKmtReportText` / `getDrOrgChange` / `copyKmtReport` / `submitDecisionReport` |
 | 売上管理 | `renderSaleMonthTable` / `openSaleModal` / `saveSale` |
 | チャット | `openChatRoom` / `loadChatMessages` / `sendChatMessage` / `_ensureWorkerRoomId` |
 
@@ -2486,6 +2486,38 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - **「読み込み中」の覆いは `LOADING_MAX_MS`(20秒) で自動的に消える**（`showLoading` の1箇所）。
   どこかで消し忘れても画面が固まったままにならないための保険。
   ほかのモーダルの上に出すため `#choiceModal` だけ z-index を上げてある
+
+### 📤 決定報告（KMT案件）は **ボタン1つで全部やる**
+
+- **入口は `sendKmtDecisionAll()` の1箇所だけ**（画面は［📤 決定報告を送信（全部まとめて）］の1つ）。
+  やることは5つで、**順番を変えないこと**
+
+  | | すること | 関数 |
+  |---|---|---|
+  | ① | 依頼スプレッドシートへ送信（→ 大房の受信トレイ） | `submitDecisionReport()` |
+  | ② | 決定報告の控えを `decision_report_log` に保存 | ①の中 |
+  | ③ | 「外国人材に追加しますか？」→ 人材を登録／更新 | ①の中（`saveDecisionAsWorker`） |
+  | ④ | 売上管理に「初期費用」を登録 | ①の中（`saveDecisionInitialFeeToSales`） |
+  | ⑤ | 文面をコピー ＋ その人材のチャットに投稿 | `copyKmtReport()` |
+
+- > ⚠️ **過去の事故**: 以前は［📋 テキストコピー＆チャット送信］と［📤 スプレッドシートに送信］の
+  > **2つのボタンに分かれていて、コピーだけ押して終わっていた**ため、
+  > **スプレッドシートにも売上にも入っていない決定報告**が出た
+  > （2026/09/14 に2件。`decision_report_log` も `sales_forecast` も0件だったので押されていないと分かった）。
+  > **押し分けを無くすためにボタンを1つにした。増やし直さないこと**
+- ⚠️ **⑤を①より先にやってはいけない。** ⑤の `_ensureWorkerFromDecision()` が人材を作り、
+  そのあと③が【認定】のとき**重複を見ずにもう1件登録する**ので、**同じ人材が2件できる**。
+  いまの順番なら③が先に作り、⑤は名前で探して見つけるだけなので二重にならない
+- ⚠️ **①が失敗したら②〜⑤はやらない**（送っていないのにチャットへ「送りました」と流れるため）。
+  ただし**文面のコピーだけはする**＝書いたものを絶対に捨てない
+- ⚠️ **`submitDecisionReport()` は成否（`sentOk`）を必ず返すこと**（`sendKmtDecisionAll` が見ている）
+- 🚫 **売上に入れない組み合わせは①の中の1箇所**＝【A区分】特定技能2号／【B区分】更新・1-6修正。
+  トーストで「登録していません」と知らせる
+- ⚠️ **大房への経路は①の `KMT_REQUEST_GAS_URL` への POST のまま**（依頼スプレッドシート → 大房のGASが巡回）。
+  紹介案件の `ofusaFetch()`（`intake_requests` に直接入れるほう）とは**別物**で、ここでは触っていない
+- ⚠️ **企業名が `companies.name` と1文字でも違うと `company_id` が空のまま売上に入る**
+  （`saveDecisionInitialFeeToSales` は完全一致で引く）。「（株）栄光」と「（株）英光」のような
+  誤字がそのまま通るので、送信前に企業名を確かめること
 
 ### 🤝 決定報告 →（紹）決定者リスト ＋ 売上（紹介案件）
 
