@@ -1249,6 +1249,21 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   `loadNotes(scope)` / `renderNotes(scope)` / `addNote(scope)` / `saveNote(scope,id)` / `deleteNote(scope,id)`
 - `loadJobNotes()` などの旧い名前は `'job'` を渡すだけの包みとして残してある
 - 書式ツール（`jnExec` / `jnInsertTable` / `markJobNoteDirty`）はノートidで動くので scope 不要
+- 💾 **ノートは自動保存**（入力が止まって `NOTE_AUTOSAVE_MS`(1500)ms 後）。
+  未保存のぶんは `_noteDirty`（noteId → scope）に持ち、**書き込むのは `flushNoteSaves()` の1箇所だけ**
+  - 呼ぶのは「入力欄を作り直す・閉じる」**3か所**＝ `switchJpTab`（`jpTabBody` を差し替える前）／
+    `renderNotes`（描き直す前）／`closeGenModal`。入力欄の `onblur` でも走る
+  - ⚠️ `saveNote()` は入力欄を**同期で**読むので、`innerHTML` を差し替える**前**に呼べば
+    （await しなくても）内容は失われない。**差し替えたあとに呼んでも手遅れ**
+  - ⚠️ **入力欄がもう無いときは保存しない**（`jnT_` / `jnB_` の両方が無ければ即 return）＝
+    空で上書きしないため
+  - ⚠️ **自動保存が落ちたときこそ黙らない**＝ トーストと、ノートの右上に赤で
+    「⚠️ 保存できませんでした」を出す
+  - > ⚠️ **過去の事故**: ノートの 💾 ではなく**求人票タブの下の［💾 保存］**（`saveJobSheet`）を
+    > 押すと、その最後の `switchJpTab('sheet')` が入力欄ごと作り直すので
+    > **書いた内容が黙って消えていた**（「✅ 求人票の内容を保存しました」と出るので
+    > 保存されたと思ってしまう）。タブの切り替え・モーダルを閉じたときも同じだった。
+    > FC98／有限会社渡部工務店 で実際に起きた（ノートが作成時のまま空のまま残っていた）
 - **表の大きさを変えるのは `_jnHitEdge()` ＋ `_jnInitResize()` の1組だけ**（`.jn-table`）
   - **罫線をドラッグ**＝列幅（縦の罫線）／行の高さ（横の罫線）。掴める距離は **`JN_EDGE` の1箇所**
   - **表の右下の［⇔］をドラッグ**＝表全体の幅（列の比率はそのまま）。目印は `_jnShowGrip()`、
