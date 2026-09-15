@@ -1768,6 +1768,12 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
     **5年満了日は8番が空でも `worker5yExpiry()` から入れる**（10番の計算と同じ読み方）
   - 収入印紙費用の負担パターンは **`VISA_FEE_PATTERNS` の1箇所**（下の節）。
     `REN_FEE_PATTERNS` はそこから作るだけ
+  - 💴 **【パターンB】＝本人の自己負担のときだけ聞くことは `REN_FEE_SELF` ＋
+    `REN_FEE_B_PAY_OK` ＋ `_renFeeSelfAsk(v)` の一かたまりだけ**＝
+    ① 本人が希望する在留期間（`STAY_PERIODS_3Y` を使い回す。印紙代が期間で変わるため）
+    ② 本人が自分で決済できるか確認済みか ③ 支払いの詳細（任意）
+    - パターンの記号は `VISA_FEE_PATTERNS` の `v` と同じ（`REN_FEE_SELF = 'B'`）。
+      **パターンを増やすときは `VISA_FEE_PATTERNS` を直すだけでよい**
 - 🚫 **更新決定の対象にしない在職ステータスは `REN_EXCLUDE_STATUS` ＋
   `_renExcludedWorker(w)` の1箇所だけ**（`退職済`／`支援機関変更済` の前方一致。
   辞退/キャンセルは `isAlertExcludedWorker()` が見る）。
