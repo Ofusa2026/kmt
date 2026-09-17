@@ -997,7 +997,27 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   | `health_status` 健康状況 | とても良い／普通／あまりよくない |
 
 - **保存先は今までどおりの1列**（列は増やさない）。足したのは
-  `night_shift_count` / `health_note` / `skill_exam_item` の3列だけ
+  `night_shift_count` / `health_note` / `skill_exam_item` /
+  `cur_net_salary_base` / `cur_net_salary_overtime` の5列だけ
+
+#### 💴 履歴書の給料は「現職」と「希望」の2組
+
+| 画面の名前 | 列 |
+|---|---|
+| 現職の給与 手取り(残業あり) | `cur_net_salary_overtime` |
+| 現職の給与 手取り(残業無し) | `cur_net_salary_base` |
+| 希望の給与 手取り(残業あり) | `net_salary_overtime` |
+| 希望の給与 手取り(残業無し) | `net_salary_base` |
+
+- **希望のほうは今までどおりの2列**（`net_salary_*`）。現職のぶんだけ `cur_net_salary_*` を足した
+- 🚫 **旧「希望月給」（`desired_salary`）は履歴書から外した。列も値も消していない**＝
+  候補者情報タブの【希望月給】でこれまでどおり見られる・直せる
+  - ⚠️ そのため **`CAND_SYNC_FIELDS` から `desired_salary` を外してある**
+    （履歴書に欄が無いので写す相手がいない。残すと「＊履歴書作成から自動反映」の注記だけが出る）
+  - ⚠️ **履歴書の保存（`getResumeFormData`）から `desired_salary` を送らないこと**＝
+    送ると候補者情報に入っている金額を空で上書きする
+- 🗓 **面接可能日時は入社可能日のとなり**（1行いっぱいの欄から移した）＝
+  給料が2行に増えたぶん、**履歴書がA4縦1枚に収まる**ようにするため
 - 🌙 **夜勤は「あり／なし」＋ あり のときだけ回数**。**保存先は `night_shift_count` の1列のまま**で、
   `なし` ／ `あり` ／ `あり（月3回）` の形で入れる。
   **読み書きは `_nightShiftParse()` / `_nightShiftValue()` の2つだけ**、欄の出し入れは
