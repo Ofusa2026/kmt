@@ -1122,6 +1122,16 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   - `createTestApplyLink()` で作り、`purgeApplyTestCandidates()` でまとめて消せる
     （**消すのは【テスト】が付いた候補者だけ**）
   - すでに受付中のテストリンクがあるときは［＋ テスト用リンクを作る］を出さない（1本に保つ）
+- 👁 **下見モード（社内の人だけ・`_applyPreview` の1箇所だけ）**＝
+  リンクを発行しなくても、**公開リンクとまったく同じ応募フォーム**を開いて項目を確かめられる。
+  入口は候補者管理【📣 募集リンク】タブの［👁 項目を確認（下見）］（`openApplyPreview()` / `closeApplyPreview()`）
+  - ⚠️ **画面を2つ持たない**＝ 出すのは `renderApplyForm()` の1箇所そのまま。
+    項目（`APPLY_P0` / `resumeFormFieldsHtml`）を直せば**下見にも必ず同じものが出る**
+  - `_applyPreview` が見るのは3つだけ＝ ①`_applyValidate()` が素通し（**必須が空でも次へ進める**）
+    ②`checkApplyDup()` が聞きにいかない ③`submitApplyForm()` が止まる ＝ **DBには何も書かない**
+  - `max_page` は `CAND_APPLY_MAX_PAGE_DEF` にするので、履歴書①・人材資料まで全部見られる
+  - ログインしている人しか開けない（`#candform=` のような外から開く道は作っていない）
+
 - 🌏 **国籍の選択肢は `CAND_NATIONALITIES` の1箇所だけ**（＋ `CAND_NAT_OTHER`）。
   以前は履歴書の中に直に書いてあり**ネパールが抜けていた**。
   履歴書の国籍欄・候補者一覧の絞り込み・募集フォームが同時に追従する。
