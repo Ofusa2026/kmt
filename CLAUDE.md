@@ -997,7 +997,23 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   | `health_status` 健康状況 | とても良い／普通／あまりよくない |
 
 - **保存先は今までどおりの1列**（列は増やさない）。足したのは
-  `night_shift_count` と `health_note` の2列だけ
+  `night_shift_count` / `health_note` / `skill_exam_item` の3列だけ
+- 🌙 **夜勤は「あり／なし」＋ あり のときだけ回数**。**保存先は `night_shift_count` の1列のまま**で、
+  `なし` ／ `あり` ／ `あり（月3回）` の形で入れる。
+  **読み書きは `_nightShiftParse()` / `_nightShiftValue()` の2つだけ**、欄の出し入れは
+  `onNightShiftChange()` の1箇所
+  - ⚠️ **古い値（`0回` `1〜4回` `4回以上`）も必ず あり／なし のどちらかに寄せること。**
+    `has` を空のままにすると画面に出ないまま**保存で消える**（実際に消えかけた）
+  - ⚠️ **`fillResumeForm` で生の値を入れ直さないこと**＝ ほどいたあとに
+    `g('rf_night_shift_count', c.night_shift_count)` が走ると上書きされる（実際に上書きされた）
+- 🗣️ **【日本語会話】は1つ選ぶだけ**（`JP_TALK_LEVELS` ＋ `jpTalkOptionsHtml()` の1箇所）。
+  保存先は今までどおり `jp_language_detail` の1列。
+  以前の「聞き取り／会話」の2欄（`JP_SKILL_PARTS` / `_jpDetailParse` / `_jpDetailValue`）は
+  **昔の値を読むためだけに残してある**（移行はしない）
+- 🎓 **【修了予定日】は在留資格が技能実習２号・３号のときだけ出す。判定は `_jissyuVisa()` の1箇所**
+  （`RESUME_JISSYU_VISAS` を**前方一致**で見る）。欄の出し入れは `onResumeVisaChange()`、
+  書類（`buildResumeHTML`）も同じ `_jissyuVisa()` を通すので画面と必ずそろう。
+  ⚠️ **ほかの在留資格に変えたら保存で空にする**（学歴の中退メモと同じ考え方）
 - ⚠️ **一覧に無い値（これまでの自由記入）は消さない**。選択欄を作るのは
   **`resumeOptsHtml(key, cur)` の1箇所**で、いまの値が一覧に無ければ先頭に残す
   - ⚠️ **`fillResumeForm` の `g()` も同じことをする。**
