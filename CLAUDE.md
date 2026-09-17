@@ -2867,13 +2867,20 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
     見出しを【新規登録】／【既存人材の更新】で変え、**氏名・企業**と、
     既存のときは**該当した人の管理番号・氏名・在職ステータス**（本人か確かめられる）、
     新規のときは**なぜ新規になるのか**を出す
-- ⚠️ **更新のときは下の列を決定報告の内容で丸ごと置き換える**（足すのではない）＝
-  `name` / `nationality` / `visa_status` / `visa_expiry` / `applicant_field` / `staff` / `company_id` /
-  `return_home_date` / `desired_visa` / `apply_type` / `request_date` / `apply_memo` / `memo` / `apply_status`
-  - **在職ステータス（`status`）は触らない**（`配属前` で上書きしないよう外してある）
+- ⚠️ **更新のときに送る項目を作るのは `_drWorkerPatch()` の1箇所だけ。**
+  対象は `name` / `nationality` / `visa_status` / `visa_expiry` / `applicant_field` / `staff` / `company_id` /
+  `return_home_date` / `desired_visa` / `apply_type` / `request_date` / `apply_memo` / `apply_status`
+  - 🚫 **空の項目（`null` / 空文字 / `undefined`）は送らない**＝
+    **決定報告に書かなかった欄で、人材に入っている値を消さないため**。
+    入るのは**書いた項目だけ**で、書いた項目は上書きする
+    - > ⚠️ **過去の事故**: 以前は空欄をそのまま `null` で送っていたので、
+      > 決定報告に書かなかった**国籍・分野・一時帰国日などが黙って消えていた**
+  - 🚫 **触らない列は `DR_WORKER_KEEP_COLS` の1箇所だけ**
+    - `memo`（【5. メモ】の備考）… 決定報告に対応する欄が無く、**担当者の申し送りが消える**ため。
+      以前は `memo: null` を送っていて実際に消えていた
+    - `status`（在職ステータス）… `配属前` で上書きしないため
   - **1-6修正のときは `apply_type` をキーごと送らない**（書類の修正なので申請種別を書き換えない）
-  - ⚠️ **`memo: null` を送るので、人材の【5. メモ】の備考が消える**
-  - ⚠️ **決定報告で空欄の項目は、既存人材の値を null で上書きして消す**
+  - **`apply_status` は必ず `申請準備中` にする**（`_drWorkerPatch()` の最後の1行）
 
 ### 🤝 決定報告 →（紹）決定者リスト ＋ 売上（紹介案件）
 
