@@ -1709,14 +1709,51 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   - 記録が入った予定は「📅 予定」を出さず、記録のほうに 🔗 カレンダー を付ける
 - **記録が入っているかの判定は `_meetingSchedDone()` の1箇所**
   ＝ その予定に紐づいた記録があり、**対応結果（`result_memo`）が入っていること**
-- **予定日から `MEETING_TODO_DAYS`(14)日たっても対応結果が空＝「⏰ 記入待ち」。
+- **予定日から `MEETING_TODO_BIZ_DAYS`(3)営業日たっても対応結果が空＝「⏰ 記入待ち」。
   判定は `_meetingSchedTodo()` の1箇所**
+  - **日数を足すのは `_meetingTodoLimit()` の1箇所だけ**（土日を飛ばす。祝日は見ない＝ほかの平日計算と同じ）。
+    画面に出す言い方は `MEETING_TODO_DAYS_TEXT`（「3営業日」）
+  - ⚠️ **`loadMeetingTodos()` も最後は `_meetingSchedTodo()` を通す**（日付での絞り込みは
+    ざっくり7日前までにして、判定は1箇所に寄せる）＝お知らせの件数と一覧が必ず同じになる
+- 🚫 **次回（2ヶ月後）の定期面談を自動で作らない。** 次の予定は支援カレンダーから手で入れる
+  - > ⚠️ **過去の事故**: 実施済にすると勝手に予定が増えていたので、**だれも入れていない予定が36件**たまり、
+    > そのまま ⏰ 記入待ちのお知らせに出ていた（**本帰国した人材にも出続けた**）。
+    > `autoCreateNextPeriodicMeeting()` と2つの呼び出しを消し、たまった36件も削除した
+    > （どれも面談記録が紐づいていないことを確かめてから消した）
+- 🚫 **退職した人材には出さない**＝ `loadMeetingTodos()` が `workerBucket(w) === 'past'` を外す
+  （`workers(...)` の embed に `status` / `kmt_support` を入れてある）
 - 手で入れた定期面談も、**同じ企業・`MEETING_MATCH_DAYS`(3)日以内の予定があれば自動で結び付ける**
   （`_meetingMatchSchedule()`。これが無いと記入待ちが消えない）
 - **担当者へのお知らせ**。数えるのは **`_meetingTodoMine()` の1箇所だけ**
   - **担当かどうかの判定は `_meetingTodoIsMine()` の1箇所**＝ その企業のメイン／サブ担当・
-    **人材の担当（`workers.staff`）**・予定の担当者（`staff_names`）のどれかに自分がいること。
+    **人材の担当（`workers.staff`）**・**🙋 お願いされた人**のどれかに自分であること。
     関係のない人には出さない
+    - ⚠️ **予定の担当者（`staff_names`）は見ない。** 訪問に同行しただけの人にも出ていたため
+      （処理するのはメイン・サブ担当と決めた）。`_meetingTodoStaffText()` も同じ顔ぶれにそろえる
+
+##### 🙋 面談記録の記入をサブ担当にお願いする（委任）
+
+- メイン担当が「この記録はサブ担当に書いてほしい」ときに使う。実体は **`meeting_delegations`**
+  （1予定＝1件。`schedule_id` で結び付く）。**作りは 🔁 更新決定の `renewal_delegations` とそろえてある**
+- **お願いされた人は自分の担当としてあつかう**（`_meetingTodoIsMine()` の中で**先に**見る）。
+  お願いした側の一覧からも**消さない**＝ 🙋 お願い済み として残す（放りっぱなしにしないため）
+- お願いすると**その人材のチャットに相手を @メンションして投稿する**（`_meetingPostDelegChat()` の1箇所）
+- 入口は一覧の［🙋 お願いする］（`askMeetingDelegate` → `saveMeetingDelegate` ／
+  取り消しは `cancelMeetingDelegate`）。相手の選択肢は `workerStaffOptionsHtml()` を共用する
+- **引くのは `_meetingDelegOf(scheduleId)` の1箇所だけ**。読み込みは `loadMeetingDelegations()` で、
+  `loadMeetingTodos()` の中から一緒に呼ぶ（別に読みにいかない）
+- ⚠️ **`SB_SOFT_DELETE_TABLES` に `meeting_delegations` を入れてある**（取り消しは論理削除）
+
+##### 🌐 担当ごとの対応状況（管理者だけ）
+
+- `MEETING_TODO_WATCHERS` の人だけ、一覧の上の［🌐 担当ごとの対応状況を見る］から
+  `openMeetingTodoAll()` を開ける（**だれに何件残っているか**を担当ごとにまとめる）
+- ⚠️ **数え直さない**＝ `_meetingTodoAll` と `_meetingTodoStaffText()` の組み合わせだけを見るので、
+  お知らせの件数・一覧と必ず同じ顔ぶれになる
+- 🙋 お願いしてあるぶんは、**お願いされた人のところ**に出す（実際に書く人のところに出す）
+- **一覧の1行を作るのは `_meetingTodoRowHtml(s, opt)` の1箇所だけ**（自分のぶんも全体表示も同じ見た目）
+- ⚠️ z-index は一覧より上（`#meetingTodoAllModal` 1125 →`#meetingDelegModal` 1130）。
+  **`.modal-overlay` の下の1箇所にまとめて書く**
   - **📅 定期面談報告書に必要な日付（配属日・退職日）が空の人材**のお知らせは別もの＝
     `loadMeetDateTodos()` → `updateMeetDateAlerts()`（サイドバー `meetDateAlerts` ／
     マイページ `myMeetDateAlerts`）。押すと `openMeetDateFix('mine')` が開く
