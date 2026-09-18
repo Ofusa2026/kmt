@@ -1000,13 +1000,14 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   | `skill_exam_1` 技能試験 | なし／専門級／評価調書／特定技能評価試験 |
   | `overtime_preference` 残業の希望 | あり／なし（⚠️ **夜勤は別の欄**なので、ここに夜勤を混ぜない） |
   | `night_shift_count` 夜勤の回数（月） | 0回／1〜4回／4回以上 |
-  | `temp_return_wish` 一時帰国希望 | 希望する／希望しない |
+  | `temp_return_wish` 一時帰国希望 | 希望する／希望しない（⚠️ **希望するのときだけ タイミングと期間を聞く**＝下の節） |
   | `family_consent` 家族の同意 | 同意している／同意していない |
   | `health_status` 健康状態 | `HEALTH_STATUSES` の4つ（下の節） |
 
 - **保存先は今までどおりの1列**（列は増やさない）。足したのは
   `night_shift_count` / `health_note` / `skill_exam_item` /
-  `cur_net_salary_base` / `cur_net_salary_overtime` / `lifestyle` の6列だけ
+  `cur_net_salary_base` / `cur_net_salary_overtime` / `lifestyle` /
+  `temp_return_timing` / `temp_return_period` の8列だけ
 
 #### 💴 履歴書の給料は「現職」と「希望」の2組
 
@@ -1067,6 +1068,27 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
     ◎○△✕ で入っている行は選択欄の先頭に残るので、選び直すまでそのまま出る
   - ⚠️ `_jpDetailParse()` は**区切りの手前まで**取るので、2文字以上の値（`N4`）も1文字（`○`）も同じように読める
 - ⚠️ **項目名も選択肢も `EXT_FORM_I18N` に足すこと**（本人が読む外部フォームに出るため）
+
+#### 🛫 一時帰国（希望するときだけ聞く2つ）
+
+- **【一時帰国希望】が「希望する」のときだけ**、下に2つの欄を出す＝
+  **一時帰国のタイミング**（`temp_return_timing`）／**一時帰国期間**（`temp_return_period`）
+- **聞くかどうかの判定は `_tempReturnAsk(v)` の1箇所だけ**で、
+  欄の出し入れ（`onTempReturnChange()`）・履歴書に出すか（`_tempReturnNote()`）・
+  保存で空にするか が同じものを見る
+- **選択肢は `TEMP_RETURN_TIMINGS` の1箇所だけ**（入社前／入社後1〜2年目以内／入社後3年目以降）
+  ＋ `TEMP_RETURN_TIMING_OTHER`（その他（記入））。
+  ⚠️ 「その他」は**宗教と同じで、記入した文字をそのまま列に入れる**（`_other` の列は持たない）。
+  読み書きは **`_tempReturnTimingValue()` / `_tempReturnTimingSet()` の2つだけ**を通す
+  （⚠️ `fillResumeForm` で生の値を `g()` で入れ直さないこと。選択肢に無い書き方が消える）
+- 欄を作るのは **`tempReturnFieldHtml(prefix, timing, period)` の1箇所だけ**
+  （履歴書作成の画面・候補者モーダルの【📝 履歴書作成】タブ・本人が書く外部リンク・
+  📣 募集フォームが同時に追従する）
+- ⚠️ **「希望しない」に戻したら保存で空にする**（学歴の中退メモ・病名と同じ考え方）。
+  どちらも text の列なので `''` でよい（日付の列だけは `null`）
+- 履歴書では**【一時帰国希望】のセルの中に小さく**出す（「タイミング：◯◯ ／ 期間：◯◯」）＝
+  行を増やさない（A4縦1枚に収めるため）
+- ⚠️ **項目名・選択肢・記入例は `EXT_FORM_I18N` にも足すこと**（本人が読む外部フォームに出る）
 
 #### 🏥 健康状態（4つ）と【病名】
 
