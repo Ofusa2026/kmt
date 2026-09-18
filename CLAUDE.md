@@ -235,6 +235,14 @@ UI変更やロジック変更のときは実際に描画して確かめる。
 - 合計を作るのは未読集計の中の `_sumJobOnly()`（求人ぶんだけを足す）。
   凡例は `updateJobMentionLegend()`、絞り込みは `setJobChatMentionKind()` / `setJobChatMentionFilter()`
 - 並びは **📌ピン → 未読の多い順 → 最終更新の新しい順**
+- 📌 **左メニューの「💬 チャット」のすぐ下に、求人チャットのショートカットを1行出す**
+  （`#jobChatShortcut`。押すと `showScreen('job_chat')`）
+  - **出すかどうかを決めるのは `updateJobChatShortcut()` の1箇所だけ**＝
+    🔴自分あて（`_jobMentionDirectTotal`）＋ 🟡所属チームあて（`_jobMentionGroupTotal`）が1件でもあるとき
+  - ⚠️ **🔵全体あて（@全員）だけのときは出さない**（毎日出ると、自分の番のときに気づけない）
+  - ⚠️ **件数は数え直さない**＝ 上の2つの変数をそのまま見るので、
+    💬 求人チャットの凡例・ナビのバッジと**必ず同じ数**になる
+  - ⚠️ **やりとりの本体は 💬 求人チャットの画面のまま**（ショートカットに一覧を持たせない）
 - ピンのボタンは `toggleChatRoomPin()` を共用する。**そのあと描き直すのは開いている一覧だけ**
   （`#chatRoomList` があれば `renderChatRooms`、`#jobChatList` があれば `renderJobChatList`）
 
