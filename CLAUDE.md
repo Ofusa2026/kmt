@@ -398,6 +398,62 @@ UI変更やロジック変更のときは実際に描画して確かめる。
 - **人材を保存する前は使えない**（`editingWorkerId` が無いときはトーストで知らせる）。
   依頼したあとは欄の下に「✅ ○○さんに依頼しました ／ 💬 チャットを開く」を出す（画面だけ・DBに列は持たせていない）
 
+### 🏠 社内チャット（`team_chat_*`）＝ **3つめのチャット。既存の2つとは別**
+
+社員どうしが自由にグループを作って話す画面。左メニュー「社内」の**いちばん上**（📋 社内共有事項の上）。
+
+- ⚠️ **テーブルも関数も完全に分けてある**＝ `team_chat_rooms` / `team_chat_members` / `team_chat_messages`、
+  関数は **`tc` 始まり**。**`chat_rooms` に相乗りさせない**
+  （上の「ルームの取得は2系統に分かれている（絶対に1本化しない）」と同じ理由＝
+  片方が壊れたときに 💬 チャット・💬 求人チャットまで巻き添えになる）
+- **画面キーは `TC_SCREEN_KEY`（`team_chat`）の1箇所だけ**（`SCREENS` の登録・`renderScreenContent` の
+  振り分け・サイドバーがこれを見る）
+- 既存チャットから**そのまま使い回しているのは「純粋な部品」だけ**＝
+  `renderMessageContent()`（URLのリンク化・@の色付け）／`extractMentions()` / `expandMentions()` /
+  `_withReplyMention()` / `isMentionForMe()`／`isChatImageAttachment()` / `driveImageUrl()` / `_chatImgFallback()`／
+  `getChatAvatar()`／`_driveFolderUrl()` / `CHAT_FILE_WARN_MB` / `_chatDriveErrText()` / `_chatDriveNoReply()`。
+  **これらには1行も触っていない**
+
+| やること | 1箇所 |
+|---|---|
+| 見てよいか（公開 or 参加中） | `_tcCanSee(r)` |
+| 参加しているか | `_tcIsMember(r)` |
+| ルームの名前（DMは相手の名前） | `_tcRoomName(r)` |
+| アイコン（画像 → 絵文字 → 頭文字） | `_tcRoomIconHtml(r, px)` |
+| 1対1のキー（同じ相手のDMを2つ作らない） | `_tcDmKey(a, b)` → `team_chat_rooms.dm_key`（一意） |
+| 未読の数え方 | `loadTeamChatUnread()`（サイドバーのバッジ `updateTeamChatBadge()` も一覧も `_tcUnread` だけを見る） |
+| 一覧に出すルーム | `_tcVisibleRooms()` |
+| 絞り込みのチップ | `TC_FILTERS` |
+| アイコンの絵文字の一覧 | `TC_ICON_EMOJIS`（先頭が既定） |
+| @の候補 | `_tcMentionSuggest()`（そのルームのメンバー＋@全員） |
+
+- **グループはだれでも作れる**（［＋ グループ］）。作るときに **🌐 公開（全社員が入れる）／🔒 非公開（招待した人だけ）**
+  を選ぶ（`team_chat_rooms.is_public`）。名前・説明・アイコン・メンバーは**入っている人ならだれでも**直せる
+  （社内の道具なので承認は付けていない）
+- **メンバーの足し引きを書くのは `tcSaveRoom()` の1箇所だけ**（いまのメンバーとの差分で POST / DELETE）
+- 🚪 離脱は `tcLeaveRoom()`（自分の `team_chat_members` を消すだけ。公開グループなら入り直せる）／
+  ＋ 参加は `tcJoinRoom()`（公開グループを読んでいる人に出る）
+- 🗑 **グループの削除は論理削除**（`is_deleted`）。**消す前に `_confirmDeleteTwice()` で2回たずねる**。
+  ⚠️ `SB_SOFT_DELETE_TABLES` と `TRASH_TABLES` の**両方**に `team_chat_rooms` / `team_chat_messages` を入れてある
+- 🖼️ **アイコンは絵文字が既定**。画像も選べる＝ 実ファイルはチャットの添付と同じ
+  **GAS → Google ドライブ（チャット用フォルダ）**に入れ、URLだけ `icon_url` に持つ。
+  ⚠️ **kmt.html に画像を埋めない**（電子印・社団ロゴと同じ考え方）
+- 📎 **添付の入れ先はチャット用フォルダの1か所だけ**（`_tcUploadFiles()`）。
+  人材・企業のドライブは使わない（社内の話なので置き場を分ける）。
+  ⚠️ **1件も入らなかったときだけ「本文だけ送りますか？」とたずねる**＝ **書いた本文を絶対に捨てない**
+  （既存チャットとまったく同じ考え方。言い換えも `_chatDriveErrText()` を共用する）
+- 👀 **既読は `team_chat_members.last_read_at` の1箇所**（書くのは `_tcMarkRead()` だけ）
+- 🔔 通知は `_tcNotify()`。**同じ発言で二度出さない**（`_tcNotifSeen`）／
+  ⚠️ **開いた直後の既存分では鳴らさない**（`_tcLoaded` を見る。ログインのたびに古い未読で鳴らないため）
+- 🔁 画面を開いているあいだだけ `TC_POLL_MS`(12秒) で読み直す。
+  **ほかの画面に移ったら自分で止まる**（`_tcStartPoll` の中で `currentScreen` を見る）
+- ⚠️ **未読を数えるときに読む発言は `TC_UNREAD_SCAN`(800) 件まで**（`limit` を書くので `sbFetch` の
+  ページ送りには入らない）。これより古いものは未読に数えない
+- 💬 **発言の削除は論理削除**（`deleted_at`）＝ 一覧には「🗑️ このメッセージは削除されました」と残す。
+  消せるのは**自分の発言だけ**
+- ⚠️ **`showGenModal` は本文しか受け取らない**ので、モーダルのフッターは
+  **`_tcFooterHtml()` の1箇所**で本文の最後に足す
+
 ### 大房行政書士法人 案件システムとの連携
 
 KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕組み。
