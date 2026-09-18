@@ -3645,22 +3645,29 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 
   | scope | 項目 | 単位 | 保存先 |
   |---|---|---|---|
-  | `co` | 新しい委任契約書／古い委任契約書／大房側の契約 | 所属機関ごと | `companies.contract_status`（jsonb） |
-  | `wk` | (5-10) 支援委託契約書／(1-18) 支援委託契約書 | 外国人ごと | その記録の `data` |
+  | `co` | 新しい委任契約書／古い委任契約書／大房側の契約 ＋ メモ（`ct_co_memo`） | 所属機関ごと | `companies.contract_status`（jsonb） |
+  | `wk` | (5-10) 支援委託契約書／(1-18) 支援委託契約書 ＋ メモ（`ct_memo`） | 外国人ごと | `workers.contract_status`（jsonb） |
 
-  - ⚠️ **所属機関ごとのぶんを記録（`data`）に持たせない**＝ 同じ企業の人材ぶん値が散らばって、
-    どれが正か分からなくなる。**抜き出すのは `_regContractCoPatch()` の1箇所だけ**
-    （`saveRegTaskRecord` が `companies` に PATCH する）
-  - **読むのは `_regContractOf(x, mode)` の1箇所だけ**＝ 記入フォームも一覧も同じものを見るので必ずそろう
+  - ⚠️ **記録（`reg_support_records.data`）には持たせない**
+    ① 所属機関ごとのぶんが人材の数だけ散らばって、どれが正か分からなくなる
+    ② **5-10号の記録が無い人材にも状況は入る**（チェックリストから取り込んだ755名ぶん）。
+       記録に持たせると、状況を入れただけで「記入済」に数えられてしまう
+    **抜き出すのは `_regContractSplit()` の1箇所だけ**（`saveRegTaskRecord` が `companies` / `workers` に PATCH。
+    いま入っているもの＝`imported_at` などは残して、欄のぶんだけ上書きする）
+  - **読むのは `_regContractOf(x, mode)` の1箇所だけ**＝ 記入フォームも一覧も同じものを見るので必ずそろう。
+    外国人の行を引くのは `_regWkRow(x, mode)`（人材ごとの様式＝`x.ent`／無ければ記録の `worker_id`）
+  - 値は 有／無し／**△**（`REG_CONTRACT_STATES`）。△はチェックリストで使われていた「要確認・一部あり」の印
 - 欄に入れ直すのは `reg2FillContract()` の1箇所。
-  ⚠️ **同じ企業のままなら入れ直さない**（`_reg2CtCoId`）＝ 保存のときも `onRegCompanyPick` を通るので、
-  入れ直すと打った内容が消える
-- 一覧の1つぶんの見た目は `_regContractCellHtml()` の1箇所（有＝緑／無し＝グレー ＋ ☑）。
+  ⚠️ **同じ企業・同じ人材のままなら入れ直さない**（`_reg2CtCoId` / `_reg2CtWkId`）＝
+  保存のときも `onRegCompanyPick` / `onRegWorkerPick` を通るので、入れ直すと打った内容が消える
+- 一覧の1つぶんの見た目は `_regContractCellHtml()` の1箇所（有＝緑／無し＝グレー／△＝黄 ＋ ☑）。
   `listCols` に入れてあるので**見出しを押した並べ替えもそのまま効く**
-- ⚠️ `companies.contract_status` は **`REG_COMPANY_SELECT_COLS` にも入れてある**
+- ⚠️ `contract_status` は **`REG_COMPANY_SELECT_COLS` / `REG_WORKER_SELECT_COLS` の両方に入れてある**
   （入れないと一覧で読めない）
-- 元になったのは Google スプレッドシート「企業・人材チェックリスト（委任契約書／支援委託契約書）」の
-  G〜K列。**シートからの取り込みはまだしていない**（画面から入れる）
+- 📥 **2026/09/19 に Google スプレッドシート「企業・人材書類チェックリスト」（G〜K列）から取り込み済み**
+  （189社・755名。`companies.folder_no` / `workers.management_no` で突き合わせ、`imported_at` を残してある）。
+  シートは以後メンテしない＝**システムが正**。もう一度取り込むときは `folder_no` / `management_no` で
+  UPDATE するだけ（`reg_support_records` は作らない）
 
 #### 📄 参考様式第５－１０号（支援委託契約書）の書類
 
