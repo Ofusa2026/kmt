@@ -56067,7 +56067,8 @@ const WHATS_NEW = [
   { version:'ver.20260924.2', date:'2026-09-24', notify:true, screens:['team_chat'], items:[
     '☑ 社内チャットの一覧で、チャットを選んで（または［すべて選択］で全部まとめて）既読・未読にできるようになりました（メールと同じ使い方）。一覧の上の［☑ 選んで既読・未読にする］から使えます',
     '開いているチャットは、上の［● 未読にする］で未読に戻せます（いちばん新しい1件が未読になります）',
-    '✏️ メッセージの編集は管理者だけにしました（グループの説明などの自動メッセージを直すためのものです）',
+    '✏️ 自分のメッセージは今までどおりだれでも［✏️ 編集］で直せます。グループの説明などの自動メッセージは、管理者が直せます',
+    '📜 直す前と後の内容は記録に残り、管理者は「（編集済み・履歴）」を押すといつ・だれが・どう直したかを見られます',
   ]},
   { version:'ver.20260924.1', date:'2026-09-24', notify:true, screens:['team_chat'], items:[
     '🏠 社内チャットで、自分のメッセージをあとから直せるようになりました。メッセージの下の［✏️ 編集］を押すと、その場で書き直して［💾 保存］できます（Ctrl+Enter でも保存）',
@@ -60341,8 +60342,13 @@ function _tcMessageHtml(m) {
       + (_tcCanEdit(m) && m.content ? '<span style="cursor:pointer;color:#1a73e8;" onclick="tcStartEdit(\'' + m.id + '\')">✏️ 編集</span>' : '')
       + (isMine ? '<span style="cursor:pointer;color:#dc2626;" onclick="tcDeleteMessage(\'' + m.id + '\')">🗑 削除</span>' : '')
     + '</div>';
+  /* 📜 管理者だけ「（編集済み）」を押すと編集履歴が開く（ほかの人には印だけ） */
   const editedMark = (!del && m.edited_at)
-    ? '　<span title="' + esc(new Date(m.edited_at).toLocaleString('ja-JP')) + ' に編集">（編集済み）</span>' : '';
+    ? (isAdminUser()
+      ? '　<span onclick="openTcEditHistory(\'' + m.id + '\')" title="押すと編集履歴（管理者だけ）" '
+        + 'style="cursor:pointer;color:#7c3aed;text-decoration:underline dotted;">（編集済み・履歴）</span>'
+      : '　<span title="' + esc(new Date(m.edited_at).toLocaleString('ja-JP')) + ' に編集">（編集済み）</span>')
+    : '';
   return '<div style="display:flex;gap:8px;margin-bottom:12px;' + (isMine ? 'flex-direction:row-reverse;' : '') + '">'
     + '<div style="width:32px;height:32px;border-radius:50%;background:#e0e7ff;color:#3730a3;display:flex;align-items:center;justify-content:center;'
       + 'font-weight:800;font-size:13px;flex:0 0 auto;overflow:hidden;">' + getChatAvatar(m.sender_name) + '</div>'
@@ -60376,12 +60382,14 @@ function tcClearReply() {
   if (p) { p.style.display = 'none'; p.innerHTML = ''; }
 }
 
-/* ✏️ 発言の編集。**できるのは管理者だけ**＝ 判定は `_tcCanEdit(m)` の1箇所だけ
-   （自分の発言 ＋ 自動メッセージ `is_auto`＝グループの説明など。自動メッセージはだれの名前で入っていても直せる）。
-   保存先は同じ行の `content` ＋ `edited_at`（行を増やさない＝既読・未読の数は変わらない） */
+/* ✏️ 発言の編集。判定は `_tcCanEdit(m)` の1箇所だけ＝
+   **自分の発言はだれでも** ／ **自動メッセージ（`is_auto`＝グループの説明など）は管理者**（だれの名前で入っていても）。
+   保存先は同じ行の `content` ＋ `edited_at`（行を増やさない＝既読・未読の数は変わらない）。
+   📜 **直す前と後は `team_chat_message_edits` に1回＝1行で残し、見られるのは管理者だけ**（`openTcEditHistory`） */
 function _tcCanEdit(m) {
-  if (!m || m.deleted_at || !isAdminUser()) return false;
-  return !!m.is_auto || String(m.sender_id||'') === _tcMeId();
+  if (!m || m.deleted_at) return false;
+  if (String(m.sender_id||'') === _tcMeId()) return true;
+  return !!m.is_auto && isAdminUser();
 }
 function _tcEditBoxHtml(m) {
   const n = Math.min(24, Math.max(4, String(_tcEditDraft).split('\n').length + 1));
@@ -60442,6 +60450,11 @@ async function tcSaveEdit() {
   const mentions = _withReplyMention(expandMentions(text ? extractMentions(text) : []), m.reply_to && m.reply_to.sender_name);
   const now = new Date().toISOString();
   try {
+    /* 📜 先に履歴を書く。**書けなかったら本文も直さない**（履歴の残らない編集を作らないため） */
+    await sbFetch('team_chat_message_edits', { method:'POST', prefer:'return=minimal', body: JSON.stringify({
+      message_id: m.id, room_id: m.room_id || (_tcRoom && _tcRoom.id) || null,
+      before_content: m.content || null, after_content: text || null, sender_name: m.sender_name || null,
+      edited_at: now, edited_by: _tcMeName(), edited_by_id: _tcMeId() || null }) });
     await sbFetch('team_chat_messages?id=eq.' + m.id, { method:'PATCH', prefer:'return=minimal',
       body: JSON.stringify({ content: text || null, mentions, edited_at: now }) });
     Object.assign(m, { content: text || null, mentions, edited_at: now });
@@ -60462,6 +60475,41 @@ async function tcSaveEdit() {
     showToast('❌ 保存できませんでした（直した内容はそのまま残っています）', 'error');
     if (btn) btn.disabled = false;
   }
+}
+
+/* 📜 編集履歴。**見られるのは管理者だけ**（`requireAdmin()`）。
+   元データは `team_chat_message_edits` の1箇所だけ（1回の編集＝1行。古い順に並べる） */
+async function openTcEditHistory(msgId) {
+  if (!requireAdmin('編集履歴を見られるのは管理者だけです')) return;
+  const m = _tcMessages.find(x => x.id === msgId);
+  let rows = [];
+  try {
+    rows = await sbFetch('team_chat_message_edits?select=*&message_id=eq.' + msgId + '&order=edited_at.asc') || [];
+  } catch(e) { showToast('❌ 編集履歴を読み込めませんでした', 'error'); return; }
+  const fmt = t => t ? new Date(t).toLocaleString('ja-JP', { year:'numeric', month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
+  const box = (label, text, bg, bd) => '<div style="flex:1;min-width:0;">'
+    + '<div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:3px;">' + label + '</div>'
+    + '<div style="background:' + bg + ';border:1px solid ' + bd + ';border-radius:8px;padding:8px 10px;font-size:12.5px;line-height:1.6;'
+    + 'white-space:pre-wrap;word-break:break-word;max-height:260px;overflow-y:auto;">' + (text ? esc(text) : '<span style="color:#94a3b8;">（なし）</span>') + '</div></div>';
+  const list = rows.length
+    ? rows.map((r, i) => '<div style="border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;margin-bottom:10px;">'
+        + '<div style="font-size:12px;font-weight:700;color:#334155;margin-bottom:8px;">' + (i + 1) + '回目　' + esc(fmt(r.edited_at))
+        + '　✏️ ' + esc(r.edited_by || '') + '</div>'
+        + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
+          + box('変更前', r.before_content, '#fef2f2', '#fecaca')
+          + box('変更後', r.after_content, '#f0fdf4', '#bbf7d0')
+        + '</div></div>').join('')
+    : '<div style="padding:24px;text-align:center;color:#94a3b8;font-size:13px;">記録された編集はありません</div>';
+  const note = (m && m.edited_at && (!rows.length || String(rows[rows.length-1].edited_at) < String(m.edited_at).slice(0,19)))
+    ? '<div style="font-size:11.5px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:6px 10px;margin-bottom:10px;">'
+      + '※ 編集履歴を残すようになる前（' + esc(fmt(m.edited_at)) + '）の編集は、中身が記録されていません</div>' : '';
+  showGenModal('tcEditHistModal', '📜 編集履歴' + (m ? '（' + (m.sender_name || '') + ' の発言）' : ''),
+    '<div style="font-size:11.5px;color:#64748b;margin-bottom:10px;">🔒 この画面は管理者だけが見られます</div>'
+    + note + list
+    + (m ? '<div style="font-size:11px;font-weight:700;color:#64748b;margin:6px 0 3px;">いまの内容</div>'
+      + '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:12.5px;line-height:1.6;white-space:pre-wrap;word-break:break-word;">'
+      + esc(m.content || '') + '</div>' : '')
+    + _tcFooterHtml('<button class="btn btn-secondary" onclick="closeGenModal(\'tcEditHistModal\')">閉じる</button>'));
 }
 
 /* 🗑 発言の削除は**論理削除**（`deleted_at`）＝ 一覧には「削除されました」と残す */
