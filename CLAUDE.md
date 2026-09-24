@@ -331,6 +331,25 @@ UI変更やロジック変更のときは実際に描画して確かめる。
   無ければ企業カードのピン（`_chatPinnedCompanyIds` / `_chatPinnedRoomIds`）。
   個別ピンは企業内リストで先頭に並び、`_prependPinnedRoomSection()` が一覧最上部にも表示する。
   **求人チャットのピンも同じテーブル**（💬 チャットの一覧は求人ぶんを最初から外しているので混ざらない）
+- ☑ **選んで既読・未読にする（メールのように）**＝ 💬 チャット（キー `general`）と 💬 求人チャット（キー `job`）。
+  一覧の上の［☑ 選んで既読・未読にする］（`#chatSelBar` / `#jobChatSelBar`。描くのは `renderChatSelBar(key)`）
+  - ⚠️ **🏠 社内チャットの `_tcSel` / `tcMarkRooms()` とは別の入れ物**。2つの画面どうしも
+    **`_chatSelMode[key]` / `_chatSel[key]` で分けて持つ**（共用にすると片方で選んだものがもう片方にも効く）
+  - **書き替えるのは `chatMarkRooms(key, ids, unread)` の1箇所だけ**で、さわるのは**自分の `chat_read_at` だけ**
+    - 既読 … いまの時刻／未読 … **ほかの人のいちばん新しい発言の 1ms 前**（＝件数 1。`markUnreadFromMessage` と同じ考え方）。
+      発言は `chat_room_id=in.(…)` で40ルームずつまとめて引く（ルームごとに引くと数百回になる）。
+      ほかの人の発言が無いルームは未読にできない（トーストで件数を知らせる）
+    - ⚠️ **未読に戻した発言は `_notifSeen` に入れる**（入れないと、未読に戻しただけでブラウザ通知が鳴る）
+    - ⚠️ **開いているチャットを未読にしたら `_chatCloseCurrentRoom()` で閉じる**＝ **Realtime の購読も止める**
+      （止めないと新しい発言が届いた瞬間に `markChatRead` で既読に戻る）
+    - `CHAT_SEL_CONFIRM_AT`(30) 件以上まとめて切り替えるときは1回たずねる
+    - 数え直しは `loadChatUnread()` にまかせる＝ 一覧・バッジ・ショートカットが必ず同じ数になる
+  - ［すべて選択］の対象は **`_chatSelVisible[key]` の1箇所**＝ いま一覧に出ているぶん（絞り込み・検索にそのまま従う）。
+    入れるのは `renderGroupList`（企業カード＝その企業のチャット全部）／`renderGroupRooms`（その企業のチャット）／`renderJobChatList`
+  - チェックボックスを作るのは **`_chatSelChkHtml(key, ids)` の1箇所**。企業カードはその企業のチャット全部を1つで選ぶ
+    （企業を開けば1件ずつ選べる）。**行を押したときの動き（開く）は変えていない**
+  - これまでの行ごとの ✓/◉ ボタン・ヘッダーの ◉（`toggleRoomReadStatus` / `toggleCompanyRoomsReadStatus` /
+    `openMarkUnreadDialog`）は**そのまま残してある**
 - **添付**: `chat_messages.attachments`（`[{url,name,mimeType,size}]`）。実体は GAS 経由で Google Drive にアップロード。
   画像（`isChatImageAttachment()` が true）は `driveImageUrl(url, 800)` でサムネイル化してチャット内に直接表示、
   それ以外はファイルリンク。表示に失敗したら `_chatImgFallback()` がリンクに戻す
