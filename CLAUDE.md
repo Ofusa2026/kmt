@@ -2029,6 +2029,31 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   対応者は面談相手の隣に 🙋 のバッジで出す
 - 面談記録は **相談記録書（5-4号）の元データ**になる（下の節）
 
+#### 📂 一覧の見せ方と記入フォームの使い勝手（ver.20260925.2 で取り込んだ改善）
+
+- ⚠️ **見せ方だけを変えた。データ・列・支援カレンダーとのつながり・⏰ 記入待ちの判定は1文字も変えていない**
+  （`company_meetings` / `support_schedules` の読み書き、`todoIds`、`_saveMeetingFromSchedule`、
+  `_syncScheduleNotes`、`_meetingCarry`、`_meetingMatchSchedule` はそのまま）
+- 一覧はフォルダ式（`<details>`）＝ 所属機関 **年度 ▸ 期間 ▸ 人材ごとの要約**／外国人材 **年度 ▸ 期間**
+  - `renderMeetingList(side)` は**入れ物（⏰の帯・件数・検索欄・絞り込み）だけ**を描き、
+    中身は **`_meetingRenderBody(side)` の1箇所**が描く。
+    ⚠️ **検索は中身だけ描き直す**（`_meetingSetQuery`）＝ 検索欄を作り直すと日本語入力が切れる
+  - 1件のカードは **`_meetingCardHtml(m, side, todoIds)` の1箇所だけ**
+  - 絞り込みのチップは **`MEETING_CHIPS` の1箇所**（すべて／⏰ 記入待ち／📅 予定／`MEETING_KINDS` の項目）
+  - 画面の状態（検索・チップ・フォルダの開き閉じ）は `_meetingView` / `_meetingOpen`。
+    **別の所属機関・人材を開いたら `_meetingViewFor()` の1箇所が最初に戻す**
+  - 既定で開くのは**いちばん新しい期間と ⏰ 記入待ちを含む所だけ**。絞り込み中は全部開く
+- 記入フォーム（`openMeetingForm`）
+  - 項目はボタン（`_meetingPickKind`）。**保存や欄の出し入れは今までどおり見えない `<select id="mf_kind">` を見る**
+  - 入力途中かは **`_meetingDirty` の1箇所**。✕・キャンセル・Esc は `requestCloseMeetingForm()` を通って確認が出る
+    （保存のあとは `closeMeetingForm()` を直接呼ぶ）
+  - 二重保存は `_meetingSaving` で止める（本体は `_saveMeetingBody()`）。**日付が空なら保存しない**／
+    人材が空なら1回たずねる（外国人材の【面談記録】に出なくなるため）
+  - 定型の見出しは **`MEETING_MEMO_TEMPLATE` の1箇所**（［＋ 定型］＝ `insertMeetingTemplate()`）
+  - 人材が `8` 名を超えるときだけ名前の検索欄を出す（`_meetingWorkerFilter()`。チェック済みの人は常に出す）
+- 見た目は **`.mt-*` のCSSの1かたまり**（メインの `<style>` の末尾）。
+  ⚠️ `.mt-sec` は `grid-column:1/-1`（フォームの2列をまたぐ見出し。kmt.html の `.full` は `.form-group.full` だけなので）
+
 ### 求人ヒアリングフォーム
 
 - `#hearing` のリンクで**ログインなしで開ける**（`initLogin` の先頭で分岐）。外に渡せる
