@@ -4104,9 +4104,17 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 
 - 書類を作れる様式（`def.doc` があるもの）の画面は **📝 記録の一覧 ／ 📄 作成済みの書類** の2タブ。
   切り替えは `setRegView(no, 'list'|'docs')`、いま見ているほうは `_regViewOf(no)`
-- 出力設定のフッターのボタンは2つ＝ **［📄 書類生成のみ］（履歴に残さない）／
-  ［💾 書類生成＋履歴保存］**。どちらも `regRunDocExport(saveHistory)` の1箇所を通り、
-  最後に `_regSaveDocHistory()` を呼ぶかどうかだけが違う
+- 出力設定のフッターのボタンは2つ＝ **［📄 書類生成のみ］／［💾 書類生成＋履歴保存］**。
+  どちらも `regRunDocExport(saveHistory)` の1箇所を通り、**どちらも `_regSaveDocHistory()` で一覧に1行残す**
+  （いつ・だれが出したか）。違いはドライブに入れるかどうかだけ
+  - ［📄 書類生成のみ］の行は **`reg_doc_history.output_only = true`**（ドライブには入れない）。
+    一覧では「📄 生成のみ」と出し、`_regDocNeedsRemake()` の ⚠️［作り直す］は出さない。トーストも出さない
+- 🖨️ **印刷・PDFでブラウザが刷り込む「日時・書類名・URL・ページ数」は出さない。やるのは `printNoBrowserHead(html, 余白)` の1箇所だけ**
+  （履歴書の `printResume` と記録簿の `buildRegPrintHtml` がここを通す）。
+  `@page` の余白を0にして置き場をなくし、余白は**ページごとにくり返す表の thead / tfoot（上下）と body の左右の padding** で作る
+  - ⚠️ **body の padding だけにしないこと**＝ 2ページ目以降の上下の余白が消える
+  - 名前つきページ（`@page ls`＝5-5号の別紙の横向き）も表の中で効くことを確かめてある
+  - **いつ・だれが出したかは紙に出さず、【📄 作成済みの書類】の一覧に残す**
 - **履歴を残せる様式かどうかは `_regDocHistoryOn(no)` の1箇所**
   （`REG_DOC_HISTORY_TASKS` が `null` のあいだは `def.doc` があるものすべて）
 - **「何年何期分か」を作るのは `_regDocPeriodLabel(no, d)` の1箇所**＝
