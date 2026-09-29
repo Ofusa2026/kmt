@@ -2576,6 +2576,20 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   相手の選択肢は `workerStaffOptionsHtml()` を共用する
 - 担当ごとの残りを数える **`_renCycleStaffBreak(ym)`** も、お願いされた人をメインとして数える
 
+##### 🚫 管理者がこの回の一覧から外す（依頼なし ／ 依頼取り下げ）
+
+- 更新決定の一覧の行ごとに、**更新の管理者（`_renCycleIsAdmin()`）だけ**［🚫 依頼なし］／［↩ 依頼取り下げ］が出る。
+  **どちらになるかは `_renExclKindNow(ym)` の1箇所**＝ その回にまだ依頼をかけていなければ「依頼なし」、依頼済みなら「依頼取り下げ」。
+  言い方は `REN_EXCL_KINDS` の1箇所
+- 実体は **`renewal_cycle_excludes`**（1回×1人材で1件・理由は任意・取り消しは論理削除）。
+  ⚠️ `SB_SOFT_DELETE_TABLES` と `TRASH_TABLES` の両方に入れてある
+- **外れているかの判定は `_renExclOf(ym, workerId)` の1箇所だけ**で、`_renCycleTargets()` の**先頭**で見る＝
+  一覧・残りの人数・サイドバー／マイページのお知らせ・更新状況リストの月の見出しから同時に消える
+- **更新ステータスは変えない**（一覧から外すだけ）
+- 外した人は回の見出しと［📋 依頼の履歴と対応状況］に出す（`_renExclListHtml(ym)`）。［戻す］も管理者だけ
+- 外した・戻したあとの描き直しは `_renAfterExclChange()` の1箇所。読み込みは `loadRenewalCycle()` の中の `loadRenCycleExcludes()`
+- 🧪 `resetRenewalTest()` はテスト用の人材ぶんの外した記録も消す
+
 ##### 🌐 全体表示（更新の管理者だけ）
 
 - 更新の管理者（`REN_CYCLE_ADMINS` ＝ ニサ・白井・アヒュ）は、**自分の担当ぶんとは別に**
