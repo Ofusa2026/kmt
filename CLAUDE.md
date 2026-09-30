@@ -563,10 +563,14 @@ STOCK は同じアカウントに別の端末でログインすると前の人�
   ⚠️ **書くときは必ず「いまの holder_id」を条件に付ける**（`holder_id=eq.◯` ／ 空きを取るときは `holder_id=is.null`）＝
   同時に2人が押しても片方だけが通る。返りが0件なら「先にほかの人が…」と知らせる
 - 入口は `stockUse(id)`（空き → 使う ／ 使用中 → `askChoice` で確認してから代わりに使う）と `stockReturn(id)`
-- 🔒 **ID・パスワードは DB の関数を通してだけ読み書きする**＝ `stock_secret_get(p_user_id, p_pin)`（だれでも）／
-  `stock_secret_set(...)`（**管理者だけ**）。どちらも**ログイン中の人の暗証番号（`users.pin_code`）**を確かめる
+- 🔒 **ID・パスワードは DB の関数を通してだけ読み書きする**（`stock_account_secrets` は公開キーから直接は読めない）
+  - 👀 **見るのはログインしている全員・暗証番号なし**＝ `stock_secret_list(p_user_id)`（`is_active` のユーザーなら全アカウントぶん返す）。
+    読むのは **`_stockLoadSecrets()` の1箇所**で、`loadStockAccounts()` が画面を描く前に呼ぶ。
+    カードではパスワードは伏せ字（👁 で表示・📋 でコピー）。画面を離れたら手元から消す（`_stockHideSecrets()`）
+  - ✏️ **変更は管理者だけ**＝ `stock_secret_set(...)`。**暗証番号（`users.pin_code`）を聞くのはこのときだけ**
+    （`_stockNeedPin()` → `stockSubmitPin()` が `stock_secret_get` で確かめる。まちがいなら `_stockPin` を空に戻す）
+    - ⚠️ 暗証番号の欄は `type="text"` ＋ `-webkit-text-security:disc`（`type="password"` だと Chrome が「パスワードを保存」を出す。実際に出た）
   - 呼ぶのは **`_stockRpc()` の1箇所だけ**。⚠️ **`sbFetch` を使わない**（送った中身＝暗証番号・パスワードを操作ログ `kmtLog` に残すため）
-  - 見せておくのは `STOCK_SECRET_SHOW_MS`(5分) だけ。画面を離れたら手元から消す（`_stockHideSecrets()`）
   - ⚠️ **kmt.html に ID・パスワードを1文字も書かない**（公開リポジトリのため）
   - ⚠️ 暗証番号（`users.pin_code`）自体は公開キーで読めるつくりなので、**技術的に知識のある人が公開キーを使えば取り出せる**。
     本当に守るには Supabase Auth でのログインに変える必要がある（いまはそこまでしていない）
