@@ -581,7 +581,7 @@ STOCK のような「メンバーだけが見られるノートの入れ物」�
 - ⚠️ 社内チャット（`team_chat_*`）とは**テーブルも関数も分けてある**（関数は `gn` 始まり）。
   メンバーの選択肢だけ `_tcUserList()` を共用する
 - 📝 **ノートの中身は求人・候補者のフリーノートと同じ部品**＝ `NOTE_SCOPES.group`。
-  表・文字の大きさ／色・自動保存（`NOTE_AUTOSAVE_MS`）・添付はそのまま。違うところは**スコープのフックだけ**
+  表・文字の大きさ／色・添付はそのまま。違うところは**スコープのフックだけ**（⚠️ **社内ノートだけは自動保存しない**＝ `manual`）
   | フック | 中身 |
   |---|---|
   | `render` | `renderNotes()` の代わりに `renderGnMain()` で描く |
@@ -589,6 +589,7 @@ STOCK のような「メンバーだけが見られるノートの入れ物」�
   | `soft` | `deleteNote()` を論理削除にする（2回たずねる） |
   | `links` | ツールの［📎 ファイルを貼る］［🔗 リンク］を出す |
   | `conflict` | `saveNote()` の前に、**ほかの人が**あとから保存していないかを見て、上書きしてよいかを1回たずねる（キャンセルなら保存しない） |
+  | `manual` | **自動保存しない**（💾 を押したときだけ書く）。添付・リンクの追加や外したときも未保存の印を付けるだけ |
   | `onAdd` / `onDelete` / `afterSave` | 開いているノート・一覧の描き直し |
   - ⚠️ **求人・候補者のノートにはフックが無いので動きは今までどおり**（添付の `success:false` でも `fileUrl` があれば入ったものとする、だけ共通で直した）
 - 📎 **本文に入れるファイルのリンクは `.jn-file`**（作るのは `_jnFileChipHtml()` の1箇所・`contenteditable=false`）。
@@ -598,7 +599,14 @@ STOCK のような「メンバーだけが見られるノートの入れ物」�
     ［🔗 リンク］＝ `addNoteLink()`（アップロードせずURLだけ）。どちらも下の📎添付の一覧にも入る
 - 検索は**一覧の中身だけ**描き直す（`setGnQuery` → `_renderGnNoteItems`。検索欄を作り直すと日本語入力が切れる）。
   並べ方は **`GN_SORTS` の1箇所**（更新日／作成日／タイトル）。アイコンは `GN_ICON_EMOJIS`
-- 画面を移るときは `showScreen` の中で `flushNoteSaves()` を呼ぶ（書きかけを先に書き込む）
+- 💾 **社内ノートは手動保存。未保存のまま移るときにたずねるのは `noteManualUnsavedOk()` の1箇所だけ**
+  （［💾 保存して移動］／［保存せずに移動］／［キャンセル］。有無は `noteManualHasUnsaved()`）
+  - 呼ぶのは `showScreen`（社内ノートから出るとき）／`gnOpenNote` / `gnOpenFolder` / `addNote`（manual のスコープ）／
+    `loadGroupNotes`（🔄 更新）／`gnLeaveFolder` / `gnDeleteFolder` ／ `beforeunload`
+  - ⚠️ `flushNoteSaves()` と入力欄の `onblur` は **manual のスコープを書かない**（勝手に保存しない）
+  - ⚠️ **添付は選んだ時点でメモリの `attachments` を書き替える**ので、書き替える前に `_noteSnapAtt()` で控え、
+    保存せずに移るときは `_noteSavedAtt` から戻す（戻さないと一覧の📎の数がずれる）。ファイル自体はドライブに残る
+  - 求人ノート・候補者メモ（manual なし）は今までどおり自動保存
 - ⚠️ `SB_SOFT_DELETE_TABLES` と `TRASH_TABLES` の両方に `group_note_folders` / `group_notes` を入れてある
 
 ### 🔑 STOCK 共有アカウントの貸出ボード（社内 → 🔑 STOCK共有 ／ 画面キー `STOCK_SCREEN_KEY`＝`stock_accounts`）
