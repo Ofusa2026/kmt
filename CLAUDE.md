@@ -3651,6 +3651,7 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - 🔘 **特定技能2号の【2号移行後の支援】は必須の2択**（ラジオ `dr_2go_support`。以前のチェック `dr_full_support` は外した）。
   **選択肢と言い方は `DR_2GO_SUPPORT_OPTS` の1箇所**（なし＝`apply`／あり＝`full`）、読むのは **`_dr2goSupport()` の1箇所**
   （特定技能2号以外は常に空）。選んだほうは `getDecisionData().support_2go` に入り、文面（`_drBillingLines`）と送信前の確認に出る
+  - 文面の1行は **`_dr2goLine()` の1箇所**＝「2号移行後の支援: なし」／「2号移行後の支援: あり（フルサポートプラン）」
   - ⚠️ **選ぶまでは請求条件の欄を出さない**（`updateDrBillingFields()` の `pick`）＝ 先に申請費用を書いてから「あり」に変えて消える、を防ぐ
   - ⚠️ **未選択なら `sendKmtDecisionAll()` の先頭で止める**（その欄まで動かして赤枠で知らせる）
   請求書の送付先の欄（メール／その他）は **`updateDrInvoiceMethod()` の1箇所**で、**`apply` のときだけ**出す
