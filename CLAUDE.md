@@ -571,7 +571,9 @@ STOCK のような「メンバーだけが見られるノートの入れ物」�
   （メンバー ／ 管理者）。管理者として（メンバーでないのに）見ているかは `_gnAdminView(f)`、
   だれのノートかの説明は `_gnOwnerText(f)` の1箇所
   - 左の一覧のいちばん下に「🔐 ほかの人のノート（管理者）」として**たたんで**出す（`_gnAdminOpen`）
-  - 🔐 **画面右上の［🔐 ノート確認（管理者）］（`#gnAdminBtn`。管理者だけに出す）＝ `openGnAdminList()` / `renderGnAdminList()` の1組**。
+  - 🔐 **入れ物の見出しの ⚙️ 設定 のとなりの［🔐 管理者設定］（`_gnAdminBtnHtml()` の1箇所。管理者だけに出す。
+    入れ物を開いていないときも見出しの位置に出す）＝ `openGnAdminList()` / `renderGnAdminList()` の1組**。
+    ⚠️ 管理者向けの変更なので、アップデートのお知らせ（`WHATS_NEW`）には中身を書かない（`notify:false` / `screens:[]`）。
     持ち主・メンバー・件数・最終更新・管理者が最後に開いた日時の一覧で、行を押すと `gnOpenFolder()` を通る（確認と記録は同じ）
   - 開くときに1回たずね、**`group_note_folders.admin_viewed_at` / `admin_viewed_by` に残す**（`gnOpenFolder` の中）＝
     本人・メンバーの画面の上に「🔐 管理者（◯◯）が 日時 にここを開きました」と出る
