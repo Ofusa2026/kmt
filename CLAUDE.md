@@ -1930,6 +1930,15 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   - ⚠️ **`#jnGrip` / `#jnGuide` は `document.body` に置くので z-index を最大にする**。
     モーダル（99999 まである）より下だと、つまみが隠れて掴めない（実際に掴めなかった）
   - 動かしたら `markJobNoteDirty()` で「未保存」にする（保存し忘れの防止）
+- ➕➖ **行・列をあとから足す／消す（STOCK と同じ）**＝ 表にマウスを乗せると**上のレール（列）と左のレール（行）**に点が出る。
+  点（罫線の位置）にさわると［＋］になり、押すとそこに列・行が入る。マスにマウスを乗せると、その列の上・その行の左に赤い［−］
+  - **出し入れは `_jnShowTblTools(table, cell)` の1箇所だけ**、足す・消すのは **`jnTblAdd(kind, idx)` / `jnTblDel(kind, idx)` の2つだけ**
+    （`kind`＝`row`／`col`、`idx`＝入れる位置・消す番号）。レールの位置は `JN_TOOL_GAP` の1箇所
+  - 道具（`#jnTblTools`）は `#jnGrip` と同じく **`document.body` に置き、z-index を最大**にする。
+    押したときは `pointerdown` で `preventDefault`＝ノートのカーソルを動かさない
+  - 列を足したら `<colgroup>` にも1つ足す（`_jnEnsureColgroup()`）。見出し行には `th`、それ以外は `td` を入れる
+  - 消すとき**入力があれば1回たずねる**。**最後の1行・1列なら表ごと消すかたずねる**
+  - 変えたら `markJobNoteDirty()` ＝ 自動保存に乗る。社内ノート・求人ノート・候補者メモで共通
 - **添付ファイル**: `job_notes.attachments` / `candidate_notes.attachments`（jsonb の
   `[{url,name,size,mimeType,at,by}]`）。実体はチャットの添付と同じ Drive フォルダー
   （`CHAT_DRIVE_URL_DEFAULT`／設定の `kmt_chat_only_drive_url`）に GAS 経由で入れる。
