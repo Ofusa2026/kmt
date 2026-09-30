@@ -552,7 +552,7 @@ UI変更やロジック変更のときは実際に描画して確かめる。
 
 ### 📒 社内ノート（社内 → 📒 社内ノート ／ 画面キー `GN_SCREEN_KEY`＝`group_notes`）
 
-STOCK のような「メンバーだけが見られるノートの入れ物」（旧名グループノート。**テーブル名・関数名・画面キーは `group_*` / `gn` のまま**）。**左メニューは【社内】のいちばん下**（年間カレンダーの下）。左＝入れ物／まん中＝ノートの一覧／右＝ノートの中身の3ペイン。
+STOCK のような「メンバーだけが見られるノートの入れ物」（旧名グループノート。**テーブル名・関数名・画面キーは `group_*` / `gn` のまま**）。**左メニューは【社内】の 📋 社内共有事項 のすぐ下**（🔑 STOCK共有 の上）。左＝入れ物／まん中＝ノートの一覧／右＝ノートの中身の3ペイン。
 
 | 実体 | 中身 |
 |---|---|
@@ -1947,6 +1947,9 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   - 列を足したら `<colgroup>` にも1つ足す（`_jnEnsureColgroup()`）。見出し行には `th`、それ以外は `td` を入れる
   - 消すとき**入力があれば1回たずねる**。**最後の1行・1列なら表ごと消すかたずねる**
   - 変えたら `markJobNoteDirty()` ＝ 自動保存に乗る。社内ノート・求人ノート・候補者メモで共通
+  - 📢 **アナウンスの本文（`#annEditorBody`）の表でも効く**（`.jn-body` の中の `.jn-table` ならどこでも）。
+    ⚠️ 仕組みは document に1回だけ付けるので、**表を編集できる画面を開くときは `_jnInitResize()` を呼ぶこと**
+    （いまは `renderNotes` / `renderGnEditor` / `openAnnouncementModal`）
 - **添付ファイル**: `job_notes.attachments` / `candidate_notes.attachments`（jsonb の
   `[{url,name,size,mimeType,at,by}]`）。実体はチャットの添付と同じ Drive フォルダー
   （`CHAT_DRIVE_URL_DEFAULT`／設定の `kmt_chat_only_drive_url`）に GAS 経由で入れる。
