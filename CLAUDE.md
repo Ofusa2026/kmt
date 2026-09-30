@@ -626,8 +626,10 @@ STOCK は同じアカウントに別の端末でログインすると前の人�
 | `stock_account_secrets` | **ID・パスワード。RLS を有効にしてポリシーなし＝公開キーから直接は読めない** |
 
 - **状態を決めるのは `_stockStateOf(a)` の1箇所**（`free`／`mine`／`busy`）。
-  **返し忘れは `STOCK_AUTO_RELEASE_HOUR`(18) 時で自動で空き**＝ 判定は `_stockCutoff()` / `_stockExpired()` の1箇所。
-  サーバーで時刻に動くものは無いので、**だれかの画面が読み込んだときに見つけて書く**（`loadStockAccounts()`）
+  🚫 **自動で空きに戻さない（全部手動で［■ 返す］）＝ `STOCK_AUTO_RELEASE_HOUR` が `null`**（そう頼まれた）。
+  数字（例 18）を入れると毎日その時刻に空きに戻る仕組みが元どおり動く＝ 判定は `_stockCutoff()` / `_stockExpired()` の1箇所、
+  カードの「⏱ ◯:00 に自動で空きに戻ります」は `_stockAutoHtml()`、使い方の文は `STOCK_GUIDE_NOTES` が同じ値を見て出し分ける。
+  サーバーで時刻に動くものは無いので、戻すときは**だれかの画面が読み込んだときに見つけて書く**（`loadStockAccounts()`）
 - **使用中の人を外すのは `_stockRelease(a, kind)` の1箇所だけ**（返す／代わりに使う／自動）。
   ⚠️ **書くときは必ず「いまの holder_id」を条件に付ける**（`holder_id=eq.◯` ／ 空きを取るときは `holder_id=is.null`）＝
   同時に2人が押しても片方だけが通る。返りが0件なら「先にほかの人が…」と知らせる
