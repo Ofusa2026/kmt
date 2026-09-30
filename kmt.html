@@ -14723,12 +14723,15 @@ function _badDateInputs(root){
 /* 🔢 **管理番号の重複チェックはこの1箇所だけ**（DBに聞く。手元の allWorkers は軽いSELECTのことがあるため）。
    ⚠️ 過去の事故: 同じ管理番号の人材が2人いて、片方を支援委託費の表で✕にしたらもう片方も消えた
    （076-001・214-001）。支援委託費の金額・確定（worker_fee_overrides）も管理番号で持つので、かぶると2人で共有になる */
-async function _confirmMnoUnique(mno, selfId){
+/* ⚠️ **どちらも退職済なら重複でもよい**（表にも出ず、請求にも使わないため）＝ `_mnoDupOk()` の1箇所 */
+const _mnoRetired = st => String(st || '').startsWith('退職済');
+const _mnoDupOk = (a, b) => _mnoRetired(a) && _mnoRetired(b);
+async function _confirmMnoUnique(mno, selfId, selfStatus){
   mno = String(mno || '').trim();
   if (!mno) return true;
   let rows = [];
   try { rows = await sbFetch('workers?select=id,name,status&management_no=eq.' + encodeURIComponent(mno)) || []; } catch(e) { return true; }
-  const others = rows.filter(r => r.id !== selfId);
+  const others = rows.filter(r => r.id !== selfId && !_mnoDupOk(selfStatus, r.status));
   if (!others.length) return true;
   return confirm('⚠️ 管理番号「' + mno + '」はほかの人材にも使われています\n\n'
     + others.map(r => '・' + (r.name || '') + '（' + (r.status || '-') + '）').join('\n')
@@ -14747,7 +14750,7 @@ async function saveWorker(returnResult=false) {
     return false;
   }
   // 🔢 管理番号がほかの人材とかぶっていないか（かぶると支援委託費の表・確定・除外が混ざる）
-  if (!(await _confirmMnoUnique(g('wf_management_no'), editingWorkerId))) return false;
+  if (!(await _confirmMnoUnique(g('wf_management_no'), editingWorkerId, g('wf_status')))) return false;
   // 🛫 出国の担当者は「その他」だけでは登録できない（登録支援機関の業務なのでKMT担当が要る）
   if (!_departStaffOk()) {
     onDepartStaffChange();
