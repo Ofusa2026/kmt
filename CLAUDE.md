@@ -4848,6 +4848,15 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   | ✕で手動で外した人 | `fee_excluded_workers` | 氏名の ✕ |
   | 退職済で直近1年に記録がない人 | 自動判定 | 自動 |
 
+- 🔑 **✕の除外は人材ごと（`fee_excluded_workers.worker_id`）に持つ。判定は `_fmManualExcl(w)` の1箇所だけ**
+  （`FEE_EXCLUDED` のキーは `'id:<人材id>'`。人材idの無い古い行だけ `'mno:<管理番号>'`）。
+  `fmExcludeWorker(id)` / `fmRestoreWorker(id)` は**人材idを受け取る**
+  - > ⚠️ **過去の事故**: 以前は管理番号が主キーだったので、**同じ管理番号の人材が2人いると、
+    > 片方（退職・辞退）を✕で外しただけで、もう片方（在職中・配属前）まで表から消えた**
+    > （076-001 ELPIS ELIK SIADARI・214-001 MUSLIM ANSORI。2026/09/30 に直した）
+  - ⚠️ 金額・確定（`worker_fee_overrides`）と ↩ の自動除外の解除（`fee_kept_workers`）は**いまも管理番号で持つ**＝
+    管理番号がかぶると2人で共有になる。**そもそもかぶらせない**のが本筋なので、
+    外国人材の 💾 保存で **`_confirmMnoUnique()` の1箇所**がDBに聞いて、かぶっていれば確認を出す
 - **どちらも ↩ で1人ずつ表に戻せる。戻す処理は `fmRestoreWorker()` の1箇所**
   - ✕で外したぶん … `fee_excluded_workers` から消す
   - 自動除外ぶん … **`fee_kept_workers` に入れて残す**（`FEE_KEPT`）。
