@@ -573,6 +573,9 @@ STOCK は同じアカウントに別の端末でログインすると前の人�
 - 左メニューの「空き n/3」は `updateStockBadge()`。起動時に `startStockBadge()` が読み、`STOCK_BADGE_MS`(60秒) ごとに読み直す。
   画面を開いているあいだは `STOCK_POLL_MS`(20秒) ごと
 - 使っている人のオンライン／離席は `userPresence`（🟢 だれがいま使っているか の節）をそのまま見る
+- 📖 **［📖 使用方法確認］は画面のいちばん上**（`openStockGuide()`）。**文章は `STOCK_GUIDE_STEPS` / `STOCK_GUIDE_NOTES`、
+  見本は `_stockGuideSamplesHtml()` の1箇所だけ**。見本は**画像を埋めず、本物と同じ部品（`.stk-card` など）で描く**＝
+  kmt.html を重くしない・画面を直せば見本の見た目も追従する。仕組みを変えたらここも直すこと
 
 ### 大房行政書士法人 案件システムとの連携
 
