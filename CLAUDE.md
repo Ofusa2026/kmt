@@ -938,6 +938,10 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 | 📄 求人票＋よくある質問 | **求人票の種類**（上の節）→ 求人ノート → 求人票の項目編集（📥テキストから読み込む付き）→ よくある質問 | `saveJobSheet` / `saveJobFaq` |
 | 👥 候補者リスト | `candidate_job_progress` の紐付け | 行ごとに即保存 |
 
+- 👤 **【営業担当】【GLT担当】は選択式。選択肢を作るのは `jpStaffOptionsHtml(kind, cur)` の1箇所だけ**
+  （GLT と 営業のユーザー全員＝`JP_STAFF_TEAMS`）。**営業担当は漢字の名前のユーザーが上、GLT担当は下**
+  （判定は `_jpHasKanji()`）。いまの値が一覧に無いときは先頭に残す（保存先は今までどおり `sales_staff` / `glt_staff` の文字）。
+  名簿（チームつき）がまだ無いときは `_jpFillStaffSelects()` が取り直して2つの欄だけ作り直す
 - **タブごとに保存する範囲を分けてある。** 開いていないタブの欄を空で上書きしないため、
   `saveJobProgress` は求人票の列に触らない／`saveJobSheet` は `JOB_SHEET_FIELDS` の列だけを書く
 - 🔍 **【👥 候補者リスト】の「候補者を名前で検索」（`#jpCandSearchBox`）は
