@@ -550,6 +550,43 @@ UI変更やロジック変更のときは実際に描画して確かめる。
   - ⚠️ **やりとりの本体は 🏠 社内チャットの画面のまま**（ショートカットに一覧を持たせない）
   - 色は**青**（`#eff6ff` / `#93c5fd` / `#1e40af`）＝ オレンジの求人チャットと一目で見分けるため
 
+### 📒 グループノート（社内 → 📒 グループノート ／ 画面キー `GN_SCREEN_KEY`＝`group_notes`）
+
+STOCK のような「メンバーだけが見られるノートの入れ物」。左＝グループ／まん中＝ノートの一覧／右＝ノートの中身の3ペイン。
+
+| 実体 | 中身 |
+|---|---|
+| `group_note_folders` | 1行＝1グループ（名前・説明 `topic`・`icon_emoji`・`drive_url`）。論理削除 |
+| `group_note_members` | だれがメンバーか（`folder_id` ＋ `user_id` で一意） |
+| `group_notes` | ノート（`title` / `content_html` / `attachments`）。論理削除 |
+
+- **見られるのはメンバーだけ**（公開のグループは作らない）。判定は **`_gnIsMember(f)` の1箇所だけ**で、
+  一覧に出すグループもここを通す。グループは**だれでも作れる**、設定・メンバーは**メンバーならだれでも**直せる
+- **メンバーの足し引きを書くのは `gnSaveFolder()` の1箇所だけ**（いまのメンバーとの差分で POST / DELETE）。
+  🚪 抜ける＝`gnLeaveFolder()`（自分の行を消すだけ）／🗑 削除＝`gnDeleteFolder()`（論理削除・2回たずねる）
+- ⚠️ 社内チャット（`team_chat_*`）とは**テーブルも関数も分けてある**（関数は `gn` 始まり）。
+  メンバーの選択肢だけ `_tcUserList()` を共用する
+- 📝 **ノートの中身は求人・候補者のフリーノートと同じ部品**＝ `NOTE_SCOPES.group`。
+  表・文字の大きさ／色・自動保存（`NOTE_AUTOSAVE_MS`）・添付はそのまま。違うところは**スコープのフックだけ**
+  | フック | 中身 |
+  |---|---|
+  | `render` | `renderNotes()` の代わりに `renderGnMain()` で描く |
+  | `drive` | 添付の入れ先＝ **`_gnDriveDest()` の1箇所**（グループの `drive_url` → 無ければ共通のチャット用フォルダー） |
+  | `soft` | `deleteNote()` を論理削除にする（2回たずねる） |
+  | `links` | ツールの［📎 ファイルを貼る］［🔗 リンク］を出す |
+  | `conflict` | `saveNote()` の前に、**ほかの人が**あとから保存していないかを見て、上書きしてよいかを1回たずねる（キャンセルなら保存しない） |
+  | `onAdd` / `onDelete` / `afterSave` | 開いているノート・一覧の描き直し |
+  - ⚠️ **求人・候補者のノートにはフックが無いので動きは今までどおり**（添付の `success:false` でも `fileUrl` があれば入ったものとする、だけ共通で直した）
+- 📎 **本文に入れるファイルのリンクは `.jn-file`**（作るのは `_jnFileChipHtml()` の1箇所・`contenteditable=false`）。
+  押すと新しいタブで開く（document の click で拾う）。入れる位置は **`jnSaveRange()` で覚えたカーソル**
+  （ファイルを選んでいるあいだにフォーカスが外れるため）→ `jnInsertAtRange()`。表のマスの中にも入る
+  - ［📎 ファイルを貼る］＝ `addNoteFiles(scope, id, files, {insert:true})`（アップロードして本文にも入れる）／
+    ［🔗 リンク］＝ `addNoteLink()`（アップロードせずURLだけ）。どちらも下の📎添付の一覧にも入る
+- 検索は**一覧の中身だけ**描き直す（`setGnQuery` → `_renderGnNoteItems`。検索欄を作り直すと日本語入力が切れる）。
+  並べ方は **`GN_SORTS` の1箇所**（更新日／作成日／タイトル）。アイコンは `GN_ICON_EMOJIS`
+- 画面を移るときは `showScreen` の中で `flushNoteSaves()` を呼ぶ（書きかけを先に書き込む）
+- ⚠️ `SB_SOFT_DELETE_TABLES` と `TRASH_TABLES` の両方に `group_note_folders` / `group_notes` を入れてある
+
 ### 🔑 STOCK 共有アカウントの貸出ボード（社内 → 🔑 STOCK共有 ／ 画面キー `STOCK_SCREEN_KEY`＝`stock_accounts`）
 
 STOCK は同じアカウントに別の端末でログインすると前の人がログアウトされるので、
