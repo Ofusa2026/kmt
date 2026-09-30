@@ -545,6 +545,35 @@ UI変更やロジック変更のときは実際に描画して確かめる。
   - ⚠️ **やりとりの本体は 🏠 社内チャットの画面のまま**（ショートカットに一覧を持たせない）
   - 色は**青**（`#eff6ff` / `#93c5fd` / `#1e40af`）＝ オレンジの求人チャットと一目で見分けるため
 
+### 🔑 STOCK 共有アカウントの貸出ボード（社内 → 🔑 STOCK共有 ／ 画面キー `STOCK_SCREEN_KEY`＝`stock_accounts`）
+
+STOCK は同じアカウントに別の端末でログインすると前の人がログアウトされるので、
+**「いまだれが使っているか」をボタンとステータスだけでやりとりする**（チャットには流さない＝そう頼まれた）。
+
+| 実体 | 中身 |
+|---|---|
+| `stock_accounts` | 1行＝1アカウント（いまは3つ）。使用中＝`holder_id` / `holder_name` / `since`、最後に使った人＝`last_user` / `last_until` |
+| `stock_account_log` | 1回の利用＝1行。終わり方 `end_kind`＝ `return` 返却／`taken` 代わりに使用（`ended_by`）／`auto` 自動で空きに |
+| `stock_account_secrets` | **ID・パスワード。RLS を有効にしてポリシーなし＝公開キーから直接は読めない** |
+
+- **状態を決めるのは `_stockStateOf(a)` の1箇所**（`free`／`mine`／`busy`）。
+  **返し忘れは `STOCK_AUTO_RELEASE_HOUR`(18) 時で自動で空き**＝ 判定は `_stockCutoff()` / `_stockExpired()` の1箇所。
+  サーバーで時刻に動くものは無いので、**だれかの画面が読み込んだときに見つけて書く**（`loadStockAccounts()`）
+- **使用中の人を外すのは `_stockRelease(a, kind)` の1箇所だけ**（返す／代わりに使う／自動）。
+  ⚠️ **書くときは必ず「いまの holder_id」を条件に付ける**（`holder_id=eq.◯` ／ 空きを取るときは `holder_id=is.null`）＝
+  同時に2人が押しても片方だけが通る。返りが0件なら「先にほかの人が…」と知らせる
+- 入口は `stockUse(id)`（空き → 使う ／ 使用中 → `askChoice` で確認してから代わりに使う）と `stockReturn(id)`
+- 🔒 **ID・パスワードは DB の関数を通してだけ読み書きする**＝ `stock_secret_get(p_user_id, p_pin)`（だれでも）／
+  `stock_secret_set(...)`（**管理者だけ**）。どちらも**ログイン中の人の暗証番号（`users.pin_code`）**を確かめる
+  - 呼ぶのは **`_stockRpc()` の1箇所だけ**。⚠️ **`sbFetch` を使わない**（送った中身＝暗証番号・パスワードを操作ログ `kmtLog` に残すため）
+  - 見せておくのは `STOCK_SECRET_SHOW_MS`(5分) だけ。画面を離れたら手元から消す（`_stockHideSecrets()`）
+  - ⚠️ **kmt.html に ID・パスワードを1文字も書かない**（公開リポジトリのため）
+  - ⚠️ 暗証番号（`users.pin_code`）自体は公開キーで読めるつくりなので、**技術的に知識のある人が公開キーを使えば取り出せる**。
+    本当に守るには Supabase Auth でのログインに変える必要がある（いまはそこまでしていない）
+- 左メニューの「空き n/3」は `updateStockBadge()`。起動時に `startStockBadge()` が読み、`STOCK_BADGE_MS`(60秒) ごとに読み直す。
+  画面を開いているあいだは `STOCK_POLL_MS`(20秒) ごと
+- 使っている人のオンライン／離席は `userPresence`（🟢 だれがいま使っているか の節）をそのまま見る
+
 ### 大房行政書士法人 案件システムとの連携
 
 KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕組み。
