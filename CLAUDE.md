@@ -3025,9 +3025,13 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - 実体は **`workers.jp_addresses`**（jsonb の `[{address, from, to}]`）。**終了日が空の行が現住所**で、
   従来の `jp_address` にも写す（`_jpAddrSyncHidden()`。決定報告・履歴書などが今までどおり `jp_address` を見るため）
 - 画面の行は **`_jpAddrRows` の1箇所**に持ち、描くのは `renderJpAddrRows()` の1箇所
-- ↕ **並び順は変えられる**＝ 行ごとの ▲▼（`moveJpAddrRow(i, d)`。ボタンは `_jpAddrMoveBtn()`）／
-  ［📅 新しい順に並べる］（`sortJpAddrRows()`＝現住所を先頭 → いつからの新しい順・空欄は最後）。
+- ↕ **並び順は行の左の ⠿ をつかんで上下に引っぱって変える**（`jpAddrDragStart` → `jpAddrDragMove` → `jpAddrDragEnd` の1組）。
   **並べた順のまま `jp_addresses` に入る**（保存は人材詳細の 💾 保存）
+  - ⚠️ **`pointer` イベントで書く**（マウスも指も同じ処理）。つかめるのは ⠿（`.jpaddr-grip`＝`touch-action:none`）だけ＝
+    入力欄の中はつかめない（文字を選べなくなるため）
+  - 動かしている行は `translateY` でついてくるだけ。**`_jpAddrRows` を書き替えるのは指を離したときの1回だけ**
+    （途中で描き直すとつかんでいる行が作り直されて離れる）。落とす位置は青い線（`#jpAddrDropLine`）
+  - ▲▼ ボタンと［📅 新しい順に並べる］は**外した**（⠿ だけにしてと言われた）。増やし直さないこと
 
 ### 👤 外国人材【8. 支援情報】の担当を選ぶ欄
 
