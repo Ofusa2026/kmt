@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT業務管理システム</title>
-<!-- KMT_VERSION ver.20260930.23 -->
+<!-- KMT_VERSION ver.20260930.24 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -138,6 +138,8 @@ span[data-fe]:hover,div[data-fe]:hover{outline:2px solid #fcd34d;outline-offset:
 #gnEditor .jn-body{min-height:calc(100vh - 380px);}
 #gnEditor .jn-card{margin-bottom:0;}
 .jn-body a.jn-file:hover{background:#eff6ff;border-color:#93c5fd;}
+#jnFileDel{position:fixed;z-index:2147483002;display:none;width:20px;height:20px;border-radius:50%;border:1.5px solid #fca5a5;background:#fff;color:#dc2626;font-size:12px;font-weight:800;line-height:1;cursor:pointer;padding:0;box-shadow:0 1px 4px rgba(0,0,0,.18);align-items:center;justify-content:center;}
+#jnFileDel:hover{background:#dc2626;color:#fff;border-color:#dc2626;}
 .jn-body{min-height:120px;padding:12px;font-size:13px;line-height:1.7;color:#1e3a5f;outline:none;}
 .jn-body:focus{background:#FEFEFF;}
 .jn-table{border-collapse:collapse;margin:8px 0;width:auto;table-layout:fixed;}
@@ -45089,6 +45091,56 @@ document.addEventListener('click', e => {
   e.preventDefault();
   window.open(a.getAttribute('href'), '_blank', 'noopener');
 });
+/* 🗑 本文のファイルのリンク（`.jn-file`）を消す＝ マウスを乗せると右上に赤い［✕］が出る。
+   **出し入れは `_jnFileDelShow()`、消すのは `jnFileDelete()` の1箇所だけ**（消す前に1回たずねる）。
+   ［✕］は表の［＋］［−］と同じく `document.body` に置く（チップ自体の HTML は変えない＝保存ずみのノートにもそのまま効く）。
+   本文から消したファイルが本文のどこにも残らなければ、下の📎添付の一覧からも外す（ドライブのファイルは残る） */
+let _jnFileDelEl = null, _jnFileDelCur = null;
+function _jnFileDelShow(a) {
+  if (!_jnFileDelEl) {
+    _jnFileDelEl = document.createElement('button');
+    _jnFileDelEl.id = 'jnFileDel'; _jnFileDelEl.type = 'button';
+    _jnFileDelEl.textContent = '✕'; _jnFileDelEl.title = 'このファイルを本文から削除します';
+    _jnFileDelEl.addEventListener('pointerdown', e => e.preventDefault());   // ノートのカーソルを動かさない
+    _jnFileDelEl.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); jnFileDelete(); });
+    document.body.appendChild(_jnFileDelEl);
+  }
+  _jnFileDelCur = a || null;
+  if (!a) { _jnFileDelEl.style.display = 'none'; return; }
+  const r = a.getBoundingClientRect();
+  Object.assign(_jnFileDelEl.style, { display:'flex', left:(r.right - 12) + 'px', top:(r.top - 9) + 'px' });
+}
+document.addEventListener('pointermove', e => {
+  const t = e.target;
+  if (t === _jnFileDelEl) return;
+  const a = t && t.closest ? t.closest('.jn-body a.jn-file') : null;
+  const body = a && a.closest('.jn-body');
+  _jnFileDelShow(body && body.isContentEditable ? a : null);
+});
+document.addEventListener('scroll', () => { if (_jnFileDelCur) _jnFileDelShow(null); }, true);
+function jnFileDelete() {
+  const a = _jnFileDelCur;
+  _jnFileDelShow(null);
+  if (!a || !a.isConnected) return;
+  const name = (a.textContent || '').replace(/^\s*\S+\s/, '').trim() || 'このファイル';
+  if (!confirm('「' + name + '」をノートの本文から削除しますか？\n（Google ドライブのファイル自体は残ります）')) return;
+  const url = a.getAttribute('href') || '';
+  const body = a.closest('.jn-body');
+  const nx = a.nextSibling;   // チップのうしろに入れた空白（&nbsp;）も1つ消す
+  if (nx && nx.nodeType === 3 && nx.data.charAt(0) === '\u00a0') nx.data = nx.data.slice(1);
+  a.remove();
+  const noteId = body && body.closest('.jn-card')?.dataset.note;
+  if (!noteId) return;
+  // 📎 本文のどこにも残っていなければ、添付の一覧からも外す
+  const still = Array.from(body.querySelectorAll('a.jn-file')).some(x => x.getAttribute('href') === url);
+  const scope = _noteScopeOf(noteId);
+  const n = scope && (NOTE_SCOPES[scope].get() || []).find(x => x.id === noteId);
+  if (n && url && !still && Array.isArray(n.attachments)) {
+    const i = n.attachments.findIndex(x => x && x.url === url);
+    if (i >= 0) { _noteSnapAtt(noteId, n); n.attachments.splice(i, 1); _noteAttRender(scope, noteId); }
+  }
+  markJobNoteDirty(noteId);
+}
 /* 🔗 URLをリンクとして添付する（アップロードしない）。本文のカーソルの位置にも入れる */
 async function addNoteLink(scope, noteId) {
   const s = NOTE_SCOPES[scope]; if (!s) return;
@@ -59086,6 +59138,9 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20260930.24', date:'2026-09-30', notify:true, screens:['group_notes','jobs','candidates'], items:[
+    '🗑 ノートの本文に入れたファイル（📕 ○○.pdf のボタン）にマウスを乗せると、右上に赤い［✕］が出るようにしました。押すと「削除しますか？」と確認が出て、OKで本文から消えます（下の📎添付の一覧からも外れます。Google ドライブのファイル自体は残ります）。社内ノートは［💾 保存］で確定します',
+  ]},
   { version:'ver.20260930.23', date:'2026-09-30', notify:true, screens:['group_notes','notices'], items:[
     '📒 左メニューの「社内ノート」の場所を、📋 社内共有事項 のすぐ下（🔑 STOCK共有 の上）に移しました',
     '▦ アナウンスを作る画面の表でも、社内ノートと同じように罫線を引っぱって幅・高さを変えたり、［＋］［−］で行・列を足したり消したりできるようにしました（求人ノート・候補者メモはすでに同じ操作ができます）',
