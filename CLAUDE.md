@@ -3870,6 +3870,17 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - 「各チーム」以外を選んだときは **保存で `target_team` を null にする**（前の値が残らないように）
 - 削除は**論理削除**（`is_deleted`）で、消す前に `_confirmDeleteTwice()` で2回たずねる
 
+### 📋 社内共有事項のカテゴリー（分野ごと・国籍ごと）とたたみ
+
+- **2段目を選ぶカテゴリーは `NOTICE_SUB_CATS` の1箇所だけ**（`分野ごと`＝`SSW_FIELD_LIST`／`国籍ごと`＝`CAND_NATIONALITIES`＋その他）。
+  絞り込み・登録画面（`nm_`）・自分のメモ（`mn_`）が同時に追従する。欄を作り直すのは `_noticeSubcatSync(prefix)`、
+  選択肢は `_noticeSubOptionsHtml()`（一覧に無い古い値は「（旧）」を付けて先頭に残す）
+  - ⚠️ **分野の一覧を別に持たない**＝ 人材情報の【分野】と同じ `SSW_FIELDS` を見る（特定技能の分野が増えたらそこだけ直す）
+  - 旧 `NOTICE_FIELDS_19`（古い名前・重複あり）はやめた。提携先の「主な職種」だけは前の一覧のまま（`IRO_MAIN_INDUSTRY_OPTS`）
+- 🔽 **1件ずつたためる。既定は開いたまま**。たたんだものは `localStorage`（`kmt_notice_min_<user_id>`）に覚える
+  （**判定は `_noticeMinSet()` の1箇所**、たたんだ1行＝タイトル・投稿者・日付は `_noticeMinCardHtml()`）。
+  ［▾ すべて開く］／［▸ すべてたたむ］（`setAllNoticeMin`）は**いま一覧に出ているぶんだけ**（`_noticeVisibleIds`）
+
 ### 📝 システムに依頼・要望等の記入シート
 
 - サイドバーの**全体アラート（`sidebarAlerts`）とアナウンス確認（`announcementAlerts`）の間**のボタン。
