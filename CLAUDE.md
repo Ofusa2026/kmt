@@ -3480,6 +3480,18 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - **通った画面を覚えるのは `_navStack` の1箇所だけ**（画面キーの配列。新しいものが末尾）。
   `showScreen()` が画面を変えるたびに、**変える前の画面**を `_navPush()` で1つ積む
   （上限は `NAV_STACK_MAX`(50)）
+- 🪜 **画面の中の切り替え（タブ・最初の画面 → 様式 など）も戻れる。** `_navStack` には
+  画面キーの文字（画面ごと移った）と `{ screen, label, restore }`（同じ画面の中で切り替えた）の2種類が積まれる
+  - **画面の中の切り替えを積むのは `navPushSub(label, restore)` の1箇所だけ**＝ 切り替える**前**に呼ぶ。
+    `restore` は前の状態に戻す関数で、**false を返すと戻るのを取り消す**（未保存のときなど）
+  - 1つの操作で何度呼ばれても積むのは1回（`NAV_SUB_MERGE_MS` 以内の同じ画面はまとめる）。
+    **画面を開いた直後（`_navScreenAt` から `NAV_SUB_MERGE_MS` 以内）の切り替えは積まない**＝ 画面の初期化はその画面への移動と1つ
+  - 戻すときは `_navGoPrev()` が `restore()` を呼ぶ（その画面にいなければ先に開く）。戻している間は `_navPopping` で積まない
+  - いまつないでいるのは＝ 随時届出の書類生成（`_zgNavMark()`＝最初の画面・様式・人材リスト／書類を作る・タブ。
+    `_zg` を丸ごと控えるので入力中の中身も戻る）／外国人材のタブ（`switchWorkersScreenTab`）／
+    求人管理の表示（`setJobView`）／候補者の表示（`setCandView`）／社内共有事項のタブ（`switchNoticeTab`）／
+    記録簿の【記録の一覧／作成済みの書類／署名リンク】（`setRegView`）／随時届出のQ&Aのタブ（`setZjTab`）。
+    **ほかの画面の中の切り替えも、切り替える前に `navPushSub()` を1行足すだけで戻れるようになる**
 - ⚠️ **URL は変えない**＝ `history.pushState` に `location.href` をそのまま渡す。
   ハッシュを使うと `#jobform=` / `#candform=` / `#regsign=` / `#hearing` の外部リンクが壊れる
 - ⚠️ **［← 戻る］は `history.back()` を呼ぶだけ**にして、実際の切り替えは **`popstate` の1箇所**でやる
