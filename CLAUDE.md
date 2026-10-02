@@ -4073,6 +4073,16 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   - 📘 **登録支援機関業務へ移るときは必ず `zjGoReg(reg)` を通す**＝ 移る前に「別のページで作ります」と1回たずねる（いきなり移ると驚くため。保存していない書類があればそれも出す）
   - 👤 **［🖨️ 書類を作る］は人材でも探せる**＝ 探すのは `_zgRenderWkHits()`（`#zgWkHits` だけ描き直す。全人材は `_zgLoadAllWks()` で1回だけ読む）、
     入れるのは `zgPickWkAny(id)` の1箇所（所属機関が違えば切り替える／`wk` の様式は ① の人材に、別紙（`rows`）は1行足す）。人材の列は `ZG_WK_COLS`
+  - 📋 **人材リストで管理（届出状況）＝ `ZG_FORMS[no].list` を書いた様式だけ**（いまは 3-3-2＝`{ bucket:'out' }`）。
+    その様式を開くとまず【📋 人材リスト】（`_zg.view`＝`list`／`doc`。出し分けは **`_zgApplyView()` の1箇所**、切り替えは `setZgView()`）
+    - 列は `ZG_LIST_COLS`（所属機関／外国人材／ステータス／担当＝所属機関のメイン・サブ（`coOfRow`）／届出状況／書類）。見出しを押すと並べ替え
+    - 人材の枠は `workerBucket()` をそのまま使う（`ZG_LIST_BUCKETS`。最初は `list.bucket`＝➖ 支援外人材、🤝 支援・📦 過去・🗂 すべて にも切り替えられる）
+    - **届出状況の選択肢は `ZG_FILE_STATUSES` の1箇所だけ**（⬜ 未提出（既定）→ 📝 作成中 → ✅ 提出済み）。
+      実体は **`zuiji_filings`**（様式 × 人材で1行・一意は `form_no,worker_id`＝`SB_UPSERT_KEYS`）。**書くのは `zgSetFiling()` の1箇所だけ**＝
+      作成中は `made_at` / `made_by`、提出済みは `filed_at` / `filed_by` を入れ、変えるたびに `log` に1行足す（🕘 履歴＝`openZgFilingLog()`）
+    - 行の［🖨️ 書類を作る］＝ `zgListMake()`（その人材で新しく作る）／［📄 保存した書類］＝ その人材のいちばん新しい `zuiji_docs`
+    - **書類を保存すると、未提出の人は自動で作成中に進む**（`zgSave` の中の1箇所）
+    - ⚠️ 検索欄は作り直さない（`#zgListChips` / `#zgListHead` / `#zgListRows` だけ描き直す＝ `_zgRenderListBody()`）
   - 🎨 **画面の色はアプリのメイン（水色 `#DCEBFA` と白）にそろえる**（`ZG_UI_CSS`）。濃い紺・濃いグレーは目が疲れると言われた
   - 様式番号は「3-1-1」「3-1別紙」「3-6別紙1」の形。画面の言い方（第３－１－１号（別紙））は `_zjFormLabel()`、並び順は `_zjFormSortKey()`
   - ⚠️ こちら（Claude）の環境からは Supabase に直接書けなかったので、ファイルは**画面から取り込む**作りにしてある
