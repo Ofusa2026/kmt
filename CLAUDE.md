@@ -1403,12 +1403,12 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   | `night_shift_count` 夜勤の回数（月） | 0回／1〜4回／4回以上 |
   | `temp_return_wish` 一時帰国希望 | 希望する／希望しない（⚠️ **希望するのときだけ タイミングと期間を聞く**＝下の節） |
   | `family_consent` 就労についての家族の同意 | 同意している／**相談中**／同意していない（⚠️ **相談中のときだけ【いつまでに結論が出ますか】を必須で聞く**＝下の節） |
-  | `health_status` 健康状態 | `HEALTH_STATUSES` の4つ（下の節） |
+  | `health_status` 健康状態 | `HEALTH_STATUSES` の5つ・チェック式（下の節） |
 
 - **保存先は今までどおりの1列**（列は増やさない）。足したのは
   `night_shift_count` / `health_note` / `skill_exam_item` /
   `cur_net_salary_base` / `cur_net_salary_overtime` / `lifestyle` /
-  `temp_return_timing` / `temp_return_period` / `family_consent_due` の9列だけ
+  `temp_return_timing` / `temp_return_period` / `family_consent_due` / `chronic_disease` の10列だけ
 
 #### 🏠 履歴書の住所は「本国住所」と「日本住所」の2つ
 
@@ -1552,22 +1552,34 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - 履歴書では**【就労についての家族の同意】のセルの中に小さく**出す（行を増やさない）
 - ⚠️ **項目名・選択肢・記入例は `EXT_FORM_I18N` にも足すこと**（本人が読む外部フォームに出る）
 
-#### 🏥 健康状態（4つ）と【病名】
+#### 🏥 健康状態（チェック式・5つ）と【病名】【持病名】
 
 - **選択肢は `HEALTH_STATUSES` の1箇所だけ**（`RESUME_OPTS.health_status` はこれを見るだけ）
-  ＝ ①良好（持病なし・入院歴なし・通院中ではない）＝`HEALTH_OK` ／②通院歴はあるが、完治している ／
-  ③入院歴はあるが、完治している ／④治療中
-- 🩺 **①以外を選んだときだけ【病名】の記入欄を出す**（`rf_health_note_box`。
+  ＝ ①良好（持病なし・入院歴なし・通院中ではない）＝`HEALTH_OK` ／②持病あり＝`HEALTH_CHRONIC` ／
+  ③通院歴はあるが、完治している ／④入院歴はあるが、完治している ／⑤治療中
+- ☑ **チェック式。①【良好】はほかと一緒に選べない**（選ぶとほかは外れて押せなくなる）。②〜⑤はいくつでも選べる
+  - 欄を作るのは **`healthFieldHtml(prefix, cur)` の1箇所**（履歴書作成の画面・【📝 履歴書作成】タブ（`rf_`）・
+    候補者情報タブ（`cf_`）・本人が書く外部リンク・📣 募集フォームが同時に追従する）。描き直しは `_healthRender(prefix)`、
+    チェックを押したときは `onHealthCbChange(prefix, el)`
+  - **保存先は今までどおり `candidates.health_status` の1列**。選んだものを **`HEALTH_SEP`（`／`）** でつなぐ
+    （⚠️ 選択肢の中に「、」があるので「、」では区切らない）。**読むのは `_healthParse()` の1箇所**
+  - 値は隠しの `<prefix>health_status` に入れて `input` を出す＝ 未保存の印・`cf_`⇄`rf_` の写し（`CAND_SYNC_FIELDS`）が今までどおり効く。
+    写したあとのチェックの描き直しは `_cndCopyField` の中
+  - ⚠️ **一覧に無い値（これまでの自由記入）はチェック済みのまま残す**（消さない）
+- 🩺 **②【持病あり】を選んだときだけ【持病名】の記入欄**（`rf_chronic_box`。保存先は `candidates.chronic_disease`）。
+  判定は **`_healthNeedsChronic()`**、履歴書に出す文字は `_healthChronicText()`
+- 🩺 **③〜⑤のどれかを選んだときだけ【病名】の記入欄を出す**（`rf_health_note_box`。
   保存先は今までどおり `candidates.health_note` の1列）。
   **出す状況は `HEALTH_NOTE_STATUSES` ＋ `_healthNeedsNote()` の1箇所だけ**で、
   欄の出し入れ（`onHealthStatusChange`）・履歴書に出すか（`_healthNoteText()`）・保存が同じものを見る
-  - ⚠️ **【病名】は記入必須。判定は `_healthNoteOk(prefix)` の1箇所だけ**で、
+  - ⚠️ **【病名】【持病名】は記入必須。判定は `_healthNoteOk(prefix)` の1箇所だけ**で、
     **履歴書の 💾保存（`saveResume`）／本人が書く履歴書作成リンクの送信（`submitCandForm`）／
     📣 募集フォームの送信（`submitApplyForm`）の3つが同じものを通る**
     （募集フォームは別のページから送られても止まるよう、集めた値（`_applyVals`）でも見る）
-  - ⚠️ **①【良好】に切り替えたら保存で空にする**（学歴の中退メモと同じ考え方）
+  - ⚠️ **当てはまらなくなったら保存で空にする**（学歴の中退メモと同じ考え方）
   - ⚠️ 昔の値（`あまりよくない` / `入院歴あり`）も `HEALTH_NOTE_OLD` に残してある＝
     すでに書いてある内容が履歴書から消えないようにするため。**移行はしない**
+- ⚠️ **項目名・選択肢・説明（`HEALTH_HINT`）は `EXT_FORM_I18N` にも足すこと**
 
 #### 🚬 ライフスタイル（複数選択）
 
