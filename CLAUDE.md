@@ -1410,6 +1410,16 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   `cur_net_salary_base` / `cur_net_salary_overtime` / `lifestyle` /
   `temp_return_timing` / `temp_return_period` / `family_consent_due` の9列だけ
 
+#### 🏠 履歴書の住所は「本国住所」と「日本住所」の2つ
+
+- 入力欄は `rf_home_country_address` / `rf_jp_address`（候補者情報タブ・📣 募集フォームと同じ2つ。
+  `CAND_SYNC_FIELDS` に `home_country_address` と `jp_address` の両方を入れてある）
+- **書類の行を作るのは `_resumeAddrRowsHtml(c)` の1箇所だけ**＝ 記入があるほうだけ出す（両方あれば2行）。
+  どちらも空なら手書き用に空の「本国住所」を1行だけ残す
+- > ⚠️ **過去の事故**: 以前は「現住所」の1欄で、`home_country_address || jp_address` を出していた。
+  > 日本住所しか無い候補者で履歴書を保存すると、**日本住所が本国住所の列に書き込まれていた**。
+  > 1欄にまとめ直さないこと
+
 #### 💴 履歴書の給料は「現職」と「希望」の2組
 
 | 画面の名前 | 列 |
