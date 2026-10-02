@@ -14928,7 +14928,7 @@ async function saveWorker(returnResult=false) {
     tokutei_six_year:   _tokutei6yOn(),        // ⭐ 通算在留期間6年（2号評価試験に不合格）
     request_date:     g('wf_request_date'),
     apply_date:       g('wf_apply_date'),
-    apply_number:     g('wf_apply_number'),
+    apply_number:     _vaNormNo(g('wf_apply_number')),   // ver.20261001.10: 全角/半角を揃える
     apply_memo:       g('wf_apply_memo') || null,
     card_info_done:   document.getElementById('wf_card_info_done')?.checked || false,
     jp_address_done:  document.getElementById('wf_jp_address_done')?.checked || false,
@@ -24430,6 +24430,7 @@ async function saveVaRow(id){
   const d = _vaDirty.get(id); if (!d) return;
   const r = _vaRows.find(x => x.id === id); if (!r) { _vaDirty.delete(id); return; }
   const patch = Object.assign({}, d, { updated_at:new Date().toISOString(), updated_by:_curUserName() });
+  if ('apply_number' in patch) patch.apply_number = _vaNormNo(patch.apply_number) || null;   // ver.20261001.10
   try {
     await sbFetch('visa_applications?id=eq.' + encodeURIComponent(id), { method:'PATCH', prefer:'return=minimal', body:JSON.stringify(patch) });
     Object.assign(r, patch);
@@ -24484,7 +24485,7 @@ const VA_FORM_FIELDS = [
   { k:'apply_date',   l:'申請日',      t:'date', req:true },
   { k:'apply_type',   l:'申請の種類',  t:'sel',  opts:VA_TYPES.map(x => x.v), req:true },
   { k:'status',       l:'ステータス',  t:'sel',  opts:VA_STATUSES, req:true },
-  { k:'apply_number', l:'申請番号',    t:'text', ph:'例) 東オンＥＶ26017662' },
+  { k:'apply_number', l:'申請番号',    t:'text', ph:'例) 東オンEV26017662', auto:'全角で入れても半角にそろえて保存します' },
   { k:'case_name',    l:'案件名',      t:'text' },
   { k:'visa_expiry',  l:'在留期限',    t:'date', auto:'人材情報から' },
   { k:'tokurei_date', l:'特例期間',    t:'date', auto:'在留期限＋2ヶ月で自動' },
@@ -24523,6 +24524,29 @@ function _vaWkOptionsHtml(coId, sel){
       + esc((w.management_no ? w.management_no + '　' : '') + (w.name || '')) + '</option>').join('');
 }
 function _vaNorm(s){ return String(s || '').replace(/[\s　]/g, '').toLowerCase(); }
+/* ver.20261001.10: 申請番号の全角/半角ぶれを揃える（半角・大文字・空白なし）。
+   ⚠️ DB側にも同じ揃え方のトリガー（kmt_norm_apply_no）があるので、どこから保存しても半角になる。ここは画面表示と重複確認用 */
+function _vaNormNo(s){
+  const t = String(s == null ? '' : s)
+    .replace(/[Ａ-Ｚａ-ｚ０-９－]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+    .replace(/[\s　]+/g, '').toUpperCase();
+  return t;
+}
+/* 同じ申請番号の申請記録がもうあるか（削除済み・自分自身は除く）→ あれば確認。OK=保存してよい */
+async function _vaConfirmDup(no, selfId){
+  if (!no) return true;
+  let d = [];
+  try {
+    d = await sbFetch('visa_applications?apply_number=eq.' + encodeURIComponent(no)
+      + '&select=id,worker_name,apply_date,apply_type,status,created_by,created_at,is_deleted') || [];
+  } catch(e) { return true; }   // 確認できないときは止めない
+  d = d.filter(x => !x.is_deleted && x.id !== selfId);
+  if (!d.length) return true;
+  const lines = d.map(x => '・' + (x.worker_name || '') + '（申請日 ' + (x.apply_date || '-') + '／' + (x.apply_type || '-') + '／' + (x.status || '-')
+    + '）登録：' + (x.created_by || '-') + ' ' + String(x.created_at || '').slice(0,10)).join('\n');
+  return confirm('⚠️ 同じ申請番号「' + no + '」の申請記録がすでにあります。\n\n' + lines
+    + '\n\n同じ申請を2回登録していないか確認してください。\nそれでも保存しますか？（OK＝保存する／キャンセル＝やめる）');
+}
 function setVaCoSearch(v){
   _vaPick.coQ = v;
   const sel = document.getElementById('vaf_company_id');
@@ -24580,6 +24604,7 @@ function openVaForm(id){
     +     '<select class="form-select" id="vaf_worker_id" onchange="vaFormPickWorker()">'
     +       '<option value="">── 人材を選ぶ ──</option>' + _vaWkOptionsHtml(_vaPick.co, r.worker_id || '') + '</select>'
     +     '<div id="vaf_worker_info" style="font-size:11px;color:var(--gray-500);margin-top:4px;"></div></div>'
+    +   _vaAnsysBlockHtml()
     +   VA_FORM_FIELDS.map(f).join('')
     + '</div>'
     + '<div style="display:flex;gap:8px;align-items:center;margin-top:14px;padding-top:12px;border-top:1px solid var(--gray-200);">'
@@ -24592,11 +24617,161 @@ function openVaForm(id){
   showGenModal('vaFormModal', id ? '📄 申請記録' : '📄 申請を追加', body);
   if (id && r.updated_at) renderSaveMeta('sm_va', r.updated_at, r.updated_by);
   vaFormPickWorker(true);
+  _vaAnsysInit(r);   // ver.20261001.9: アンシスの入管記録（受付番号・申請中証明・預かり証）
   // ⚠️ allCompanies は起動直後はまだ空のことがある。届いたら企業の欄だけ作り直す
   ensureCompaniesLoaded().then(() => {
     const sel = document.getElementById('vaf_company_id');
     if (sel) sel.innerHTML = '<option value="">── 企業を選ぶ ──</option>' + _vaCoOptionsHtml(_vaPick.co);
   }).catch(() => {});
+}
+/* ===========================================================================
+   ver.20261001.9: 🔗 アンシス（大房 案件管理システム）の入管記録から入れる
+   ・元データは大房DBの `receipt_archive`（受付番号の入った入管記録）＋ `cases` ＋ `persons`。読み取りだけ（ofusaFetch）
+   ・氏名で探す → 1件えらぶと 申請番号・申請日・申請の種類・在留期限・特例期間・在留カード番号 を入れる
+     （申請番号・申請日・種類はアンシスの値で入れ直す。ほかは空いている欄だけ）
+   ・KMTの人材がまだ選ばれていなければ、同じ氏名の人材が1人だけのときに自動で選ぶ
+   ・申請中証明・預かり証は persons.application_cert_pdf_urls / custody_receipt_pdf_urls の最新を「開く／⬇」
+   ・保存済みの申請は「申請番号」でアンシスを引き直して書類を出す（KMT側には何も増やさない）
+   ========================================================================= */
+let _vaAnsys = { seq:0, rows:[], picked:null };
+function _vaAnsysBlockHtml(){
+  return '<div class="form-group full" style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:10px;padding:10px 12px;">'
+    + '<label class="form-label" style="color:#6d28d9;">🔗 アンシスの入管記録から入れる</label>'
+    + '<div style="display:flex;gap:6px;">'
+    +   '<input class="form-input" id="vaf_ans_q" placeholder="🔍 氏名（ローマ字）で検索" style="flex:1;" '
+    +     'oninput="clearTimeout(window._vaAnsT);window._vaAnsT=setTimeout(()=>_vaAnsysSearch(this.value),400)">'
+    + '</div>'
+    + '<div style="font-size:9.5px;color:#7c3aed;margin-top:2px;">＊受付番号が入っている申請だけ出ます。えらぶと申請番号・申請日・種類・在留期限・特例期間・在留カード番号が入ります</div>'
+    + '<div id="vaf_ans_list" style="margin-top:6px;"></div>'
+    + '<div id="vaf_ans_docs" style="margin-top:6px;"></div>'
+    + '</div>';
+}
+function _vaDriveDl(u){
+  const m = String(u||'').match(/\/file\/(?:u\/\d+\/)?d\/([A-Za-z0-9_-]{10,})/) || String(u||'').match(/[?&]id=([A-Za-z0-9_-]{10,})/);
+  return m ? ('https://drive.google.com/uc?export=download&id=' + m[1]) : '';
+}
+function _vaLastUrl(arr){ return (Array.isArray(arr) && arr.length) ? (arr[arr.length-1].url || '') : ''; }
+// receipt_archive の行に cases / persons をくっつける
+async function _vaAnsysJoin(recs){
+  const ids = Array.from(new Set((recs || []).map(r => r.case_id).filter(Boolean)));
+  let cs = [], ps = [];
+  if (ids.length) {
+    const il = ids.map(encodeURIComponent).join(',');
+    [cs, ps] = await Promise.all([
+      ofusaFetch('cases?id=in.(' + il + ')&select=id,app_type,residence_status,status,company,org,expire,tokurei_date'),
+      ofusaFetch('persons?case_id=in.(' + il + ')&select=case_id,applicant_name_en,birthdate,residence_card,application_cert_pdf_urls,custody_receipt_pdf_urls'),
+    ]);
+  }
+  return (recs || []).map(r => Object.assign({}, r, {
+    c: (cs || []).find(x => x.id === r.case_id) || {},
+    p: (ps || []).find(x => x.case_id === r.case_id) || {},
+  }));
+}
+async function _vaAnsysSearch(q, auto){
+  const box = document.getElementById('vaf_ans_list'); if (!box) return;
+  const qi = document.getElementById('vaf_ans_q');
+  if (auto && qi) qi.value = q || '';
+  const words = String(q || '').replace(/[（(].*?[）)]/g, ' ').trim().split(/[\s　]+/).filter(Boolean);
+  if (!words.length || words.join('').length < 2) { box.innerHTML = ''; _vaAnsys.rows = []; return; }
+  const seq = ++_vaAnsys.seq;
+  box.innerHTML = '<div style="font-size:11px;color:var(--gray-400);">アンシスを検索中…</div>';
+  try {
+    const pat = '*' + words.join('*') + '*';
+    const recs = await ofusaFetch('receipt_archive?name=ilike.' + encodeURIComponent(pat)
+      + '&case_no=not.is.null&case_no=neq.&select=id,name,date,application_date,case_no,case_id,drive_url,pdf_done&order=created_at.desc&limit=15');
+    if (seq !== _vaAnsys.seq) return;
+    const rows = await _vaAnsysJoin(recs);
+    if (seq !== _vaAnsys.seq) return;
+    _vaAnsys.rows = rows;
+    if (!rows.length) { box.innerHTML = '<div style="font-size:11px;color:var(--gray-400);">― アンシスに受付番号の入った入管記録はありません</div>'; return; }
+    box.innerHTML = rows.map((x, i) => {
+      const d = (x.application_date || String(x.date || '').slice(0,10) || '');
+      const sel = _vaAnsys.picked && _vaAnsys.picked.id === x.id;
+      return '<div onclick="_vaAnsysPick(' + i + ')" style="cursor:pointer;display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:5px 8px;margin-bottom:3px;border-radius:7px;font-size:11.5px;'
+        + (sel ? 'background:#ede9fe;border:1px solid #8b5cf6;' : 'background:#fff;border:1px solid #e9d5ff;') + '">'
+        + '<b>' + esc(x.name || '') + '</b>'
+        + '<span style="color:#b91c1c;font-weight:700;">' + esc(x.case_no || '') + '</span>'
+        + '<span style="color:var(--gray-500);">' + esc(d) + '</span>'
+        + (x.c.app_type ? '<span style="padding:0 6px;border-radius:5px;background:#f1f5f9;">' + esc(x.c.app_type) + (x.c.residence_status ? '・' + esc(x.c.residence_status) : '') + '</span>' : '')
+        + '<span style="color:var(--gray-500);">' + esc(x.c.company || '') + '</span>'
+        + (sel ? '<span style="margin-left:auto;color:#6d28d9;font-weight:700;">✓ 入れました</span>' : '<span style="margin-left:auto;color:#7c3aed;">えらぶ ›</span>')
+        + '</div>';
+    }).join('');
+  } catch(e) {
+    if (seq !== _vaAnsys.seq) return;
+    box.innerHTML = '<div style="font-size:11px;color:#b91c1c;">検索エラー（アンシスDBに接続できません）</div>';
+    console.error('[va ansys]', e);
+  }
+}
+// アンシスの申請種別 → KMTの「申請の種類」
+function _vaAnsysType(c){
+  const at = (c.app_type || '').trim(), rs = (c.residence_status || '');
+  if (rs.indexOf('特定活動') >= 0) return at === '更新' ? '特活更新' : (at === '変更' ? '特活' : at);
+  if (rs.indexOf('2号') >= 0 && at === '変更') return '2号申請';
+  return at;
+}
+function _vaAnsysPick(i){
+  const x = _vaAnsys.rows[i]; if (!x) return;
+  _vaAnsys.picked = x;
+  const set  = (k, v) => { const el = document.getElementById('vaf_' + k); if (el && v) { if (el.tagName === 'SELECT' && !Array.from(el.options).some(o => o.value === v)) el.add(new Option(v, v)); el.value = v; } };
+  const fill = (k, v) => { const el = document.getElementById('vaf_' + k); if (el && !el.value && v) el.value = v; };
+  set('apply_number', _vaNormNo(x.case_no || ''));   // ver.20261001.10: アンシスは全角なので半角に揃える
+  set('apply_date', x.application_date || String(x.date || '').slice(0,10));
+  set('apply_type', _vaAnsysType(x.c));
+  fill('status', '審査中');
+  fill('visa_expiry', x.c.expire || '');
+  fill('tokurei_date', x.c.tokurei_date || vaTokureiOf(x.c.expire || ''));
+  fill('residence_card_no', x.p.residence_card || '');
+  // KMTの人材がまだなら、同じ氏名の人材が1人だけのときに選ぶ
+  const ws = document.getElementById('vaf_worker_id');
+  if (ws && !ws.value) {
+    const n = _vaNorm(x.name);
+    const hit = (allWorkers || []).filter(w => !_isTestWorker(w) && _vaNorm(String(w.name || '').replace(/[（(].*?[）)]/g, '')) === n);
+    if (hit.length === 1) {
+      _vaPick.co = hit[0].company_id || ''; _vaPick.wkQ = '';
+      ws.innerHTML = '<option value="">── 人材を選ぶ ──</option>' + _vaWkOptionsHtml('', hit[0].id);
+      ws.value = hit[0].id; vaFormPickWorker();
+    } else {
+      showToast(hit.length ? '⚠️ 同じ氏名の人材が' + hit.length + '人います。人材を選んでください' : '⚠️ KMTに同じ氏名の人材が見つかりません。人材を選んでください');
+    }
+  }
+  _vaAnsysDocs(x);
+  _vaAnsysSearch(document.getElementById('vaf_ans_q')?.value || x.name);   // ✓表示を付け直す
+  showToast('✅ アンシスの入管記録から入れました（保存を押すと登録されます）', 'success');
+}
+// 申請中証明・預かり証（開く／⬇ダウンロード）
+function _vaAnsysDocs(x){
+  const el = document.getElementById('vaf_ans_docs'); if (!el) return;
+  if (!x) { el.innerHTML = ''; return; }
+  const btn = (url, bg, label, wip) => {
+    if (!url && wip) return '<span style="font-size:11px;padding:5px 10px;border-radius:7px;background:#fef3c7;color:#a16207;">⏳ ' + label + '（アンシスで準備中）</span>';
+    if (!url) return '<span style="font-size:11px;padding:5px 10px;border-radius:7px;background:#f1f5f9;color:#94a3b8;">— ' + label + '（アンシスで未作成）</span>';
+    const dl = _vaDriveDl(url);
+    return '<span style="display:inline-flex;gap:2px;">'
+      + '<a href="' + esc(url) + '" target="_blank" rel="noopener" style="font-size:11px;padding:5px 10px;border-radius:7px 0 0 7px;background:' + bg + ';color:#fff;font-weight:700;text-decoration:none;">' + label + 'を開く</a>'
+      + (dl ? '<a href="' + esc(dl) + '" title="' + label + 'をダウンロード" style="font-size:11px;padding:5px 9px;border-radius:0 7px 7px 0;background:' + bg + ';color:#fff;font-weight:700;text-decoration:none;opacity:.85;">⬇</a>' : '')
+      + '</span>';
+  };
+  el.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">'
+    + '<span style="font-size:11px;color:var(--gray-500);">' + esc(x.case_no || '') + '：</span>'
+    + btn(x.drive_url || '', '#dc2626', '📄 受付番号', !!x.pdf_done)   // ver.20261001.11
+    + btn(_vaLastUrl(x.p.application_cert_pdf_urls), '#2563eb', '🪪 申請中証明')
+    + btn(_vaLastUrl(x.p.custody_receipt_pdf_urls), '#7c3aed', '📋 預かり証')
+    + '</div>';
+}
+// 開いたとき：保存済みの申請番号でアンシスを引き直す
+async function _vaAnsysInit(r){
+  _vaAnsys = { seq:0, rows:[], picked:null };
+  const no = (r && r.apply_number || '').trim();
+  const noZ = no.replace(/[A-Za-z]/g, c => String.fromCharCode(c.charCodeAt(0) + 0xFEE0));   // アンシス側は英字だけ全角（数字は半角）
+  if (!no) return;
+  try {
+    const recs = await ofusaFetch('receipt_archive?case_no=in.(' + encodeURIComponent('"' + no + '"') + ',' + encodeURIComponent('"' + noZ + '"') + ')'
+      + '&select=id,name,date,application_date,case_no,case_id,drive_url,pdf_done&order=created_at.desc&limit=1');
+    const rows = await _vaAnsysJoin(recs);
+    if (rows.length) { _vaAnsys.picked = rows[0]; _vaAnsysDocs(rows[0]); }
+    else { const el = document.getElementById('vaf_ans_docs'); if (el) el.innerHTML = '<div style="font-size:11px;color:var(--gray-400);">― この申請番号はアンシスの入管記録にありません</div>'; }
+  } catch(e) { console.error('[va ansys init]', e); }
 }
 // 特例期間は在留期限から自動（空のときだけ）
 function vaFormTokurei(){
@@ -24610,6 +24785,7 @@ function vaFormPickWorker(initial){
   const info = document.getElementById('vaf_worker_info');
   const w = (allWorkers || []).find(x => x.id === id);
   if (!w) { if (info) info.textContent = ''; return; }
+  if (!initial && !_vaAnsys.picked) _vaAnsysSearch(w.name || '', true);   // ver.20261001.9
   const co = coOfRow(w) || {};
   // 企業を選ばずに人材を直接えらんだときは、企業の欄もその人材の企業に合わせる
   const cs = document.getElementById('vaf_company_id');
@@ -24648,6 +24824,12 @@ async function saveVaForm(){
     nationality: w.nationality || null, industry: w.applicant_field || null,
     updated_at: new Date().toISOString(), updated_by: _curUserName() };
   VA_FORM_FIELDS.forEach(d => { row[d.k] = g(d.k) || null; });
+  row.apply_number = _vaNormNo(row.apply_number) || null;   // ver.20261001.10: 全角/半角を揃える
+  { const ne = document.getElementById('vaf_apply_number'); if (ne) ne.value = row.apply_number || ''; }
+  const cur0 = _vaEditId ? (_vaRows.find(x => x.id === _vaEditId) || {}) : {};
+  if (row.apply_number && _vaNormNo(cur0.apply_number) !== row.apply_number) {
+    if (!await _vaConfirmDup(row.apply_number, _vaEditId)) { showToast('保存をやめました'); return; }
+  }
   showLoading(true);
   try {
     if (_vaEditId) {
@@ -60349,6 +60531,17 @@ const WHATS_NEW = [
     '見出しの行（申請日・申請番号・申請人氏名…）が上に固定され、下へスクロールしても見えたままになります',
     '一覧の枠が画面の高さに合わさるので、横のスクロールバーがいつも画面の下に出ます（いちばん下まで行かなくても右側を見られます）',
     '「対応日」は押すだけで「今日の日付＋自分の名前」が入るボタンになりました（もう一度押すと取り消し）',
+  ]},
+  { version:'ver.20261001.11', date:'2026-10-01', notify:true, screens:['workers'], items:[
+    '📄 <b>申請受付番号のPDFも開く／⬇ダウンロードできるようになりました</b>。［＋ 申請を追加］でアンシスの入管記録をえらんだときと、保存した申請を［✏️ 開く］で開いたときに、申請中証明・預かり証の左に出ます（アンシスでPDFを作っている途中のものは「準備中」と出ます）。',
+  ]},
+  { version:'ver.20261001.10', date:'2026-10-01', notify:true, screens:['workers'], items:[
+    '🔢 <b>申請番号の全角・半角のちがいをなくしました</b>。全角で入れても（アンシスから入れたときも）<b>半角にそろえて保存</b>します。これまでに入っていた全角の番号もすべて半角にそろえました。',
+    '⚠️ <b>同じ申請番号の申請記録がすでにあるときは、保存の前に確認が出る</b>ようになりました。だれがいつ登録したかが出るので、同じ申請を2回登録していないか確かめてください。<b>OKを押せばそのまま保存できます</b>（これまでは英語のエラーで保存できませんでした）。',
+  ]},
+  { version:'ver.20261001.9', date:'2026-10-01', notify:true, screens:['workers'], items:[
+    '🔗 <b>申請記録の［＋ 申請を追加］で、アンシスの入管記録（受付番号が入ったもの）から入れられるようになりました</b>。氏名で検索してえらぶと、<b>申請番号・申請日・申請の種類・在留期限・特例期間・在留カード番号</b>が入ります。人材を先に選ぶと、その氏名で自動で探します。',
+    '📋 えらんだ申請の<b>申請中証明・預かり証</b>をその場で開く／⬇ダウンロードできます。保存した申請を［✏️ 開く］で開いたときも、申請番号から自動で出ます（アンシスでまだ作っていないものは「未作成」と出ます）。',
   ]},
   { version:'ver.20261001.8', date:'2026-10-01', notify:true, screens:['jobs'], items:[
     '📋 求人管理の右上に［📋 回答状況］を追加しました。求人登録リンク（求人情報ヒヤリングフォームなど）から届いた回答を一覧で確認できます',
