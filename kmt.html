@@ -47451,7 +47451,7 @@ const STOCK_AUTO_RELEASE_HOUR = null;      // 🚫 自動で空きに戻さな�
 const STOCK_POLL_MS = 20000;               // 画面を開いているあいだの読み直し
 const STOCK_BADGE_MS = 60000;              // 左メニューの「空き n/3」の読み直し
 const STOCK_LOG_LIMIT = 40;
-const STOCK_END_KINDS = { return:'返却', taken:'代わりに使用', auto:'自動で空きに', force:'管理者が空きに' };
+const STOCK_END_KINDS = { return:'返却', taken:'代わりに使用', auto:'自動で空きに', force:'空きに戻した' };
 let _stockAccts = [], _stockLog = [], _stockLoaded = false;
 let _stockSecrets = null, _stockPin = '', _stockShowPw = {};
 let _stockPollTimer = null, _stockBadgeTimer = null, _stockBusy = false;
@@ -47591,7 +47591,7 @@ async function stockReturn(id) {
 /* 🔐 返し忘れを管理者が空きに戻す（強制ログアウト）。**管理者だけ**（`requireAdmin()`）
    ⚠️ STOCK本体からログアウトさせるわけではない＝ この画面の表示を空きに戻すだけ。
    次の人が［使う］でログインした時点で、前の人はSTOCKからログアウトされる。
-   履歴には end_kind='force'・ended_by＝管理者の名前で残す（書くのは `_stockRelease()` の1箇所のまま） */
+   履歴には end_kind='force'・ended_by＝押した人のユーザー名で残す（「◯◯さんが空きに」）（書くのは `_stockRelease()` の1箇所のまま） */
 async function stockForceRelease(id) {
   if (!requireAdmin() || _stockBusy) return;
   _stockBusy = true;
@@ -47602,7 +47602,7 @@ async function stockForceRelease(id) {
     const k = await askChoice('🔐 ' + esc(a.name) + ' を空きに戻しますか？（管理者）',
       '<b>' + esc(a.holder_name) + '</b> さん（' + (pres ? pres + '・' : '') + _stockTime(a.since) + '〜・' + _stockDur(a.since) + '）の使用中を外して、<b>🟢 空き</b>に戻します。<br>'
       + '<span style="font-size:12px;color:var(--gray-600);">返し忘れのときに使ってください。次の人が［使う］でSTOCKにログインした時点で、'
-      + esc(a.holder_name) + ' さんはSTOCKからログアウトされます。<br>使用履歴には「🔐 管理者（' + esc(_curUserName()) + '）が空きに」と残ります。</span>',
+      + esc(a.holder_name) + ' さんはSTOCKからログアウトされます。<br>使用履歴には「🔐 ' + esc(_curUserName()) + 'さんが空きに」と残ります。</span>',
       [{ k:'no', label:'やめる' }, { k:'ok', label:'🔐 空きに戻す', primary:true, style:'background:#334155;border-color:#334155;' }]);
     if (k !== 'ok') return;
     if (await _stockRelease(a, 'force', _curUserName())) showToast('🔐 ' + a.name + ' を空きに戻しました', 'success');
@@ -47840,7 +47840,7 @@ function _stockCardHtml(a) {
 function _stockHowText(l) {
   return !l.ended_at ? '使用中'
     : l.end_kind === 'taken' ? (l.ended_by || '') + 'さんが代わりに使用'
-    : l.end_kind === 'force' ? '🔐 管理者（' + (l.ended_by || '') + '）が空きに'
+    : l.end_kind === 'force' ? '🔐 ' + (l.ended_by || '') + 'さんが空きに'
     : (STOCK_END_KINDS[l.end_kind] || '');
 }
 function _stockHowHtml(l) {
@@ -64344,7 +64344,7 @@ function _doForceReloadNow() {
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
   { version:'ver.20261005.2', date:'2026-10-05', notify:true, screens:['stock_accounts'], items:[
-    '🔐 STOCK共有：返し忘れたまま「使用中」になっているアカウントを、管理者が［🔐 空きに戻す（管理者）］で空きに戻せるようにしました。使用履歴には「管理者（◯◯）が空きに」と残ります',
+    '🔐 STOCK共有：返し忘れたまま「使用中」になっているアカウントを、管理者が［🔐 空きに戻す（管理者）］で空きに戻せるようにしました。使用履歴には「◯◯さんが空きに」と押した人の名前で残ります',
   ]},
   { version:'ver.20261005.1', date:'2026-10-05', notify:true, screens:[], items:[
     '🔴 左メニューで、アップデートがある項目の文字を赤くするのをやめました。アップデートがあるときは右の赤い●だけが出ます',

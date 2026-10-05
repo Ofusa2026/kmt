@@ -625,7 +625,7 @@ STOCK は同じアカウントに別の端末でログインすると前の人�
 | 実体 | 中身 |
 |---|---|
 | `stock_accounts` | 1行＝1アカウント（いまは3つ）。使用中＝`holder_id` / `holder_name` / `since`、最後に使った人＝`last_user` / `last_until` |
-| `stock_account_log` | 1回の利用＝1行。終わり方 `end_kind`＝ `return` 返却／`taken` 代わりに使用（`ended_by`）／`auto` 自動で空きに／`force` 管理者が空きに（`ended_by`＝管理者） |
+| `stock_account_log` | 1回の利用＝1行。終わり方 `end_kind`＝ `return` 返却／`taken` 代わりに使用（`ended_by`）／`auto` 自動で空きに／`force` 管理者が空きに戻した（`ended_by`＝押した人。履歴は「◯◯さんが空きに」＝「管理者」の文字は出さない） |
 | `stock_account_secrets` | **ID・パスワード。RLS を有効にしてポリシーなし＝公開キーから直接は読めない** |
 
 - **状態を決めるのは `_stockStateOf(a)` の1箇所**（`free`／`mine`／`busy`）。
