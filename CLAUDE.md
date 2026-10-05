@@ -625,7 +625,7 @@ STOCK は同じアカウントに別の端末でログインすると前の人�
 | 実体 | 中身 |
 |---|---|
 | `stock_accounts` | 1行＝1アカウント（いまは3つ）。使用中＝`holder_id` / `holder_name` / `since`、最後に使った人＝`last_user` / `last_until` |
-| `stock_account_log` | 1回の利用＝1行。終わり方 `end_kind`＝ `return` 返却／`taken` 代わりに使用（`ended_by`）／`auto` 自動で空きに |
+| `stock_account_log` | 1回の利用＝1行。終わり方 `end_kind`＝ `return` 返却／`taken` 代わりに使用（`ended_by`）／`auto` 自動で空きに／`force` 管理者が空きに（`ended_by`＝管理者） |
 | `stock_account_secrets` | **ID・パスワード。RLS を有効にしてポリシーなし＝公開キーから直接は読めない** |
 
 - **状態を決めるのは `_stockStateOf(a)` の1箇所**（`free`／`mine`／`busy`）。
@@ -637,6 +637,10 @@ STOCK は同じアカウントに別の端末でログインすると前の人�
   ⚠️ **書くときは必ず「いまの holder_id」を条件に付ける**（`holder_id=eq.◯` ／ 空きを取るときは `holder_id=is.null`）＝
   同時に2人が押しても片方だけが通る。返りが0件なら「先にほかの人が…」と知らせる
 - 入口は `stockUse(id)`（空き → 使う ／ 使用中 → `askChoice` で確認してから代わりに使う）と `stockReturn(id)`
+- 🔐 **返し忘れを管理者が空きに戻す＝ `stockForceRelease(id)`**（`requireAdmin()`）。ほかの人が使用中のカードに
+  管理者だけ［🔐 空きに戻す（管理者）］が出る（`.stk-force`）。確認を1回出してから `_stockRelease(a, 'force', 管理者名)` を通す
+  - ⚠️ **STOCK本体からログアウトさせるわけではない**（この画面の表示を空きに戻すだけ。次の人がログインした時点で前の人が落ちる）
+  - 履歴の言い方は **`_stockHowText(l)` の1箇所だけ**（画面の `_stockHowHtml()` も CSV もここを通す）
 - 🔒 **ID・パスワードは DB の関数を通してだけ読み書きする**（`stock_account_secrets` は公開キーから直接は読めない）
   - 👀 **見るのはログインしている全員・暗証番号なし**＝ `stock_secret_list(p_user_id)`（`is_active` のユーザーなら全アカウントぶん返す）。
     読むのは **`_stockLoadSecrets()` の1箇所**で、`loadStockAccounts()` が画面を描く前に呼ぶ。
