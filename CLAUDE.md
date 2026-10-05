@@ -3050,6 +3050,10 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - 🪪在留期限の更新待ち: apply_status が APPLY_DONE_STATUSES（審査完了以降）になってから
   VISA_UPDATE_WAIT_DAYS(30)日以上たっても、visa_expiry が空欄 or VISA_UPDATE_SOON_DAYS(120)日以内のまま。
   経過日数の起点は workers.apply_status_changed_at（saveWorker がステータス変更時に記録）→ apply_date → request_date
+- 📋 **更新リマインドに出さない人材は `_renRemindSkip(w)` の1箇所だけ**＝ 更新以外の申請がもう動いている人
+  （`apply_status` が入っていて `REN_REMIND_APPLY_IDLE`＝申請予定なし・取り下げ・不許可 **以外**、かつ `apply_type` が入っていて「更新」**以外**）。
+  在留資格が変わる（変更・認定）ので、更新の確認は要らないため。
+  `computeGlobalWorkerAlerts`（外国人材の画面・サイドバー）と `computeMyWorkerAlerts`（マイページの applyCheck）の**両方がここを見る**
 - サイドバーのバッジ（`updateSidebarAlerts`）と外国人材ページのバナー（`renderWorkerAlerts`）は
   同じ関数・同じデータソース（`_alertSourceWorkers()`）を使うので、必ず同じ数字になる
 - これらは **一覧フィルターに追従しない**（全人材で数える）。
