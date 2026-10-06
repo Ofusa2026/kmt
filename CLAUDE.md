@@ -777,8 +777,13 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - ⚠️ **上の段は今までの `kmt_flag` のまま**＝ 求人の【区分】（id は `jpf_kmt` のまま）を選ぶと、
   **`caseKindFromSel()` の1箇所**が `case_kind` と `kmt_flag` を一緒に返す（保存2か所はこれを展開するだけ）。
   `kmt_flag` を見ている処理（登録支援機関検索・LINEグループ・アラート・売上見込み）は変えていない
-- **移行はしない**＝ `case_kind` が空の案件は「KMT案件（未選択）」「大房側案件（未選択）」（値は `__kmt` / `__ofusa`＝`CASE_KIND_UNSET`）。
+- **移行はしない**＝ `case_kind` が空の案件は、一覧・絞り込み・グループでは「KMT案件（未選択）」「大房側案件（未選択）」（`caseKindLabelOf()`）。
   一覧の印は `_jpCaseKindBadge()`、絞り込み・グループの「案件区分ごと」は `caseKindLabelOf()` ＋ `caseKindRank()`
+  - ⚠️ **求人の【区分】の選択欄には「◯◯案件（未選択）」を出さない**（optgroup の見出しと重なると言われた）。
+    未選択の案件は「-- 選択してください --」（空）で開き、下に「いまは◯◯案件としてあつかっています」と出す
+  - ⚠️ **空のまま保存しても `case_kind` / `kmt_flag` を書かない**＝ `caseKindFromSel('')` は `{}` を返す（大房側の案件が KMT に化けないように）。
+    紹介案件かどうか（登録支援機関検索・LINEグループの出し入れ）は **`_jpCaseIsIntro()` の1箇所**＝ 空ならその案件のいまの `kmt_flag` を見る。
+    新規登録は【区分】が必須（`JP_NEW_REQUIRED`）なので空では作れない
 - 📋 **決定報告は3フォームとも【基本情報】のいちばん上に必須の欄**（`drCaseKindFieldHtml(type)` の1箇所）。
   **選べる区分は `DR_CASE_KINDS` の1箇所**（KMT案件＝4つ／他社支援・企業単独＝KMT支援案件を除く3つ）。
   読むのは `drCaseKindValue()`、送信の入口3つ（`sendKmtDecisionAll` / `sendIntroDecisionAll` / `sendDecisionFormToOfusa`）が
