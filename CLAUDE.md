@@ -4014,10 +4014,14 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   読み込みは社内ノートと同じ `loadGroupNoteFolders()` を通す＝ 見てよいか・個人かの判定を2つ持たない
 - 🔐 **万が一のときは管理者も確認できる**＝ 社内ノートの管理者の仕組みそのまま（`_gnCanSee()` / `gnOpenFolder()`）。
   ⚠️ **マイページには「管理者が開いた」記録も案内も出さない**（いらないと言われた）
-- マイページの中身＝ 個人ノートのフォルダ（件数つき）／🕘 最近のノート（`MY_NOTE_RECENT` 件）／検索（タイトル・本文）。
-  `renderMyNotes()` は入れ物だけ、中身は `_renderMyNoteBody()`（⚠️ **検索は中身だけ描き直す**＝ 日本語入力が切れないように）
-- **社内ノートへ移る入口は `myGnGo(fid, nid, isNew)` の1箇所だけ**＝ `_gnPendingFolderId` / `_gnPendingNoteId` / `_gnPendingNew` に入れて
-  `showScreen(GN_SCREEN_KEY)`。`loadGroupNotes()` がその入れ物・ノートを開く／`isNew` なら作成のモーダル（既定は 👤 個人）
+- 📂 **マイページの見た目は別の社員の見本（`notes_folder_view.js`）どおり**＝ カテゴリーごとのフォルダ（件数つき）→ 押すとそのフォルダのメモ一覧
+  （パンくずで戻る・検索はフォルダの中／すべてのフォルダから）。メモを押すと社内ノートでそのノートが開く
+  - **フォルダ＝ `NOTICE_CATEGORIES` の名前の個人ノート**（無くても0件で出し、［＋ 新規メモ］のときに `_myGnEnsureFolder()` が作る）＋
+    それ以外の名前の個人ノート（社内ノートで自分で作ったもの）。**一覧を作るのは `_myNoteFolders()` の1箇所だけ**、色・アイコンは `MY_NOTE_FOLDERS`
+  - 開いているフォルダは `_myNoteOpen`（`c:<カテゴリー>` ／ `f:<入れ物のid>`）。［＋ 新規メモ］は `myNoteNew()`＝ フォルダの中ならそこ、一覧ならフォルダを選ぶ（`openMyNoteCatPick()`）
+  - `renderMyNotes()` は入れ物だけ、中身は `_renderMyNoteBody()`（⚠️ **検索は中身だけ描き直す**＝ 日本語入力が切れないように）
+- **社内ノートへ移る入口は `myGnGo(fid, nid, isNew, addNote)` の1箇所だけ**＝ `_gnPendingFolderId` / `_gnPendingNoteId` / `_gnPendingNew` / `_gnPendingAddNote` に入れて
+  `showScreen(GN_SCREEN_KEY)`。`loadGroupNotes()` がその入れ物・ノートを開く／`addNote` ならノートを1件足す／`isNew` なら作成のモーダル（既定は 👤 個人）
 - 🚚 **以前の `my_notes`（マイページの自分メモ）は 2026/10/06 に社内ノートへ写した**（3人・8件 → カテゴリーごとの個人ノート5つ。
   入れ物の説明に「マイページの自分メモから移しました（2026/10/06）」）。`my_notes` の行は消していないが、**もう読み書きしない**
   （別の社員の見本 `notes_folder_view.js`＝自分メモのフォルダ表示は、この形に置き換えた）
