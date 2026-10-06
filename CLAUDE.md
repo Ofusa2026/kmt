@@ -391,6 +391,9 @@ UI変更やロジック変更のときは実際に描画して確かめる。
   - 📏 **大きいファイルほどこの症状が出る**（base64 で1.33倍になり、GAS への送信が重くなる）。
     **めやすは `CHAT_FILE_WARN_MB`(8) の1箇所だけ**で、`addChatFiles()` が**知らせるだけ**
     （添付は止めない）。失敗したときは `kmtLog` にファイル名と**大きさ**も残す
+- 😊 **絵文字（リアクションの😊・入力欄の絵文字ボタン）の一覧は `EMOJI_GROUPS` の1箇所だけ**（タブ＝よく使う〈`COMMON_EMOJIS`〉／顔／手・人／ハート・記号／動物・自然／食べ物／活動・もの）。
+  中身を作るのは `_emojiPanelHtml(mode)` の1箇所（`react`／`input`）。タブを押したときは一覧（`#emjGrid_<mode>`）だけ描き直す。
+  🕘 最近使ったものは `localStorage`（`kmt_emoji_recent_<user_id>`・`EMOJI_RECENT_MAX` 件）に覚えてタブの先頭に出す
 - 入力欄での画像貼り付けは `initChatPasteImage()`（document の paste を拾って `addChatFiles()` に渡す）
 - **本文のURLのリンク化**: 見つけ方は **`CHAT_URL_RE` の1箇所だけ**（`renderMessageContent`）。
   - **URLに使う文字は半角だけ**にしてある。全角・日本語まで拾うと
