@@ -4952,6 +4952,41 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
     【📜 作成履歴】から読み込み直し・出し直しができる）。削除は論理削除で、`SB_SOFT_DELETE_TABLES` と `TRASH_TABLES` の両方に入れてある
   - 入力中の中身は localStorage（`kmt_jcon_draft_<user_id>`）に覚える。［🆕 新しく作る］で（新）の書式から作り直す
 
+### 📈 月報・実績（社内 → 📈 月報・実績 ／ 画面キー `MR_SCREEN_KEY`＝`monthly_report`）
+
+GLTの月報Excel（国別チーム月報・年度まとめ・3か月ごと目標・支援者数・SNS月報・広告月報）をシステムに移したもの。
+左メニューは【社内】の 👥 担当一覧 の上。タブは6つ（`MR_TABS`）＝ 📝 月報 ／ 📊 チーム実績・目標 ／ 👤 担当者別（評価）／ 👥 支援人数の推移 ／ 📣 SNS ／ 📢 広告
+
+| 実体 | 中身 |
+|---|---|
+| `monthly_reports` | チーム × 月で1行（`ym,team` で一意）。`nums`（手で書いた人数）・`support_count`・`report_date`・目標/トラブル/改善の4つの文 |
+| `monthly_report_staff` | 担当者 × 月の手直し（`ym,staff_name` で一意）。`nums` |
+| `monthly_report_targets` | 目標（`year,period,scope,name` で一意）。`period` 0＝年間／1〜4＝期、`scope`＝`team`／`staff`、`vals`＝`{total,kmt_min,kmt,intro,new,retire,retire_line}` |
+| `sns_followers` | SNSのフォロワー数（`ym,platform,team` で一意） |
+| `ad_reports` | 広告1回＝1行。**論理削除**（`SB_SOFT_DELETE_TABLES` と `TRASH_TABLES` の両方に入れてある） |
+
+- **項目（紹介／新規採用 変更・認定／元実習生 変更・認定／入社 切替・配属／退職 退職・CL）は `MR_KEYS` の1箇所だけ**
+  （`grp` がまとまり。月報の入力欄・チーム実績・担当者別・CSVが同時に追従する）。チームは `MR_TEAMS`、文の欄は `MR_TEXTS`
+- 🤖 **人数は自動で数え、手で書いたものがあればそちらを使う**
+  - **値を決めるのは `_mrValOf()`（チーム）／`_mrStaffValOf()`（担当者）／`_mrSupportOf()`（支援人数）の3つだけ**＝
+    `nums` にキーがあれば手入力（オレンジ）、無ければ自動。欄を空にすると自動に戻る
+  - **自動の数え方は `_mrAutoOf(ym)` の1箇所だけ**（めやす）＝
+    紹介＝（紹）決定者の `period`（「◯年◯月度分」）／ 新規採用・元実習生＝人材の依頼日（`request_date`）× 申請種別（変更・認定）、
+    いまの在留資格が技能実習なら元実習生（希望在留資格が2号・家族滞在＝`MR_AUTO_SKIP_VISA` は数えない）／
+    配属＝配属日 ／ 退職＝退職日 ／ 支援人数＝その月の末に支援中（辞退・KMT支援外を除く）。**切替・CL は元のデータが無いので手入力だけ**（`auto:false`）
+  - 担当者＝人材の `staff` と（紹）決定者の `jinzai_staff`。**名前をそろえるのは `_mrStaffNorm()` の1箇所**（名簿の名前に寄せる・表記ゆれは `MR_STAFF_ALIAS`）
+  - 読む元は `_mrLoadSrc()` の1箇所（人材・（紹）決定者）
+- 🎯 **達成数＝（紹介＋新規採用＋元実習生）−退職。数えるのは `_mrAchieve()` の1箇所だけ**。
+  ⚠️ **2024年のExcelは退職を引いていなかった**ので `MR_ACHIEVE_SUB_RETIRE_FROM`(2025) より前は引かない（過去の達成率がExcelと同じになる）
+- 判定のしきいは **`MR_GRADES` の1箇所**（100%以上 GOOD／61〜99% 注意／60%以下 BAD）。期は `MR_PERIODS`（暦の3か月・`p:0` が年間）。
+  年間の目標が無いときは4期の合計（`_mrTargetOf()`）。**目標を書けるのは管理者だけ**（`openMrTargets` / `openMrTargetDetail` → `_mrSaveTargetRows()`）
+- 💾 月報・担当者別の手直しは**手動保存**（［💾 保存］／［💾 まとめて保存］。upsert）。未保存は `mrHasUnsaved()`＝ `showScreen` と `beforeunload` でたずねる。
+  SNS は欄を直すとその場で保存
+- 📥 **過去のデータは 2026/10/06 にExcelから取り込み済み**（月報209件＝2023年の支援人数だけの行を含む・目標50件・SNS84件・広告37件。`source`＝`excel_import`）。
+  支援人数は 2024〜2025年＝「表」シート、2023年＝「支援者数」シート、2026年＝各月の月報。
+  ⚠️ 過去の月報は**チーム単位**しか無いので、担当者別は**システムのデータがある月だけ**数が出る
+- ⚠️ 月報の文には人材名・企業名が入っている＝ **kmt.html に埋めない**（DBにだけ持つ）
+
 ### 💸 立替管理（立替登録）
 
 - **選択肢は5つの const の1箇所だけ**。増やす・並べ替えるときはここを直せば
