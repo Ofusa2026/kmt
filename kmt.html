@@ -13504,7 +13504,7 @@ async function deleteMyTaskCard(id) {
 // ===== マイページ: 自分のノート ＝ 📒 社内ノートの「👤 個人ノート」 =====
 // ⚠️ ノートの実体は社内ノート（group_note_folders / group_notes）だけ。マイページは入口と一覧だけを持つ
 //   （以前の my_notes は 2026/10/06 に社内ノートの個人ノートへ写した。読み書きはもうしない）
-// 🔐 個人ノートは万が一のときに管理者も開ける（開くと admin_viewed_at に残り、ここにも出る）＝ 社内ノートと同じしくみ
+// 🔐 個人ノートは万が一のときに管理者も開ける（社内ノートと同じしくみ）。⚠️ マイページには管理者が開いた記録を出さない
 let _myGnFolders = [];   // 自分の個人ノートの入れ物
 let _myGnNotes = [];     // その中のノート（一覧・検索用。本文は文字だけにして持つ）
 let _myNoteSearch = '';
@@ -13535,8 +13535,6 @@ function myGnGo(fid, nid, isNew) {
 function renderMyNotes() {
   const box = document.getElementById('myNotesSection');
   if (!box) return;
-  const viewed = _myGnFolders.filter(f => f.admin_viewed_at)
-    .sort((a, b) => String(b.admin_viewed_at).localeCompare(String(a.admin_viewed_at)));
   box.innerHTML =
     '<div style="background:white;border:1px solid var(--gray-200);border-radius:12px;box-shadow:var(--shadow);overflow:hidden;">' +
       '<div style="padding:10px 14px;border-bottom:1px solid var(--gray-200);display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' +
@@ -13544,11 +13542,6 @@ function renderMyNotes() {
         '<span style="font-size:10px;color:var(--gray-400);">📒 社内ノートの「👤 個人ノート」です</span>' +
         '<button class="btn btn-outline" style="font-size:11px;padding:3px 12px;margin-left:auto;" onclick="myGnGo()">📒 社内ノートを開く</button>' +
         '<button class="btn btn-primary" style="font-size:11px;padding:3px 12px;" onclick="myGnGo(null,null,true)">＋ 個人ノートを作る</button>' +
-      '</div>' +
-      '<div style="padding:7px 14px;font-size:11px;color:#9a3412;background:#fff7ed;border-bottom:1px solid #fed7aa;line-height:1.6;">' +
-        '🔐 自分だけが見られるノートです。<b>万が一のときは管理者も確認できます</b>（管理者が開くと記録が残り、ここに出ます）' +
-        (viewed.length ? viewed.slice(0, 3).map(f => '<div style="color:#b91c1c;font-weight:700;">🔐 管理者（' + esc(f.admin_viewed_by || '') + '）が ' +
-          esc(_gnDate(f.admin_viewed_at)) + ' に「' + esc(f.name || '') + '」を開きました</div>').join('') : '') +
       '</div>' +
       '<div style="padding:8px 14px;border-bottom:1px solid var(--gray-100);display:flex;gap:6px;align-items:center;">' +
         '<input id="myNoteQ" class="search-input" style="flex:1;min-width:150px;font-size:12px;" placeholder="🔎 自分のノートを検索（タイトル・本文）..." value="' + esc(_myNoteSearch).replace(/"/g,'&quot;') + '" oninput="setMyNoteSearch(this.value)">' +
@@ -64900,7 +64893,6 @@ const WHATS_NEW = [
   { version:'ver.20261006.4', date:'2026-10-06', notify:true, screens:['my_account','group_notes'], items:[
     '📝 マイページ【自分のノート】を 📒 社内ノートの「👤 個人ノート」につなげました。マイページには自分の個人ノートがフォルダで並び、押すと社内ノートでそのノートが開きます（［＋ 個人ノートを作る］もここから）',
     'これまでマイページの「自分メモ」に書いていた内容は、カテゴリーごとに個人ノートへ移してあります（中身はそのまま）',
-    '🔐 個人ノートは自分だけが見られますが、万が一のときは管理者も確認できます。管理者が開くと記録が残り、マイページにも「管理者（◯◯）が 日時 に開きました」と出ます',
   ]},
   { version:'ver.20261006.2', date:'2026-10-06', notify:true, screens:['jobs','decision_report'], items:[
     { t:'🏷️ 求人案件の【区分】を4つに分けました。🏢 KMT案件＝「KMT支援案件／KMT紹介案件」、🤝 大房側案件＝「紹介＋申請案件／申請のみ案件」から選びます。これまでの案件は「KMT案件（未選択）」「大房側案件（未選択）」と出るので、開いて選び直してください', s:['jobs'] },

@@ -4012,8 +4012,8 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - ⚠️ **ノートの実体は社内ノート（`group_note_folders` / `group_notes`）だけ。マイページは入口と一覧だけ**
   （自分がメンバーで、メンバーが自分1人＝`_gnIsMember(f) && _gnIsSolo(f)` の入れ物）。
   読み込みは社内ノートと同じ `loadGroupNoteFolders()` を通す＝ 見てよいか・個人かの判定を2つ持たない
-- 🔐 **万が一のときは管理者も確認できる**＝ 社内ノートの管理者の仕組みそのまま（`_gnCanSee()` / `gnOpenFolder()` が
-  1回たずねて `admin_viewed_at` / `admin_viewed_by` に残す）。マイページにも「管理者（◯◯）が 日時 に開きました」と出す
+- 🔐 **万が一のときは管理者も確認できる**＝ 社内ノートの管理者の仕組みそのまま（`_gnCanSee()` / `gnOpenFolder()`）。
+  ⚠️ **マイページには「管理者が開いた」記録も案内も出さない**（いらないと言われた）
 - マイページの中身＝ 個人ノートのフォルダ（件数つき）／🕘 最近のノート（`MY_NOTE_RECENT` 件）／検索（タイトル・本文）。
   `renderMyNotes()` は入れ物だけ、中身は `_renderMyNoteBody()`（⚠️ **検索は中身だけ描き直す**＝ 日本語入力が切れないように）
 - **社内ノートへ移る入口は `myGnGo(fid, nid, isNew)` の1箇所だけ**＝ `_gnPendingFolderId` / `_gnPendingNoteId` / `_gnPendingNew` に入れて
