@@ -394,6 +394,14 @@ UI変更やロジック変更のときは実際に描画して確かめる。
 - 😊 **絵文字（リアクションの😊・入力欄の絵文字ボタン）の一覧は `EMOJI_GROUPS` の1箇所だけ**（タブ＝よく使う〈`COMMON_EMOJIS`〉／顔／手・人／ハート・記号／動物・自然／食べ物／活動・もの）。
   中身を作るのは `_emojiPanelHtml(mode)` の1箇所（`react`／`input`）。タブを押したときは一覧（`#emjGrid_<mode>`）だけ描き直す。
   🕘 最近使ったものは `localStorage`（`kmt_emoji_recent_<user_id>`・`EMOJI_RECENT_MAX` 件）に覚えてタブの先頭に出す
+- 🙇 **文字のスタンプ（ありがとうございます／承知しました! など）は `STAMPS` の1箇所だけ**（`t`＝送る文字／`b`＝改行の位置〈/〉／`c`＝`STAMP_COLORS`）。
+  ⚠️ **画像は使わない**＝ 太い丸文字＋白いふちどりを `_stampHtml(st, size)` の1箇所で描く（`msg`／`pick`／`chip`）
+  - 送ると **`STAMP_PREFIX`（`[スタンプ] `）＋ t の本文で1件のメッセージ**になる（`sendChatStamp` ／ 🏠 `tcSendStamp`）＝ 通知・一覧・大房側でも文字で読める。
+    **スタンプかどうかは `_stampOf(content)` の1箇所だけ**（STAMPS に無い文字はふつうの本文のまま）。スタンプは吹き出しなしで大きく出し、✏️ 編集は出さない
+  - リアクションにも付けられる（`emoji` 列に同じ文字。チップは `_reactLabelHtml()`）
+  - ⚠️ **`t` は変えない**（入っているメッセージ・リアクションと結び付いている）。足すときは末尾に足す
+  - ⭐ よく使うスタンプ＝ 使った回数の多い順（`localStorage` の `kmt_stamp_use_<user_id>`・`STAMP_FAV_MAX` 件）。⭐ タブと 🙇 タブのいちばん上に出す（`_stampFav()`）
+  - ピッカーは mode で4つに分かれる（`react`／`input`／`tcreact`／`tcinput`）。押したときの振り分けは `emojiPick()` / `stampPick()` の2つだけ、浮かせて出すのは `openEmojiPopup()`
 - 入力欄での画像貼り付けは `initChatPasteImage()`（document の paste を拾って `addChatFiles()` に渡す）
 - **本文のURLのリンク化**: 見つけ方は **`CHAT_URL_RE` の1箇所だけ**（`renderMessageContent`）。
   - **URLに使う文字は半角だけ**にしてある。全角・日本語まで拾うと
@@ -485,6 +493,9 @@ UI変更やロジック変更のときは実際に描画して確かめる。
     書類を入れる場所に見た目の画像を混ぜないため
   - ⚠️ **1件も入らなかったときだけ「本文だけ送りますか？」とたずねる**＝ **書いた本文を絶対に捨てない**
     （既存チャットとまったく同じ考え方。言い換えも `_chatDriveErrText()` を共用する）
+- 😊 **リアクションは `team_chat_reactions`**（`room_id` ＋ `message_id` ＋ `user_id` ＋ `emoji`。一意は message_id,user_id,emoji）。
+  **読むのは `loadTcMessages` の1箇所**（ルームごとに1回。変わったら既読と同じく描き直す）、**書くのは `tcToggleReaction()` の1箇所**（参加している人だけ）。
+  入力欄の［😊］から絵文字・🙇 スタンプ（`tcinput`）
 - 👀 **既読は `team_chat_members.last_read_at` の1箇所**（書くのは `_tcMarkRead()` だけ）
   - ✓✓ **発言ごとの既読（人数とだれか）は `_tcMsgReaders(m)` の1箇所だけ**＝ そのルームのメンバーのうち、
     `last_read_at` が発言の送信時刻より後の人。**送った本人は数えない**（💬 チャットの `_msgReaders` と同じ考え方）。
