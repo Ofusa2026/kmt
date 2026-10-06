@@ -770,6 +770,24 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   一覧に無い国（ネパール・中国 など）は「その他」の色で、**その国の頭文字**を出す。国名は title
   - ⚠️ 国名の照合は**完全一致**（`_csNatOf()` の先頭1文字で見ると「スリランカ」「中国」も拾えないため）
 
+### 🏷️ 案件区分（個人評価のため ／ `job_progress.case_kind` ・ `decision_report_log.case_kind`）
+
+- **選択肢・並び・色は `CASE_KINDS` ＋ `CASE_KIND_GROUPS` の1箇所だけ**＝
+  🏢 KMT案件（KMT支援案件／KMT紹介案件）・🤝 大房側案件（紹介＋申請案件／申請のみ案件）。保存は文字のまま
+- ⚠️ **上の段は今までの `kmt_flag` のまま**＝ 求人の【区分】（id は `jpf_kmt` のまま）を選ぶと、
+  **`caseKindFromSel()` の1箇所**が `case_kind` と `kmt_flag` を一緒に返す（保存2か所はこれを展開するだけ）。
+  `kmt_flag` を見ている処理（登録支援機関検索・LINEグループ・アラート・売上見込み）は変えていない
+- **移行はしない**＝ `case_kind` が空の案件は「KMT案件（未選択）」「大房側案件（未選択）」（値は `__kmt` / `__ofusa`＝`CASE_KIND_UNSET`）。
+  一覧の印は `_jpCaseKindBadge()`、絞り込み・グループの「案件区分ごと」は `caseKindLabelOf()` ＋ `caseKindRank()`
+- 📋 **決定報告は3フォームとも【基本情報】のいちばん上に必須の欄**（`drCaseKindFieldHtml(type)` の1箇所）。
+  **選べる区分は `DR_CASE_KINDS` の1箇所**（KMT案件＝4つ／他社支援・企業単独＝KMT支援案件を除く3つ）。
+  読むのは `drCaseKindValue()`、送信の入口3つ（`sendKmtDecisionAll` / `sendIntroDecisionAll` / `sendDecisionFormToOfusa`）が
+  **`drCaseKindRequire()` で止める**。最初は空＝👤 候補者から自動入力したときだけ紐付いた求人の区分を入れる（`pickDrCandidate`）
+  - KMT案件フォームは「**1.** 案件区分」＝ もともと空いていた番号。**2〜28 は変えない**（依頼スプレッドシートの項目番号とそろえてある）
+  - 文面は見出しのすぐ下に「案件区分：◯◯」（`drCaseKindLine()`）。KMT案件はスプレッドシートのコメント欄にも1行入る。
+    大房の `intake_requests` には列が無いので送らない
+  - 控え（`_saveDecisionReportLog`）に `case_kind` を残す。同じ控えがすでにあって区分が空なら足す
+
 ### 🔮 求人案件の見込み状況（`job_progress.forecast_status`）
 
 - **選択肢・色は `JP_FORECAST_OPTS` の1箇所だけ**＝ 全決定を目指す／応募者がいればでOK／条件の見直しが必要／要確認・催促
