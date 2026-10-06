@@ -4942,6 +4942,9 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
     **書くのは `_lblSaveLog()` の1箇所だけ**、まとめは `_lblSummary()`、数え方は `_lblTally()`（画面の件数と同じ）。
     一覧は `openLabelHistory()`、1件の見本は `openLabelHistItem()`＝［📥 この内容を読み込む］（`lblHistLoad`）／
     ［🖨️ もう一度印刷］（`lblHistReprint`）。ログなので削除は付けていない（`is_deleted` も無い）
+    - 🏷️ **タイトル（任意）は `label_print_log.title`**（＋ `title_by` / `title_at`）。印刷のダイアログの欄（`_lblTitleDraft`）で付けて
+      ［印刷＋履歴保存］で一緒に入る／あとから一覧・見本の［✏️］で付け直す＝ **書き替えるのは `lblHistEditTitle()` の1箇所だけ**、
+      見た目は `_lblTitleHtml()` の1箇所。長さは `LABEL_TITLE_MAX`。検索にも効く。もう一度印刷するときは前のタイトルが入った状態で開く
   - ✏️ **見本（`#lblOnePrev`）は contenteditable**＝ 直した中身は `_lblDraft.html` に入り、枠にもそのまま入る
     （`_lblInnerHtml()` は `html` があればそれを出す）。**残してよいものは `_lblCleanHtml()` の1箇所だけ**
     （div/span/br/b と `lb-` の class だけ。貼り付けは文字だけ）。④の欄・住所・担当者を選び直すと `html` を消して作り直す。
