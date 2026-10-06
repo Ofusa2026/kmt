@@ -683,6 +683,16 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - 他社支援は人材名が複数行のことがあるので、**1名につき1行**を作って配列でINSERTする（大房は1案件＝1名）
 - `delivery_method` は画面で選んだ交付方法をそのまま渡す。認定を電子交付に倒すのは大房側が案件登録時にやる
 
+> ⚠️ **受信トレイに同じ決定報告が何件も入る件（2026/10/06 に原因が分かった）**
+> KMT案件の送信（依頼スプレッドシートへの POST）は**1回だけ**で、シートにも1行しか入っていなかった。
+> 重ねて入れていたのは**大房側の取込GAS**（`fetchIntakeRequests`＝時間トリガー／［🔄 今すぐ取込］）で、
+> 取込が重なって走ると**同じシートの同じ行を何度も INSERT する**（JUSMAN 529行目が 9:51 の35秒のあいだに4件。
+> 大房の `audit_log` で確認。KMTに限らず全機関で200組以上の前例があった）。
+> GAS のコードはどのリポジトリにも無いので、**大房DBに `trg_zz_intake_dedupe`（AFTER INSERT）を入れて止めている**＝
+> 「シートID＋gid × 行番号 × 人材名」（`intake_dedupe_key()`）がすでにあれば、あとから入った行をその場で消す。
+> GAS には今までどおり「入った」と返るので GAS 側の動きは変わらない。`row_number` が無い行（`ofusaFetch` の直送）は対象外。
+> 外すときは `drop trigger trg_zz_intake_dedupe on public.intake_requests;`（project `ehwlgbwpycglmopiqyty`）
+
 > ⚠️ **`ofusaIntakeRow` に列を足すときは、必ず大房DBの `information_schema.columns` で実在を確かめること。**
 > 存在しない列が1つ混ざるだけで INSERT がまるごと400で落ちる（chat_rooms のときと同じ事故になる）。
 >
