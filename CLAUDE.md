@@ -3911,11 +3911,15 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - 🧾 **【請求書送付担当】は選択式＝ `DR_INVOICE_SENDERS` の1箇所だけ**（KMT（白井）／大房側。欄は `ot_invoice_staff` / `sl_invoice_staff`、
   作るのは `drInvoiceSenderHtml()`、読むのは `_drInvoiceSender(id)`、文面の1行は `_drInvoiceLine()`）
   - **大房側**＝ 大房が請求するので **KMTの請求金額には入れない**。売上は**人数だけ**（数量1・単価／金額は空）、
-    備考の頭に **`DR_OFUSA_BILL_MARK`（大房側請求）**＝ 売上の行がそれかの判定は **`_saleIsOfusaBill(s)` の1箇所だけ**
+    備考の頭に **`DR_OFUSA_BILL_HEAD`（`大房側請求（人数のみ`）**＝ 売上の行がそれかの判定は **`_saleIsOfusaBill(s)` の1箇所だけ**
+    （⚠️ 頭の印まで見る＝ 手で「大房側請求」と書いてあった今までの売上の行を巻き込まない）
     （一覧の金額の欄に「🏢 大房側請求」・未作成／未請求／未入金の絞り込みには出さない）。
     決定者リストは `bill_amount` を空・`bill_timing` に `DR_OFUSA_BILL_MARK`・`doc_staff`＝大房側（人数＝月報の紹介には今までどおり数える）
   - ⚠️ **案件の金額は捨てない**＝ 決定報告の控え（`decision_report_log.data`）に `{bill_by, ofusa_bill, contrib_amount, item}` を残す
     （KMT側のときも残す）。**個人がいくらの案件に貢献したかを出すときはここを見る**
+  - ⚠️ **KMT（白井）のときは今までの流れを1文字も変えない**（2026/10/06 に旧版と送信内容をくらべて確かめた）＝
+    文面「メール @KMT白井　お願いいたします。」／大房への備考「請求書送付担当: 白井」（`_drInvoiceSender().staff`）／
+    決定者リスト（`doc_staff`＝白井・`bill_amount`＝金額）／売上 がすべて同じ。増えたのは控えの `data` だけ
   - ⚠️ 列は足していない（2026/10/06 は Supabase の接続が使えなかった）＝ 既存の列（`notes` / `bill_timing` / `doc_staff` / `data`）だけで持つ
 - **すでに同じ人材・同じ企業が決定者リストに入っていれば作らない**（二重登録の防止）。
   くらべ方は `worker_name` ＋ `_drCoNorm(company_name)`（企業名の表記ゆれを吸収）。
