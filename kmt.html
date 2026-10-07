@@ -63530,26 +63530,22 @@ function onCountryProgressChange(input) {
 }
 
 /* 🎨 **履歴書の見た目は3つ。選択肢は `RESUME_FMTS`、いま選んでいるのは `_resumeFmt` の1箇所だけ**（先頭＝既定）。
-   new＝いまの見た目（見出しはまん中・KMTロゴの青を薄くした水色・文字は黒で大きく・絵文字なし／項目名を大きく／「入社希望日」）
-   old＝前のフォーマット（実装前と同じ＝濃い紺の見出し・絵文字あり・項目名10px・「入社可能日」）
-   old_plain＝前のフォーマットから絵文字だけ外したもの
-   old_center＝old_plain の見出しの文字をまん中にしたもの（RESUME_CENTER_CSS）。足すCSSは _resumeExtraCss() の1箇所
-   いまの見た目かは `_resumeIsNew()`、見出しに絵文字を出すかは `_resumeShowIco()` の2つだけで見る。
-   ⚠️ 覚えない（開き直すと いまの見た目 に戻る）。
+   dark＝いまの見た目（既定）＝ 濃い紺の見出し・文字は左・絵文字なし／「入社希望日」
+   light＝水色の見出し（まん中・文字は黒で大きく・絵文字なし／項目名を大きく／「入社希望日」）＝ RESUME_V2_CSS
+   old＝実装前と同じ（濃い紺の見出し・絵文字あり・「入社可能日」）
+   見出しに絵文字を出すかは `_resumeShowIco()`、「入社希望日」にするかは `_resumeNewLabel()`、
+   うしろに足すCSSは `_resumeExtraCss()` の3つだけで見る。
+   ⚠️ 覚えない（開き直すと 既定 に戻る）。
    ⚠️ CSSは **後ろに足して上書きする**＝ 印刷（`printResume` の resumeCss）・Excel にも同じ <style> が入るので、どこでも同じ見た目になる */
 const RESUME_FMTS = [
-  { k:'new',       l:'いまの見た目（既定）',        t:'水色の見出し・絵文字なし・項目名が大きい・「入社希望日」' },
-  { k:'old',       l:'🕘 前のフォーマット',          t:'変更前（2026/10/07より前）の見た目：濃い紺の見出し・絵文字あり・「入社可能日」' },
-  { k:'old_plain', l:'🕘 前のフォーマット（絵文字なし）', t:'変更前の見た目（濃い紺の見出し）から、見出しの絵文字だけ外したもの' },
-  { k:'old_center', l:'🕘 前のフォーマット（絵文字なし・見出しまん中）', t:'変更前の見た目（濃い紺の見出し）から絵文字を外し、見出しの文字をまん中にしたもの' },
+  { k:'dark',  l:'いまの見た目（既定）',       t:'濃い紺の見出し・文字は左・絵文字なし・「入社希望日」' },
+  { k:'light', l:'💧 水色の見出し',            t:'薄い水色の見出し（文字はまん中・大きめ）・絵文字なし・項目名が大きい・「入社希望日」' },
+  { k:'old',   l:'🕘 前のフォーマット（絵文字あり）', t:'変更前（2026/10/07より前）の見た目：濃い紺の見出し・絵文字あり・「入社可能日」' },
 ];
 let _resumeFmt = RESUME_FMTS[0].k;
-const _resumeIsNew = () => _resumeFmt === 'new';
 const _resumeShowIco = () => _resumeFmt === 'old';
-/* 見出しの文字をまん中にするか（いまの見た目は RESUME_V2_CSS の中でまん中にしてある） */
-const RESUME_CENTER_CSS = `
-.resume-section-title { text-align: center; letter-spacing: 3px; }`;
-const _resumeExtraCss = () => _resumeIsNew() ? RESUME_V2_CSS : (_resumeFmt === 'old_center' ? RESUME_CENTER_CSS : '');
+const _resumeNewLabel = () => _resumeFmt !== 'old';
+const _resumeExtraCss = () => _resumeFmt === 'light' ? RESUME_V2_CSS : '';
 const RESUME_V2_CSS = `
 .resume-section-title { background: #e4f2fb; color: #111; text-align: center; border: 1px solid #b9dcf2; letter-spacing: 4px; font-size: 13px; line-height: 1.35; padding: 2px 8px; }
 .resume-info td.lbl, .resume-table td.lbl, .resume-table th { font-size: 12px; }`;
@@ -63712,7 +63708,7 @@ ${_resumeExtraCss()}
     ${_rsTitle('✅', '就労状況')}
     <table class="resume-table">
       <tr><td class="lbl">分野</td><td>${esc(c.applicant_field||'')}</td><td class="lbl">職種</td><td>${esc(c.job_category||'')}</td></tr>
-      <tr><td class="lbl">${_resumeIsNew() ? '入社希望日' : '入社可能日'}</td><td>${c.available_from?formatDate(c.available_from):''}</td><td class="lbl">面接可能日時</td><td>${esc(c.interview_availability||'')}</td></tr>
+      <tr><td class="lbl">${_resumeNewLabel() ? '入社希望日' : '入社可能日'}</td><td>${c.available_from?formatDate(c.available_from):''}</td><td class="lbl">面接可能日時</td><td>${esc(c.interview_availability||'')}</td></tr>
       <tr><td class="lbl">現職 手取(残業あり)</td><td>${esc(c.cur_net_salary_overtime||'')}</td><td class="lbl">現職 手取(残業無し)</td><td>${esc(c.cur_net_salary_base||'')}</td></tr>
       <tr><td class="lbl">希望 手取(残業あり)</td><td>${esc(c.net_salary_overtime||'')}</td><td class="lbl">希望 手取(残業無し)</td><td>${esc(c.net_salary_base||'')}</td></tr>
       <tr><td class="lbl">残業</td><td>${esc(c.overtime_preference||'')}</td><td class="lbl">夜勤</td><td>${esc(c.night_shift_count||'')}</td></tr>
@@ -66543,8 +66539,8 @@ function _doForceReloadNow() {
 const WHATS_NEW = [
   { version:'ver.20261007.3', date:'2026-10-07', notify:true, screens:['candidates','resume'], items:[
     '📝 履歴書の「入社可能日」を「入社希望日」に変えました（候補者情報・履歴書作成・ご本人が書くフォームも同じ名前です）',
-    '📝 履歴書の見た目を変えました。項目の見出し（学歴・職歴など）は文字をまん中・大きめにして背景を薄い水色に、絵文字は外しました。氏名・国籍などの項目名の文字も少し大きくしました',
-    '🎨 前の見た目で出したいときは、履歴書の「出すページ」の右の［🎨 見た目］で「🕘 前のフォーマット」「🕘 前のフォーマット（絵文字なし）」「🕘 前のフォーマット（絵文字なし・見出しまん中）」のどれかを選んでから印刷・PDF・Excelを押してください',
+    '📝 履歴書の項目の見出し（学歴・職歴など）の絵文字を外しました（見出しの色はこれまでどおり濃い紺です）',
+    '🎨 履歴書の「出すページ」の右の［🎨 見た目］で、見出しを薄い水色（文字はまん中・大きめ）にした見た目や、絵文字のある前のフォーマットでも印刷・PDF・Excelを出せます',
   ]},
   { version:'ver.20261007.2', date:'2026-10-07', notify:true, screens:['chat','job_chat','team_chat'], items:[
     '💬 チャットで、読んだはずのチャットが未読に戻ってしまうことがあったのを直しました（既読にしたチャットが多い人ほど起きていました）',
