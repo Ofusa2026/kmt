@@ -1989,13 +1989,16 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   `resume_opts.logo_kind`（列は増やさない）で、**既定は `KMT_LOGO_DEF`（株式会社KMT）**
   ＝ これまでの履歴書の見た目は変わらない。選択欄は `resumeFormFieldsHtml()` の中の `rf_logo_kind`
 - 置き場所は `.resume-head`（左＝ロゴ／右＝日付）の1行
-- 🎨 **履歴書の見た目は2つ。どちらで出すかは `_resumeOldFmt` の1箇所だけ**（false＝いまの見た目＝既定）
-  - いまの見た目で変えたのは **`RESUME_V2_CSS` と `_rsTitle()` の2つだけ**＝ 項目の見出しはまん中・13px・KMTロゴの青を薄くした水色（`#e4f2fb`）・文字は黒・
-    **絵文字なし**／項目名（`td.lbl` / `th`）は 12px（10px から。いちばん長い「就労についての家族の同意」も枠に収まる）／「入社希望日」
-  - ［🕘 前のフォーマットで出力］（`resumePagePickerHtml()` の中・`setResumeOldFmt()`）を入れると**実装前と同じ見た目**
-    （濃い紺の見出し・絵文字あり・項目名10px・「入社可能日」）。⚠️ **覚えない**＝開き直すといまの見た目に戻る
+- 🎨 **履歴書の見た目は3つ。選択肢は `RESUME_FMTS`、いま選んでいるのは `_resumeFmt` の1箇所だけ**（先頭の `new`＝いまの見た目＝既定）
+  | キー | 見た目 |
+  |---|---|
+  | `new` | いまの見た目＝ **`RESUME_V2_CSS` と `_rsTitle()` の2つだけ**で変えたもの。項目の見出しはまん中・13px・KMTロゴの青を薄くした水色（`#e4f2fb`）・文字は黒・**絵文字なし**／項目名（`td.lbl` / `th`）は 12px（10px から。いちばん長い「就労についての家族の同意」も枠に収まる）／「入社希望日」 |
+  | `old` | 🕘 前のフォーマット＝**実装前と同じ見た目**（濃い紺の見出し・絵文字あり・項目名10px・「入社可能日」） |
+  | `old_plain` | 🕘 前のフォーマット（絵文字なし）＝ `old` から見出しの絵文字だけ外したもの |
+  - いまの見た目かは **`_resumeIsNew()`**（`RESUME_V2_CSS` と「入社希望日」）、見出しに絵文字を出すかは **`_resumeShowIco()`**（`old` のときだけ）の2つだけで見る
+  - 選ぶのは［🎨 見た目］の選択欄（`resumePagePickerHtml()` の中・`setResumeFmt(k)`）。⚠️ **覚えない**＝開き直すといまの見た目に戻る
   - ⚠️ `RESUME_V2_CSS` は `buildResumeHTML` の <style> の**うしろに足して上書きする**＝ 印刷（`printResume` の resumeCss）・Excel にも同じ <style> が入るので、どこでも同じ見た目になる
-  - 見出しを足すときは `<div class="resume-section-title">` を直に書かず **`${_rsTitle('絵文字', '見出し')}`** を使う（絵文字は前のフォーマットのときだけ出る）
+  - 見出しを足すときは `<div class="resume-section-title">` を直に書かず **`${_rsTitle('絵文字', '見出し')}`** を使う（絵文字は `old` のときだけ出る）
 - **印刷・PDF・Excel に出すページは `RESUME_PAGES` の1箇所**で定義する
   （`main` / `docs`＝`.resume-doc-page` / `iv1`＝`.resume-iv1-page`）。
   選択は `_resumePageSel`、出力時のふるい落としは `_resumeFilterPages()`。

@@ -11504,11 +11504,12 @@ function resumePagePickerHtml() {
       + '<input type="checkbox" data-rpage="' + p.key + '" ' + (_resumePageSel[p.key] ? 'checked' : '')
       + ' onchange="toggleResumePage(\'' + p.key + '\', this.checked)" style="cursor:pointer;">'
       + esc(p.label) + '</label>').join('')
-    + '<label title="変更前（2026/10/07より前）の見た目で出します：濃い紺の見出し・絵文字あり・項目名が小さい・「入社可能日」" '
-    + 'style="display:inline-flex;align-items:center;gap:4px;font-size:11.5px;cursor:pointer;margin-left:6px;'
-    + 'border:1px dashed var(--gray-300);border-radius:6px;padding:3px 8px;background:white;color:var(--gray-600);">'
-    + '<input type="checkbox" data-rfmt="1" ' + (_resumeOldFmt ? 'checked' : '') + ' onchange="setResumeOldFmt(this.checked)" style="cursor:pointer;">'
-    + '🕘 前のフォーマットで出力</label>';
+    + '<label title="履歴書の見た目を選べます（開き直すと いまの見た目 に戻ります）" '
+    + 'style="display:inline-flex;align-items:center;gap:4px;font-size:11.5px;margin-left:6px;'
+    + 'border:1px dashed var(--gray-300);border-radius:6px;padding:2px 6px;background:white;color:var(--gray-600);">'
+    + '🎨 見た目:<select data-rfmt="1" onchange="setResumeFmt(this.value)" style="font-size:11.5px;padding:1px 4px;border:1px solid var(--gray-200);border-radius:4px;cursor:pointer;">'
+    + RESUME_FMTS.map(f => '<option value="' + f.k + '"' + (f.k === _resumeFmt ? ' selected' : '') + ' title="' + esc(f.t) + '">' + esc(f.l) + '</option>').join('')
+    + '</select></label>';
 }
 function toggleResumePage(key, on) {
   _resumePageSel[key] = !!on;
@@ -63528,25 +63529,33 @@ function onCountryProgressChange(input) {
   if (upd) upd.textContent = new Date().toISOString().slice(0,10);
 }
 
-/* 🎨 **履歴書の見た目は2つ。どちらで出すかは `_resumeOldFmt` の1箇所だけ**（false＝いまの見た目＝既定）。
-   いまの見た目で変えたところは **`RESUME_V2_CSS` と `_rsTitle()` の2つだけ**＝
-   項目の見出し（まん中・KMTロゴの青を薄くした水色・文字を大きく・絵文字なし）／項目名の文字を大きく／「入社希望日」。
-   ［🕘 前のフォーマットで出力］（`resumePagePickerHtml()` の中）を入れると、実装前と同じ見た目で出る
-   ＝ 濃い紺の見出し・絵文字あり・項目名10px・「入社可能日」。⚠️ 覚えない（開き直すと いまの見た目 に戻る）。
+/* 🎨 **履歴書の見た目は3つ。選択肢は `RESUME_FMTS`、いま選んでいるのは `_resumeFmt` の1箇所だけ**（先頭＝既定）。
+   new＝いまの見た目（見出しはまん中・KMTロゴの青を薄くした水色・文字は黒で大きく・絵文字なし／項目名を大きく／「入社希望日」）
+   old＝前のフォーマット（実装前と同じ＝濃い紺の見出し・絵文字あり・項目名10px・「入社可能日」）
+   old_plain＝前のフォーマットから絵文字だけ外したもの
+   いまの見た目かは `_resumeIsNew()`、見出しに絵文字を出すかは `_resumeShowIco()` の2つだけで見る。
+   ⚠️ 覚えない（開き直すと いまの見た目 に戻る）。
    ⚠️ CSSは **後ろに足して上書きする**＝ 印刷（`printResume` の resumeCss）・Excel にも同じ <style> が入るので、どこでも同じ見た目になる */
-let _resumeOldFmt = false;
+const RESUME_FMTS = [
+  { k:'new',       l:'いまの見た目（既定）',        t:'水色の見出し・絵文字なし・項目名が大きい・「入社希望日」' },
+  { k:'old',       l:'🕘 前のフォーマット',          t:'変更前（2026/10/07より前）の見た目：濃い紺の見出し・絵文字あり・「入社可能日」' },
+  { k:'old_plain', l:'🕘 前のフォーマット（絵文字なし）', t:'変更前の見た目（濃い紺の見出し）から、見出しの絵文字だけ外したもの' },
+];
+let _resumeFmt = RESUME_FMTS[0].k;
+const _resumeIsNew = () => _resumeFmt === 'new';
+const _resumeShowIco = () => _resumeFmt === 'old';
 const RESUME_V2_CSS = `
 .resume-section-title { background: #e4f2fb; color: #111; text-align: center; border: 1px solid #b9dcf2; letter-spacing: 4px; font-size: 13px; line-height: 1.35; padding: 2px 8px; }
 .resume-info td.lbl, .resume-table td.lbl, .resume-table th { font-size: 12px; }`;
-const _rsTitle = (ico, t) => '<div class="resume-section-title">' + (_resumeOldFmt ? ico + ' ' : '') + t + '</div>';
-function setResumeOldFmt(on) {
-  _resumeOldFmt = !!on;
+const _rsTitle = (ico, t) => '<div class="resume-section-title">' + (_resumeShowIco() ? ico + ' ' : '') + t + '</div>';
+function setResumeFmt(k) {
+  _resumeFmt = RESUME_FMTS.some(f => f.k === k) ? k : RESUME_FMTS[0].k;
   if (_resumePreviewOpen() && document.getElementById('rf_name')) {
     document.getElementById('resumeModalPreview').innerHTML = buildResumeHTML(getResumeFormData());
   } else if (document.getElementById('resumePreviewWrap') && typeof previewResume === 'function') {
     previewResume();
   }
-  document.querySelectorAll('[data-rfmt]').forEach(cb => { cb.checked = _resumeOldFmt; });
+  document.querySelectorAll('[data-rfmt]').forEach(sel => { sel.value = _resumeFmt; });
   _applyResumePageSel();
 }
 function buildResumeHTML(c) {
@@ -63623,7 +63632,7 @@ function buildResumeHTML(c) {
 .iv1-q { border: 1.5px solid #333; background: #dbe5f1; padding: 4px 6px; font-size: 10.5px; font-weight: 700; color: #1e3a5f; text-align: left; }
 .iv1-a { border: 1.5px solid #333; border-top: none; padding: 6px; font-size: 11px; vertical-align: top; height: 15mm; white-space: pre-wrap; word-break: break-word; }
 .iv1-alt { background: #fdf3d8; }
-${_resumeOldFmt ? '' : RESUME_V2_CSS}
+${_resumeIsNew() ? RESUME_V2_CSS : ''}
 </style>
 
 <div class="resume-page" id="resumeContent">
@@ -63697,7 +63706,7 @@ ${_resumeOldFmt ? '' : RESUME_V2_CSS}
     ${_rsTitle('✅', '就労状況')}
     <table class="resume-table">
       <tr><td class="lbl">分野</td><td>${esc(c.applicant_field||'')}</td><td class="lbl">職種</td><td>${esc(c.job_category||'')}</td></tr>
-      <tr><td class="lbl">${_resumeOldFmt ? '入社可能日' : '入社希望日'}</td><td>${c.available_from?formatDate(c.available_from):''}</td><td class="lbl">面接可能日時</td><td>${esc(c.interview_availability||'')}</td></tr>
+      <tr><td class="lbl">${_resumeIsNew() ? '入社希望日' : '入社可能日'}</td><td>${c.available_from?formatDate(c.available_from):''}</td><td class="lbl">面接可能日時</td><td>${esc(c.interview_availability||'')}</td></tr>
       <tr><td class="lbl">現職 手取(残業あり)</td><td>${esc(c.cur_net_salary_overtime||'')}</td><td class="lbl">現職 手取(残業無し)</td><td>${esc(c.cur_net_salary_base||'')}</td></tr>
       <tr><td class="lbl">希望 手取(残業あり)</td><td>${esc(c.net_salary_overtime||'')}</td><td class="lbl">希望 手取(残業無し)</td><td>${esc(c.net_salary_base||'')}</td></tr>
       <tr><td class="lbl">残業</td><td>${esc(c.overtime_preference||'')}</td><td class="lbl">夜勤</td><td>${esc(c.night_shift_count||'')}</td></tr>
@@ -66529,7 +66538,7 @@ const WHATS_NEW = [
   { version:'ver.20261007.3', date:'2026-10-07', notify:true, screens:['candidates','resume'], items:[
     '📝 履歴書の「入社可能日」を「入社希望日」に変えました（候補者情報・履歴書作成・ご本人が書くフォームも同じ名前です）',
     '📝 履歴書の見た目を変えました。項目の見出し（学歴・職歴など）は文字をまん中・大きめにして背景を薄い水色に、絵文字は外しました。氏名・国籍などの項目名の文字も少し大きくしました',
-    '🕘 前の見た目で出したいときは、履歴書の「出すページ」の右の［🕘 前のフォーマットで出力］にチェックを入れてから印刷・PDF・Excelを押してください',
+    '🎨 前の見た目で出したいときは、履歴書の「出すページ」の右の［🎨 見た目］で「🕘 前のフォーマット」か「🕘 前のフォーマット（絵文字なし）」を選んでから印刷・PDF・Excelを押してください',
   ]},
   { version:'ver.20261007.2', date:'2026-10-07', notify:true, screens:['chat','job_chat','team_chat'], items:[
     '💬 チャットで、読んだはずのチャットが未読に戻ってしまうことがあったのを直しました（既読にしたチャットが多い人ほど起きていました）',
