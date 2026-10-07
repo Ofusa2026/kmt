@@ -63536,7 +63536,7 @@ function onCountryProgressChange(input) {
    ⚠️ CSSは **後ろに足して上書きする**＝ 印刷（`printResume` の resumeCss）・Excel にも同じ <style> が入るので、どこでも同じ見た目になる */
 let _resumeOldFmt = false;
 const RESUME_V2_CSS = `
-.resume-section-title { background: #e4f2fb; color: #1f4e79; text-align: center; border: 1px solid #b9dcf2; letter-spacing: 4px; font-size: 13px; line-height: 1.35; padding: 2px 8px; }
+.resume-section-title { background: #e4f2fb; color: #111; text-align: center; border: 1px solid #b9dcf2; letter-spacing: 4px; font-size: 13px; line-height: 1.35; padding: 2px 8px; }
 .resume-info td.lbl, .resume-table td.lbl, .resume-table th { font-size: 12px; }`;
 const _rsTitle = (ico, t) => '<div class="resume-section-title">' + (_resumeOldFmt ? ico + ' ' : '') + t + '</div>';
 function setResumeOldFmt(on) {
