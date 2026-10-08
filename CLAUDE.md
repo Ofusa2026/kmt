@@ -2027,8 +2027,11 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   - ⚠️ 2段組みは **table で組む**（grid / flex にすると Excel で崩れる）。右のほうが高いときの左の余りは**左の表の全部の行に配る**（1つの行に寄せない＝左の table が `height:100%`）
   - ⚠️ 言葉の途中で改行しない＝ `word-break:keep-all`。見出しの改行位置は `<br>` で決める（「在留可能期間<br>（特定技能）」）
   - 📏 **A4の1枚にきれいに収めるのは `_resumeNewFit(root)` の1箇所だけ**。1ページの高さ＝ いまの横幅 × `RESUME_NEW_A4_RATIO`（281/194＝A4から余白8mm×2を引いた中身）−`RESUME_NEW_FIT_SAFE`
-    - はみ出す → `.rzin` に zoom（下限 `RESUME_NEW_FIT_MIN`(0.72)）
-    - 余る → 表の行の上下の余白 `--rzpy` を広げてA4の下まで均等に埋める（上限 `RESUME_NEW_PAD_MAX`(9px)。二分探索）＝ 下に大きな空きを残さない
+    - ① はみ出す → `.rzin` に**収まるいちばん大きい zoom**（二分探索・下限 `RESUME_NEW_FIT_MIN`(0.72)）
+    - ② 余る（①のあとも）→ 表の行の上下の余白 `--rzpy` と段と段のすき間 `--rzgap`（＝6＋余白×`RESUME_NEW_GAP_RATE`）を**同じ割合で**広げてA4の下まで埋める
+      （上限 `RESUME_NEW_PAD_MAX`(16px)。二分探索）＝ 内容が少なくても多くても、余白とすき間のつり合いが変わらない
+    - 高さは `getBoundingClientRect()` で測る（zoom を掛けたあとの見た目の高さ）
+    - 左右の段の高さが違うときは、低いほうの表の行に配る（左＝table の height:100%／右＝`.rz-right` の flex）
     - 描いたあとに必ず呼ぶ＝ `previewResume` ／ `openResumePreview` ／ `setResumeFmt`。幅が無い（見えていない）ときは何もしない。
       画面に出していない文字列は `_resumeFitHtml()` が見えない所で組んでから返す（`_resumeExportHtml` の最後の道）。DOM に書くので印刷・Excel にもそのまま入る
   - 📎 **新フォーマットに出ない入力欄の印は `RESUME_EXTRA_TAG` の1箇所だけ**（「（追加情報）」・`.i18n-inline`）＝ 在留カード番号／残業（現職）／夜勤（現職）。

@@ -63638,14 +63638,15 @@ function setResumeFmt(k) {
    見た目は `RESUME_NEW_CSS` の1かたまり（黒の細線・項目名は灰色の地のゴシック・中身は明朝）。
    2〜3ページ目（人材資料・一次面接）は今までどおり `buildResumeHTML` が後ろに足す。
    ⚠️ 2段組み（左＝基本情報〜保有資格／右＝写真と在留の5項目）は **table で組む**（Excel・印刷で崩れないように）。
-   右のほうが高いときの左の余りは、1つの行に寄せず**左の表の全部の行に配る**（左の table が height:100%）
+   左右の高さが違うときの余りは、1つの行に寄せず**低いほうの表の全部の行に配る**（左の table は height:100%／右は .rz-right の flex）
    ⚠️ **全部書いても1枚に収める**＝ はみ出すときは `_resumeNewFit()` が中身を少しずつ小さくする */
 const RESUME_NEW_FONT_JA = "'Yu Mincho','YuMincho','Hiragino Mincho ProN','Noto Serif JP','MS Mincho',serif";
 const RESUME_NEW_FONT_GO = "'Yu Gothic','YuGothic','Hiragino Sans','Meiryo',sans-serif";
 const RESUME_NEW_A4_RATIO = 281 / 194;  // 1ページの中身の 縦÷横（A4縦 297×210mm から印刷の余白 8mm×2 を引いた大きさ）
 const RESUME_NEW_FIT_SAFE = 14;          // はみ出し防止に少しだけ余らせる（px）
 const RESUME_NEW_FIT_MIN = 0.72;         // 縮めるときの下限
-const RESUME_NEW_PAD_MAX = 9;            // A4を埋めるときに広げる行の上下の余白の上限（px）
+const RESUME_NEW_PAD_MAX = 16;
+const RESUME_NEW_GAP_RATE = 0.8;         // 行の余白を1px広げるごとに、段と段のすき間を何px広げるか            // A4を埋めるときに広げる行の上下の余白の上限（px）
 const RESUME_NEW_CSS = `
 .resume-page.rzp { max-width:760px; padding:14px 16px; font-family:${RESUME_NEW_FONT_JA}; font-size:10.5px; line-height:1.35; color:#111; border-radius:0; }
 .rzp table { border-collapse:collapse; width:100%; table-layout:fixed; }
@@ -63664,7 +63665,10 @@ const RESUME_NEW_CSS = `
 .rzp table.rz-2col > tbody > tr > td.rz-cell { border:none; padding:0; vertical-align:top; }
 .rzp .rz-photo { border:1px solid #333; height:158px; display:flex; align-items:center; justify-content:center; color:#999; font-size:10px; text-align:center; overflow:hidden; }
 .rzp .rz-photo img { width:100%; height:100%; object-fit:cover; }
-.rzp .rz-gap { height:7px; }
+.rzp .rz-gap { height:var(--rzgap,7px); }
+.rzp .rz-mt { margin-top:var(--rzgap,6px); }
+.rzp .rz-right { display:flex; flex-direction:column; height:100%; }
+.rzp .rz-right > table { flex:1 1 auto; margin-top:var(--rzgap,6px); }
 .rzp .rz-name { font-size:15px !important; }
 `;
 function _resumeNewPageHtml(c, today) {
@@ -63720,12 +63724,12 @@ function _resumeNewPageHtml(c, today) {
       <tr><td class="lb">保有資格</td><td colspan="3" style="padding:2px 4px">${lic}</td></tr>
     </table></td>
     <td class="rz-cell"></td>
-    <td class="rz-cell">
+    <td class="rz-cell" style="height:1px"><div class="rz-right">
       <div class="rz-photo">${ph ? `<img src="${esc(ph)}" alt="証明写真">` : '写真<br>（縦4cm×横3cm）'}</div>
-      <table style="margin-top:6px">${stack}</table>
-    </td>
+      <table>${stack}</table>
+    </div></td>
   </tr></table>
-  <table style="margin-top:6px">
+  <table class="rz-mt">
     <tr><th>現職の手取り</th><th>希望の手取り</th><th>面接可能日時</th></tr>
     <tr><td class="c">${pay(c.cur_net_salary_base, c.cur_net_salary_overtime)}</td><td class="c">${pay(c.net_salary_base, c.net_salary_overtime)}</td><td class="c">${v(c.interview_availability)}</td></tr>
   </table>
@@ -63763,16 +63767,25 @@ function _resumeNewPageHtml(c, today) {
    1ページの高さは「いまの横幅 × RESUME_NEW_A4_RATIO」で出す＝ 画面でも印刷でも同じ割合になる */
 function _resumeNewFit(root) {
   (root || document).querySelectorAll('.rzp > .rzin').forEach(el => {
-    el.style.zoom = ''; el.style.removeProperty('--rzpy');
+    el.style.zoom = ''; el.style.removeProperty('--rzpy'); el.style.removeProperty('--rzgap');
     const w = el.clientWidth; if (w < 300) return;   // まだ見えていない（幅が無い）ときは何もしない
     const target = Math.floor(w * RESUME_NEW_A4_RATIO) - RESUME_NEW_FIT_SAFE;
-    const h = el.offsetHeight;
-    if (h > target) { el.style.zoom = String(Math.max(RESUME_NEW_FIT_MIN, Math.floor(target / h * 100) / 100)); return; }
-    const fits = px => { el.style.setProperty('--rzpy', px + 'px'); return el.offsetHeight <= target; };
+    // 行の余白（--rzpy）と、段と段のすき間（--rzgap）を同じ割合で広げる＝ どの量でも全体のつり合いが変わらない
+    const set = px => { el.style.setProperty('--rzpy', px + 'px'); el.style.setProperty('--rzgap', Math.round(6 + px * RESUME_NEW_GAP_RATE) + 'px'); };
+    const hNow = () => el.getBoundingClientRect().height;   // zoom を掛けたあとの見た目の高さ
+    const fits = px => { set(px); return hNow() <= target; };
+    // ① 多すぎるとき … いちばん大きく収まる zoom を探す（下限 RESUME_NEW_FIT_MIN）
+    set(1);
+    if (hNow() > target) {
+      let lo = RESUME_NEW_FIT_MIN, hi = 1;
+      for (let i = 0; i < 8; i++) { const mid = (lo + hi) / 2; el.style.zoom = String(mid); if (hNow() <= target) lo = mid; else hi = mid; }
+      el.style.zoom = String(Math.floor(lo * 1000) / 1000);
+    }
+    // ② 余ったぶんは、行の余白と段のすき間に均等に配って下まで埋める（zoom したあとも同じ）
     if (fits(RESUME_NEW_PAD_MAX)) return;
     let lo = 1, hi = RESUME_NEW_PAD_MAX;
     for (let i = 0; i < 8; i++) { const mid = (lo + hi) / 2; if (fits(mid)) lo = mid; else hi = mid; }
-    el.style.setProperty('--rzpy', (Math.floor(lo * 10) / 10) + 'px');
+    set(Math.floor(lo * 10) / 10);
   });
 }
 // 画面に出していない履歴書（文字列）を、いちど見えない所で組んで縮めてから返す
