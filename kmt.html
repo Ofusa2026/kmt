@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT業務管理システム</title>
-<!-- KMT_VERSION ver.20261008.2 -->
+<!-- KMT_VERSION ver.20261008.3 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -585,6 +585,9 @@ input[type="date"].form-input{min-width:112px;padding-left:6px;padding-right:6px
 /* 外部フォームの翻訳。紺色の見出しの中だけ白系にする（青のままだと読めない） */
 .extform-head .i18n-tr{color:#cfe3ff !important;}
 #candFormOverlay .btn-primary .i18n-tr{color:rgba(255,255,255,.92) !important;}
+/* 📎 履歴書（新フォーマット）に出ない欄（RESUME_EXTRA_TAG）は点線の枠で囲む。外部フォーム（ご本人が書く）は今までどおり */
+.form-group:has(> .form-label .rz-extra){border:1.5px dashed #fcd34d;background:#fffdf5;border-radius:6px;padding:5px 7px;}
+#candFormOverlay .form-group:has(> .form-label .rz-extra){border:0;background:none;padding:0;}
 /* モーダルの全画面ボタン */
 .modal-max{background:none;border:none;color:rgba(255,255,255,.75);font-size:17px;cursor:pointer;padding:0 8px;line-height:1;}
 /* 🔗 モーダルの見出しの右に置くショートカット（いまは人材の 📁 KMTドライブだけ）。
@@ -38760,9 +38763,33 @@ function _interview1PageHtml(c) {
    募集フォームが「履歴書①＝ここ／履歴書②＝人材資料」の2ページに分けるためだけの逃げ道で、
    **既定は今までどおり出す**（社内タブ・履歴書作成リンクは1文字も変わらない） */
 /* 📎 **新フォーマットの履歴書に出ない欄の印は `RESUME_EXTRA_TAG` の1箇所だけ**（入力・保存は今までどおり）。
-   いま付けているのは 在留カード番号／残業（現職）／夜勤（現職）。外部フォームでは「（追加情報） / 訳」になる（.i18n-inline） */
-const RESUME_EXTRA_TAG = '<span class="i18n-inline" title="入力した内容は保存されますが、履歴書（新フォーマット）には出ません" '
-  + 'style="background:#f1f5f9;color:#64748b;border:1px solid #cbd5e1;font-size:9.5px;font-weight:700;border-radius:4px;padding:0 5px;margin-left:5px;">（追加情報）</span>';
+   **どの欄に付けているかは `RESUME_EXTRA_ITEMS` の1箇所だけ**（欄の上のまとめ `_resumeExtraSummaryHtml()` もここから作る）。
+   外部フォームでは「（追加情報） / 訳」になる（.i18n-inline）。社内の画面だけ、欄を点線の枠で囲む（CSS の .rz-extra の1箇所） */
+const RESUME_EXTRA_TAG = '<span class="i18n-inline rz-extra" title="入力した内容は保存されますが、履歴書（新フォーマット）には出ません" '
+  + 'style="background:#fef3c7;color:#92400e;border:1px solid #fcd34d;font-size:9.5px;font-weight:700;border-radius:4px;padding:0 5px;margin-left:5px;">（追加情報）</span>';
+const RESUME_EXTRA_ITEMS = [
+  { id:'rf_residence_card',      l:'在留カード番号' },
+  { id:'rf_resignation_note',    l:'退職理由・状況' },
+  { id:'rf_overtime_preference', l:'残業（現職）' },
+  { id:'rf_night_shift',         l:'夜勤（現職）' },
+];
+function _resumeExtraSummaryHtml() {
+  return `<div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:7px 10px;margin:0 0 10px;font-size:11px;color:#78350f;line-height:1.6;">
+    <b>📎 履歴書（新フォーマット）に出ない項目</b>
+    <span style="font-size:10px;color:#a16207;">＝ 入力・保存はできます（担当者の確認用）。欄には ${RESUME_EXTRA_TAG.replace('margin-left:5px;','')} の印と点線の枠が付きます</span>
+    <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:4px;">${RESUME_EXTRA_ITEMS.map(x =>
+      `<button type="button" onclick="resumeExtraGo('${x.id}')" style="font-size:10.5px;border:1px solid #fcd34d;background:#fff;color:#92400e;border-radius:999px;padding:1px 9px;cursor:pointer;">${esc(x.l)} ↓</button>`).join('')}</div>
+  </div>`;
+}
+function resumeExtraGo(id) {
+  const scope = document.getElementById('candidateModal') || document;
+  const el = (scope.querySelector && scope.querySelector('#' + id)) || document.getElementById(id);
+  if (!el) return;
+  const box = el.closest('.form-group') || el;
+  box.scrollIntoView({ behavior:'smooth', block:'center' });
+  box.style.transition = 'box-shadow .3s'; box.style.boxShadow = '0 0 0 3px #fbbf24';
+  setTimeout(() => { box.style.boxShadow = ''; }, 1600);
+}
 function resumeFormFieldsHtml(opt) {
   const ext = !!(opt && opt.external);   // 外部フォームでは社内用の項目を出さない
   const withDocs = !(opt && opt.docs === false);
@@ -38783,7 +38810,8 @@ function resumeFormFieldsHtml(opt) {
           ${isAdminUser() ? `<button type="button" class="btn btn-outline" style="font-size:10px;padding:2px 8px;"
             onclick="event.preventDefault();event.stopPropagation();openKmtLogoModal()"
             title="社団KMTのロゴを登録します（管理者のみ）">🏢 ロゴを登録</button>` : ''}
-        </label>`}
+        </label>
+        ${_resumeExtraSummaryHtml()}`}
 
         <!-- 基本情報 -->
         <div class="section-title" style="font-size:11px;font-weight:800;color:var(--navy);padding:8px 0 4px;border-bottom:1px solid var(--gray-200);margin-bottom:8px;grid-column:1/-1;">👤 基本情報</div>
@@ -38908,7 +38936,7 @@ function resumeFormFieldsHtml(opt) {
         </div>
         ${ext ? '<div style="font-size:10.5px;color:var(--gray-400);margin-bottom:6px;">1つ目の欄に、いちばん新しいお仕事を書いてください。2つ以上あるときは［＋ 追加］で欄を増やせます</div>' : ''}
         <div id="rf_work_history_list" style="margin-bottom:8px"></div>
-        <div class="form-group" style="margin-bottom:8px"><label class="form-label">退職理由・状況</label><input class="form-input" id="rf_resignation_note" oninput="previewResume()"></div>
+        <div class="form-group" style="margin-bottom:8px"><label class="form-label">退職理由・状況${RESUME_EXTRA_TAG}</label><input class="form-input" id="rf_resignation_note" oninput="previewResume()"></div>
 
         <!-- 就労希望 -->
         <div class="section-title" style="font-size:11px;font-weight:800;color:var(--navy);padding:8px 0 4px;border-bottom:1px solid var(--gray-200);margin:4px 0 8px;">✅ 就労状況・希望条件</div>
@@ -63742,7 +63770,6 @@ function _resumeNewPageHtml(c, today) {
     <tr><th>勤務期間</th><th>在留資格</th><th>所属機関</th><th>勤務地</th><th>職種</th></tr>
     ${wh.length ? wh.map(w => `<tr><td class="c" style="height:18px">${v(w.period)}</td><td class="c">${v(w.visa)}</td><td>${v(w.company)}</td><td class="c">${v(w.location)}</td><td class="c">${v(w.job_type)}</td></tr>`).join('')
       : '<tr><td class="c" colspan="5" style="height:18px;color:#999">（職歴なし）</td></tr>'}
-    ${c.resignation_note ? `<tr><td colspan="5" class="sm">退職理由：${v(c.resignation_note)}</td></tr>` : ''}
   </table>
   <div class="rz-gap"></div>
   <table>
@@ -66778,6 +66805,10 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20261008.3', date:'2026-10-08', notify:true, screens:['candidates','resume'], items:[
+    '履歴書（新フォーマット）から「退職理由」の行を外しました（入力欄はそのまま残っています）',
+    '履歴書作成の画面のいちばん上に「📎 履歴書（新フォーマット）に出ない項目」のまとめを出しました。押すとその欄まで移動します。出ない欄（在留カード番号・退職理由・残業・夜勤）は点線の枠で囲みます',
+  ]},
   { version:'ver.20261008.2', date:'2026-10-08', notify:true, screens:['candidates','resume'], items:[
     '履歴書（新フォーマット）の「現職・希望の手取り／面接可能日時」と「一時帰国希望・家族の同意・健康状態・ライフスタイル」を、職歴のすぐ下（本人からの質問の上）に移しました',
   ]},
