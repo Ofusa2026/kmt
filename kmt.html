@@ -63638,6 +63638,7 @@ function setResumeFmt(k) {
    見た目は `RESUME_NEW_CSS` の1かたまり（黒の細線・項目名は灰色の地のゴシック・中身は明朝）。
    2〜3ページ目（人材資料・一次面接）は今までどおり `buildResumeHTML` が後ろに足す。
    ⚠️ 2段組み（左＝基本情報〜保有資格／右＝写真と在留の5項目）は **table で組む**（Excel・印刷で崩れないように）。
+   右のほうが高いときの左の余りは、1つの行に寄せず**左の表の全部の行に配る**（左の table が height:100%）
    ⚠️ **全部書いても1枚に収める**＝ はみ出すときは `_resumeNewFit()` が中身を少しずつ小さくする */
 const RESUME_NEW_FONT_JA = "'Yu Mincho','YuMincho','Hiragino Mincho ProN','Noto Serif JP','MS Mincho',serif";
 const RESUME_NEW_FONT_GO = "'Yu Gothic','YuGothic','Hiragino Sans','Meiryo',sans-serif";
@@ -63714,7 +63715,7 @@ function _resumeNewPageHtml(c, today) {
       <tr><td class="lb">住所</td><td colspan="3">${addr}</td></tr>
       <tr><td class="lb">希望</td><td colspan="3">${wish}</td></tr>
       <tr><td class="lb">志望動機</td><td colspan="3">${v(c.motivation)}</td></tr>
-      <tr style="height:100%"><td class="lb">保有資格</td><td colspan="3" style="padding:2px 4px">${lic}</td></tr>
+      <tr><td class="lb">保有資格</td><td colspan="3" style="padding:2px 4px">${lic}</td></tr>
     </table></td>
     <td class="rz-cell"></td>
     <td class="rz-cell">
