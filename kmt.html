@@ -63642,12 +63642,14 @@ function setResumeFmt(k) {
    ⚠️ **全部書いても1枚に収める**＝ はみ出すときは `_resumeNewFit()` が中身を少しずつ小さくする */
 const RESUME_NEW_FONT_JA = "'Yu Mincho','YuMincho','Hiragino Mincho ProN','Noto Serif JP','MS Mincho',serif";
 const RESUME_NEW_FONT_GO = "'Yu Gothic','YuGothic','Hiragino Sans','Meiryo',sans-serif";
-const RESUME_NEW_FIT_PX = 1030;   // 1ページに入る高さ（A4縦・余白8mm の中身 約1060px から少し余らせる）
-const RESUME_NEW_FIT_MIN = 0.72;  // これより小さくはしない
+const RESUME_NEW_A4_RATIO = 281 / 194;  // 1ページの中身の 縦÷横（A4縦 297×210mm から印刷の余白 8mm×2 を引いた大きさ）
+const RESUME_NEW_FIT_SAFE = 14;          // はみ出し防止に少しだけ余らせる（px）
+const RESUME_NEW_FIT_MIN = 0.72;         // 縮めるときの下限
+const RESUME_NEW_PAD_MAX = 9;            // A4を埋めるときに広げる行の上下の余白の上限（px）
 const RESUME_NEW_CSS = `
 .resume-page.rzp { max-width:760px; padding:14px 16px; font-family:${RESUME_NEW_FONT_JA}; font-size:10.5px; line-height:1.35; color:#111; border-radius:0; }
 .rzp table { border-collapse:collapse; width:100%; table-layout:fixed; }
-.rzp td, .rzp th { border:1px solid #333; padding:1px 5px; vertical-align:middle; font-size:10.5px !important; line-height:1.35;
+.rzp td, .rzp th { border:1px solid #333; padding:var(--rzpy,1px) 5px; vertical-align:middle; font-size:10.5px !important; line-height:1.35;
   word-break:keep-all; overflow-wrap:anywhere; font-weight:400; color:#111; background:none; text-align:left; }
 .rzp td.lb, .rzp th { background:#ececec; font-family:${RESUME_NEW_FONT_GO}; font-weight:700; font-size:10px !important; overflow-wrap:normal; }
 .rzp th { text-align:center; }
@@ -63755,12 +63757,22 @@ function _resumeNewPageHtml(c, today) {
   </table>
 </div></div>`;
 }
-/* 🆕 はみ出すときに中身を小さくして1枚に収める。**やるのはこの1箇所だけ**（表示中の DOM に zoom を書く＝印刷・Excel にもそのまま入る） */
+/* 🆕 **A4の1枚にきれいに収める。やるのはこの1箇所だけ**（表示中の DOM に書く＝印刷・Excel にもそのまま入る）
+   ・はみ出すとき … 中身を小さくする（zoom。下限 RESUME_NEW_FIT_MIN）
+   ・余るとき     … 表の行の上下の余白（--rzpy）を広げて、A4の下まで均等に埋める（下に大きな空きを残さない）
+   1ページの高さは「いまの横幅 × RESUME_NEW_A4_RATIO」で出す＝ 画面でも印刷でも同じ割合になる */
 function _resumeNewFit(root) {
   (root || document).querySelectorAll('.rzp > .rzin').forEach(el => {
-    el.style.zoom = '';
+    el.style.zoom = ''; el.style.removeProperty('--rzpy');
+    const w = el.clientWidth; if (w < 300) return;   // まだ見えていない（幅が無い）ときは何もしない
+    const target = Math.floor(w * RESUME_NEW_A4_RATIO) - RESUME_NEW_FIT_SAFE;
     const h = el.offsetHeight;
-    if (h > RESUME_NEW_FIT_PX) el.style.zoom = String(Math.max(RESUME_NEW_FIT_MIN, Math.floor(RESUME_NEW_FIT_PX / h * 100) / 100));
+    if (h > target) { el.style.zoom = String(Math.max(RESUME_NEW_FIT_MIN, Math.floor(target / h * 100) / 100)); return; }
+    const fits = px => { el.style.setProperty('--rzpy', px + 'px'); return el.offsetHeight <= target; };
+    if (fits(RESUME_NEW_PAD_MAX)) return;
+    let lo = 1, hi = RESUME_NEW_PAD_MAX;
+    for (let i = 0; i < 8; i++) { const mid = (lo + hi) / 2; if (fits(mid)) lo = mid; else hi = mid; }
+    el.style.setProperty('--rzpy', (Math.floor(lo * 10) / 10) + 'px');
   });
 }
 // 画面に出していない履歴書（文字列）を、いちど見えない所で組んで縮めてから返す

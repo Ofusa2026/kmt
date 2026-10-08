@@ -2026,9 +2026,11 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   - 手取りは1枠に「18万（残業なし）／20万（残業あり）」（入力は今までどおり2つの欄）。備考欄＝担当者の感想＋企業面接メモをつなげて出す（列は今までどおり2つ）
   - ⚠️ 2段組みは **table で組む**（grid / flex にすると Excel で崩れる）。右のほうが高いときの左の余りは**左の表の全部の行に配る**（1つの行に寄せない＝左の table が `height:100%`）
   - ⚠️ 言葉の途中で改行しない＝ `word-break:keep-all`。見出しの改行位置は `<br>` で決める（「在留可能期間<br>（特定技能）」）
-  - 📏 **全部書いてもA4で1枚＝ はみ出すときに縮めるのは `_resumeNewFit(root)` の1箇所だけ**（`.rzin` に zoom を書く。
-    上限 `RESUME_NEW_FIT_PX`(1030)・下限 `RESUME_NEW_FIT_MIN`(0.72)）。描いたあとに必ず呼ぶ＝ `previewResume` ／ `openResumePreview` ／ `setResumeFmt`。
-    画面に出していない文字列は `_resumeFitHtml()` が見えない所で組んで縮める（`_resumeExportHtml` の最後の道）。zoom は DOM に書くので印刷・Excel にもそのまま入る
+  - 📏 **A4の1枚にきれいに収めるのは `_resumeNewFit(root)` の1箇所だけ**。1ページの高さ＝ いまの横幅 × `RESUME_NEW_A4_RATIO`（281/194＝A4から余白8mm×2を引いた中身）−`RESUME_NEW_FIT_SAFE`
+    - はみ出す → `.rzin` に zoom（下限 `RESUME_NEW_FIT_MIN`(0.72)）
+    - 余る → 表の行の上下の余白 `--rzpy` を広げてA4の下まで均等に埋める（上限 `RESUME_NEW_PAD_MAX`(9px)。二分探索）＝ 下に大きな空きを残さない
+    - 描いたあとに必ず呼ぶ＝ `previewResume` ／ `openResumePreview` ／ `setResumeFmt`。幅が無い（見えていない）ときは何もしない。
+      画面に出していない文字列は `_resumeFitHtml()` が見えない所で組んでから返す（`_resumeExportHtml` の最後の道）。DOM に書くので印刷・Excel にもそのまま入る
   - 📎 **新フォーマットに出ない入力欄の印は `RESUME_EXTRA_TAG` の1箇所だけ**（「（追加情報）」・`.i18n-inline`）＝ 在留カード番号／残業（現職）／夜勤（現職）。
     ⚠️ 入力・保存は今までどおり（欄は消さない）。新フォーマットに出ない欄を増やしたらここも付けること
 - **印刷・PDF・Excel に出すページは `RESUME_PAGES` の1箇所**で定義する
