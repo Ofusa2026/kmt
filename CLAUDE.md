@@ -2041,6 +2041,12 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
     社内の画面だけ欄を点線の枠で囲む（CSS の `.rz-extra` の1箇所。外部フォーム `#candFormOverlay` では囲まない）。
     履歴書作成の画面のいちばん上（🏢 履歴書の見た目の下）にまとめ＝ `_resumeExtraSummaryHtml()`（押すと `resumeExtraGo()` でその欄へ）
     ⚠️ 入力・保存は今までどおり（欄は消さない）。新フォーマットに出ない欄を増やしたらここも付けること
+  - 🟥 **新フォーマットに出る項目で空いている欄は `RESUME_PRINT_ITEMS` の1箇所だけ**（`l` 名前／`go` 飛ぶ先の欄／`more` 一緒に赤くする欄／`has(d)` 入っているか／`when(d)` 見る条件。
+    d は `getResumeFormData()`＝履歴書と同じ値）。「あれば書く」項目（本人からの質問・備考欄・その他の資格・技能試験項目・専攻）は入れない
+    - 描き直すのは **`_resumeBlankRefresh()` の1箇所だけ**＝ 上のまとめ（`#rfBlankBox`＝社内の画面だけ）と欄の `.rz-blank`（薄い赤＋「空欄」）。
+      入力・変更・クリックのたびに `_resumeBlankSoon()`（200ms待つ）＋ `fillResumeForm` / `previewResume` から呼ぶ
+    - 押すと `resumeBlankGo(id)`（その欄へ移動して光らせ、入力欄にフォーカス）／［▶ 次の空欄へ］＝ `resumeBlankNext()`
+    - ⚠️ 新フォーマット（`_resumeNewPageHtml`）に出す項目を足したら、ここにも足すこと
 - **印刷・PDF・Excel に出すページは `RESUME_PAGES` の1箇所**で定義する
   （`main` / `docs`＝`.resume-doc-page` / `iv1`＝`.resume-iv1-page`）。
   選択は `_resumePageSel`、出力時のふるい落としは `_resumeFilterPages()`。
