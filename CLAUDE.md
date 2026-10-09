@@ -1077,6 +1077,14 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   **セルを作るのは `_jpFeeCell()` の1箇所**（`openJobProgressDetail(src_row, 'jpf_amount')`。
   `_jpCountCell()` と同じく `event.stopPropagation()` が必須）
 
+### 📋 求人管理リスト（KMT管理リスト）の見た目
+
+- **見た目は CSS の `.jp-list` の1かたまりだけ**（文字を大きめ・1行で出して横にスクロール・`min-width:1500px`）。会社名（`.jpl-co`）だけ折り返す
+- 印を大きくするのは各部品の **`lg` 引数**＝ `_jpStatusBadge(s, true)` / `_jpPriorityBadge(v, true)`（枠なしの文字。「非常に高い」だけ赤字）/
+  `_jpForecastBadge(v, true)` / `_jpCaseKindBadge(r, true)` / `_jpNatChips(arr, true)` / `_csCellHtml(r, true)`。
+  チップの大きさは `_csChipSize(lg)` の1箇所。**`lg` を付けないほかの一覧（売上見込みなど）は今までどおり**
+- 見出しの並べ替えの印（▲▼）は**選んでいる列だけ**に出す（⇅ は出さない）
+
 ### 🟡 売上見込みの上のサマリ（売上管理【🟡 売上見込み】タブ）
 
 - **作るのは `_sfSummaryHtml(list)` の1箇所だけ**（いま一覧に出ているぶん＝絞り込み・現在／過去に従う）。カードは3つ
