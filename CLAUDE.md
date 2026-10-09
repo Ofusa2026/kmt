@@ -1086,13 +1086,16 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   `_jpForecastBadge(v, true)` / `_jpCaseKindBadge(r, true)` / `_jpNatChips(arr, true)` / `_csCellHtml(r, true)`。
   チップの大きさは `_csChipSize(lg)` の1箇所。**`lg` を付けないほかの一覧（売上見込みなど）は今までどおり**
 - 見出しの並べ替えの印（▲▼）は**選んでいる列だけ**に出す（⇅ は出さない）
-- ✂️ **長い文字の列（会社名・分野・職種・企業担当メモ）は言葉の切れ目で下の行へ折り返す**＝ 1つの列だけ大きく空くのを防ぐ。
-  分野・職種・メモの1つぶんは **`_jplTxt(v, col)` の1箇所**、列ごとの幅（いちばん細い／広い）は **`JP_LIST_TXT_W` の1箇所だけ**、
-  メモは `JP_LIST_MEMO_LINES`(3) 行まで（全文は title）。会社名の幅は CSS の `.jpl-co`
+- 📐 **列の幅は `JP_LIST_COLS` の1箇所だけ**（並び・見出し・幅px・寄せ）＝ `<colgroup>` ＋ `table-layout:fixed`、表の幅は列の合計（`_jpListW()`）。
+  ⚠️ **表を横幅いっぱいに引き伸ばさない**（`width:100%` だと、つまみで縮めたときに余った幅が列に配られて、すき間だらけになった。実際に言われた）。
+  グループの枠も表の幅まで（`max-width`）。どのグループも列の位置がそろう
+- ✂️ **長い文字の列（会社名・分野・職種・企業担当メモ）は言葉の切れ目で下の行へ折り返す**（幅は `JP_LIST_COLS`）。
+  1つぶんは **`_jplTxt(v, col)` の1箇所**、メモは `JP_LIST_MEMO_LINES`(3) 行まで（全文は title）
   - 🔤 **文字の切れ目を入れるのは `txtWrap()` / `TXT_WRAP_CSS` の1箇所だけ**（求人票の書類の `_jsWrap` / `JS_WRAP_CSS` はこれを指すだけ）
 - 🔍 **表示の大きさのつまみ**（合計の行の［🔍 表示の大きさ 小 ━●━ 大 ◯%］）＝ 一覧（グループの表）だけを `#jpZoomBox` の `zoom` で縮める・広げる。
   **範囲・きざみ・既定は `JP_LIST_ZOOM` の1箇所だけ**（50〜130%・5%きざみ・既定100%）、いまの値を読むのは **`_jpListZoom()` の1箇所だけ**
-  （`localStorage` の `kmt_jp_zoom_<user_id>`＝この端末・このユーザー）。つまみは `_jpZoomBarHtml()`、動かすのは `setJpListZoom(v, save)`
+  （`localStorage` の `kmt_jp_zoom_<user_id>`＝この端末・このユーザー）。つまみは `_jpZoomBarHtml()`、動かすのは `setJpListZoom(v, save)`。
+    ［⇔ 幅に合わせる］＝ `jpZoomFit()`（`#jpGroupArea` の幅 ÷ `_jpListW()` をきざみで切り捨て＝ 横に入るいちばん大きい％）
   - ⚠️ **引っぱっているあいだは描き直さない**（`oninput` は zoom と％の文字だけ書き替え、離したとき＝`onchange` で覚える）
   - 上の売上見込み・検索欄・タブ・合計の行は縮めない。⛶ 全画面の `_fullFit()` はこの上からさらに合わせる（つまみを動かしたら測り直す）
 
