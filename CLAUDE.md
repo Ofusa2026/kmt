@@ -1079,6 +1079,8 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 
 ### 📋 求人管理リスト（KMT管理リスト）の見た目
 
+- 🔢 **いちばん上の件数の枠（`#jpForecast`）は `_jpRenderForecast()` の1箇所**＝ KMT案件／紹介案件／合計 を「◯件　◯人」（人数＝募集人数）の1行の小さな枠で出す。
+  ⚠️ **金額は出さない**（売上見込みは 売上管理【🟡 売上見込み】で見る＝そう頼まれた）
 - **見た目は CSS の `.jp-list` の1かたまりだけ**（文字を大きめ・1行で出して横にスクロール・`min-width:1500px`）。会社名（`.jpl-co`）だけ折り返す
 - 印を大きくするのは各部品の **`lg` 引数**＝ `_jpStatusBadge(s, true)` / `_jpPriorityBadge(v, true)`（枠なしの文字。「非常に高い」だけ赤字）/
   `_jpForecastBadge(v, true)` / `_jpCaseKindBadge(r, true)` / `_jpNatChips(arr, true)` / `_csCellHtml(r, true)`。
