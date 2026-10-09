@@ -1579,6 +1579,19 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   - ⚠️ `_jpDetailParse()` は**区切りの手前まで**取るので、2文字以上の値（`N4`）も1文字（`○`）も同じように読める
 - ⚠️ **項目名も選択肢も `EXT_FORM_I18N` に足すこと**（本人が読む外部フォームに出るため）
 
+#### 🧪 履歴書の【技能試験】と 🚗【運転免許】
+
+- **技能試験の欄は `skillExamFieldHtml(prefix, cur)` の1箇所だけ**（`rf_` / `cf_`。選択肢は `RESUME_OPTS.skill_exam_1`＝ なし／専門級／随時３級／評価調書／特定技能評価試験 ＋ `SKILL_EXAM_OTHER`）。
+  「その他（記入）」は**書いた文字をそのまま `skill_exam_1` に入れる**（宗教と同じ持ち方）。読み書きは `_skillExamValue()` / `_skillExamSet()` の2つだけ
+  - ⚠️ `cf_skill_exam_1_other` は列が無いので、旧・応募者登録リンク（`_cndFormValues`）では総なめから外してある
+- 🚫 **評価調書（`hyoka_chosho`）の個別の欄は外した**（技能試験の選択肢にあるため）。**列と値は残す**＝ 履歴書作成は隠しの `rf_hyoka_chosho` で持ち回り、
+  候補者情報タブ（`saveCandidate`）は送らない。ver5 では「有」のとき技能試験の横に「（評価調書：有）」と出す。過去④〜①は今までどおり
+- 🚗 **運転免許は `candidates.licenses.drive`**（`{car, car_type, bike, bike_cc}`。列を増やさない）。選択肢は `DRIVE_HAS` / `DRIVE_CAR_TYPES` / `DRIVE_BIKE_CC`、
+  欄は `driveLicenseFieldHtml()`、出し入れは `onDriveChange()`、読み書きは `_driveSet()` / `_driveValue()`、履歴書の1行は `_driveText()`
+  - **読むのは `_licSplit(lic)` の1箇所だけ**＝ 保有資格の項目「普通車運転免許」（`DRIVE_LEGACY_ITEMS`）を抜き出し、チェックがあれば自動車＝あり に読み替える
+    （移行はしない＝開いて保存したときにそろう）。ver5 の保有資格の行もこれを通す（過去④は今までどおり `_licItems()`）
+  - 🟥 空欄のまとめ（`RESUME_PRINT_ITEMS`）は自動車・バイクの両方が答えてあるまで「運転免許」を出す
+
 #### 🛂 職歴の【在留資格】（選択式）
 
 - 職歴1行＝ 勤務期間 → **在留資格** → 所属機関 → 勤務地 → 職種（履歴書の表もこの並び）。
