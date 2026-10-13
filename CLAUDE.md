@@ -2294,7 +2294,14 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   **`_schedCalShift()` の1箇所**（年＝1年／週＝7日／月＝1か月）
   - 年表示は `renderScheduleYearGrid()`＝12か月ぶんの小さなカレンダー。
     予定は**種別の色の点**（4件以上は「+n」）、月の見出しを押すと `schedCalGoMonth()` で月表示に切り替わる
-  - 件数の見出しの言い方は **`SCHED_PERIOD_LABEL` の1箇所**（この年／この週／この月）
+  - 件数の見出しの言い方は **`SCHED_PERIOD_LABEL` の1箇所**（この年／この週／この月／この期間）
+  - 🏢 **企業×月（業務管理シートと同じ形）は `renderScheduleCoGrid(area, range)` の1箇所だけ**（ボタンは［🏢 企業×月］＝ view `co`）。
+    期間は **`SCHED_CO_YEARS`(2) 年ぶん**（いまの年で終わる・前後は1年ずつ）、開いたときは今月のあと `SCHED_CO_AHEAD`(3) か月が見える所まで横に送る
+    - 行＝その期間に予定がある企業（企業番号順。絞り込み・種別に従う）／1マスの中は **「日付・種別・状態」ごとに1行**（何名でも1行＝「3名」）
+    - 色は **`SCHED_CO_CELL` の1箇所**（実施済＝白／日付ありの予定＝薄い黄／日付未定＝黄）。状態は `_schedCoKind()`（`schedIsDone()` を通す）
+    - 📌 日付未定は帯と同じく **`_schedUndatedIsMine()` を通す**（自分がメイン・サブ担当の企業のぶんだけ）
+    - 1行を押す＝ `openSchedCoCell()`（1件ならその予定・何件かなら一覧）／空いたマス＝ `openScheduleModalPreset(null, 企業, 月の1日)`
+    - ⚠️ 上の説明は左に貼り付ける＝ **外側の箱を `width:max-content` にしてから** `position:sticky;left:0`（しないと説明も横に流れる）
 - 📅 **社内の「年間カレンダー」の休みを、支援カレンダーにも出す。**
   **読むのは `loadCalDays()` の1箇所だけ**で、`company_calendars` の
   `days`（日付ごとの区分）と `holidays`（◇祝日）の**両方**を見る。
