@@ -4372,6 +4372,14 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   - ⚙️ 設定に Anthropic APIキー（`ofusa_apiKey`）がある人は **`_zjAskAi()`** が Q&A全文を渡して文章で答える。
     **AIに渡す資料は `_zjKnowledgeText()` の1箇所**（資料は `cache_control` で使い回す）。型番は `ZUIJI_AI_MODELS` の先頭から試す
   - 答えの中の「Q2-37」は押すと `openZjQa()` でその1問が開く（`_zjRich()` の1箇所でリンクにする）
+  - 🤖 **答えの組み立ては system の文の1箇所**＝【結論】【資料から答えられること】【資料では答えられないこと】【確認先】（問いが複数なら問いごと）。
+    **AIに渡す資料（`_zjKnowledgeText()`）には Q&A全文のほか、入管の連絡先・`ZUIJI_JURIS`・`ZG_GUIDES`（出来事ごとの案内）・`ZG_CHG_ROWS`（第３－１－１号の変更事由ごとの添付）も入れる**
+  - ⚠️ **いまの型番は考える過程（thinking）を必ず持つ**＝ `max_tokens` が小さいと考える過程だけで使い切って本文が空で返る（1,500 で実際に「答えが空でした」になった）。
+    上限は `ZUIJI_AI_MAX_TOKENS`、深さは `ZUIJI_AI_EFFORT`、本文は `type:'text'` のブロックだけ読む。空のときは `stop_reason`（refusal／max_tokens）を言い換えて出す。
+    安全の判定で断られたときに別の型番へ回す `fallbacks:'default'`（ベータ `server-side-fallback-2026-07-01`）を付けてある
+  - 🧭 **「どこに聞けばいいか」は `ZUIJI_JURIS` の1箇所だけ**（AIの資料／APIキーが無いときの答えの下の「確認先」＝ `_zjJurisHits()` の `kw`／☎️ 連絡先のタブ）
+  - ☎️ **［☎️ 連絡先・問い合わせ先］のタブ**＝ `_zjContactsHtml()`。各局の代表番号は `ZUIJI_OFFICES` の `tel`、総合窓口は `ZUIJI_INFO_CENTER`。
+    探すのは `_zjOfficeHit()`（⚠️ 検索欄は作り直さず `#zjOffList` だけ描き直す）。電話は変わることがあるので、画面に「かける前に入管庁のページで確かめる」を必ず出す
   - 会話はメモリだけ（`_zjChat`）。DBには何も書かない
 - Q&A一覧の検索は**一覧の中身だけ**描き直す（`setZjListQ` → `_zjRenderListItems`。検索欄を作り直すと日本語入力が切れる）
 - 📄 **2. の様式一覧は `ZUIJI_FORMS`（名前が分かっている様式）＋ 取り込んだファイルの2つから作る（`_zjFormList()` の1箇所）**
