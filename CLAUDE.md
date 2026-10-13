@@ -4424,6 +4424,12 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
       **案内の文章は `ZG_GUIDES`（出来事ごと）＋ `ZG_GUIDE_COMMON`（期限・提出先・出し方）の1箇所だけ**＝ 入管庁のQ&A（令和7年6月版）から。
       文中の「Q4-2」は `_zjRich()` が押せるリンクにする。出すかどうかは `_zg.guide`（`_zg.home` が true のときだけ見る＝ `_zgApplyHome()`）、描くのは `renderZgGuide()`
     - 案内から進む先は **`zgGuideGo(k, mode, no)` の1箇所だけ**（`list`＝人材リスト／`doc`＝書類を作る／`no`＝その様式から）。入力画面の上の［📖 案内を見る］で戻れる
+      - ここで作れない様式（`ZG_FORMS` に無い＝第３－１－１号・第３－２号など）は、案内のボタンが **原本（Excel）／記載例** に変わる（`zgOpenOriginal()` / `zgOpenSample()`）。
+        入力画面の上の「この届出で使う様式」には作れる様式だけ並べる（`_zgPurposeStripHtml()`）
+      - 案内の部品は `steps`（①②の出す順番と時期）／`table` ＋ `tableHead` / `tableTitle` / `tableNote`（変更した項目ごとの添付書類。第３－１－１号の表は `ZG_CHG_ROWS`）／`src`（根拠の資料のキー）
+    - 📚 **根拠の資料（入管庁の「随時届出 提出資料一覧表」001361526.pdf・001361527.pdf）は `ZUIJI_LEAFLETS` の1箇所だけ**＝
+      最初の画面・各案内（`src`）・Q&Aの画面の参考リンク（`ZUIJI_LINKS`）が同時に追従する。ボタンは `_zjLeafletsHtml()`。
+      ⚠️ こちら（Claude）の環境からは moj.go.jp を読めないので、中身はユーザーの画面の写しから書いた
     - 選んだ出来事は `_zg.purpose`。入力画面・人材リストの上に「この届出で使う様式」を出す（`_zgPurposeStripHtml()`。押すと `zgOpenForm`＝所属機関・人材はそのまま）
     - 最初の画面には 人材リストの進み具合（`list` のある様式）・様式番号で探す（`_zjFormHit`。⚠️ 検索欄は作り直さず `#zgHomeHits` だけ）・📜 作成履歴 も置く。左上の［🏠 何がありましたか？］＝ `zgGoHome()`
   - 📋 **人材リストで管理（届出状況）＝ `ZG_FORMS[no].list` を書いた様式だけ**（いまは 3-3-2＝`{ bucket:'out' }`）。
