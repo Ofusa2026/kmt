@@ -1042,6 +1042,9 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
     `updCandStatusRow()` は配列を書き替えるだけ。描き直すのは
     **国籍を選び直したとき**（記入欄の出し入れがある）と**追加・削除**のときだけ
   - ⚠️ 欄の id が `jpf_` 始まりでないので、**未保存の印は `_csTouch()` の1箇所**で自分で立てる
+  - 👥 **国籍ごとの見込み人数＝ 行の `count`**（国籍と状況のあいだの小さな欄）。**合計を【見込み人数】（`jpf_prospect_count`）に入れるのは `_csApplyProspect()` の1箇所だけ**
+    （合計は `_csProspectSum()`。入れたあと `_jpFeeCalc()` も通す）。⚠️ **全部空のときは【見込み人数】に触らない**（手で入れた人数を消さない）。
+    一覧のセル（`_csCellHtml`）にも「◯名」と出す
   - 外側の入れ物の id は **`jpf_candidate_status` のまま**（売上見込みのセルを押したときの
     `openJobProgressDetail(src_row,'jpf_candidate_status')` がそのまま効く）
 
