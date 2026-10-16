@@ -3399,7 +3399,10 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   （記録簿の一覧の `stateOf()`＝`none`（対象外）／`missOf()`＝必要な欄なし）。**すでに記録がある行は今までどおり**
 - 🚫 **人材情報の 6. 人材情報〜9. 連絡先の未記入アラートも件数に数えない**（`missingRequiredFields` の中。対象は `PERIODIC_OUT_SKIP_IDS`＝`WORKER_REQUIRED_FIELDS` の `wf_name_kana` から後ろ全部）。
   ⚠️ **欄の薄赤はそのまま出す**（保存時の確認 `missingRequiredFieldsFromForm` も変えていない）。1〜4 と 10. 通算期間は今までどおり数える
-- ⚠️ 読む列は `REG_WORKER_SELECT_COLS` に入れてある。**定期面談報告書の対象人材（`_meetReportWorkers`）は変えていない**
+- 🚫 **登録支援機関業務のお知らせからも外す**（どれも `_regPeriodicOut()` を通す）＝ 📅 定期面談報告書の日付が足りない人材（`loadMeetDateTodos` / `_meetReportNeedFix`）／
+  定期面談報告書の対象人材（`_meetReportWorkers`）／⏰ 面談記録の記入待ち（`loadMeetingTodos`）／✍️ 電子サイン待ち（`loadSignTodos`）。
+  ⚠️ embed で人材を読むところは `periodic_report` を select に入れること（入れないと外れない）
+- ⚠️ 読む列は `REG_WORKER_SELECT_COLS` と `WORKER_ALERT_SELECT_COLS` に入れてある
 
 ### 📦 外国人材の3区分（🤝 支援人材 ／ ➖ 支援外人材 ／ 📦 過去の人材）
 
