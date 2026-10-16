@@ -2817,6 +2817,10 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   辞退/キャンセルは `isAlertExcludedWorker()` が見る）。
   更新決定リスト（`_renCycleTargets`）と ⏰ 申請依頼まち（`_renApplyLate`）が同じものを通る
   （退職した人材が更新決定リストに出ていた）
+- 🚫 **認定・変更の申請がもう動いている人材は、更新まわりから全部外す。判定は `_renOtherApply(w)` の1箇所だけ**
+  ＝ 申請ステータスが入っていて `REN_REMIND_APPLY_IDLE`（申請予定なし・取り下げ・不許可）**以外**、かつ申請種別が `REN_OTHER_APPLY_TYPES`（認定・変更）。
+  見るのは 🔁 更新決定の対象（`_renCycleTargets`）／⏰ 申請依頼まち（`_renApplyLate`）／📋 更新リマインド（`_renRemindSkip` はこれを呼ぶだけ）／
+  更新状況リストの［🔁 更新確認が必要］（`_renNeedCheck`）の4か所
 - 🚫 **更新決定の対象にしない在留資格は `REN_EXCLUDE_VISA` ＋ `_renExcludedVisa(w)` の1箇所だけ**
   （いまは `特定活動`。**前方一致**で見るので「特定活動（就職活動）」のような書き方も拾う）＝
   特定技能1号の更新ではないので、毎月の更新決定にはかけない
@@ -3249,8 +3253,7 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - 🪪在留期限の更新待ち: apply_status が APPLY_DONE_STATUSES（審査完了以降）になってから
   VISA_UPDATE_WAIT_DAYS(30)日以上たっても、visa_expiry が空欄 or VISA_UPDATE_SOON_DAYS(120)日以内のまま。
   経過日数の起点は workers.apply_status_changed_at（saveWorker がステータス変更時に記録）→ apply_date → request_date
-- 📋 **更新リマインドに出さない人材は `_renRemindSkip(w)` の1箇所だけ**＝ 更新以外の申請がもう動いている人
-  （`apply_status` が入っていて `REN_REMIND_APPLY_IDLE`＝申請予定なし・取り下げ・不許可 **以外**、かつ `apply_type` が入っていて「更新」**以外**）。
+- 📋 **更新リマインドに出さない人材は `_renRemindSkip(w)` の1箇所だけ**（中身は `_renOtherApply(w)`＝ 認定・変更の申請が動いている人）。
   在留資格が変わる（変更・認定）ので、更新の確認は要らないため。
   `computeGlobalWorkerAlerts`（外国人材の画面・サイドバー）と `computeMyWorkerAlerts`（マイページの applyCheck）の**両方がここを見る**
 - サイドバーのバッジ（`updateSidebarAlerts`）と外国人材ページのバナー（`renderWorkerAlerts`）は
