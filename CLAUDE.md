@@ -4512,6 +4512,14 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   - ⚠️ **文中で使ってよいタグは `<b>` と `<a href>` だけ**（そのまま `innerHTML` に入れる）
   - 出すのは `_auditPartHtml(p)` の1箇所（`t` で振り分ける）。目次の飛び先は `auditGo(n)`
   - `AUDIT_DOCS` … `{ name, url }`。新しいタブで開くだけ（閲覧権限は Google 側）
+- 📝 **03 監査記録（3つめのタブ）＝ `audit_records`**（1件＝1回の監査。種別・監査日・タイトル・対応者名・監査官名）
+  - **種別は `AUDIT_REC_KINDS` の1箇所だけ**（🧪 模擬監査／🏛️ 本番監査。一覧のチップ・選択欄・色が追従する）
+  - ノートの中は左右2つの枠＝ **左＝⚠️ 指摘内容（`findings_html`）／右＝📝 監査記録（`record_html`）**。
+    **枠の見出し・色・説明は `AUDIT_REC_PANES` の1箇所だけ**（書式は `arExec()`＝アナウンスと同じ execCommand）
+  - だれでも書ける・直せる。**手動保存**（`_manualSave.auditRecModal` ／ 接頭辞 `ar_` ／ `sm_audit`）。
+    新規は作った id を `_editingAuditRecId` に覚える（続けて保存しても二重に作らない）
+  - 一覧の検索は `#auditRecList` だけ描き直す（`setAuditRecQ` → `_renderAuditRecList`。検索欄を作り直さない）
+  - 削除は論理削除（`_confirmDeleteTwice()`）。`SB_SOFT_DELETE_TABLES` と `TRASH_TABLES` の両方に入れてある
 - 画面キーは **`AUDIT_KEY`（`reg_audit`）**。`SCREENS` への登録・`renderScreenContent` の
   振り分け・サイドバーの3箇所がこの定数を見る
 
