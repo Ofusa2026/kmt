@@ -1220,7 +1220,7 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   - 掲載ステータスは `job_progress.hp_status`（空＝未掲載／掲載予約／掲載中／掲載停止予約／掲載終了）。
     **選択肢・色・説明は `HP_STATUSES` の1箇所だけ**、**書き込むのは `setHpStatus()` の1箇所だけ**（その場で保存）。
     人が選べるのは `pick:true` だけで、行き先は `_hpNextOf()` でしぼる。「掲載中」「掲載終了」は同期が書く
-  - 欄は求人票タブのいちばん上（`#jpHpBox` ＝ `_jpHpBoxHtml()`）、求人管理の一覧は「求人サイト」列（`JP_LIST_COLS` の `hp_status` ＝ `hpStatusBadge()`）。同期のタイミングの文言は `HP_SYNC_WHEN`
+  - 欄は【📋 求人進捗 情報】タブのいちばん上（`#jpHpBox` ＝ `_jpHpBoxHtml()`。新規登録のときは出さない）、求人管理の一覧は「求人サイト」列（`JP_LIST_COLS` の `hp_status` ＝ `hpStatusBadge()`）。同期のタイミングの文言は `HP_SYNC_WHEN`
   - WP の投稿へのリンクは `hpPostUrl()`（公開ページ `/jobs/ID/`）／`hpEditUrl()`（編集画面）の2つだけ。
     ⚠️ `/?p=ID` はカスタム投稿だと 404 になる。公開ページのリンクは「掲載中」「掲載停止予約」のときだけ出す（下書きは 404）
   - 業種（タクソノミー `industry`）はプラグインの `KMT_JS_INDUSTRIES` が案シスの「分野」（自由入力）の言葉から選ぶ
@@ -1230,7 +1230,7 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
     ⚠️ 給与形態は「＊（労働局指定＝ `req:true`）」にはしない（空の求人に労働局のアラートが一斉に出るため。ユーザーの判断）。
     確かめるのは **`hpMissingOf()` の1箇所だけ**。日本語レベルの選択肢は `JOB_JP_LEVELS`（ACF の `job_jp`・プラグインの `kmt_js_jp()` とそろえる）
   - `t:'sel'` の欄は、選択肢に無い今の値（選択式にする前の書き方）を消さずに残して出す（求人票タブ・企業向けフォームの両方）
-  - Supabase の関数は2つ＝ **`hp_sync_list()`**（同期の対象を HP に出してよい列だけで返す。紹介料・担当・連絡先・メモは入れない）／
+  - Supabase の関数は2つ＝ **`hp_sync_list()`**（同期の対象を HP に出してよい列だけで返す。紹介料・担当・連絡先・メモは入れない。**会社名・優先度は管理用**＝ WP の ACF「KMT管理用」（`jobs_code` / `jobs_company` / `jobs_priority`）に入れるだけでサイトには出さない。⚠️ `jsonb_build_object` は引数100個まで＝ 足すときは `|| jsonb_build_object(...)` でつなぐ）／
     **`hp_sync_mark(p_results, p_summary)`**（結果の書き戻し＝ `hp_status` / `hp_wp_post_id` / `hp_synced_at` / `hp_sync_note`、
     前回の結果は `app_settings.hp_sync_last`＝ 案シスには出さない）。⚠️ **WP に出す列を足すときは `hp_sync_list()` に足す**
   - 対象＝ 掲載予約・掲載中（→公開）／掲載停止予約・未掲載に戻したのに投稿がある・削除した案件（→非公開＝下書き）
