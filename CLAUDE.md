@@ -1215,8 +1215,18 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
     出すときは (10) の欄を 190px → 110px に低くする＝ **ページ1（A4）から押し出さないため**。チェックが無ければ枠ごと出さない
 - **HP掲載タイトルとチェックポイントは企業向けの外部フォームには出さない**（`JOB_FORM_INTERNAL_COLS`）。
   最寄り駅・休日・支給額の上限は企業にも書いてもらえる
-- ⚠️ **WordPress への送信はまだ作っていない**。作るときも **APIキー（アプリケーションパスワード）は kmt.html に書かない**
-  （公開リポジトリのため）。GAS か Supabase の Edge Function に置いて、そこを通して送る
+- 🌐 **求人サイト（work.k-m-t.jp・WordPress のカスタム投稿 `jobs`）へは WordPress 側が読みにくる**（プラグイン `kmt-job-sync`。**このリポジトリには無い**）
+  - ⚠️ **kmt.html から WordPress には何も送らない**＝ アプリケーションパスワード等のキーを kmt.html に置かない（公開リポジトリのため）
+  - 掲載ステータスは `job_progress.hp_status`（空＝未掲載／掲載予約／掲載中／掲載停止予約／掲載終了）。
+    **選択肢・色・説明は `HP_STATUSES` の1箇所だけ**、**書き込むのは `setHpStatus()` の1箇所だけ**（その場で保存）。
+    人が選べるのは `pick:true` だけで、行き先は `_hpNextOf()` でしぼる。「掲載中」「掲載終了」は同期が書く
+  - 欄は求人票タブのいちばん上（`#jpHpBox` ＝ `_jpHpBoxHtml()`）、一覧のコードの右に `hpStatusBadge()`。同期のタイミングの文言は `HP_SYNC_WHEN`
+  - Supabase の関数は2つ＝ **`hp_sync_list()`**（同期の対象を HP に出してよい列だけで返す。紹介料・担当・連絡先・メモは入れない）／
+    **`hp_sync_mark(p_results, p_summary)`**（結果の書き戻し＝ `hp_status` / `hp_wp_post_id` / `hp_synced_at` / `hp_sync_note`、
+    前回の結果は `app_settings.hp_sync_last`）。⚠️ **WP に出す列を足すときは `hp_sync_list()` に足す**
+  - 対象＝ 掲載予約・掲載中（→公開）／掲載停止予約・未掲載に戻したのに投稿がある・削除した案件（→非公開＝下書き）
+  - ⚠️ **チェックポイントの文言は3か所でそろえる**＝ `JOB_HP_FEATURES` ／ ACF の こだわり条件の選択肢 ／ プラグインの `KMT_JS_FEATURES`
+  - 自動のタイトル（`_jobHpAutoTitle`）はプラグインの `kmt_js_title()` が同じ形で作る＝ **形を変えたら両方直す**
 
 ### 求人票のページの組み方（印刷・PDF）
 
