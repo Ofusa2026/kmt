@@ -1235,6 +1235,8 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   - Supabase の関数は2つ＝ **`hp_sync_list()`**（同期の対象を HP に出してよい列だけで返す。紹介料・担当・連絡先・メモは入れない。**会社名・優先度は管理用**＝ WP の ACF「KMT管理用」（`jobs_code` / `jobs_company` / `jobs_priority`）に入れるだけでサイトには出さない。⚠️ `jsonb_build_object` は引数100個まで＝ 足すときは `|| jsonb_build_object(...)` でつなぐ）／
     **`hp_sync_mark(p_results, p_summary)`**（結果の書き戻し＝ `hp_status` / `hp_wp_post_id` / `hp_synced_at` / `hp_sync_note`、
     前回の結果は `app_settings.hp_sync_last`＝ 案シスには出さない）。⚠️ **WP に出す列を足すときは `hp_sync_list()` に足す**
+  - 求人サイトの表示順（ACF `jobs_priority`）＝ 非常に高い1／高い2／普通3。**過去の求人（`JOB_PAST_STATUSES`＝ 停止・決定・募集停止）は掲載はそのままで 9＝ いちばん下**
+    （プラグインの `KMT_JS_PAST_STATUSES` とそろえる。`hp_sync_list()` が `progress` を返す）。サイトの並べ替え自体はテーマの PHP 側
   - 対象＝ 掲載予約・掲載中（→公開）／掲載停止予約・未掲載に戻したのに投稿がある・削除した案件（→非公開＝下書き）
   - ⚠️ **チェックポイントの文言は3か所でそろえる**＝ `JOB_HP_FEATURES` ／ ACF の こだわり条件の選択肢 ／ プラグインの `KMT_JS_FEATURES`
   - 自動のタイトル（`_jobHpAutoTitle`）はプラグインの `kmt_js_title()` が同じ形で作る＝ **形を変えたら両方直す**
