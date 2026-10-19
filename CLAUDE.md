@@ -1205,8 +1205,11 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
     給与＝給与形態＋支給額（＋上限）／タイトルに出すチェックポイントは `HP_TITLE_TAGS` の順で最大 `HP_TITLE_TAG_MAX` 個。入っていない要素は飛ばす
   - 求人票タブでは欄の下（`#jsHpTitleAuto`）と placeholder に**いま載るタイトル**を出す（`_jsHpTitleRefresh()`。関係する欄を直すと出し直す）。
     ［入れて手直しする］／［自動のタイトルに戻す］は `jsHpTitleUseAuto()`
-- ✅ **チェックポイントの選択肢は `JOB_HP_FEATURES` の1箇所だけ**。
-  ⚠️ **文言は WordPress 側のチェックの名前とそろえること**（1文字でも違うと別物になる）
+- ✅ **チェックポイントの選択肢は管理者が画面から足せる**（求人票タブの項目名の横［⚙️ 選択肢を編集（管理者）］＝ `openJobHpFeaturesEdit()`）。
+  保存先は `app_settings.job_hp_features`（`[{g, k, opts:[{t:文言, v:WPの値}]}]`。まだ直していなければ `JOB_HP_FEATURES_DEFAULT`）、
+  **読むのは `jobHpFeatures()` の1箇所だけ**（起動時に `loadJobHpFeatures()`）。足す・消す・並べ替えだけで、**文言の書き換えはさせない**
+  （求人の値は文言で持っているので別物になる）。`k` は ACF のチェックボックス（visa/house/allowance/training/style）＝ グループは増やせない。
+  新しく足した項目の WP の値 `v` は自動（`k`＋英数字）
   - 保存先は `hp_features` の1列（選んだものを `JOB_HP_FEATURE_SEP`＝「、」でつなぐ）。
     欄は `t:'checks'` で、作るのは **`_jsChecksHtml()` の1箇所**、値を入れるのは **`_jsChecksSync()` の1箇所**
   - 値は**隠しの `jsf_hp_features` に入る**ので、保存・プレビュー・外部フォームは今までどおりそこを読むだけ。
@@ -1238,7 +1241,8 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   - 求人サイトの表示順（ACF `jobs_priority`）＝ 非常に高い1／高い2／普通3。**過去の求人（`JOB_PAST_STATUSES`＝ 停止・決定・募集停止）は掲載はそのままで 9＝ いちばん下**
     （プラグインの `KMT_JS_PAST_STATUSES` とそろえる。`hp_sync_list()` が `progress` を返す）。サイトの並べ替え自体はテーマの PHP 側
   - 対象＝ 掲載予約・掲載中（→公開）／掲載停止予約・未掲載に戻したのに投稿がある・削除した案件（→非公開＝下書き）
-  - ⚠️ **チェックポイントの文言は3か所でそろえる**＝ `JOB_HP_FEATURES` ／ ACF の こだわり条件の選択肢 ／ プラグインの `KMT_JS_FEATURES`
+  - チェックポイントの選択肢は **案シスが正**＝ プラグインが同期の最初に Supabase の `hp_features_def()` を読み、ACF のチェックボックスに無いものを足す
+    （並びも案シスに合わせる。消したものは ACF からは消さない）。プラグインの `KMT_JS_FEATURES` は既定と昔の書き方の読み替えだけ
   - 自動のタイトル（`_jobHpAutoTitle`）はプラグインの `kmt_js_title()` が同じ形で作る＝ **形を変えたら両方直す**
 
 ### 求人票のページの組み方（印刷・PDF）
