@@ -2340,6 +2340,8 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
     - 色は **`SCHED_CO_CELL` の1箇所**（実施済＝白／日付ありの予定＝薄い黄／日付未定＝黄）。状態は `_schedCoKind()`（`schedIsDone()` を通す）
     - 📌 日付未定は帯と同じく **`_schedUndatedIsMine()` を通す**（自分がメイン・サブ担当の企業のぶんだけ）
     - 1行を押す＝ `openSchedCoCell()`（1件ならその予定・何件かなら一覧）／空いたマス＝ `openScheduleModalPreset(null, 企業, 月の1日)`
+      - 何件かの一覧は**行ごとに［✏️ 編集］［🗑 削除］**がある（日付未定のいらなくなった予定をその場で消せる）。消すのは **`deleteSchedule()` の1箇所**（`schedCoCellDelete()` はそれを呼んで、消せたら一覧を閉じるだけ＝ 消すと企業×月が描き直されて一覧の行の対応が変わるため）。
+        `deleteSchedule()` は**消したかどうか（true／false）を返す**（確認でやめたときは一覧をそのまま残す）
     - ⚠️ 上の説明は左に貼り付ける＝ **外側の箱を `width:max-content` にしてから** `position:sticky;left:0`（しないと説明も横に流れる）
 - 📅 **社内の「年間カレンダー」の休みを、支援カレンダーにも出す。**
   **読むのは `loadCalDays()` の1箇所だけ**で、`company_calendars` の
