@@ -2344,6 +2344,11 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
         `deleteSchedule()` は**消したかどうか（true／false）を返す**（確認でやめたときは一覧をそのまま残す）
       - ☑ **一覧の行ごとのチェックで一括削除もできる**（［すべて選択］／［🗑 選んだ予定を削除］＝ `schedCoCellBulkDelete()` の1箇所。確認は1回だけ・`id=in.(…)` で1回の DELETE → `_schedAfterChange()`。状態の数え直しは `schedCoCellSyncSel()`）
     - ⚠️ 上の説明は左に貼り付ける＝ **外側の箱を `width:max-content` にしてから** `position:sticky;left:0`（しないと説明も横に流れる）
+- 🔽 **カレンダーの上の3つ（種別ごとの件数・📌 日付未定・社内カレンダーの休み）は最初たたんだ1行（`#schedFoldBar`）。出し入れは `renderSchedFoldBar()` の1箇所だけ**
+  （状態は `_schedFold`＝覚えない。画面を開くたびにたたむ＝ `buildSupportSchedulesScreen()` で戻す）。押すと `toggleSchedFold(k)`
+  - 呼ぶのは `renderScheduleLegend()` の最後＝ どの表示（週・月・年・企業×月）でも必ず通る（⚠️ 週表示の「該当する人材がありません」で返るところでも凡例を呼んでいる）
+  - 件数の合計は `_schedLegendTotal`、日付未定の数は `_schedUndatedList()`（帯の `_schedUndatedBandHtml()` と同じ一覧）。0件なら日付未定のボタンは出さない
+  - ⚠️ 中身（`_schedCalOffNote()` / `_schedUndatedBandHtml()` / `#scheduleLegend`）をカレンダーの中（`scheduleCalArea`）に戻さないこと
 - 📅 **社内の「年間カレンダー」の休みを、支援カレンダーにも出す。**
   **読むのは `loadCalDays()` の1箇所だけ**で、`company_calendars` の
   `days`（日付ごとの区分）と `holidays`（◇祝日）の**両方**を見る。
