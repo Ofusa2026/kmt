@@ -5878,3 +5878,9 @@ GLTの月報Excel（国別チーム月報・年度まとめ・3か月ごと目�
 - ⚠️ **欄の `.value` は今までどおりカンマ抜きの数字を返す**（欄ごとに `value` を差し替える）＝ 保存・計算のコードは変えない。`valueAsNumber` は使わない
 - type=number の欄は text（inputmode=decimal）に変える（number はカンマを出せない）。カンマを付けるのは数字だけのとき（「約20万」などの文字はそのまま）
 - ⚠️ 人数・年・時間・率・電話・番号は金額ではないので `MONEY_ID_RE` に入れない。金額の欄を足すときは id に fee / amount / salary / price など入れるか `data-money="1"`
+
+### 🛠 マイページ【システム改善依頼】（タブ `sysreq`）
+
+- 元データは要望リストの `_srRows` だけ（別に持たない）。数えるのは **`_mySrCounts()` の1箇所**＝ 自分（依頼者が自分・`_renSameName()`）／全体（未完了すべて）／着手済み（`_srStarted()`＝着手日あり or 着手中）。タブの文字・上のカード・一覧が同じ数になる
+- 管理者リストの依頼は管理者にしか数えない。開く・書くは `openSysReqModal` ／ 全体は `showScreen(SR_SCREEN_KEY)` をそのまま使う。描くのは `updateMySrTab()`（読み込みのたびに呼ぶ）
+
