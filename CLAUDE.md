@@ -259,6 +259,8 @@ UI変更やロジック変更のときは実際に描画して確かめる。
 
 - 🔍 **💬 チャットの検索（`#chatRoomSearch` → `chatSearch()`）**
   - 企業カードは**企業名で当たったものを先頭**（`coHit`）→ 人材名だけで当たったもの。判定は **`_chatCoHit()` の1箇所**、くらべ方は `_chatNorm()`（全角半角・大文字小文字・空白を無視）。検索中は一覧に「🏢 企業名で一致」「👤 人材名で一致」の見出しが入る
+  - 👤 **人材名・管理番号で当たったものは企業カードではなく人材チャットの行をそのまま出す**（`_chatWorkerHits()` の1箇所。行は `buildChatRoomRow(r, …, false, true)`＝4つめの引数で企業名を1行足す）。検索中はピン留めのまとめ（`_prependPinnedRoomSection`）を出さない
+  - 企業の中を開いていても（`_selectedGroupId`）、打てば `chatSearch()` が外して全体から探す
   - メッセージ内の検索結果（`#chatSearchResults`）は**企業カードの一覧の下**。最初はたたむ（`_chatMsgResOpen`。検索を消すと戻る）、開くと高さ `CHAT_MSG_RES_MAX_H` までで中だけスクロール。⚠️ 検索欄の下に戻さない（企業カードが下に押し出される）
 - **KMTドライブのリンク**: そのチャットの「元の欄」に書き戻す。人材＝`workers.drive_url_kmt`／
   求人＝`job_progress.drive_url_kmt`（求人進捗 情報タブ）／候補者＝`candidates.drive_url_kmt`（候補者情報タブ）。
