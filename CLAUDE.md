@@ -4387,7 +4387,7 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   空のときだけ一覧にボタンが出る。着手日に名前が入るので一覧の【担当】の列は無い（🙋 お願い＝`assignee` は詳細の中だけ。通知の行き先に使う）
 - 改善状況は `SR_STATUSES` の1箇所（**「完了」は無い**＝ ✅ 実装完了のチェックに置き換えた）。優先度は `SR_PRIORITIES`
   - 📈 **一覧は【改善状況】と【着手日】を1つの欄【進み具合】にまとめた＝ `_srProgressCellHtml()` の1箇所**（状況のバッジ＋その下に「日付 担当」）。
-    まだ何も無い行は［▶ 着手］（＝「着手中」）。バッジを押すと `srStatusPick()` が選択肢を開き、選ぶと **`srSetStatus()` → `_srStatusPatch()` の1組だけ**が
+    まだ何も無い行は［未着手］のボタン（押すと「着手中」。⚠️ 表示は「着手」にしない＝ 着手中と見分けにくい）。バッジを押すと `srStatusPick()` が選択肢を開き、選ぶと **`srSetStatus()` → `_srStatusPatch()` の1組だけ**が
     `status` ＋ `status_at`（今日）＋ `status_by`（自分）を書き、`status_log`（jsonb `[{from,to,at,by}]`）に1行足す。着手中にしたとき `started_at` / `started_by` が空なら一緒に入れる。
     モーダルで状況を変えて保存したときも `_srStatusPatch()` を通る（履歴は詳細の「進み具合の履歴」＝ `_srStatusLogHtml()`）。変えられるのは `_srCanManage()` の人だけ。
     取り込んだ古い行は `status_at` が空なので `started_at` / `started_by` を代わりに出す
