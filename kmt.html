@@ -320,14 +320,9 @@ body.jn-resizing .jn-body{cursor:col-resize;}
 body{background:linear-gradient(180deg,#DCEBFA 0%,#eef5fd 260px,#f8fbfe 640px,#ffffff 100%) fixed;}
 .topbar{background:linear-gradient(180deg,#ffffff 0%,#f7fbff 100%);border-bottom:1px solid #e3edf7;}
 .sidebar{background:#f9fbfd;border-right:1px solid #e6eef6;}
-.logo-head{background:linear-gradient(135deg,#DCEBFA 0%,#eef6fe 55%,#ffffff 100%);border:1px solid #d3e4f6;}
-.logo-title{color:#1e3a5f;}
-.logo-ver{color:#4479B0;}
-.sidebar-section{background:linear-gradient(90deg,#DCEBFA 0%,#eef5fd 60%,#ffffff 100%);color:#1e3a5f;border:1px solid #dbe8f5;}
-.sidebar-section:hover{background:linear-gradient(90deg,#cfe3f8 0%,#e6f0fb 60%,#ffffff 100%);}
-.sidebar-section-arrow{color:#4479B0;}
-.sidebar-section-count{background:#4479B0;color:#FFFFFF;}
-.nav-item:hover,.nav-item.active{background:#e6f0fb;}
+.logo-head{background:linear-gradient(135deg,#5b93c9 0%,#4479B0 55%,#3a6b9e 100%);}
+.sidebar-section{background:linear-gradient(90deg,#4479B0 0%,#5689bf 100%);}
+.sidebar-section:hover{background:linear-gradient(90deg,#3A6B9E 0%,#4a7fb5 100%);}
 /* 🔝 上のアイコン（kmtHeadIcons）。見た目はこの1かたまりだけ */
 #kmtHeadIcons{--chatNavScale:1;position:relative;display:flex;align-items:flex-end;gap:4px;margin-left:auto;margin-right:6px;}
 #kmtHeadIcons .kh-item{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:58px;padding:2px 6px;border-radius:8px;cursor:pointer;color:#1e3a5f;}
@@ -27501,6 +27496,7 @@ const SR_SCREEN_KEY = 'sys_requests';
 const SR_OWNER = 'ニサ';                         // 優先度つきの要望が届く人
 const SR_SUB = '白井';                           // ［🙋 白井にお願いする］の相手
 const SR_DONE_USERS = [SR_OWNER, SR_SUB, '大房', '多尾'];        // ✅ 実装完了のチェックができる人
+const SR_STATUS_TODO = '未着手';                   // 一覧の改善状況には出さない（着手日の［▶ 着手］で分かるため）
 const SR_STATUSES = [                            // 改善状況（「完了」は ✅ 実装完了 のチェックに置き換えた）
   { v:'未着手',            bg:'#f1f5f9', fg:'#475569' },
   { v:'検討中',            bg:'#fae8ff', fg:'#86198f' },
@@ -27791,7 +27787,7 @@ function renderSysReqList(){
       + cell('srf_content', '具体的にどんな機能か', clip(r.content, 3), 'min-width:260px;')
       + (adm ? '' : cell('srf_solves', 'なにが解決されるか？', clip(r.solves, 2), 'min-width:160px;color:#475569;'))
       + cell('srDrop', '写真・ファイル', att ? '📎' + att : '', 'white-space:nowrap;')
-      + cell('srf_status', '改善状況', r.status ? _srBadge(st.v, st.bg, st.fg) : '')
+      + cell('srf_status', '改善状況', (r.status && r.status !== SR_STATUS_TODO) ? _srBadge(st.v, st.bg, st.fg) : '')   // 「未着手」は着手日の欄で分かるので出さない
       + cell('srf_started_at', '着手日', r.started_at ? esc(_srMd(r.started_at)) + (r.started_by ? '<div style="font-size:10px;color:#64748b;">' + esc(r.started_by) + '</div>' : '') : (canStamp && !r.done ? stampBtn('start', '▶ 着手') : ''), 'white-space:nowrap;')
       + (adm ? '' : cell('srf_comment', 'コメント', clip(r.comment, 2), 'min-width:150px;color:#475569;'))
       + cell('srf_due_date', 'いつまでに', esc(_srMd(r.due_date)), 'white-space:nowrap;')
@@ -27860,6 +27856,7 @@ async function srStamp(id, kind){
   if (kind === 'start') {
     if (!_srCanManage()) { showToast('⚠️ 着手日を記録できるのは ' + SR_DONE_USERS.join('・') + ' です', 'error'); return; }
     patch.started_at = _srYmd(); patch.started_by = _srMe();
+    if (!r.status || r.status === SR_STATUS_TODO) patch.status = '着手中';   // ▶ 着手 を押したら改善状況も着手中に
   } else {
     if (!(_srCanManage() || _srIsMe(r.requester) || !r.requester)) { showToast('⚠️ 他の人の依頼の記入日は直せません', 'error'); return; }
     if (!r.req_date) patch.req_date = _srYmd();
@@ -69922,7 +69919,8 @@ function _doForceReloadNow() {
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
   { version:'ver.20261027.10', date:'2026-10-27', notify:true, screens:'all', items:[
-    '画面の色を水色と白のグラデーションにし、左メニューを白に近い明るい色にしました（機能は変わりません）',
+    '画面の地の色を水色と白のグラデーションにし、左メニューを白に近い明るい色にしました（見出しは今までの青に少しグラデーション。機能は変わりません）',
+    { t:'システム要望リストの【改善状況】に「未着手」を出さないようにしました（着手日の欄で分かるため）。［▶ 着手］を押すと改善状況も「着手中」になります', s:['sys_requests'] },
   ]},
   { version:'ver.20261027.9', date:'2026-10-27', notify:true, screens:'all', items:[
     '画面の上にアイコンを並べました（アラート／チャット／求人チャット／社内チャット）。左メニューにあったアラートとチャットの件数はここに移りました（中身・押したときの動きは今までと同じです）',
