@@ -3856,7 +3856,7 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   **書き替える関数は変えていない**（`updateSidebarAlerts` / `loadChatUnread` / `updateJobChatShortcut` / `updateTeamChatShortcut` …）。
   ⚠️ **左メニューに戻したり複製したりしないこと**（同じ id が2つになる）
 - 🔔 を押すと `#khAlertPanel` が開く（`khToggle()`）。閉じるのは外を押したとき・画面を移ったとき（`showScreen` の先頭の `khClosePanel()`）。
-  🔔 の数字は **出ているアラートの種類の数**＝ `_khRecount()` の1箇所（パネルの中を MutationObserver で見て数え直す）
+  🔔 の数字は **随時きたアラートの種類の数**＝ `_khRecount()` の1箇所（パネルの中を MutationObserver で見て数え直す）。⚠️ **いつも出ている［自分の担当のアラート］（`myAlertSummary`）と［全体アラート］（`sidebarAlerts`）は数えない**（数えるのは `KH_ALERT_COUNT_IDS`。パネルには `KH_ALERT_IDS` の全部を出す）。0のときは数字を消す（パネルの「いま出ているアラートはありません」は、数えない2つも含めて何も出ていないときだけ）
 - 💬 / 💼 / 🏠 は押すとその画面（`data-nav`）。開いている画面のアイコンに色を付けるのは `_khMark()`（showScreen から呼ぶ）。左メニューの検索にも出る（`_navFindIndex` が `#kmtHeadIcons .kh-item[data-nav]` も拾う）
 - 求人チャット・社内チャットのショートカット行（`#jobChatShortcut` / `#teamChatShortcut`）は CSS で隠したまま残してある（関数が見るので消さない）
 - 見た目は CSS の `#kmtHeadIcons` / `.kh-panel` の1かたまり（900px 以下は文字を消してアイコンだけ）。
