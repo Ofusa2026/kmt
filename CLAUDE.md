@@ -3833,6 +3833,21 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   - ⚠️ スマホでは ← のぶん狭くなるので、**画面の名前は折り返さず … にする**
     （`.topbar .page-title`。2行になるとヘッダーの高さが変わって下がずれる）
 
+### 🔝 上のアイコン（アラート・チャット・要望 ／ `#kmtHeadIcons`）
+
+- 画面の上の帯（`.topbar` の右、`.topbar-actions` の左）に 🔔 アラート／💬 チャット／💼 求人チャット／🏠 社内チャット／📝 要望 を並べる。
+  **もとは左メニューにあったもの。位置を移しただけ**
+- ⚠️ **中身の要素は同じ id のまま移してある**＝ アラートの入れ物（`KH_ALERT_IDS`＝ myAlertSummary 〜 signAlerts）は `#khAlertPanel` の中、
+  チャットのバッジ（`chatMentionDirectBadge` / `chatMentionAllBadge` / `chatMentionGroupBadge` / `chatUnreadBadge` /
+  `jobChatScDirectBadge` / `jobChatScGroupBadge` / `teamChatScDirectBadge` / `teamChatScAllBadge`）は各アイコンの `.kh-badges` の中。
+  **書き替える関数は変えていない**（`updateSidebarAlerts` / `loadChatUnread` / `updateJobChatShortcut` / `updateTeamChatShortcut` …）。
+  ⚠️ **左メニューに戻したり複製したりしないこと**（同じ id が2つになる）
+- 🔔 を押すと `#khAlertPanel` が開く（`khToggle()`）。閉じるのは外を押したとき・画面を移ったとき（`showScreen` の先頭の `khClosePanel()`）。
+  🔔 の数字は **出ているアラートの種類の数**＝ `_khRecount()` の1箇所（パネルの中を MutationObserver で見て数え直す）
+- 💬 / 💼 / 🏠 は押すとその画面（`data-nav`）。開いている画面のアイコンに色を付けるのは `_khMark()`（showScreen から呼ぶ）。左メニューの検索にも出る（`_navFindIndex` が `#kmtHeadIcons .kh-item[data-nav]` も拾う）
+- 求人チャット・社内チャットのショートカット行（`#jobChatShortcut` / `#teamChatShortcut`）は CSS で隠したまま残してある（関数が見るので消さない）
+- 見た目は CSS の `#kmtHeadIcons` / `.kh-panel` の1かたまり（900px 以下は文字を消してアイコンだけ）
+
 ### 🔍 左メニューの検索（チャットの下 ／ `#navFindQ`）
 
 - メニューの名前だけでなく、**画面の中のタブ・ボタンの名前でも探せる**（「ラベル」→ 社内書類生成のラベル作成／「現金小口」→ 立替管理）
