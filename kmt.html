@@ -1008,6 +1008,14 @@ input[type="date"].form-input{min-width:112px;padding-left:6px;padding-right:6px
     </div>
     <div id="currentUserBadge" style="font-size:10px;color:#334e6d;margin-top:2px;cursor:pointer;display:flex;align-items:center;gap:4px;" onclick="showScreen('my_account')"><span id="myPresenceDot" style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span><span>👤 読込中...</span> <span id="myPresenceStatusBtn" onclick="event.stopPropagation();toggleMyPresence();" title="クリックでステータス切替" style="margin-left:auto;font-size:9px;background:rgba(15,32,64,.08);padding:1px 5px;border-radius:6px;">アクティブ</span></div>
     <button onclick="showScreen('my_account')" title="自分のダッシュボード・設定を開く" style="margin-top:6px;width:100%;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:800;color:#111111;background:#FFFFFF;border:1px solid #B9D4EE;border-radius:6px;padding:6px 8px;cursor:pointer;">📊 マイページ</button>
+    <!-- 📝 システムへの依頼・要望（ここだけは左メニューに残す）。開くのは openRequestSheetChoice() -->
+    <button onclick="openRequestSheetChoice()" title="システムの修正・依頼・要望を書いてください（システム要望リストが開きます）"
+      style="margin-top:8px;width:100%;display:flex;align-items:center;gap:5px;background:#fff7ed;border:1px solid #fdba74;
+        border-radius:6px;padding:6px 6px;font-size:9.5px;font-weight:800;color:#9a3412;cursor:pointer;text-align:center;line-height:1.4;">
+      <span style="font-size:13px;flex-shrink:0;">📝</span>
+      <span style="flex:1;min-width:0;text-align:center;">システムの修正・依頼・要望等の記入シート</span>
+      <span style="flex-shrink:0;opacity:.7;">↗</span>
+    </button>
   </div>
   <!-- 💼 求人チャットのショートカット。**自分あて・所属チームあてのメンションがあるときだけ出す**
        （メインの一覧は 💬 求人チャットの画面。ここは気づくための近道だけ）＝ updateJobChatShortcut() の1箇所 -->
@@ -1106,7 +1114,6 @@ input[type="date"].form-input{min-width:112px;padding-left:6px;padding-right:6px
       <div class="kh-item" data-nav="team_chat" onclick="showScreen('team_chat')" title="社内チャット"><span class="kh-top"><span class="kh-ico">🏠</span><span class="kh-badges">
     <span id="teamChatScDirectBadge" class="chat-nav-badge" title="自分あての未読メンション" style="display:none;background:#ef4444;color:white;">@0</span>
     <span id="teamChatScAllBadge" class="chat-nav-badge" title="全体あて（@全員）の未読メンション" style="display:none;background:#3b82f6;color:white;">@0</span></span></span><span class="kh-lbl">社内チャット</span></div>
-      <div class="kh-item" onclick="openRequestSheetChoice()" title="システムの修正・依頼・要望を書く（システム要望リストが開きます）"><span class="kh-top"><span class="kh-ico">📝</span><span class="kh-badges"></span></span><span class="kh-lbl">要望</span></div>
       <div id="khAlertPanel" class="kh-panel" onclick="event.stopPropagation()">
         <div class="kh-panel-head">🔔 アラート</div>
     <div id="myAlertSummary" style="margin-top:6px;display:none;"></div>
@@ -69881,7 +69888,7 @@ function _doForceReloadNow() {
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
   { version:'ver.20261027.9', date:'2026-10-27', notify:true, screens:'all', items:[
-    '画面の上にアイコンを並べました（🔔 アラート／💬 チャット／💼 求人チャット／🏠 社内チャット／📝 要望）。左メニューにあったアラートとチャットの件数はここに移りました（中身・押したときの動きは今までと同じです）',
+    '画面の上にアイコンを並べました（🔔 アラート／💬 チャット／💼 求人チャット／🏠 社内チャット）。左メニューにあったアラートとチャットの件数はここに移りました（中身・押したときの動きは今までと同じです）',
     '🔔 アラートを押すと、これまで左メニューに並んでいたアラートの一覧が開きます',
   ]},
   { version:'ver.20261027.8', date:'2026-10-27', notify:true, screens:['sys_requests'], items:[

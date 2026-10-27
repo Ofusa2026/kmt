@@ -3833,10 +3833,10 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   - ⚠️ スマホでは ← のぶん狭くなるので、**画面の名前は折り返さず … にする**
     （`.topbar .page-title`。2行になるとヘッダーの高さが変わって下がずれる）
 
-### 🔝 上のアイコン（アラート・チャット・要望 ／ `#kmtHeadIcons`）
+### 🔝 上のアイコン（アラート・チャット ／ `#kmtHeadIcons`）
 
-- 画面の上の帯（`.topbar` の右、`.topbar-actions` の左）に 🔔 アラート／💬 チャット／💼 求人チャット／🏠 社内チャット／📝 要望 を並べる。
-  **もとは左メニューにあったもの。位置を移しただけ**
+- 画面の上の帯（`.topbar` の右、`.topbar-actions` の左）に 🔔 アラート／💬 チャット／💼 求人チャット／🏠 社内チャット を並べる。
+  **もとは左メニューにあったもの。位置を移しただけ**。⚠️ **［📝 システムの修正・依頼・要望等の記入シート］のボタンだけは左メニュー（マイページの下）に残す**（そう頼まれた）
 - ⚠️ **中身の要素は同じ id のまま移してある**＝ アラートの入れ物（`KH_ALERT_IDS`＝ myAlertSummary 〜 signAlerts）は `#khAlertPanel` の中、
   チャットのバッジ（`chatMentionDirectBadge` / `chatMentionAllBadge` / `chatMentionGroupBadge` / `chatUnreadBadge` /
   `jobChatScDirectBadge` / `jobChatScGroupBadge` / `teamChatScDirectBadge` / `teamChatScAllBadge`）は各アイコンの `.kh-badges` の中。
