@@ -318,10 +318,10 @@ body.jn-resizing .jn-body{cursor:col-resize;}
 .sched-staff-row i{font-style:normal;color:var(--gray-400);font-size:10px;margin-left:6px;}
 /* 🔝 上のアイコン（kmtHeadIcons）。見た目はこの1かたまりだけ */
 #kmtHeadIcons{--chatNavScale:1;position:relative;display:flex;align-items:flex-end;gap:4px;margin-left:auto;margin-right:6px;}
-#kmtHeadIcons .kh-item{position:relative;display:flex;flex-direction:column;align-items:center;gap:1px;min-width:58px;padding:2px 6px;border-radius:8px;cursor:pointer;color:#1e3a5f;}
+#kmtHeadIcons .kh-item{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:58px;padding:2px 6px;border-radius:8px;cursor:pointer;color:#1e3a5f;}
 #kmtHeadIcons .kh-item:hover,#kmtHeadIcons .kh-item.kh-on{background:#eef5fd;}
-#kmtHeadIcons .kh-ico{font-size:21px;line-height:1.15;}
-#kmtHeadIcons .kh-lbl{font-size:10px;font-weight:800;white-space:nowrap;}
+#kmtHeadIcons .kh-ico{display:flex;line-height:1;color:#1f2937;}
+#kmtHeadIcons .kh-lbl{font-size:10px;font-weight:800;white-space:nowrap;color:#1f2937;}
 #kmtHeadIcons .kh-top{display:flex;align-items:center;gap:3px;}
 #kmtHeadIcons .kh-badges{display:flex;gap:2px;pointer-events:none;}
 #kmtHeadIcons .kh-badges:empty{display:none;}
@@ -330,6 +330,14 @@ body.jn-resizing .jn-body{cursor:col-resize;}
 .kh-panel.open{display:block;}
 .kh-panel-head{font-size:12px;font-weight:800;color:#1e3a5f;margin-bottom:2px;}
 #jobChatShortcut,#teamChatShortcut{display:none !important;}
+/* 上の帯に入りきらない画面（ボタンの多い求人管理など）は文字を消してアイコンだけにする＝ _khFit() の1箇所 */
+#kmtHeadIcons.kh-compact .kh-lbl{display:none;}
+#kmtHeadIcons.kh-compact .kh-item{min-width:34px;padding:2px 4px;}
+#kmtHeadIcons.kh-compact .kh-ico svg{width:23px;height:23px;}
+.topbar .page-title{white-space:nowrap;}
+.topbar-actions .btn{white-space:nowrap;}
+.topbar.kh-wrap{flex-wrap:wrap;row-gap:8px;}
+.topbar.kh-wrap .topbar-actions{flex-wrap:wrap;justify-content:flex-end;margin-left:auto;}
 @media(max-width:900px){#kmtHeadIcons .kh-lbl{display:none;}#kmtHeadIcons .kh-item{min-width:38px;}.kh-panel{position:fixed;left:8px;right:8px;width:auto;top:64px;}}
 #chatNavLabel{font-size:calc(13px * var(--chatNavScale));}
 .chat-nav-badge{flex:0 0 auto;font-size:calc(9px * var(--chatNavScale));font-weight:800;
@@ -1102,20 +1110,20 @@ input[type="date"].form-input{min-width:112px;padding-left:6px;padding-right:6px
     <!-- 🔝 上のアイコン（アラート・チャット・要望）＝ 位置を移しただけ。中身の要素（id）は左メニューにあったものをそのまま入れてある
          ＝ 件数・メンションを書き替える関数は1文字も変えていない。開閉は khToggle() / khClosePanel() の1組 -->
     <div id="kmtHeadIcons">
-      <div class="kh-item" id="khAlertBtn" onclick="khToggle(event)" title="アラート（押すと一覧が開きます）"><span class="kh-top"><span class="kh-ico">🔔</span><span class="kh-badges"><span id="khAlertCount" class="chat-nav-badge" style="display:none;background:#ef4444;color:white;">0</span></span></span><span class="kh-lbl">アラート</span></div>
-      <div class="kh-item" data-nav="chat" onclick="showScreen('chat')" title="チャット"><span class="kh-top"><span class="kh-ico">💬</span><span class="kh-badges">
+      <div class="kh-item" id="khAlertBtn" onclick="khToggle(event)" title="アラート（押すと一覧が開きます）"><span class="kh-top"><span class="kh-ico"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4.5h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H10l-4.5 3.5v-3.5H4a1 1 0 0 1-1-1v-10a1 1 0 0 1 1-1z"/><path d="M12 7.5v4.5"/><circle cx="12" cy="14.2" r=".4" fill="currentColor"/></svg></span><span class="kh-badges"><span id="khAlertCount" class="chat-nav-badge" style="display:none;background:#ef4444;color:white;">0</span></span></span><span class="kh-lbl">アラート</span></div>
+      <div class="kh-item" data-nav="chat" onclick="showScreen('chat')" title="チャット"><span class="kh-top"><span class="kh-ico"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4.5h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H10l-4.5 3.5v-3.5H4a1 1 0 0 1-1-1v-10a1 1 0 0 1 1-1z"/><path d="M8 9h8M8 12.5h5.5"/></svg></span><span class="kh-badges">
     <span id="chatMentionDirectBadge" class="chat-nav-badge" title="自分あての未読メンション" style="display:none;background:#ef4444;color:white;">@0</span>
     <span id="chatMentionAllBadge" class="chat-nav-badge" title="全体あて（@全員）の未読メンション" style="display:none;background:#3b82f6;color:white;">@0</span>
     <span id="chatMentionGroupBadge" class="chat-nav-badge" title="所属チームあての未読メンション" style="display:none;background:#f59e0b;color:#1e293b;">@0</span>
     <span id="chatUnreadBadge" class="chat-nav-badge" title="未読の合計" style="display:none;background:#fda4af;color:#881337;font-weight:700;">0</span></span></span><span class="kh-lbl">チャット</span></div>
-      <div class="kh-item" data-nav="job_chat" onclick="showScreen('job_chat')" title="求人チャット"><span class="kh-top"><span class="kh-ico">💼</span><span class="kh-badges">
+      <div class="kh-item" data-nav="job_chat" onclick="showScreen('job_chat')" title="求人チャット"><span class="kh-top"><span class="kh-ico"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="12.5" rx="2"/><path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7M3 12.5h18M11 12.5v1.5h2v-1.5"/></svg></span><span class="kh-badges">
     <span id="jobChatScDirectBadge" class="chat-nav-badge" title="自分あての未読メンション" style="display:none;background:#ef4444;color:white;">@0</span>
     <span id="jobChatScGroupBadge" class="chat-nav-badge" title="所属チームあての未読メンション" style="display:none;background:#f59e0b;color:#1e293b;">@0</span></span></span><span class="kh-lbl">求人チャット</span></div>
-      <div class="kh-item" data-nav="team_chat" onclick="showScreen('team_chat')" title="社内チャット"><span class="kh-top"><span class="kh-ico">🏠</span><span class="kh-badges">
+      <div class="kh-item" data-nav="team_chat" onclick="showScreen('team_chat')" title="社内チャット"><span class="kh-top"><span class="kh-ico"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 7V4.5a1 1 0 0 1 1-1H20a1 1 0 0 1 1 1V12a1 1 0 0 1-1 1h-1v2.5L16.5 13"/><path d="M4 7.5h11a1 1 0 0 1 1 1V16a1 1 0 0 1-1 1H9l-3.5 3v-3H4a1 1 0 0 1-1-1V8.5a1 1 0 0 1 1-1z"/><path d="M6.5 11h6M6.5 13.8h4"/></svg></span><span class="kh-badges">
     <span id="teamChatScDirectBadge" class="chat-nav-badge" title="自分あての未読メンション" style="display:none;background:#ef4444;color:white;">@0</span>
     <span id="teamChatScAllBadge" class="chat-nav-badge" title="全体あて（@全員）の未読メンション" style="display:none;background:#3b82f6;color:white;">@0</span></span></span><span class="kh-lbl">社内チャット</span></div>
       <div id="khAlertPanel" class="kh-panel" onclick="event.stopPropagation()">
-        <div class="kh-panel-head">🔔 アラート</div>
+        <div class="kh-panel-head">アラート</div>
     <div id="myAlertSummary" style="margin-top:6px;display:none;"></div>
     <div id="sidebarAlerts" style="margin-top:6px;display:none;flex-direction:column;gap:3px;"></div>
     <!-- 📝 システム要望リストのお知らせ（優先度つき・お願い・依頼者確認）＝ updateSysReqAlerts() の1箇所 -->
@@ -22154,6 +22162,7 @@ function updateTopbarButtons(name) {
     resume:       `<button class="btn btn-outline" onclick="showScreen('candidates')">← 候補者一覧へ</button><button class="btn btn-outline" onclick="printResume()">🖨️ 印刷</button>`,
   };
   actions.innerHTML = (btnMap[name] || '') + _fullBtnHtml(name);
+  requestAnimationFrame(_khFit);   // 🔝 入りきらなければ上のアイコンを文字なしにする
 }
 
 /* ===== ⛶ 全画面（どの一覧も同じ。**しくみはこの一かたまりだけ**） =====
@@ -27627,6 +27636,19 @@ function _khRecount(){
   if (!e && p) { e = document.createElement('div'); e.id = 'khAlertEmpty'; e.style.cssText = 'font-size:12px;color:#64748b;padding:10px 2px;'; e.textContent = '✅ いま出ているアラートはありません'; p.appendChild(e); }
   if (e) e.style.display = n ? 'none' : '';
 }
+// 上の帯に入りきらないとき（ボタンの多い画面・狭い画面）は文字を消してアイコンだけにする。**決めるのはここだけ**
+function _khFit(){
+  const box = document.getElementById('kmtHeadIcons'); if (!box) return;
+  const tb = box.closest('.topbar'); if (!tb || !tb.offsetParent) return;
+  box.classList.remove('kh-compact'); tb.classList.remove('kh-wrap');
+  if (tb.scrollWidth > tb.clientWidth + 1) box.classList.add('kh-compact');
+  // それでも入らないときだけ、右のボタンを2段目に送る（ボタンの文字が折れて縦に伸びないように）
+  if (tb.scrollWidth > tb.clientWidth + 1) {
+    tb.classList.add('kh-wrap'); box.classList.remove('kh-compact');   // 2段にしたら文字は戻せることが多い
+    if (tb.scrollWidth > tb.clientWidth + 1) box.classList.add('kh-compact');
+  }
+}
+window.addEventListener('resize', () => { try { _khFit(); } catch(_) {} });
 // 開いている画面のアイコンに色を付ける（showScreen から呼ぶ）
 function _khMark(name){
   document.querySelectorAll('#kmtHeadIcons .kh-item[data-nav]').forEach(el => el.classList.toggle('kh-on', el.dataset.nav === name));
@@ -69888,8 +69910,8 @@ function _doForceReloadNow() {
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
   { version:'ver.20261027.9', date:'2026-10-27', notify:true, screens:'all', items:[
-    '画面の上にアイコンを並べました（🔔 アラート／💬 チャット／💼 求人チャット／🏠 社内チャット）。左メニューにあったアラートとチャットの件数はここに移りました（中身・押したときの動きは今までと同じです）',
-    '🔔 アラートを押すと、これまで左メニューに並んでいたアラートの一覧が開きます',
+    '画面の上にアイコンを並べました（アラート／チャット／求人チャット／社内チャット）。左メニューにあったアラートとチャットの件数はここに移りました（中身・押したときの動きは今までと同じです）',
+    '［アラート］を押すと、これまで左メニューに並んでいたアラートの一覧が開きます',
   ]},
   { version:'ver.20261027.8', date:'2026-10-27', notify:true, screens:['sys_requests'], items:[
     'システム要望リストの画面をすっきりさせました。タブ・検索・絞り込み・まとめて操作は［▾ 絞り込み・まとめて操作］を押すと開きます（［＋ 要望を書く］はいつも出ています）',

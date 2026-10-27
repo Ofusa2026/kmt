@@ -3846,7 +3846,11 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   🔔 の数字は **出ているアラートの種類の数**＝ `_khRecount()` の1箇所（パネルの中を MutationObserver で見て数え直す）
 - 💬 / 💼 / 🏠 は押すとその画面（`data-nav`）。開いている画面のアイコンに色を付けるのは `_khMark()`（showScreen から呼ぶ）。左メニューの検索にも出る（`_navFindIndex` が `#kmtHeadIcons .kh-item[data-nav]` も拾う）
 - 求人チャット・社内チャットのショートカット行（`#jobChatShortcut` / `#teamChatShortcut`）は CSS で隠したまま残してある（関数が見るので消さない）
-- 見た目は CSS の `#kmtHeadIcons` / `.kh-panel` の1かたまり（900px 以下は文字を消してアイコンだけ）
+- 見た目は CSS の `#kmtHeadIcons` / `.kh-panel` の1かたまり（900px 以下は文字を消してアイコンだけ）。
+  **アイコンは絵文字ではなく白黒の線の SVG**（`stroke="currentColor"`。assist の見た目にそろえた）
+- 📏 **上の帯に入りきらない画面（ボタンの多い求人管理など）は文字を消してアイコンだけにする＝ `_khFit()` の1箇所**
+  （`updateTopbarButtons` の最後と resize で呼ぶ。`.topbar` が横にはみ出すかで見る）。
+  それでも入らないときは右のボタンを2段目に送る（`.topbar.kh-wrap`）＝ ボタンの文字が折れて縦に伸びないように
 
 ### 🔍 左メニューの検索（チャットの下 ／ `#navFindQ`）
 
