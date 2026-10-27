@@ -5891,3 +5891,8 @@ GLTの月報Excel（国別チーム月報・年度まとめ・3か月ごと目�
 - 🔴 タブ名は「システム改善依頼」だけ。**赤い数字＝自分の依頼で着手済みになったもののうち、まだ見ていないもの**（`_mySrNewStarted()` の1箇所）。タブを開くと `_mySrMarkSeen()` が見たことを localStorage（`kmt_sr_started_seen_<user_id>`）に覚えて消える。あとから別の依頼が着手済みになるとまた出る
 - マイページのタブは絵文字なしの番号（`buildMyAccountScreen` の `_tn`＝出ているタブに左から通し）。`updateMySrTab()` はタブの文字を書き替えるとき番号を残す
 - 更新決定（`renCycle` / `renCycleAll`）・申請依頼まち（`renApply`）のマイページの帯も、色は冒頭の見出し（最初の `<b>`）だけ・文章は黒
+
+### 💬 所属機関の詳細の［チャット開始］
+
+- `openCompanyChatFromModal()` の1箇所（⚠️ `startCompanyChat()` はチャット画面の別の関数）＝ 企業チャットは `_ensureCompanyRoomId()`（無ければ作る）、開くのは `_pendingChatRoomId` → `showScreen('chat')`。直した内容があれば先に `promptSaveModal`。フッターの並びは 💾保存 → 💬チャット開始 → 閉じる（外国人材と同じ）
+- ⚡ 自分の依頼が「依頼者確認」で未確認のあいだは、マイページのタブの文字を赤く点滅（`_mySrLabelHtml()`／判定は `_srAlertKinds()` の 'confirm' をそのまま使う `_mySrNeedConfirm()`）。［✅ 確認しました］で止まる
