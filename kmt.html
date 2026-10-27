@@ -54028,7 +54028,7 @@ function requireAdmin(msg) {
 }
 
 // ===== チーム名マスタ（app_settings.user_teams に保存） =====
-const DEFAULT_USER_TEAMS = ['GLT','営業','総務','大房'];
+const DEFAULT_USER_TEAMS = ['GLT','営業','総務'];   // DBにチーム名が無いときの既定（大房は大房チームがあるので外した）
 let _userTeams = null; // 読み込み済みのチーム名配列（未読込は null）
 
 async function loadUserTeams() {
