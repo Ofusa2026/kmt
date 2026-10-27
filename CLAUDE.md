@@ -5870,3 +5870,11 @@ GLTの月報Excel（国別チーム月報・年度まとめ・3か月ごと目�
   口座振替日は中央寄せ・太字・大きめ（`.kozabi`）、連絡の締切日と ※注記には下線
 - ⚠️ **1通がA4 1枚におさまるようにしてある**（書類5点で約253mm・6点で283mm／A4は297mm。
   余白は `.soujo` の padding 18mm）。`_soujoCss()` の行間や空行（`.sp`）をゆるめると2枚に割れる
+
+### 💴 金額の入力欄は3桁ごとにカンマを自動で入れる
+
+- **付けるのは `_moneyUpgrade()` の1箇所だけ**（MutationObserver で新しい `<input>` を拾う＋ document の `input` で打つたびに整える）。
+  対象は **`_isMoneyInput()`**＝ 金額っぽい id（`MONEY_ID_RE`・除外は `MONEY_ID_NOT_RE`）／class（`MONEY_CLASS_RE`）／求人票の「円」の項目／`data-money="1"`（逃げ道。`data-money="0"` で外す）
+- ⚠️ **欄の `.value` は今までどおりカンマ抜きの数字を返す**（欄ごとに `value` を差し替える）＝ 保存・計算のコードは変えない。`valueAsNumber` は使わない
+- type=number の欄は text（inputmode=decimal）に変える（number はカンマを出せない）。カンマを付けるのは数字だけのとき（「約20万」などの文字はそのまま）
+- ⚠️ 人数・年・時間・率・電話・番号は金額ではないので `MONEY_ID_RE` に入れない。金額の欄を足すときは id に fee / amount / salary / price など入れるか `data-money="1"`
