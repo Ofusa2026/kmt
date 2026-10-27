@@ -27674,7 +27674,7 @@ function renderSysReqList(){
     const reqEmpty = !r.req_date && !r.requester;
     const canReq = _srCanManage() || _srIsMe(r.requester) || !r.requester;
     const cell = (fe, label, inner, extra) => '<td' + _feAttr(fe, label) + ' style="padding:7px 6px;' + (extra || '') + '">' + inner + '</td>';
-    return '<tr onclick="openSysReqModal(\'' + r.id + '\', _feOf(event))" style="cursor:pointer;border-bottom:1px solid #eef2f7;' + (pr ? 'background:' + pr.bg + ';box-shadow:inset 4px 0 0 ' + pr.fg + ';' : (kinds.length ? 'background:#fff7ed;' : '')) + '">'
+    return '<tr onclick="openSysReqModal(\'' + r.id + '\', _feOf(event))" style="cursor:pointer;border-bottom:1px solid #eef2f7;' + (kinds.length ? 'background:#fff7ed;' : '') + '">'
       + (bulk ? '<td style="padding:7px 6px;" onclick="event.stopPropagation()">' + (r.done ? '' : '<input type="checkbox" ' + (_srSel.has(r.id) ? 'checked ' : '') + 'onchange="srBulkPick(\'' + r.id + '\', this.checked)" style="width:15px;height:15px;">') + '</td>' : '')
       + cell('srf_content', '番号', (kinds.length ? '🔔 ' : '') + esc(r.no ?? '－'), 'white-space:nowrap;font-weight:700;')
       + cell('srf_priority', '優先度', pr ? _srBadge(pr.v, pr.bg, pr.fg) : (r.priority ? esc(r.priority) : ''))
@@ -69809,7 +69809,6 @@ function _doForceReloadNow() {
 const WHATS_NEW = [
   { version:'ver.20261027.4', date:'2026-10-27', notify:true, screens:['sys_requests'], items:[
     '📝 システム要望リスト：【記入日】と【依頼者】を【依頼】の1つの欄にまとめました。［📝 依頼］を1回押すと「今日の日付＋自分の名前」が入ります',
-    '優先度が付いた要望は行の色が変わります（緊急＝赤・高＝黄色）',
   ]},
   { version:'ver.20261027.3', date:'2026-10-27', notify:false, screens:[], items:[
     '📝 システム要望リスト：管理者用のリストへ要望を移せるようにしました（管理者だけ）。実装完了・不要のチェックは大房・多尾も押せます',
