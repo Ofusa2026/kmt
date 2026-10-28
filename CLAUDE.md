@@ -3865,6 +3865,16 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - 画面の地＝ 水色（`#DCEBFA`）→ 白のグラデーション ／ 左メニュー＝ 白に近い色（`#f9fbfd`）
 - 見出し（`.sidebar-section`）・ロゴの箱（`.logo-head`）＝ 青（`#477aaf`）→ 水色（`#b4d3f0`）のグラデーション・白い文字。右端が薄いので**文字に薄い影（text-shadow）**を付けて読めるようにしてある（ver.20261028.27。右端を白にしない・左端を濃くしすぎない＝そう頼まれた）
 
+### 🔄 いま開いているページだけを読み込み直す（上の帯の［🔄 更新］）
+
+- ブラウザのリロード（F5）はサイト全体が最初の画面に戻って作業が止まるので、**どの画面にも上の帯（［⛶ 全画面］の左）に［🔄 更新］を出す**＝ 画面は移動せず、**データだけ取り直す**（開いているタブ・絞り込み・開いているチャットは残る）
+- **足すのは `updateTopbarButtons` の1箇所**（`btnMap` の中身に「更新」が入っている画面には足さない＝ 二重にならない）。ボタンは `_refreshBtnHtml()`、押したときは **`refreshCurrentScreen()` の1箇所**
+- **画面ごとの読み込み方は `SCREEN_REFRESH` の1箇所だけ**（書いていない画面は `SCREENS[name].init()`、登録支援機関の記録簿 `reg_task_N` は `loadRegTaskRecords(N)`）。**画面を足したらここも見ること**
+  - マイページは画面ごと作り直さず `refreshMyAccount()`（中の読み込みだけ）／求人チャットは `chatRooms=[]` にして部屋ごと取り直す／💬 チャットは開いている部屋の発言も取り直す
+- ⚠️ **入力フォームの画面（`SCREEN_FORM_RELOAD`＝履歴書作成・決定報告・求人票作成・社内書類生成）は作り直すので、入力中の内容が消える**＝ 先に1回たずねる（選んでいる候補者・求人は引き継ぐ）
+- ⚠️ `ofusa_view` は別サイト（iframe）の画面で、もとの［🔄 更新］が iframe を読み直すので足さない
+- 2026/10/28 に全画面を確かめた（ボタンが無かったのは shift_kanri・doc_gen・chat_teams・team_chat・notices・decision_report・resume・job_flyer・chat・reg_audit・reg_zuiji_qa／doc。本文の中にだけあった画面＝ fees・sales・job_alerts・job_chat・my_account・audit_log・trash・ai_knowledge・登録支援機関の記録簿 も上の帯にそろえた）
+
 ### 🔝 上のアイコン（アラート・チャット ／ `#kmtHeadIcons`）
 
 - 画面の上の帯（`.topbar` の右、`.topbar-actions` の左）に 🔔 アラート／💬 チャット／💼 求人チャット／🏠 社内チャット を並べる。
