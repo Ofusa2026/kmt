@@ -11304,15 +11304,16 @@ async function linkIntroDecisionFromReport(kind, opt) {
     // 💰 売上は決定者リストとは別に見る（`_drIntroSaleKey()` の1箇所）。
     //    ⚠️ 以前は「決定者リストに入っていたら売上も飛ばす」だったので、決定者リストに先に手で入れた人は
     //       売上に入らなかった（2026/10/16 の東和インテック3名。実際に抜けた）
-    let saleHas = new Set();
+    let saleHas = new Set(), saleNotes = [];
     try {
       const items = [...new Set(rows.map(r => r.item))].map(encodeURIComponent).join(',');
-      const ss = await sbFetch('sales_forecast?select=worker_name,item_name&item_name=in.(' + items + ')') || [];
+      const ss = await sbFetch('sales_forecast?select=worker_name,item_name,notes&item_name=in.(' + items + ')') || [];
       saleHas = new Set(ss.map(x => _drIntroSaleKey(x.worker_name, x.item_name)));
+      saleNotes = ss.map(x => ({ item: x.item_name, txt: _drIntroNameNorm(x.notes) }));
     } catch (e) {}
     for (const r of rows) {
       const decDone  = has.has(key(r.name, r.company));
-      const saleDone = saleHas.has(_drIntroSaleKey(r.name, r.item));
+      const saleDone = _drIntroSaleHas(saleHas, saleNotes, r);
       if (decDone && saleDone) { skipped++; continue; }
       const bill = _drIntroBillTo(r), co = bill.co;
       if (!decDone) await sbFetch('intro_decisions', { method: 'POST', prefer: 'return=minimal',
@@ -11350,8 +11351,14 @@ async function linkIntroDecisionFromReport(kind, opt) {
   return { made, skipped };
 }
 // 💰 売上に同じ人材・同じ項目がもう入っているかのくらべ方（空白・大文字小文字を無視）
-function _drIntroSaleKey(name, item) {
-  return String(name || '').replace(/[\s　]/g, '').toLowerCase() + '|' + String(item || '');
+function _drIntroNameNorm(v) { return String(v || '').replace(/[\s　]/g, '').toLowerCase(); }
+function _drIntroSaleKey(name, item) { return _drIntroNameNorm(name) + '|' + String(item || ''); }
+/* 💰 売上にもう入っているか＝ ①人材名の列が同じ ②手で入れた行の備考に人材名が書いてある（数名を1行にまとめた行など）。
+   どちらかに当たれば入れない（同じ内容を手で入れていた場合の二重登録を防ぐ）。見るのはこの1箇所だけ */
+function _drIntroSaleHas(keys, notes, r) {
+  if (keys.has(_drIntroSaleKey(r.name, r.item))) return true;
+  const n = _drIntroNameNorm(r.name);
+  return n.length >= 4 && notes.some(x => x.item === r.item && x.txt.includes(n));
 }
 // 同じ名前の候補者がいれば結び付けておく（候補者 → 決定者 をあとから辿れるように）
 function _drIntroCandId(name) {
@@ -70769,7 +70776,7 @@ const WHATS_NEW = [
   { version:'ver.20261028.38', date:'2026-10-28', notify:true, screens:['sales','decision_report','candidates'], items:[
     { t:'売上管理の一覧のいちばん左に【登録日】を出し、登録した順（古い → 新しい）に上から並ぶようにしました。新しく入った売上はいちばん下に足されます', s:['sales'] },
     { t:'紹介案件の決定報告で、（紹）決定者リストに先に入っている人材は売上にも入らないことがありました。売上は決定者リストとは別に確かめて、入っていなければ登録するように直しました', s:['decision_report','sales'] },
-    { t:'登録もれだった東和インテックの3名ぶんの人材紹介料を売上に入れました。後から入れた行には登録日の下に「（10/28に反映）」と出ます', s:['sales'] },
+    { t:'売上に同じ人材をもう手で入れていたとき（何名かを1行にまとめて、備考に名前を書いた行もふくむ）は、決定報告から二重に入れないようにしました', s:['decision_report','sales'] },
     { t:'（紹）決定者リストの「この一覧はまだシステムに保存されていません」の取り込みエラーを直しました。次に開いたときに過去の決定者が保存されます', s:['candidates'] },
   ]},
   { version:'ver.20261028.37', date:'2026-10-28', notify:false, screens:[], items:[
