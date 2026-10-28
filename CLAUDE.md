@@ -3791,6 +3791,24 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   - 見た目は CSS の `[data-fe]` の1箇所（押せるところだけ薄い黄色）
   - 求人管理の「募集／見込／初期費用」のセルは前からある `_jpCountCell()` / `_jpFeeCell()` のまま
 
+### 🚫 モーダルは［閉じる］か ✕ でだけ閉じる（背景を押しても閉じない）
+
+- **止めるのは `_isBackdropEl()` ＋ window の capture の click の1箇所だけ**＝ 画面の9割以上をおおう position:fixed/absolute の要素そのもの（背景）を押した click を、どの閉じる処理にも届く前に止める
+  - > ⚠️ **過去の事故**: 文字を選んだまま枠の外でマウスを離すと、ブラウザは背景への click として扱うので、書いている途中のモーダルが勝手に閉じていた
+  - 各モーダルの「背景を押したら閉じる」の処理（`ensureModals` / `companyModal` / `whatsNewModalBg` / 画像ビューアなど）は残してあるが、ここで止まるので動かない。
+    背景で閉じてよいものを作るときだけ、その要素に `data-bg-close="1"` を付ける
+  - Esc で閉じる動きは変えていない
+
+### ⏸ 待機申請（決定報告が来たときに、ほかの申請が動いている人材）
+
+- 実体は **`workers.pending_apply`**（jsonb ＝ `apply_type` / `apply_status` / `request_date` / `apply_memo` / `desired_visa` ＋ `at` / `by` / `from` / `prev_status` / `prev_type`）
+- 決定報告の既存人材の更新（`saveDecisionAsWorker`）が **`_drHoldApply()` の1箇所**を通る＝ いまの申請ステータスが動いていれば
+  （判定は **`_drApplyBusy()`**＝ 空・`DR_APPLY_FREE_STATUSES`（申請予定なし・取り下げ・不許可・発行完了・入国済み）以外）、
+  **`DR_APPLY_HOLD_COLS` の項目は人材に書かずに `pending_apply` に入れる**（ほかの項目＝国籍・在留期限などは今までどおり書く）
+  - > ⚠️ **過去の事故**: 1号の更新が【審査中】の人材に2号への変更の決定報告を送ると、申請ステータスが【申請準備中】に戻っていた
+- 人材詳細の申請ステータスの下に枠（`#wfPendingApply` ＝ `renderWfPendingApply()`。開くたびに `pending_apply` の1列だけ引く）。
+  ［この申請に変更］＝ `applyPendingApply()`（待機の中身を人材に書いて `pending_apply` を空に。画面の欄にも入れて控えを取り直す）／［待機申請を取り消す］＝ `discardPendingApply()`
+
 ### フッターのボタン配置（統一ルール）
 
 `最終更新 → 💾保存 → （チャット開始）→ 閉じる │ 余白 │ 🗑削除`
