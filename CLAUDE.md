@@ -3876,6 +3876,9 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   ⚠️ **左メニューに戻したり複製したりしないこと**（同じ id が2つになる）
 - 🔔 を押すと `#khAlertPanel` が開く（`khToggle()`）。閉じるのは外を押したとき・画面を移ったとき（`showScreen` の先頭の `khClosePanel()`）。
   🔔 の数字は **随時きたアラートの種類の数**＝ `_khRecount()` の1箇所（パネルの中を MutationObserver で見て数え直す）。⚠️ **いつも出ている［自分の担当のアラート］（`myAlertSummary`）と［全体アラート］（`sidebarAlerts`）は数えない**（数えるのは `KH_ALERT_COUNT_IDS`。パネルには `KH_ALERT_IDS` の全部を出す）。0のときは数字を消す（パネルの「いま出ているアラートはありません」は、数えない2つも含めて何も出ていないときだけ）
+- 🎨 **パネルの中のカードは水色のグラデーション・黒い細字・左端に担当の色の線**＝ CSS の `.kh-panel :is(#myAlertSummary,…)` の1かたまり（担当マークと件数バッジの色はそのまま・バッジだけ太字）。
+  線の色は `_alertChipHtml()` が style に入れる **`--acc`**（担当があれば `alertOwnerStyle().line`、無ければ文字の色）。全体アラートも `--acc` を持つ。
+  「自分の担当のアラート」の内訳の件数も担当の色のバッジ（`updateMyAlertSummary` の `chip`）
 - 🚫 **パネルの中は点滅させない**＝ CSS の `.kh-panel, .kh-panel *{animation:none !important;}` の1行（`.due-over` などの点滅を止める。左メニュー・マイページの点滅はそのまま）
 - 💬 / 💼 / 🏠 は押すとその画面（`data-nav`）。開いている画面のアイコンに色を付けるのは `_khMark()`（showScreen から呼ぶ）。左メニューの検索にも出る（`_navFindIndex` が `#kmtHeadIcons .kh-item[data-nav]` も拾う）
 - 求人チャット・社内チャットのショートカット行（`#jobChatShortcut` / `#teamChatShortcut`）は CSS で隠したまま残してある（関数が見るので消さない）
