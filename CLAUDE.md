@@ -4740,6 +4740,9 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   - **種別は `AUDIT_REC_KINDS` の1箇所だけ**（🧪 模擬監査／🏛️ 本番監査。一覧のチップ・選択欄・色が追従する）
   - ノートの中は左右2つの枠＝ **左＝⚠️ 指摘内容（`findings_html`）／右＝📝 監査記録（`record_html`）**。
     **枠の見出し・色・説明は `AUDIT_REC_PANES` の1箇所だけ**（書式は `arExec()`＝アナウンスと同じ execCommand）
+  - 💾 保存先の列は **`findings_html` / `record_html`**（⚠️ 最初は表に `findings` / `record` しか無く、保存がまるごと落ちていた。2026/10/29 に列を足した。古い2列は空のまま残してある）
+  - 番号・箇条書きの頭が左で切れないよう `.ar-body ol/ul` の左の余白を強めに戻す（貼り付けた文が padding:0 を持ってくるため）。
+    指摘内容の見出しは `grad`（赤のグラデーション）。**はじめは全画面で開く**（`_modalMaxState.auditRecModal`）＝ 枠は画面の下まで伸びる
   - だれでも書ける・直せる。**手動保存**（`_manualSave.auditRecModal` ／ 接頭辞 `ar_` ／ `sm_audit`）。
     新規は作った id を `_editingAuditRecId` に覚える（続けて保存しても二重に作らない）
   - 一覧の検索は `#auditRecList` だけ描き直す（`setAuditRecQ` → `_renderAuditRecList`。検索欄を作り直さない）
