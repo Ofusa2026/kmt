@@ -20520,7 +20520,7 @@ function renderSingleMessage(m, opts) {
         '<div style="max-width:62%;position:relative;">' +
           '<div style="font-size:10px;color:#94a3b8;text-align:right;margin-bottom:3px;">' + timeStr + editedMark + '</div>' +
           '<div class="chat-bubble-wrap" style="position:relative;">' +
-            '<div style="' + (stamp ? 'padding:2px 0;text-align:right;' : 'background:' + (isDeleted?'#e8eaed':'#1a73e8') + ';color:' + (isDeleted?'#5f6368':'white') + ';padding:10px 14px;border-radius:20px 20px 4px 20px;box-shadow:0 1px 2px rgba(0,0,0,.12);') + 'font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;">' + replyQuote + bodyHtml + '</div>' +
+            '<div style="' + (stamp ? 'padding:2px 0;text-align:right;' : (isDeleted ? 'background:#e8eaed;color:#5f6368;' : _mineBubbleCss()) + 'padding:10px 14px;border-radius:20px 20px 4px 20px;box-shadow:0 1px 2px rgba(0,0,0,.12);') + 'font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;">' + replyQuote + bodyHtml + '</div>' +
             actionsHtml +
           '</div>' +
           '<div style="text-align:right;">' + reactionsHtml + threadLink + '</div>' +
@@ -28408,6 +28408,9 @@ function _stripTabEmoji(root){
    色の系統はそのまま、彩度を SOFT_GRAD_MUTE だけ落として左上をほんの少し明るくする（文字色は触らない）。
    ⚠️ 色に意味がある所（支援カレンダー・支援委託費の表・書類のプレビュー・赤系の警告）は SOFT_GRAD_SKIP で外す。
    外す所を足すときはこの1箇所に足す。新しい印も色を書くだけで自動で追従する */
+/* 💬 自分の発言の吹き出しの色＝ #1a73e8 をほかの色つきの印と同じ落ち着いたグラデーションにしたもの（💬 チャット・🏠 社内チャット共通の1箇所） */
+const MINE_BUBBLE_BASE = '#1a73e8';
+function _mineBubbleCss(){ const v = _softGradStyle(MINE_BUBBLE_BASE); return v ? 'background:' + v.background + ';color:#fff;text-shadow:' + v.textShadow + ';' : 'background:' + MINE_BUBBLE_BASE + ';color:#fff;'; }
 const SOFT_GRAD_MUTE = 0.22, SOFT_GRAD_PALE = 0.06, SOFT_GRAD_TOP = 0.32, SOFT_GRAD_DARK_TXT = 160;
 const SOFT_GRAD_SKIP = '#scheduleCalArea,#feeMatrixTable,.fmx,.jobsheet-page,#jobFlyerPreview,.resume-page,.resume-doc-page,.reg-doc,.soujo,[data-no-softgrad],.modal-header,.btn-primary,.sidebar,.chat-bubble-wrap';
 /* 1つの色 → 見た目（地・文字色・影）。くすませて薄くし、上を明るく。地が明るければ黒文字（SOFT_GRAD_DARK_TXT） */
@@ -71396,7 +71399,7 @@ function _doForceReloadNow() {
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
   { version:'ver.20261029.19', date:'2026-10-29', notify:false, screens:[], items:[
-    'チャットで自分が送った短い発言の吹き出しも、ほかと同じ青の1色にしました（読みやすく）',
+    'チャットで自分が送った発言の吹き出しを、長さにかかわらず同じ落ち着いた青にそろえました',
   ]},
   { version:'ver.20261029.18', date:'2026-10-29', notify:false, screens:[], items:[
     '上のチャットの件数の色と、一覧の小さな色つきの印を少し明るくしました',
@@ -77433,7 +77436,7 @@ function _tcMessageHtml(m) {
         + esc(m.sender_name||'') + '　' + time + editedMark + '</div>'
       + (stamp
         ? '<div style="padding:2px 0;' + (isMine ? 'text-align:right;' : '') + 'font-size:13.5px;line-height:1.7;">' + quote + fileHtml + body + '</div>'
-        : '<div data-no-softgrad style="background:' + (isMine && !editing ? '#1a73e8' : 'white') + ';color:' + (isMine && !editing ? 'white' : '#202124')
+        : '<div data-no-softgrad style="' + (isMine && !editing ? _mineBubbleCss() : 'background:white;') + 'color:' + (isMine && !editing ? 'white' : '#202124')
         + ';border:' + (isMine ? 'none' : '1px solid #e0e0e0') + ';border-radius:14px;padding:8px 12px;font-size:13.5px;line-height:1.7;'
         + 'word-break:break-word;white-space:pre-wrap;' + (mention && !isMine ? 'box-shadow:0 0 0 2px #fbbf24;' : '') + '">'
         + quote + fileHtml + body + '</div>')
