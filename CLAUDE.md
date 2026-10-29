@@ -4755,6 +4755,13 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
     新規は作った id を `_editingAuditRecId` に覚える（続けて保存しても二重に作らない）
   - 一覧の検索は `#auditRecList` だけ描き直す（`setAuditRecQ` → `_renderAuditRecList`。検索欄を作り直さない）
   - 削除は論理削除（`_confirmDeleteTwice()`）。`SB_SOFT_DELETE_TABLES` と `TRASH_TABLES` の両方に入れてある
+- 🛠 **監査の指摘 → 登録支援機関業務の各項目の【改善】＝ `reg_improvements`**（1行＝1つの指摘。`audit_id`／`task_nos`＝記録簿の番号の配列・複数可／
+  `topic` 項目名／`finding` 指摘／`policy` 対応方針／`action` 具体的なアクション／`assignees` 担当の名前の配列（選択式・複数）／`status`／`due_date`／`memo`）
+  - 出す場所は2つ＝ 監査記録のモーダルの【📘 登録支援機関業務への反映】（`_auditImpSectionHtml()`＝項目ごとの直通リンク＋指摘のカード）／
+    各項目のページのいちばん上の【🛠 改善】（`regImpBoxHtml()` / `renderRegImpBox()`。`loadRegTaskRecords()` の先頭で読む）。**どちらも `_regImps` の1つを見る**
+  - 1件のカードは `_regImpCardHtml()`、記入フォームは `openRegImpModal()` → `saveRegImp()`、項目へ移るのは `regImpGoTask()`（監査記録が未保存ならたずねる）
+  - 状況は `REG_IMP_STATUSES` の1箇所。論理削除＝ `SB_SOFT_DELETE_TABLES` と `TRASH_TABLES` の両方に入れてある
+  - 2026/10/29 に 第１回模擬監査（2026/09/11）の10件を紐づけて入れた（`created_by`＝システム取込。支援記録全般＝1・3・5・6・8・9・11・12／質問対応＝4・7・10／運用要領・責任者資料＝1）
 - 画面キーは **`AUDIT_KEY`（`reg_audit`）**。`SCREENS` への登録・`renderScreenContent` の
   振り分け・サイドバーの3箇所がこの定数を見る
 
