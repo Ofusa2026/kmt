@@ -28409,7 +28409,7 @@ function _stripTabEmoji(root){
    ⚠️ 色に意味がある所（支援カレンダー・支援委託費の表・書類のプレビュー・赤系の警告）は SOFT_GRAD_SKIP で外す。
    外す所を足すときはこの1箇所に足す。新しい印も色を書くだけで自動で追従する */
 const SOFT_GRAD_MUTE = 0.22, SOFT_GRAD_PALE = 0.06, SOFT_GRAD_TOP = 0.32, SOFT_GRAD_DARK_TXT = 160;
-const SOFT_GRAD_SKIP = '#scheduleCalArea,#feeMatrixTable,.fmx,.jobsheet-page,#jobFlyerPreview,.resume-page,.resume-doc-page,.reg-doc,.soujo,[data-no-softgrad],.modal-header,.btn-primary,.sidebar';
+const SOFT_GRAD_SKIP = '#scheduleCalArea,#feeMatrixTable,.fmx,.jobsheet-page,#jobFlyerPreview,.resume-page,.resume-doc-page,.reg-doc,.soujo,[data-no-softgrad],.modal-header,.btn-primary,.sidebar,.chat-bubble-wrap';
 /* 1つの色 → 見た目（地・文字色・影）。くすませて薄くし、上を明るく。地が明るければ黒文字（SOFT_GRAD_DARK_TXT） */
 function _softGradStyle(c){
   let rgb = c;
