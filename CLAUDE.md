@@ -4759,6 +4759,9 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   - だれでも書ける・直せる。**手動保存**（`_manualSave.auditRecModal` ／ 接頭辞 `ar_` ／ `sm_audit`）。
     新規は作った id を `_editingAuditRecId` に覚える（続けて保存しても二重に作らない）
   - 一覧の検索は `#auditRecList` だけ描き直す（`setAuditRecQ` → `_renderAuditRecList`。検索欄を作り直さない）
+  - 🔗 **共有リンク＝ `#audit=<id>`**（社内共有事項の `#notice=`・求人の `#job=` と同じ仕組み。**ログインしている人だけが開ける**）。
+    作るのは `auditShareUrl()`、コピーは `copyAuditLink()`（モーダルのフッターの［🔗 共有リンクをコピー］＝保存後だけ出す／一覧のカードの［🔗 共有リンク］）、
+    開いたときは起動時に `openAuditFromShareLink()` が【03 監査記録】を開いてその記録を出す
   - 削除は論理削除（`_confirmDeleteTwice()`）。`SB_SOFT_DELETE_TABLES` と `TRASH_TABLES` の両方に入れてある
 - 🛠 **監査の指摘 → 登録支援機関業務の各項目の【改善】＝ `reg_improvements`**（1行＝1つの指摘。`audit_id`／`task_nos`＝記録簿の番号の配列・複数可／
   `topic` 項目名／`finding` 指摘／`policy` 対応方針／`action` 具体的なアクション／`assignees` 担当の名前の配列（選択式・複数）／`status`／`due_date`／`memo`）
