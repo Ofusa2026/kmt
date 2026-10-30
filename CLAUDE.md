@@ -4476,6 +4476,11 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   （**判定は `_noticeMinSet()` の1箇所**、たたんだ1行＝タイトル・投稿者・日付は `_noticeMinCardHtml()`）。
   ［▾ すべて開く］／［▸ すべてたたむ］（`setAllNoticeMin`）は**いま一覧に出ているぶんだけ**（`_noticeVisibleIds`）
 
+- ✏️ **共有事項の【内容】はアナウンスと同じリッチエディタ**（`#nmEditorBody`＝`.jn-body`。大きさ・太字・色・背景・表・箇条書き）。
+  保存は **`company_notices.content_html`（書式つき）＋ `content`（文字だけの写し）の2列**＝ 検索は `content` を見る。
+  **本文を出すのは `_noticeBodyHtml(n)` の1箇所**（`content_html` が無い古いものは `content` を改行・リンクつきでHTMLに直す＝移行不要。編集して保存すると書式つきになる）。
+  アナウンスにするときも同じ関数を通す。画面の表は `.jn-table` の見た目だけ使い、**表示側は `.jn-body` にしない**（行・列の＋／−の道具が出てしまう）。ツールは `nmExec()` / `nmInsertTable()`、保存画面を開くとき `_jnInitResize()` を呼ぶ
+
 ### 📝 システムに依頼・要望等の記入シート
 
 - サイドバーの**全体アラート（`sidebarAlerts`）とアナウンス確認（`announcementAlerts`）の間**のボタン。
