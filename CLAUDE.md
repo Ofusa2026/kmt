@@ -5878,6 +5878,7 @@ GLTの月報Excel（国別チーム月報・年度まとめ・3か月ごと目�
 - ⚠️ **✕で外したのに、いまは🤝 支援人材（`workerBucket()`＝'support'）の人は、表の上（`#feeMgmtNote`）に赤い注意を出す**。
   判定は **`_fmExclStale(w)` の1箇所**（テスト用の人材は除く）。だれがいつ外したか（`fee_excluded_workers.excluded_by` / `excluded_at`）は
   `FEE_EXCL_INFO` ＋ `_fmExclInfoText()` で、注意と ↩ の title に出す。✕の除外は自分では消えないので、KMT支援に戻った人が黙って請求から抜け続けないため
+  - ［このまま除外］（`fmExclStaleAck()`）＝ 請求しないと確かめた人は `fee_excluded_workers.stale_ack_at` / `stale_ack_by` を入れて注意から外す（`FEE_EXCL_INFO[..].ack`）
   - > ⚠️ 2026/10/30 に「067-021・067-022 が出ない」と言われた＝ 10/1 に白井さんが✕で外していた（どちらも KMT支援外なのでそのままで正しい）
 - 「除外者を表示」の横に人数の内訳は出さない（ラベルは文字だけ）。
   表から居なくなった人は、チェックを入れれば全部出るので、そちらで確認する
