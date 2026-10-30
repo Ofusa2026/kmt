@@ -4734,6 +4734,17 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   - 様式番号は「3-1-1」「3-1別紙」「3-6別紙1」の形。画面の言い方（第３－１－１号（別紙））は `_zjFormLabel()`、並び順は `_zjFormSortKey()`
   - ⚠️ こちら（Claude）の環境からは Supabase に直接書けなかったので、ファイルは**画面から取り込む**作りにしてある
 
+### 📕 0. 特定技能外国人受入れに関する運用要領（登録支援機関業務・1. の上 ／ 画面キー `YORYO_KEY`＝`reg_youryo`）
+
+- 章ごとに【要約】→【この章の項目】→［📖 本文を読む］。**要約・項目は `YORYO_CHAPTERS` の1箇所だけ**（令和８年８月版から書いた。版が変わったら見直すこと）
+- 📖 **本文は文字に起こさず、PDF のそのページを pdf.js（`YORYO_PDFJS`・cdnjs）で描く**＝ 表も原本どおり。描くのは `_yoryoRenderBody()`、章のページは `_yoryoChPages()`
+  - PDF の実体は **`ops_manual_files`**（版 `ver` で一意・中身は `data_b64`）。⚠️ kmt.html に埋めない
+  - **取り込みは管理者だけ**＝［📥 PDFを取り込む（管理者）］（`openYoryoImport()` → `yoryoImportRun()`）。
+    版は表紙の「令和◯年◯月」、章のはじまりは各ページの先頭の「第◯章」から `_yoryoFindChapters()` が見つける（見つからなければ `YORYO_PAGES_DEF`）
+  - ⚠️ こちら（Claude）の環境からは Supabase に直接書けなかったので、PDF は画面から取り込む（随時届出の様式と同じ）
+- ✅ **確認完了は営業・GLTのメンバーだけ**（`YORYO_CHECK_TEAMS` ／ 判定は `_yoryoCanCheck()` の1箇所）。実体は **`ops_manual_checks`**（版 × 章 × 人で一意）＝
+  版を差し替えると確認はやり直し。押すのは `toggleYoryoCheck()`、［👥 確認状況］（メンバー × 章）は `openYoryoStatus()`
+
 ### 🔍 00 監査関連（全員が見られる）
 
 - 入管の実地調査（報告徴収・立入検査）にそなえるための読みものと書類のリンク。
