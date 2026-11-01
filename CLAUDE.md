@@ -1310,12 +1310,19 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 
 ### 求人票の写真（作業場・寮等）
 
-- 実体は `job_progress.photos`（`[{url,name,at,by}]`）。実ファイルは
+- 実体は `job_progress.photos`（`[{url,name,at,by,hp}]`。`hp:true`＝ 求人サイトにも載せる）。実ファイルは
   **GAS経由で Google Drive の共有フォルダ**に入れる（チャットの添付と同じ経路）。
   置き場は `JOB_PHOTO_DRIVE_URL` の1箇所だけ
 - 最大 `JOB_PHOTO_MAX`(8) 枚。求人票では `JOB_PHOTO_PER_PAGE`(4) 枚ずつ並べるので**写真ページは最大2ページ**
 - 貼る欄は `jobPhotoBoxHtml()` / `renderJobPhotos()` / `addJobPhotoFiles()`。
   **社内の求人票タブと外部の記入フォームで同じ部品を使う**（`_jobPhotos` が共用の入れ物）
+- 🌐 **求人サイトに載る写真＝ 社内の写真で「🌐 サイトに載せる」（`hp:true`）にしたもの → 求人サイト用の写真（`job_progress.hp_photos`）の順**。
+  組み立てるのは Supabase の `hp_sync_list()`（WordPress には合わせた1本の `photos` で渡す）。
+  - 「サイトに載せる」のチェックは**社内の求人票タブだけ**に出す（`_jobPhotoHpUI`＝ `jobPhotoBoxHtml({hpNote:true})` のとき）。外部の記入フォームには出さない
+  - サイト用の写真の欄は `jobHpPhotoBoxHtml()` / `renderJobHpPhotos()` / `addJobHpPhotoFiles()`（`_jobHpPhotos`・最大 `JOB_HP_PHOTO_MAX`）。求人票（印刷）には出さない。
+    アップロードは社内の写真と同じ `_uploadJobPhotoFiles()` の1箇所
+  - **合わせて1枚も無いと［🌐 掲載する］で止める**。数えるのは `hpPhotoCount()` の1箇所
+  - 2026/10/30 に切り替えたとき、掲載中だった求人の写真（17件・37枚）は全部 `hp:true` にした（サイトの見た目を変えないため）
 - 求人票のページは `_jobPhotoPagesHtml(photos)` が作り、`buildJobOrderSheet` の
   page1 + page2 の後ろに足す。**ページ1に (11)(12) の空欄は置かない**
   （よくある質問はページ2の一覧、写真は3ページ目以降の専用ページ）

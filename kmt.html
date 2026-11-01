@@ -46283,8 +46283,9 @@ function switchJpTab(tab){
   // 📄 求人票＋よくある質問: 求人ノート → 求人票の項目編集 → よくある質問
   if (tab==='sheet') {
     _jobPhotos = _jobPhotoList(_r?.photos);
+    _jobHpPhotos = _jobPhotoList(_r?.hp_photos);
     box.innerHTML = _jpSheetTabHtml(_r); loadJobNotes(_jpDetailRow);
-    renderJobPhotos(); initJobSheetPasteTable();
+    renderJobPhotos(); renderJobHpPhotos(); initJobSheetPasteTable();
     initJpEmptyMarks();   // 労働局指定項目が未記入なら薄赤にする
     renderSaveMeta('sm_jobprog_sheet', _r?.updated_at, _r?.updated_by);
     loadJobSheetLinks(_jpDetailRow).then(() => renderJobLinkPanel(_jpDetailRow)); }
@@ -48004,6 +48005,7 @@ function _jpSheetTabHtml(r) {
 
   <div style="margin:16px 0 8px;"></div>
   ${jobPhotoBoxHtml({ hint:'求人票のいちばん後ろに、A4 1ページ4枚で並びます。「💾 求人票の内容を保存」で確定します。', hpNote:true })}
+  ${jobHpPhotoBoxHtml()}
 
   <div style="margin:18px 0 8px;border-top:1px solid var(--gray-200);padding-top:14px;"></div>
   <!-- ❓ よくある質問は特定技能の求人票の2ページ目に出るものなので、その種類のときだけ出す -->
@@ -48048,6 +48050,7 @@ async function saveJobSheet(srcRow) {
   });
   patch.sheet_meta = meta;
   patch.photos = _jobPhotos.slice(0, JOB_PHOTO_MAX);
+  patch.hp_photos = _jobHpPhotos.slice(0, JOB_HP_PHOTO_MAX);   // 🌐 求人サイト用の写真
   // 労働局指定項目の未記入は止めずに知らせるだけ
   const miss = JOB_SHEET_FIELDS.filter(f => f.req && !patch[f.col]);
   if (miss.length) {
@@ -48358,13 +48361,20 @@ const KMT_DRIVE_GAS_URL = 'https://script.google.com/macros/s/AKfycbzFG1X4KAUR09
 // チャットの添付・ノートの添付を入れる Google Drive のフォルダー（設定で変えられる）
 const CHAT_DRIVE_URL_DEFAULT = 'https://drive.google.com/drive/folders/1cfrO1_jk8E8uw5oT_fhd4v5IPsJL3tcv';
 
-let _jobPhotos = [];               // いま編集中の案件の写真（社内・外部フォーム共用）
+let _jobPhotos = [];               // いま編集中の案件の写真（社内・外部フォーム共用）。{url,name,at,by,hp}（hp＝ 求人サイトにも載せる）
+/* 🌐 求人サイト用の写真（job_progress.hp_photos）。社内の写真とは別に、サイトだけに載せるもの（フリー素材も可）。
+   求人サイトに載るのは **社内の写真で「サイトに載せる」にチェックしたもの → サイト用の写真** の順（Supabase の hp_sync_list() が組み立てる）。
+   合わせて1枚も無いと［🌐 掲載する］で止める（数えるのは hpPhotoCount() の1箇所） */
+let _jobHpPhotos = [];
+const JOB_HP_PHOTO_MAX = 8;
+let _jobPhotoHpUI = false;         // 社内の求人票タブだけ「サイトに載せる」のチェックを出す（外部の記入フォームには出さない）
 
 function _jobPhotoList(v) {
   return Array.isArray(v) ? v.filter(p => p && p.url) : [];
 }
 // 写真を貼る欄（社内タブ・外部フォームで共通）
 function jobPhotoBoxHtml(opt = {}) {
+  _jobPhotoHpUI = !!opt.hpNote;
   return `
   <div style="border:1px solid #fed7aa;background:#fffbf5;border-radius:8px;padding:10px 12px;margin-bottom:12px;">
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
@@ -48394,7 +48404,7 @@ function renderJobPhotos() {
     return;
   }
   grid.innerHTML = _jobPhotos.map((p, i) =>
-    '<div style="position:relative;border:1px solid var(--gray-200);border-radius:6px;overflow:hidden;background:white;">'
+    '<div style="position:relative;border:1px solid ' + (_jobPhotoHpUI && p.hp ? '#0369a1' : 'var(--gray-200)') + ';border-radius:6px;overflow:hidden;background:white;">'
     + '<img src="' + esc(driveImageUrl(p.url, 400)) + '" alt="' + esc(p.name || '') + '" '
       + 'title="クリックすると大きく見られます" onclick="openImgView(_jobPhotos,' + i + ')" '
       + 'style="width:100%;height:100px;object-fit:cover;display:block;cursor:zoom-in;" '
@@ -48402,6 +48412,10 @@ function renderJobPhotos() {
     + '<div style="display:none;padding:12px;font-size:10.5px;color:#b91c1c;">表示できません</div>'
     + '<div style="padding:4px 6px;font-size:10px;color:var(--gray-500);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'
       + (i + 1) + '. ' + esc(p.name || '写真') + '</div>'
+    // 🌐 求人サイトに載せるチェック（✕ の左。言葉は出さず、ホバーで「サイトに載せる」）
+    + (_jobPhotoHpUI ? '<label title="サイトに載せる" style="position:absolute;top:3px;right:27px;width:20px;height:20px;border-radius:4px;cursor:pointer;'
+        + 'display:flex;align-items:center;justify-content:center;background:' + (p.hp ? '#0369a1' : 'rgba(255,255,255,.9)') + ';box-shadow:0 0 0 1px rgba(0,0,0,.25);">'
+        + '<input type="checkbox" title="サイトに載せる"' + (p.hp ? ' checked' : '') + ' onchange="toggleJobPhotoHp(' + i + ',this.checked)" style="margin:0;cursor:pointer;"></label>' : '')
     + '<button type="button" onclick="removeJobPhoto(' + i + ')" title="この写真を外す" '
       + 'style="position:absolute;top:3px;right:3px;background:rgba(0,0,0,.55);color:white;border:none;border-radius:4px;'
       + 'width:20px;height:20px;font-size:12px;line-height:1;cursor:pointer;">✕</button>'
@@ -48410,17 +48424,84 @@ function renderJobPhotos() {
 function removeJobPhoto(i) {
   _jobPhotos.splice(i, 1);
   renderJobPhotos();
+  renderJobHpPhotoCount();
+}
+// 社内の写真を求人サイトにも載せる／載せない（保存で確定）
+function toggleJobPhotoHp(i, on) {
+  if (!_jobPhotos[i]) return;
+  _jobPhotos[i].hp = !!on;
+  renderJobPhotos();
+  renderJobHpPhotoCount();
+}
+// 🌐 求人サイトに載る写真の枚数（社内の「サイトに載せる」＋ サイト用）。r を渡せば保存した内容、無ければ編集中の内容
+function hpPhotoCount(r) {
+  const ph = r ? _jobPhotoList(r.photos) : _jobPhotos, hp = r ? _jobPhotoList(r.hp_photos) : _jobHpPhotos;
+  return ph.filter(p => p.hp).length + hp.length;
+}
+// 🌐 求人サイト用の写真の欄（社内の求人票タブだけ）。id は jsf_ で始める＝ ［✏️ 入力欄へ移動］でこのタブに来られる
+function jobHpPhotoBoxHtml() {
+  return '<div id="jsf_hp_photo_box" style="border:1px solid #bae6fd;background:#f0f9ff;border-radius:8px;padding:10px 12px;margin-bottom:12px;">'
+    + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">'
+    +   '<span style="font-size:12px;font-weight:800;color:#0369a1;">🌐 求人サイト用の写真</span>'
+    +   '<span style="font-size:10.5px;color:var(--gray-400);">サイトだけに載せる写真（フリー素材でも可）。求人票には出ません。最大' + JOB_HP_PHOTO_MAX + '枚</span>'
+    +   '<span style="margin-left:auto;"></span><span id="jobHpPhotoCount" style="font-size:11px;font-weight:700;"></span>'
+    + '</div>'
+    + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
+    +   '<input type="file" id="jobHpPhotoInput" accept="image/*" multiple onchange="addJobHpPhotoFiles(this.files); this.value=\'\';" style="font-size:12px;flex:1;min-width:200px;">'
+    +   '<span id="jobHpPhotoMsg" style="font-size:11px;font-weight:700;color:var(--gray-400);"></span>'
+    + '</div>'
+    + '<div id="jobHpPhotoGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-top:10px;"></div>'
+    + '</div>';
+}
+function renderJobHpPhotos() {
+  const grid = document.getElementById('jobHpPhotoGrid');
+  renderJobHpPhotoCount();
+  if (!grid) return;
+  if (!_jobHpPhotos.length) {
+    grid.innerHTML = '<div style="grid-column:1/-1;font-size:11.5px;color:var(--gray-400);padding:6px 0;">まだ写真がありません</div>';
+    return;
+  }
+  grid.innerHTML = _jobHpPhotos.map((p, i) =>
+    '<div style="position:relative;border:1px solid var(--gray-200);border-radius:6px;overflow:hidden;background:white;">'
+    + '<img src="' + esc(driveImageUrl(p.url, 400)) + '" alt="' + esc(p.name || '') + '" title="クリックすると大きく見られます" onclick="openImgView(_jobHpPhotos,' + i + ')" '
+      + 'style="width:100%;height:100px;object-fit:cover;display:block;cursor:zoom-in;" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'block\';">'
+    + '<div style="display:none;padding:12px;font-size:10.5px;color:#b91c1c;">表示できません</div>'
+    + '<div style="padding:4px 6px;font-size:10px;color:var(--gray-500);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (i + 1) + '. ' + esc(p.name || '写真') + '</div>'
+    + '<button type="button" onclick="removeJobHpPhoto(' + i + ')" title="この写真を外す" '
+      + 'style="position:absolute;top:3px;right:3px;background:rgba(0,0,0,.55);color:white;border:none;border-radius:4px;width:20px;height:20px;font-size:12px;line-height:1;cursor:pointer;">✕</button>'
+    + '</div>').join('');
+}
+// 欄の右上に「求人サイトに載る写真 ◯枚」（0枚なら赤）
+function renderJobHpPhotoCount() {
+  const el = document.getElementById('jobHpPhotoCount');
+  if (!el) return;
+  const n = hpPhotoCount();
+  el.textContent = '求人サイトに載る写真 ' + n + '枚' + (n ? '' : '（1枚以上必要）');
+  el.style.color = n ? '#0369a1' : '#dc2626';
+}
+function removeJobHpPhoto(i) {
+  _jobHpPhotos.splice(i, 1);
+  renderJobHpPhotos();
+  // 未保存の印（✕ はクリックだけで input/change が出ないので、欄で change を出す）
+  document.getElementById('jobHpPhotoInput')?.dispatchEvent(new Event('change', { bubbles:true }));
 }
 // Drive へアップロードして URL を控える（チャットの添付と同じ経路）
 async function addJobPhotoFiles(files) {
+  return _uploadJobPhotoFiles(files, _jobPhotos, JOB_PHOTO_MAX, 'jobPhotoMsg', () => { renderJobPhotos(); renderJobHpPhotoCount(); });
+}
+async function addJobHpPhotoFiles(files) {
+  return _uploadJobPhotoFiles(files, _jobHpPhotos, JOB_HP_PHOTO_MAX, 'jobHpPhotoMsg', renderJobHpPhotos);
+}
+// 画像を Drive に上げて list に足す（社内の写真・サイト用の写真で共通）。**アップロードはここだけ**
+async function _uploadJobPhotoFiles(files, target, max, msgId, onAdded) {
   const list = Array.from(files || []).filter(f => /^image\//.test(f.type));
-  const msg = document.getElementById('jobPhotoMsg');
+  const msg = document.getElementById(msgId);
   const say = (t, c) => { if (msg) { msg.textContent = t; msg.style.color = c || 'var(--gray-400)'; } };
   if (!list.length) { say('⚠️ 画像ファイルを選んでください', '#dc2626'); return; }
-  const room = JOB_PHOTO_MAX - _jobPhotos.length;
-  if (room <= 0) { say('⚠️ 写真は' + JOB_PHOTO_MAX + '枚までです', '#dc2626'); return; }
+  const room = max - target.length;
+  if (room <= 0) { say('⚠️ 写真は' + max + '枚までです', '#dc2626'); return; }
   const use = list.slice(0, room);
-  if (list.length > room) say('⚠️ ' + JOB_PHOTO_MAX + '枚までなので ' + use.length + '枚だけ受け付けます', '#c2410c');
+  if (list.length > room) say('⚠️ ' + max + '枚までなので ' + use.length + '枚だけ受け付けます', '#c2410c');
   const gasUrl = (typeof localStorage !== 'undefined' && localStorage.getItem('kmt_gas_url')) || KMT_DRIVE_GAS_URL;
   for (let i = 0; i < use.length; i++) {
     const f = use[i];
@@ -48442,9 +48523,9 @@ async function addJobPhotoFiles(files) {
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
       const r = await resp.json();
       if (!r.success) throw new Error(r.error || 'アップロード失敗');
-      _jobPhotos.push({ url: r.fileUrl, name: f.name, at: new Date().toISOString(),
+      target.push({ url: r.fileUrl, name: f.name, at: new Date().toISOString(),
         by: (typeof _curUserName === 'function' ? _curUserName() : '') || '' });
-      renderJobPhotos();
+      onAdded();
     } catch(e) {
       say('❌ ' + f.name + ' を送れませんでした: ' + e.message, '#dc2626');
       return;
@@ -51413,7 +51494,7 @@ const HP_SYNC_WHEN = '毎週金曜 22:00';   // 自動同期（すぐの同期�
 // ⚡ すぐ同期する受け口（プラグイン kmt-job-sync 1.8.0〜）。パーマリンクの設定に関係なく届く ?rest_route= の形
 const HP_SYNC_URL = HP_SITE_URL + '/?rest_route=/kmt-job-sync/v1/sync';
 // 📷 求人サイトに載せるときの写真のお願い（写真の欄・求人サイトの欄の2か所に出す。文言はここだけ）
-const HP_PHOTO_NOTE = '🌐 求人サイトに掲載するときは、写真を1枚以上登録してください（作業場・寮など。フリー素材でも可）';
+const HP_PHOTO_NOTE = '🌐 求人サイトに載せる写真は、右上の ☑ にチェック';
 function hpStatusOf(r){ return (r && r.hp_status) || '未掲載'; }
 function _hpStatusDef(v){ return HP_STATUSES.find(s => s.v === v) || HP_STATUSES[0]; }
 // 画面に出す言葉（掲載予約 → 掲載待ち など）
@@ -51463,7 +51544,7 @@ function _jpHpBoxHtml(r){
     + '<div style="font-size:11px;color:var(--gray-600);margin-top:6px;line-height:1.7;">' + esc(s.d)
     +   '　<span style="color:var(--gray-400);">載るのは<b>保存した求人票の内容</b>です（🌐 HP用の項目も）</span></div>'
     + (r.hp_sync_note ? '<div style="font-size:11px;color:#b91c1c;margin-top:4px;">⚠️ 前回の同期で失敗しました：' + esc(r.hp_sync_note) + '</div>' : '')
-    + (!_jobPhotoList(r.photos).length ? '<div style="font-size:11px;font-weight:700;color:#b91c1c;margin-top:4px;">📷 写真がまだありません。' + esc(HP_PHOTO_NOTE) + '</div>' : '')
+    + (!hpPhotoCount(r) ? '<div style="font-size:11px;font-weight:700;color:#b91c1c;margin-top:4px;">📷 求人サイトに載せる写真がまだありません（求人票タブの写真で「🌐 サイトに載せる」にチェックするか、「🌐 求人サイト用の写真」に足してください。合わせて1枚以上必要です）</div>' : '')
     + (meta.length ? '<div style="font-size:10.5px;color:var(--gray-400);margin-top:4px;">' + meta.join('　') + '</div>' : '')
     + '</div>';
 }
@@ -51474,7 +51555,8 @@ async function setHpStatus(srcRow, v){
   if (cur === v) { if (v === '掲載予約' || v === '掲載停止予約') hpSyncNow(srcRow); return; }   // 🔁 もう一度同期する
   if (v === '掲載予約') {
     // 🌐 HP用・必須（hpReq）が空なら掲載予約にしない
-    const need = hpMissingOf(r);
+    const need = hpMissingOf(r).slice();
+    if (!hpPhotoCount(r)) need.push({ label:'📷 求人サイトに載せる写真（社内の写真で「サイトに載せる」にチェック、または求人サイト用の写真。合わせて1枚以上）', focus:'jsf_hp_photo_box' });
     if (need.length) {
       // ［キャンセル］＝閉じるだけ ／ ［✏️ 入力欄へ移動］＝足りない最初の項目まで動かして光らせる
       const pick = await askChoice('🌐 求人サイトに出す前に',
@@ -51483,14 +51565,13 @@ async function setHpStatus(srcRow, v){
         [{ k:'cancel', label:'キャンセル' }, { k:'go', label:'✏️ 入力欄へ移動', primary:true }]);
       if (pick === 'go') {
         const f = need[0];
-        _jpFocusField('jsf_' + f.col + (f.t === 'checks' ? '__0' : ''));
+        _jpFocusField(f.focus || ('jsf_' + f.col + (f.t === 'checks' ? '__0' : '')));
       }
       return;
     }
     const miss = [];
     if (!String(r.job_description || '').trim()) miss.push('仕事内容');
     if (!hpTitleOf(r)) miss.push('HP掲載タイトル（または 就業場所・職種）');
-    if (!_jobPhotoList(r.photos).length) miss.push('📷 写真（1枚以上）');
     const dirty = !!(_manualSave && _manualSave['jobProgModal'] && _manualSave['jobProgModal'].dirty);
     const msg = '🌐 この求人を求人サイトに掲載します（すぐに公開されます）。'
       + (miss.length ? '\n\n⚠️ まだ入っていない項目：\n・' + miss.join('\n・') + '\n（空のまま載ります）' : '')
@@ -71896,6 +71977,18 @@ function _doForceReloadNow() {
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
 { version:'ver.20261101.1', date:'2026-11-01', notify:true, screens:['decision_report'], items:['決定報告を送ったときに、同じ外国人材が2件登録されることがある不具合を直しました（氏名の最後に空白が入っていると、同じ人だと気づけませんでした）。'] },
+  { version:'ver.20261030.15', date:'2026-10-30', notify:true, screens:['jobs'], items:[
+    '📷 求人票タブの写真の欄が「写真（作業場・寮等）」と「🌐 求人サイト用の写真」の2つに分かれました',
+    '「写真（作業場・寮等）」の写真は、右上（✕ の左）のチェックを入れたものだけが求人サイト（work.k-m-t.jp）にも載ります。社内だけで使う写真はチェックしないでください',
+    '「🌐 求人サイト用の写真」には、サイトだけに載せたい写真（フリー素材でも可）を入れてください。求人票には出ません',
+    'チェックした写真と求人サイト用の写真を合わせて1枚以上ないと、［🌐 掲載する］を押せません。今掲載中の求人の写真は、全部チェックが入った状態にしてあります',
+  ]},
+  { version:'ver.20261030.14', date:'2026-10-30', notify:false, screens:[], items:[
+    '📷 求人票の写真の欄の説明を短くしました',
+  ]},
+  { version:'ver.20261030.13', date:'2026-10-30', notify:false, screens:[], items:[
+    '📷 求人サイトに載せる写真の仕組みを入れました（くわしくは ver.20261030.15 のお知らせ）',
+  ]},
 { version:'ver.20261030.12', date:'2026-10-30', notify:true, screens:['notices'], items:['社内共有事項の「内容」欄で、文字の大きさ・太字・色・背景色・表・箇条書きが使えるようになりました（アナウンスやノートと同じ使い方です）。これまでの共有事項はそのまま表示され、編集すると書式を付けられます'] },
 { version:'ver.20261030.11', date:'2026-10-30', notify:true, screens:['reg_youryo'], items:['運用要領の各章の要約を、やさしい日本語に書き直しました。「重要キーワード」のまとめも足し、要約の文の中のキーワードは太字にしています'] },
 { version:'ver.20261030.9', date:'2026-10-30', notify:true, screens:['reg_youryo'], items:['登録支援機関業務のいちばん上（1. 支援実施体制管理簿 の上）に「0. 特定技能外国人受入れに関する運用要領」を足しました。章ごとに要約 → 本文（入管庁のPDFのそのページ）が読め、営業・GLTのメンバーは章ごとに［この章を確認しました］を押せます。［👥 確認状況］でだれがどこまで確認したか見られます'] },
