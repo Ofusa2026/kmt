@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT業務管理システム</title>
-<!-- KMT_VERSION ver.20261101.1 -->
+<!-- KMT_VERSION ver.20261101.2 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -43844,7 +43844,7 @@ async function loadFeeLedger() {
   _feeLedgerLoading = true;
   area.innerHTML = '<div style="padding:40px;text-align:center;color:var(--gray-400);font-size:12px;">読み込み中...</div>';
   try {
-    _feeLedgerRows = await sbFetch('sales_forecast?select=*,companies(name)&order=billed_date.desc.nullslast,billing_month.desc') || [];
+    _feeLedgerRows = await sbFetch('sales_forecast?select=*,companies(name,billing_cycle)&order=billed_date.desc.nullslast,billing_month.desc') || [];
   } catch(e) { _feeLedgerRows = []; }
   _feeLedgerLoading = false;
   renderFeeLedger();
@@ -43879,6 +43879,24 @@ function _feeLedgerMonths() {
   return [...new Set((_feeLedgerRows || []).map(r => String(r.billing_month || '')).filter(Boolean))]
     .sort().reverse();
 }
+/* 🧮 支援委託費の算出根拠は「委託費単価（月額）× 請求サイクル（か月）× 人数」で出す。**作るのはこの1箇所だけ**
+   売上の行の `unit_price` は1人の「サイクル1回ぶん」（3か月サイクルなら 20,000×3＝60,000）なので、
+   そのまま「単価 60,000円 × 1」と出すと、月額と何か月ぶんかが読み取れない。
+   月額＝ unit_price ÷ 請求サイクルの月数（`fmCycleN()`）。人数が違う単価に分かれているとき（`unit_breakdown`）は
+   単価ごとに「月額 × か月 × 人」を＋でつなぐ。割り切れない月額（日割りなど）は「約」を付ける。
+   支援委託費以外・請求サイクルが分からないものは null を返す（今までの「単価 × 数量」のまま） */
+function _feeLedgerShienBasis(r, yen) {
+  if (String(r.item_name || '') !== '支援委託費' || r.unit_price == null || r.quantity == null) return null;
+  const n = fmCycleN(r.companies?.billing_cycle);
+  if (!n || n < 1) return null;
+  const term = (lump, qty) => {
+    const m = Number(lump) / n;
+    return '委託費単価 ' + (Number.isInteger(m) ? '' : '約') + yen(Math.round(m)) + ' × ' + n + 'か月（請求サイクル） × ' + qty + '人';
+  };
+  const bd = Array.isArray(r.unit_breakdown) ? r.unit_breakdown.filter(b => b && b.unit != null && b.qty) : [];
+  const text = bd.length > 1 ? bd.map(b => term(b.unit, b.qty)).join('<br>＋ ') : term(r.unit_price, r.quantity);
+  return esc(r.item_name) + ' ' + text + (r.amount_excl != null ? ' ＝ ' + yen(r.amount_excl) + '（税抜）' : '');
+}
 function renderFeeLedger() {
   const area = document.getElementById('jpGroupArea'); if (!area) return;
   const rows = _feeLedgerList();
@@ -43898,7 +43916,10 @@ function renderFeeLedger() {
         w.push('＝ ' + yen(Math.round(Number(r.wage_total) * Number(r.fee_rate) / 100)));
       basis.push('<b>' + w.join(' × ').replace(' × ＝', ' ＝') + '</b>');
     }
-    if (r.unit_price != null && r.quantity != null) {
+    const shien = _feeLedgerShienBasis(r, yen);
+    if (shien) {
+      basis.push(shien);
+    } else if (r.unit_price != null && r.quantity != null) {
       basis.push(esc(r.item_name || '手数料') + ' 単価 ' + yen(r.unit_price) + ' × ' + r.quantity
         + (r.amount_excl != null ? '＝' + yen(r.amount_excl) + '（税抜）' : ''));
     } else if (r.amount_excl != null) {
@@ -71976,6 +71997,7 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+{ version:'ver.20261101.2', date:'2026-11-01', notify:true, screens:['jobs'], items:['求人管理の「手数料管理簿」で、支援委託費の算出根拠を「委託費単価（月額）× 請求サイクル（か月）× 人数」の形で出すようにしました（例: 委託費単価 20,000円 × 3か月（請求サイクル） × 1人 ＝ 60,000円（税抜））。これまでは3か月サイクルでも「単価 60,000円 × 1」と出ていて、月額と何か月ぶんかが分かりませんでした。'] },
 { version:'ver.20261101.1', date:'2026-11-01', notify:true, screens:['decision_report'], items:['決定報告を送ったときに、同じ外国人材が2件登録されることがある不具合を直しました（氏名の最後に空白が入っていると、同じ人だと気づけませんでした）。'] },
   { version:'ver.20261030.15', date:'2026-10-30', notify:true, screens:['jobs'], items:[
     '📷 求人票タブの写真の欄が「写真（作業場・寮等）」と「🌐 求人サイト用の写真」の2つに分かれました',
