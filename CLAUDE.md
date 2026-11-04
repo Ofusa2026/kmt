@@ -4769,6 +4769,25 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   - ⚠️ こちら（Claude）の環境からは Supabase に直接書けなかったので、PDF は画面から取り込む（随時届出の様式と同じ）
 - ✅ **確認完了は営業・GLTのメンバーだけ**（`YORYO_CHECK_TEAMS` ／ 判定は `_yoryoCanCheck()` の1箇所）。実体は **`ops_manual_checks`**（版 × 章 × 人で一意）＝
   版を差し替えると確認はやり直し。押すのは `toggleYoryoCheck()`、［👥 確認状況］（メンバー × 章）は `openYoryoStatus()`
+- 📝 **章ごとの確認は○✕の試験に合格してから**（ver.20261104.12〜）。**出題・採点・合否は DB の関数だけ**（画面に答えは届かない）
+  | 実体 | 中身 |
+  |---|---|
+  | `ops_manual_quiz` | 問題（章・問題文・答え・解説・節）。**RLS有効・ポリシーなし＝公開キーから直接は読めない**。206問（1〜10章 176＋監査関連 30）＝ 運用要領のPDF（`pdftotext`）と `AUDIT_OVERVIEW` から Claude が作った |
+  | `ops_manual_quiz_attempts` | 受験1回＝1行（出した問題の id・答え・1問ごとの秒数・別画面へ移った回数・点数・合否）。読むだけは公開キーでできる。書くのは関数だけ |
+  | `yoryo_quiz_rules()` | **きまりの1箇所**＝ 1問 40秒／合格 70%／再試験まで 10分／出題数＝その章の問題数の半分（5〜15問） |
+  | `yoryo_quiz_start(ver, 章, user_id, name)` | ランダムに出題して受験の行を作る（答えは返さない）。制限時間内の途中の受験は同じ問題で続ける／時間切れは不合格で閉じる／待ち時間中は `COOLDOWN:n` |
+  | `yoryo_quiz_submit(attempt, user_id, answers, times, blur)` | 採点。返すのは点数と合否だけ（**どれが間違いかは返さない**＝○✕は2択なので、見せると次は満点になる） |
+  | `yoryo_quiz_admin(user_id)` / `yoryo_quiz_save(user_id, row)` | 管理者（`users.role='管理者'`）だけ：全問題と答え・解説／問題を直す・外す（`is_active`） |
+  - **`ops_manual_checks` には BEFORE INSERT のトリガー `ops_manual_checks_require_pass`**＝ その版・章に合格した受験が無いと `QUIZ_NG`（画面の外からも押せない）
+  - 画面は `openYoryoQuiz(no)`（はじめる前に `askChoice` できまりを出す）→ `_yoryoQuizRender()`（1問ずつ・残り秒の帯・○✕）→ `_yoryoQuizSubmit()`。
+    状態は **`_yoryoQuiz` の1つ**（モーダルを閉じても時間は進む＝開き直せば続き）。
+    別画面へ移った回数は `_yoryoQuizBindBlur()`（blur と visibilitychange の両方が来るので1秒の中は1回）。問題文は `user-select:none`
+  - 🔐 **要約と重要キーワードは確認ずみの章だけ出す＝ `_yoryoShowSummary(no)` の1箇所**（試験の対象でない人＝営業・GLT以外は今までどおり全部読める）
+  - 🔐 ［🔐 管理者］＝ `openYoryoAdmin(tab)`＝ 受験の状況（メンバー × 章の 合／否／回数／✓ と、全受験の一覧＝所要・別画面の回数・1問ごとの秒数。半分以上が3秒未満なら ⚡）／問題と答え（［外す］＝ `yoryoQuizToggleActive`）／要約・キーワードの控え（`YORYO_CHAPTERS` の sum/kw をそのまま）
+  - 📄 **11番目の章＝監査関連（`audit:true`）**＝ 00 監査関連の「01 概要」が本文。PDFのページは無い（`_yoryoChPages()` は null、`YORYO_PDF_CHAPTERS`＝PDFの章の数10 で `chapter_pages` を見る）
+  - ⚠️ 問題を足す・直すときは管理者の画面か `yoryo_quiz_save`。**kmt.html に問題・答えを書かない**（公開リポジトリ）。問題を作り直したら `is_active=false` で外す（受験の記録が `q_ids` で結び付いているため行は消さない）
+  - 不正の対策はこの組み合わせ＝ ランダム出題・1問40秒・結果は点数だけ・再試験まで10分・別画面の回数と秒数を管理者に見せる（同時実施はしない）。
+    完全には止められないので「やりにくくする＋やったら分かる」
 
 ### 🔍 00 監査関連（全員が見られる）
 
