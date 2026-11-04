@@ -4853,6 +4853,18 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - 画面キーは **`AUDIT_KEY`（`reg_audit`）**。`SCREENS` への登録・`renderScreenContent` の
   振り分け・サイドバーの3箇所がこの定数を見る
 
+### 👤 登録支援機関業務の項目担当（1〜16 ／ `reg_task_owners`）
+
+- 各項目のページのいちばん上（🛠 改善の上）の【項目担当】＝ `regOwnBoxHtml()` / `renderRegOwnBox()`（`loadRegTaskRecords()` の先頭で `loadRegOwnBox()`）。監査の指摘（`reg_improvements`）とは別もの
+- 1項目＝1行（`task_no` が主キー）。`owners`（名前の配列・複数可）＋ 4つの欄。**欄の定義は `REG_OWN_SECS` の1箇所だけ**（① あるべき姿 `ideal_html` ／ ② いまのKMTの対応 `current_html` ／ ③ 改善の計画 `improve_html` ／ ④ 具体的な動き `action_html`）
+- **担当を決めるのはだれでも。すでに担当がいる項目を変えるのは管理者の承認のあと**（判定は `_regOwnNeedApprove()` の1箇所。管理者は直接変えられる）
+  - 申請は `reg_task_owner_requests`（`from_owners` / `to_owners` / `reason` 必須 / `status`＝pending・approved・rejected）。1項目に申請中は1件だけ（申請中はボタンを出さない）
+  - 承認・却下は `decideRegOwnReq()`（`requireAdmin()`）。**担当を書くのは `_regOwnWrite()` の1箇所だけ**
+  - 管理者には上の🔔に承認待ちの件数（`#regOwnerAlerts` ＝ `updateRegOwnerAlerts()`。読み込みは起動時・マイページの `loadRegOwners()`）
+- **書けるのは担当と管理者だけ（`_regOwnCanEdit()` の1箇所）**。ほかの人は見るだけ。記入は `openRegOwnEdit()` → `saveRegOwnEdit()`（手動保存 `_manualSave.regOwnModal`）
+- タスクは **マイページのタスクボードと同じ `task_requests`**（`reg_task_no` で項目に結び付く）＝ 担当のマイページにも出る（`_riSyncMyBoard()` を共用）
+- ［担当一覧］＝ `openRegOwnerList()`（1〜16 × 担当・記入・タスク・最終更新・申請中）
+
 ### 📘 登録支援機関業務の記録簿 ← 人材情報の反映
 
 - 様式の定義は **`REG_FORM_DEFS` の1箇所**（項目の一覧は `REG_SUPPORT_TASKS`）
