@@ -4528,6 +4528,7 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
     `status` ＋ `status_at`（今日）＋ `status_by`（自分）を書き、`status_log`（jsonb `[{from,to,at,by}]`）に1行足す。着手中にしたとき `started_at` / `started_by` が空なら一緒に入れる。
     モーダルで状況を変えて保存したときも `_srStatusPatch()` を通る（履歴は詳細の「進み具合の履歴」＝ `_srStatusLogHtml()`）。変えられるのは `_srCanManage()` の人だけ。
     取り込んだ古い行は `status_at` が空なので `started_at` / `started_by` を代わりに出す
+    - ✅ **依頼者確認で依頼者が［✅ 確認しました］を押したら（返信が無くても）、同じ欄に「✅ ◯◯ 確認済み 10/30」**（`confirmed_by` / `confirmed_at`。`_srProgressCellHtml()` の中）
 - ✅ **完了／不要は改善状況とは別の2択のチェック**（`SR_DONE_KINDS`＝実装完了／不要。`done` ＋ `done_kind`（`done`／`unneeded`。空の古い行は `done` あつかい＝`_srDoneKind()`）／`done_at` / `done_by`）。
   **チェックできるのは `SR_DONE_USERS`（ニサ・白井・大房・多尾）だけ＝ `_srCanDone()` の1箇所**。書き込むのは `srSetDone()` の1箇所。チェックすると今日の日付が入り、その場で直せる。
   チェックしたものは【✅ 完了・不要】タブへ移る。改善状況・着手日・コメントを直せるのも同じ人＋管理者（`_srCanManage()`）
