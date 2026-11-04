@@ -1277,6 +1277,8 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   Chrome の印刷は **grid コンテナをページで分割できない**ので、1mm でもはみ出すと
   2列がまるごと次のページへ送られ、**1ページ目がヘッダーだけの空白ページになる**（実際になった）。
   table なら足りないぶんだけ次ページへ続く
+- 📏 **1ページ目は印刷・PDFの直前に `_jobSheetFitFirstPage(doc)` の1箇所が A4縦1枚に収める**（中身の高さが A4−余白 `JOB_SHEET_FIT_PAD_MM` を超えるときだけ `zoom` で縮める。下限 `JOB_SHEET_FIT_MIN`）。
+  > ⚠️ 記入が長いと table でも1ページ目が見出しだけの空白ページになった（2026/11/04 に実際に起きた）
 - **用紙の余白は `.jobsheet-page` の `padding` の2箇所**（印刷用＝`_flyerPrintHtml`／
   画面用＝`#jobFlyerPreview.sheet-mode .jobsheet-page`）。**必ず同じ値にする**
   （違うと画面と印刷で入る量がズレる）。いまは `10mm 12mm`
