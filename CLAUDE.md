@@ -4879,7 +4879,7 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   - 管理者には上の🔔に承認待ちの件数（`#regOwnerAlerts` ＝ `updateRegOwnerAlerts()`。読み込みは起動時・マイページの `loadRegOwners()`）
 - **書けるのは担当と管理者だけ（`_regOwnCanEdit()` の1箇所）**。ほかの人は見るだけ
 - タスクは **マイページのタスクボードと同じ `task_requests`**（`reg_task_no` で項目に結び付く）＝ 担当のマイページにも出る（`_riSyncMyBoard()` を共用）
-- 👤 **【担当者リスト】＝ 画面キー `REG_OWNERS_KEY`（`reg_owners`）**。左メニューの 0. 運用要領 と 1. のあいだ（番号なし。`renderRegSupportNav()` の `owners`）。
+- 👤 **【担当者リスト】＝ 画面キー `REG_OWNERS_KEY`（`reg_owners`）**。左メニューの 0. 運用要領 と 1. のあいだ（番号なし・【】付きの名前。`renderRegSupportNav()` の `owners`）。
   ［担当一覧］・承認待ちのお知らせ（`openRegOwnerList()`）もこの画面へ移る。読み込みは `loadRegOwnerListScreen()`、描くのは `renderRegOwnerList()`＝ ① 項目ごとの担当者（表）＋ ② 担当者ごとの担当項目（`_regOwnPersonCardsHtml()`＝担当一覧の横並びの形。名前の表記ゆれは `_renSameName()` でまとめる・担当未設定のカードも出す）。項目を押すと `regOwnGoTask(no)`＝その項目の管理ページ
 
 ### 📘 登録支援機関業務の記録簿 ← 人材情報の反映
