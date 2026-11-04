@@ -4790,6 +4790,9 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   - 📥 管理者の「問題と答え」は**全問題の控え**＝［控えを保存（Excel）］（`yoryoQuizExportCsv()`＝UTF-8 BOM つき CSV）／［印刷・PDF］（`yoryoQuizPrint()`）／［読み直す］。
     行を作るのは **`_yoryoQuizRows()` の1箇所**（全章＋デモ。外した問題も「外した」で残す）。デモの問題も同じタブのいちばん下に出す
   - 画面の上のボタン（デモ試験・確認状況・管理者・PDFを取り込む）は**絵文字なしで ①②… を左から通し**（`_circledNo()`。管理者だけのボタンも数える）
+  - ⏳ **全章の試験の期限は `YORYO_DEADLINE`（2026-11-27）の1箇所**（null にすれば全部消える）。何日かは `_yoryoDaysLeft()`、残りの章（合格して［確認しました］まで済んでいない章）は `_yoryoRemainCount()`。
+    出す場所は3つ＝ 上の🔔アラート（`#yoryoAlerts`）／マイページのアラート（`#myYoryoAlerts`）＝ どちらも `updateYoryoAlerts()`（読み込みは `loadYoryoAlert()`＝起動時・マイページ）／
+    運用要領の画面のいちばん上の帯（`_yoryoDeadlineBarHtml()`）。対象は営業・GLT（`_yoryoCanCheck()`）、全章終わると消える。期限の3日前から赤く点滅（`.due-over`）
   - 🧪 **デモ試験＝ だれでも・記録なし**（［🧪 デモ試験（練習）］＝ `openYoryoDemo()`）。問題は **`YORYO_DEMO_QS` の1箇所**（10問・kmt.html に書いてよいのはこれだけ）。
     本番と同じ `_yoryoQuiz` / `_yoryoQuizRender` / `_yoryoQuizTick` を通し（`demo:true`）、採点は `_yoryoDemoResultHtml()` が手元でやって答えと解説も出す。DBには何も書かない
   - 不正の対策はこの組み合わせ＝ ランダム出題・1問60秒・結果は点数だけ・再試験まで10分・別画面の回数と秒数を管理者に見せる（同時実施はしない）。
