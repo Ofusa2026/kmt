@@ -4786,6 +4786,8 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   - 🔐 ［🔐 管理者］＝ `openYoryoAdmin(tab)`＝ 受験の状況（メンバー × 章の 合／否／回数／✓ と、全受験の一覧＝所要・別画面の回数・1問ごとの秒数。半分以上が3秒未満なら ⚡）／問題と答え（［外す］＝ `yoryoQuizToggleActive`）／要約・キーワードの控え（`YORYO_CHAPTERS` の sum/kw をそのまま）
   - 📄 **11番目の章＝監査関連（`audit:true`）**＝ 00 監査関連の「01 概要」が本文。PDFのページは無い（`_yoryoChPages()` は null、`YORYO_PDF_CHAPTERS`＝PDFの章の数10 で `chapter_pages` を見る）
   - ⚠️ 問題を足す・直すときは管理者の画面か `yoryo_quiz_save`。**kmt.html に問題・答えを書かない**（公開リポジトリ）。問題を作り直したら `is_active=false` で外す（受験の記録が `q_ids` で結び付いているため行は消さない）
+  - 🧪 **デモ試験＝ だれでも・記録なし**（［🧪 デモ試験（練習）］＝ `openYoryoDemo()`）。問題は **`YORYO_DEMO_QS` の1箇所**（5問・kmt.html に書いてよいのはこれだけ）。
+    本番と同じ `_yoryoQuiz` / `_yoryoQuizRender` / `_yoryoQuizTick` を通し（`demo:true`）、採点は `_yoryoDemoResultHtml()` が手元でやって答えと解説も出す。DBには何も書かない
   - 不正の対策はこの組み合わせ＝ ランダム出題・1問40秒・結果は点数だけ・再試験まで10分・別画面の回数と秒数を管理者に見せる（同時実施はしない）。
     完全には止められないので「やりにくくする＋やったら分かる」
 
