@@ -4818,6 +4818,11 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   - ⚠️ **文中で使ってよいタグは `<b>` と `<a href>` だけ**（そのまま `innerHTML` に入れる）
   - 出すのは `_auditPartHtml(p)` の1箇所（`t` で振り分ける）。目次の飛び先は `auditGo(n)`
   - `AUDIT_DOCS` … `{ name, url }`。新しいタブで開くだけ（閲覧権限は Google 側）
+- 📝 **01 概要の練習問題（合格ラインなし・時間なし・1回 `AUDIT_PRAC_N`(20)問・何回でも）**＝ 見出しの箱のすぐ下の `#auditPracBox`（`renderAuditPracBox()`）
+  - 問題は **`audit_practice_qs`**（答えも見えてよいので公開キーで読める・書くのはDBから）。**本番の試験（`ops_manual_quiz` の監査関連）とは別**で、本番と同じ内容は入れていない
+  - 出す問題は **`_auditPracPick()` の1箇所**＝ まだ出していない問題を先に選ぶ（出したものは `localStorage` の `kmt_audit_prac_seen_<user_id>`、一巡したら最初から）。結果の履歴も `kmt_audit_prac_hist_<user_id>`（この端末だけ・DBに残さない）
+  - 画面は運用要領の試験と同じ `_yoryoQuiz`（`practice:true`＝時間の帯を出さない）。結果と解説は `_auditPracResultHtml()`（節ごとの正解数も出す）
+  - アップデートのお知らせ（`WHATS_NEW`）には出さない（そう頼まれた。運用要領の試験まわりの ver.20261104.12〜16 のエントリも消した）
 - 📝 **03 監査記録（3つめのタブ）＝ `audit_records`**（1件＝1回の監査。種別・監査日・タイトル・対応者名・監査官名）
   - **種別は `AUDIT_REC_KINDS` の1箇所だけ**（🧪 模擬監査／🏛️ 本番監査。一覧のチップ・選択欄・色が追従する）
   - ノートの中は左右2つの枠＝ **左＝⚠️ 指摘内容（`findings_html`）／右＝📝 監査記録（`record_html`）**。
