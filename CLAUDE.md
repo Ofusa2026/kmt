@@ -4775,7 +4775,7 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   | `ops_manual_quiz` | 問題（章・問題文・答え・解説・節）。**RLS有効・ポリシーなし＝公開キーから直接は読めない**。250問（1〜10章 220＋監査関連 30。短い章も最低15問は持つ＝出題10問が毎回同じにならないように）＝ 運用要領のPDF（`pdftotext`）と `AUDIT_OVERVIEW` から Claude が作った |
   | `ops_manual_quiz_attempts` | 受験1回＝1行（出した問題の id・答え・1問ごとの秒数・別画面へ移った回数・点数・合否）。読むだけは公開キーでできる。書くのは関数だけ |
   | `yoryo_quiz_rules()` | **きまりの1箇所**＝ 1問 60秒／合格 80%（画面の文字は `YORYO_QUIZ_SEC` / `YORYO_QUIZ_PASS_RATE` をそろえる）／再試験まで 10分／出題数＝その章の問題数の半分（**最低10問**〜15問。問題がそれより少ない章は全部） |
-  | `yoryo_quiz_start(ver, 章, user_id, name)` | ランダムに出題して受験の行を作る（答えは返さない）。制限時間内の途中の受験は同じ問題で続ける／時間切れは不合格で閉じる／待ち時間中は `COOLDOWN:n` |
+  | `yoryo_quiz_start(ver, 章, user_id, name)` | ランダムに出題して受験の行を作る（答えは返さない）。**合格した人も任意で受け直せる**（合格の記録は消えない。画面は［もう一度受ける（任意）］）。待ち時間は直前の回が不合格のときだけ。制限時間内の途中の受験は同じ問題で続ける／時間切れは不合格で閉じる／待ち時間中は `COOLDOWN:n` |
   | `yoryo_quiz_submit(attempt, user_id, answers, times, blur)` | 採点。返すのは点数と合否だけ（**不合格の回にどれが間違いかは返さない**＝○✕は2択なので、見せると次は満点になる。合格したら `yoryo_quiz_review` で見られる） |
   | `yoryo_quiz_review(attempt, user_id)` | **合格した本人だけ**：その合格した回の問題・正しい答え・解説・自分の答え（合格していない回は `NOT_PASSED`）。画面は `openYoryoReview(attemptId, no)`＝ 章の試験の欄と合格の結果画面の［答えと解説を見る］ |
   | `yoryo_quiz_admin(user_id)` / `yoryo_quiz_save(user_id, row)` | 管理者（`users.role='管理者'`）だけ：全問題と答え・解説／問題を直す・外す（`is_active`） |
