@@ -4795,6 +4795,16 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
     運用要領の画面のいちばん上の帯（`_yoryoDeadlineBarHtml()`）。対象は営業・GLT（`_yoryoCanCheck()`）、全章終わると消える。期限の3日前から赤く点滅（`.due-over`）
   - 🧪 **デモ試験＝ だれでも・記録なし**（［🧪 デモ試験（練習）］＝ `openYoryoDemo()`）。問題は **`YORYO_DEMO_QS` の1箇所**（10問・kmt.html に書いてよいのはこれだけ）。
     本番と同じ `_yoryoQuiz` / `_yoryoQuizRender` / `_yoryoQuizTick` を通し（`demo:true`）、採点は `_yoryoDemoResultHtml()` が手元でやって答えと解説も出す。DBには何も書かない
+  - 🎓 **レベルアップ試験（5択・国家試験の形）＝ ○✕に合格した章だけ受けられる**（ver.20261104.24〜）。問題ごとに「正しいもの」「誤っているもの」を1つ選ぶ（`kind`）
+    | 実体 | 中身 |
+    |---|---|
+    | `ops_manual_quiz2` | 問題（章・kind・問題文・`choices`＝5つ・`a`＝1〜5・解説・節）。RLS有効・ポリシーなし＝ 公開キーから読めない。159問（1〜11章） |
+    | `ops_manual_quiz2_attempts` | 受験1回＝1行（形は `ops_manual_quiz_attempts` と同じ） |
+    | `yoryo_quiz2_rules()` | 1問 120秒／合格 80%／再試験まで10分／10問（画面の文字は `YORYO_LV2_SEC`） |
+    | `yoryo_quiz2_start` / `_submit` / `_review` / `_admin` / `_save` | ○✕と同じ作り。start は ○✕に合格していないと `NEED_LV1` |
+    - **期限は `YORYO_LV2_DEADLINE`（2026-12-25）の1箇所**。⚠️ **お知らせ（🔔・マイページ）には出さない**＝ 運用要領の章の中の枠（`_yoryoLv2BoxHtml()`）にだけ出す（そう頼まれた）
+    - 画面は ○✕と同じ `_yoryoQuiz`（`lv:2`）。入口 `openYoryoQuiz2(no)`、1問の画面 `_yoryoLv2QHtml()`、答えと解説 `openYoryoReview2()`（`_yoryoLv2AnsHtml()` は管理者の控えと共用）。管理者は［🔐 管理者］の【レベルアップ（5択）】タブ
+    - 合格は ［この章を確認しました］ には関係しない（○✕の合格だけで押せる）
   - 不正の対策はこの組み合わせ＝ ランダム出題・1問60秒・結果は点数だけ・再試験まで10分・別画面の回数と秒数を管理者に見せる（同時実施はしない）。
     完全には止められないので「やりにくくする＋やったら分かる」
 
