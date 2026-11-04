@@ -4843,7 +4843,7 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - 🛠 **監査の指摘 → 登録支援機関業務の各項目の【改善】＝ `reg_improvements`**（1行＝1つの指摘。`audit_id`／`task_nos`＝記録簿の番号の配列・複数可／
   `topic` 項目名／`finding` 指摘／`policy` 対応方針／`action` 具体的なアクション／`assignees` 担当の名前の配列（選択式・複数）／`status`／`due_date`／`memo`）
   - 出す場所は2つ＝ 監査記録のモーダルの【📘 登録支援機関業務への反映】（`_auditImpSectionHtml()`＝項目ごとの直通リンク＋指摘のカード）／
-    各項目のページのいちばん上の【🛠 改善】（`regImpBoxHtml()` / `renderRegImpBox()`。`loadRegTaskRecords()` の先頭で読む）。**どちらも `_regImps` の1つを見る**
+    各項目の ② 管理ページの【監査の改善】（`renderRegImpBox()`。指摘があるときだけ出す。`loadRegTaskRecords()` の先頭で読む）。**どちらも `_regImps` の1つを見る**
   - 1件のカードは `_regImpCardHtml()`、記入フォームは `openRegImpModal()` → `saveRegImp()`、項目へ移るのは `regImpGoTask()`（監査記録が未保存ならたずねる）
   - 状況は `REG_IMP_STATUSES` の1箇所。論理削除＝ `SB_SOFT_DELETE_TABLES` と `TRASH_TABLES` の両方に入れてある
   - 🗂 **記入フォームは2タブ＝【指摘・対応】／【改善計画】（`setRegImpTab()`）**。改善計画＝ 大枠のフリーノート（`reg_improvements.plan_html`・`#ri_plan`）＋ タスクボード（`renderRiTaskBoard()`）
@@ -4856,12 +4856,18 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 ### 👤 登録支援機関業務の項目担当（1〜16 ／ `reg_task_owners`）
 
 - 各項目のページのいちばん上（🛠 改善の上）の【項目担当】＝ `regOwnBoxHtml()` / `renderRegOwnBox()`（`loadRegTaskRecords()` の先頭で `loadRegOwnBox()`）。監査の指摘（`reg_improvements`）とは別もの
-- 1項目＝1行（`task_no` が主キー）。`owners`（名前の配列・複数可）＋ 4つの欄。**欄の定義は `REG_OWN_SECS` の1箇所だけ**（① あるべき姿 `ideal_html` ／ ② いまのKMTの対応 `current_html` ／ ③ 改善の計画 `improve_html` ／ ④ 具体的な動き `action_html`）
+- 🗂 **各項目のページは2つのタブ＝ ① 管理リスト（項目名・今までの一覧）／ ② 管理ページ**（`regPageTabsHtml()`。切り替えは **`setRegPageTab(no, k)` の1箇所**、状態は `_regPageTab`＝既定は ①）。
+  ② の中は上から 項目担当（`renderRegOwnHead()`）→ **その項目の概要（`summary_html`。管理者だけが書ける）** → **監査の改善（`regImpBox_<no>`＝指摘があるときだけ出る）** → ①〜④ → ［保存］→ タスクボード（`renderRegOwnBoard()`）
+  - 全体を作るのは `renderRegOwnBox()`。⚠️ **あとからの描き直しは見出し・ボードだけ**（`_regOwnAfterChange()`）＝ 書きかけの欄を消さない
+  - 欄は**押してそのまま書ける**（`_regOwnPaneHtml()`＝ contenteditable `rto_<番号>_<列>`）。保存は **`saveRegOwnInline(no)` の1箇所**（①〜④は担当と管理者／概要は管理者だけを書く）。
+    未保存は `_regOwnDirty`＝ 画面を移る・閉じるときにたずねる（`regOwnHasUnsaved()`）。`arExec()` は `rto_` の欄なら管理ページの未保存にする
+  - 監査の改善へ飛ぶ（`regImpGoTask`）・担当一覧から開く（`regOwnGoTask`）ときは ② を開く
+- 1項目＝1行（`task_no` が主キー）。`owners`（名前の配列・複数可）＋ 概要（`summary_html`）＋ 4つの欄。**欄の定義は `REG_OWN_SECS` の1箇所だけ**（① あるべき姿 `ideal_html` ／ ② いまのKMTの対応 `current_html` ／ ③ 改善の計画 `improve_html` ／ ④ 具体的な動き `action_html`）
 - **担当を決めるのはだれでも。すでに担当がいる項目を変えるのは管理者の承認のあと**（判定は `_regOwnNeedApprove()` の1箇所。管理者は直接変えられる）
   - 申請は `reg_task_owner_requests`（`from_owners` / `to_owners` / `reason` 必須 / `status`＝pending・approved・rejected）。1項目に申請中は1件だけ（申請中はボタンを出さない）
   - 承認・却下は `decideRegOwnReq()`（`requireAdmin()`）。**担当を書くのは `_regOwnWrite()` の1箇所だけ**
   - 管理者には上の🔔に承認待ちの件数（`#regOwnerAlerts` ＝ `updateRegOwnerAlerts()`。読み込みは起動時・マイページの `loadRegOwners()`）
-- **書けるのは担当と管理者だけ（`_regOwnCanEdit()` の1箇所）**。ほかの人は見るだけ。記入は `openRegOwnEdit()` → `saveRegOwnEdit()`（手動保存 `_manualSave.regOwnModal`）
+- **書けるのは担当と管理者だけ（`_regOwnCanEdit()` の1箇所）**。ほかの人は見るだけ
 - タスクは **マイページのタスクボードと同じ `task_requests`**（`reg_task_no` で項目に結び付く）＝ 担当のマイページにも出る（`_riSyncMyBoard()` を共用）
 - ［担当一覧］＝ `openRegOwnerList()`（1〜16 × 担当・記入・タスク・最終更新・申請中）
 
