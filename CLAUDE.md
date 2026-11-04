@@ -2066,6 +2066,8 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 | 📝 履歴書作成 | メモ（`candidate_notes`）→ 履歴書の項目 → 印刷／PDF／Excel | `saveResume` |
 
 - 2つのタブは**両方DOMに置いたまま** `display` で切り替える（写すために両方必要）
+- 🔢 **タブ（`#cndModalTabs`）と中の見出し（`.section-title`）の ①②③ は CSS の counter だけ**（`#cndTabInfo` / `#cndTabResume` で `cndsec`。見えている見出しに上から通し）。数えたくない見出しは `.no-num`（いまは「履歴書の項目」）。
+  見出しの頭の絵文字は `TAB_NOEMOJI_SEL` で**候補者モーダルの中だけ**落とす（⚠️ HTML の文字は変えない＝ 外部フォームの訳 `EXT_FORM_I18N` のキーが絵文字つきのため）
 
 #### 🔄 2つのタブで重複している項目（自動反映）
 
