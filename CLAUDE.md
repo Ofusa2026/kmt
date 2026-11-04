@@ -2981,6 +2981,9 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - 対応担当は `<input list="coStaffDl">` なので名簿の候補から選べて手入力もできる
   （候補は引継ぎの記録と同じ `_coStaffDatalistHtml()`）
 - 【変更履歴】タブにも出す＝ `CO_WATCH_FIELDS` に `initial_fee: '初期費用'` を入れてある
+- 💴 **支援委託費（1人あたり委託費）の変更履歴も同じ作り**（`companies.fee_per_person_log`。【💴 委託費設定】の欄の下）。
+  **2つの違いは `CO_FEE_LOGS` の1箇所だけ**（履歴の入れ物・金額の欄の id）＝ 関数は `renderCoFeeLog(kind)` / `addCoFeeRow(kind)` /
+  `onCoFeeChange(kind)` / `getCoFeeLog(kind)`（kind＝`init`／`pp`）、開いたときの金額は `_coFeeBefore[kind]`
 
 ### 🔁 所属機関の担当の変更履歴（引継ぎの記録）
 
@@ -5886,6 +5889,11 @@ GLTの月報Excel（国別チーム月報・年度まとめ・3か月ごと目�
   開いたときは `fmScrollToDefault()` が**今月の列を一番右**に合わせる（＝1年前あたり〜今月が見える。
   「1年前を左端」にすると今月が見切れるので、右端そろえにしてある）。［📍 今月へ］で戻せる。
   位置合わせは**画面上の位置から測る**（`offsetLeft` は入れ子や余白でずれる）
+- 💴 **人材ごとの委託費＝ `workers.fee_per_person`**（空＝所属機関の `companies.fee_per_person` に従う）。
+  **使う金額を決めるのは `fmUnitOf(w, c)` の1箇所だけ**（予定の金額 `fmWorkerMonthFee`・表の描画・売上への同期・請求書CSV が通る）
+  - 表の【委託費】の欄を押すとその場で直せる（`fmUnitCellHtml()` → `fmUnitEdit()` → **書くのは `fmSaveWorkerUnit()` の1箇所**。
+    `workers.fee_per_person_log` に `{date, from, to, own, at, by}` を先頭に1行足す）。空・企業と同じ金額は null に戻す
+  - 企業の設定額とちがう人は赤字（判定は `fmUnitDiffers()`）。⚠️ 手で入れた月の金額（`worker_fee_overrides`）と実績は今までどおりそちらが先
 - **氏名〜在職ステータスの5列は固定**（`.fz1`〜`.fz5`）。年計の列は無し
   - ⚠️ **スマホ（`@media(max-width:640px)`）では氏名・企業名の2列だけ固定にする。**
     5列ぶん（586px）が画面幅を超えると、月の列が固定列の下に隠れて
