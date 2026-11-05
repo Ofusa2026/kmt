@@ -5664,6 +5664,8 @@ GLTの月報Excel（国別チーム月報・年度まとめ・3か月ごと目�
 - **人材名・企業名は打つと候補が出る欄**（`_expPickHtml` / `expPickOpen` / `expPickChoose`）。
   選んだ結果は隠しの `ef_worker_id` / `ef_company_id` に入り、**この2つが唯一の正**
   （表示の文字は毎回 id から引き直すので、名前だけ書き換わることがない）
+- ✏️ **請求先＝企業のときは一覧に無い企業も手入力できる**＝ 企業の欄（`ef_company_q`）に打った文字は、企業を選んでいなければ `_expRow.company_name_custom` に入る（`expPickOpen(kind, typed)` が選んだ企業と違う文字を打ったら選択を外す）。
+  候補のいちばん上に「✏️ 〇〇をこのまま使う」。保存（`saveExpense`）は名前がぴったり1社に当たればその企業、無ければ `company_name_custom`。売上管理の【立替費用】もこの名前で1行になる
 - **使わない列は保存時に必ず `null` で書く**（`saveExpense`）。
   請求先を切り替えたときに前の内容が残らないようにするため
 - 候補の人材・企業は `_expEnsureMasters()` が専用に取っておく。
