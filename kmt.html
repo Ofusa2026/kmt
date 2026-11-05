@@ -38712,7 +38712,6 @@ function _expPickHtml(kind, label, ph) {
     <input class="form-input" id="ef_${kind}_q" autocomplete="off" placeholder="${ph}" value="${esc(cur ? _expOptLabel(kind, cur) : custom)}"
       oninput="expPickOpen('${kind}', true)" onfocus="expPickOpen('${kind}')">
     <div id="ef_${kind}_panel" class="exp-pick-panel" style="display:none;"></div>
-    ${kind === 'company' ? `<div id="ef_company_custom_note" style="font-size:10.5px;color:#b45309;margin-top:3px;display:${custom ? '' : 'none'};">✏️ 一覧にない企業として、この名前のまま保存します</div>` : ''}
   </div>`;
 }
 function expPickOpen(kind, typed) {
@@ -38725,8 +38724,6 @@ function expPickOpen(kind, typed) {
     const cur = _expCompanyById(idEl?.value || '');
     if (cur && raw !== (cur.name || '')) idEl.value = '';
     if (!idEl?.value) _expRow.company_name_custom = raw || null;
-    const note = document.getElementById('ef_company_custom_note');
-    if (note) note.style.display = (!idEl?.value && raw) ? '' : 'none';
     _expTouch();
   }
   // 人材は**人材番号順**（`_expSortWorkers` の1箇所）。企業は今までどおり名前順
@@ -38736,12 +38733,7 @@ function expPickOpen(kind, typed) {
     return !q || t.includes(q);
   }).slice(0, 40);
   panel.style.display = 'block';
-  const exact = kind === 'company' && raw && (_expCompanies || []).some(x => (x.name || '') === raw);
-  const freeRow = (kind === 'company' && raw && !exact)
-    ? `<div class="exp-pick-item" onclick="expPickClose('company')" style="background:#fffbeb;">
-        <div style="font-weight:700;">✏️ 「${esc(raw)}」をこのまま使う</div>
-        <div style="font-size:10.5px;color:var(--gray-400);">一覧にない企業として手入力で保存します</div></div>` : '';
-  panel.innerHTML = freeRow + (hit.length ? hit.map(x => {
+  panel.innerHTML = (hit.length ? hit.map(x => {
     const no = kind === 'worker' ? (x.management_no || '') : (x.folder_no != null ? String(x.folder_no) : '');
     const sub = kind === 'worker'
       ? [_expCompanyById(x.company_id)?.name || '', x.status].filter(Boolean).join('　')
@@ -38750,7 +38742,8 @@ function expPickOpen(kind, typed) {
       <div style="font-weight:700;">${no && kind === 'worker'
         ? `<span style="color:#1d4ed8;font-family:ui-monospace,monospace;font-size:11.5px;margin-right:6px;">${esc(no)}</span>` : ''}${esc(x.name || '')}</div>
       ${sub ? `<div style="font-size:10.5px;color:var(--gray-400);">${esc(sub)}</div>` : ''}</div>`;
-  }).join('') : (freeRow ? '' : '<div style="padding:10px;font-size:12px;color:var(--gray-400);">見つかりません</div>'));
+  }).join('') : (kind === 'company' ? '' : '<div style="padding:10px;font-size:12px;color:var(--gray-400);">見つかりません</div>'));
+  if (!panel.innerHTML) panel.style.display = 'none';   // 企業は手入力もできるので、候補が無ければパネルを出さない
 }
 function expPickClose(kind) { const p = document.getElementById('ef_' + kind + '_panel'); if (p) p.style.display = 'none'; }
 function expPickChoose(kind, id) {
@@ -38795,7 +38788,7 @@ function renderExpenseBillToFields() {
           <div class="exp-readonly${co ? '' : ' empty'}">${co ? esc(co.name) : '（人材を選ぶと出ます）'}</div></div>`;
   } else if (to === '企業') {
     seed('worker'); shown.push('worker');
-    host.innerHTML = _expPickHtml('company', '企業名', '企業名・企業番号を入力すると候補が出ます（一覧に無い企業は手入力できます）')
+    host.innerHTML = _expPickHtml('company', '企業名', '企業名・企業番号（打つと候補が出ます・手入力も可）')
       + (cid ? `<div class="form-group full" style="margin-top:-6px;"><span onclick="expPickClear('company')" style="cursor:pointer;font-size:11px;color:var(--red);font-weight:700;">✕ 選び直す</span></div>` : '')
       + _expMultiHtml('worker', cid ? '候補は<b>人材番号順</b>（その企業の人材だけ）。番号でも氏名でも絞れます。一覧に無い方は手入力できます'
                                    : '先に企業を選ぶと、その企業の人材が<b>人材番号順</b>で候補に出ます（手入力もできます）');
@@ -74063,7 +74056,7 @@ function _doForceReloadNow() {
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
   { version:'ver.20261105.12', date:'2026-11-05', notify:true, screens:['expenses'], items:[
-    '立替登録で請求先が【企業】のとき、一覧に無い企業も企業名を手で入力して登録できるようにしました（候補のいちばん上の「✏️ 〇〇をこのまま使う」を押すか、そのまま保存）',
+    '立替登録で請求先が【企業】のとき、企業名の欄を人材名と同じく「打つと候補が出る・手入力もできる」欄にしました（一覧に無い企業は名前を打ってそのまま保存できます）',
   ]},
   { version:'ver.20261105.10', date:'2026-11-05', notify:true, screens:['reg_task_1','reg_task_2','reg_task_3','reg_task_4','reg_task_5','reg_task_6','reg_task_7','reg_task_8','reg_task_9','reg_task_10','reg_task_11','reg_task_12','reg_task_13','reg_task_14','reg_task_15','reg_task_16'], items:[
     '登録支援機関業務の各項目の記入画面（支援委託契約書・事前ガイダンスの確認書・定期面談報告書など）で、タブに①②の番号を付け、欄を内容ごとのまとまり（① 特定技能所属機関（甲）／② 登録支援機関（乙）…）に分けて番号つきの見出しを付けました。入力する欄と内容は変わりません',
