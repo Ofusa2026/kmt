@@ -5822,6 +5822,7 @@ GLTの月報Excel（国別チーム月報・年度まとめ・3か月ごと目�
 
 - 📅 **いちばん左の【登録日】＝ `created_at`。並べ方は `_saleRegSort()` の1箇所だけ**（登録の古い順＝ 新しい行はいちばん下。同じ時刻なら企業番号順）。
   配属後請求のタブも同じ向き（`order=created_at.asc`）
+  - 💴 **支援委託費の行だけは請求書CSV（`mfBuildInvoices`）と同じ順＝ 企業番号（枝番は親＝`feeParentNo`）→ 企業名。並べ直すのは `_saleShienCsvOrder()` の1箇所**（`_saleRegSort` のあと。支援委託費の行があった場所に入れ直すだけ＝ ほかの項目は登録順のまま）
   - 🔁 **登録もれを後から入れた行は備考の頭に「（YYYY/M/Dに反映）」**（`SALE_LATE_MARK_RE`）＝ 登録日の下に橙の印（`_saleLateBadge()`）。備考の表示（`saleNoteDisplay`）からは落とす
 - 明細表の一番下（`<tfoot class="sale-total-row">`）に **いま絞り込んでいる `rows` の合計**を出す。
   金額（税抜・税込）・数量・作成／請求／入金の件数と、効いている絞り込みの名前
