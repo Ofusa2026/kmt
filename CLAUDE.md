@@ -4483,6 +4483,7 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   「☑️ ToDoが残っているものだけ」の絞り込みが同じ数を見る
 - 絞り込みは5つ＝ 検索／MTG種類／対象（＋チーム）／開催日の期間／ToDoが残っているものだけ。
   **ふるいは `renderMinutes()` の1箇所**
+- 🔗 **共有リンク＝ `#minute=<id>`**（`#notice=` と同じ仕組み・ログインしている人だけが開ける）。議事録の見出しの右の［🔗 共有リンク］（`_mtgHeadLinkRender()` の1箇所。開いたときと新規を保存したときに描く）＝ `copyMinuteLink(id)`／作るのは `minuteShareUrl()`／開くのは起動時の `openMinuteFromShareLink()`（社内共有事項の【MTG議事録】タブへ移って `openMinuteModal(id)`）。⚠️ 新規は保存して id ができるまでリンクを作れない
 - 「各チーム」以外を選んだときは **保存で `target_team` を null にする**（前の値が残らないように）
 - 削除は**論理削除**（`is_deleted`）で、消す前に `_confirmDeleteTwice()` で2回たずねる
 
