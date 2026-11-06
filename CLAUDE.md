@@ -4882,7 +4882,7 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   - 申請は `reg_task_owner_requests`（`from_owners` / `to_owners` / `reason` 必須 / `status`＝pending・approved・rejected）。1項目に申請中は1件だけ（申請中はボタンを出さない）
   - 承認・却下は `decideRegOwnReq()`（`requireAdmin()`）。**担当を書くのは `_regOwnWrite()` の1箇所だけ**
   - 管理者には上の🔔に承認待ちの件数（`#regOwnerAlerts` ＝ `updateRegOwnerAlerts()`。読み込みは起動時・マイページの `loadRegOwners()`）
-- 📊 **項目全体の状況（未着手／対応中／完了）＝ `reg_task_owners.status`（＋ `status_at` / `status_by`）**。見出しの行（項目担当・［担当一覧］の左）の選択欄（ドロップダウン）＝ `_regOwnStatusBtnsHtml(no)`。**まだ決めていない項目（DBが空）は【未着手】としてあつかう＝ 読むのは `_regOwnStatus(no)` の1箇所だけ**。【担当者リスト】の［状況］の列といちばん上の集計（未着手／対応中／完了の項目数＝ `renderRegOwnerList`）も同じものを見る、**書くのは `regOwnSetStatus(no, v)` の1箇所だけ**（担当と管理者）。選択肢・色は監査の改善と同じ `REG_IMP_STATUSES`
+- 📊 **項目全体の状況（未着手／対応中／完了）＝ `reg_task_owners.status`（＋ `status_at` / `status_by`）**。見出しの行（項目担当・［担当一覧］の左）の選択欄（ドロップダウン）＝ `_regOwnStatusBtnsHtml(no)`。**まだ決めていない項目（DBが空）は【未着手】としてあつかう＝ 読むのは `_regOwnStatus(no)` の1箇所だけ**。【担当者リスト】の［状況］の列（**同じ選択欄 `_regOwnStatusSelectHtml(no)` を表の中にも出す＝ そこからも変えられる**。やめた・失敗したときは `_regOwnStatusRedraw(no)` で元に戻す）といちばん上の集計（未着手／対応中／完了の項目数＝ `renderRegOwnerList`）も同じものを見る、**書くのは `regOwnSetStatus(no, v)` の1箇所だけ**（担当と管理者）。選択肢・色は監査の改善と同じ `REG_IMP_STATUSES`
   - 🔗 **変えると、その項目に入っている監査の改善（`reg_improvements.task_nos` にその番号がある行）の状況も同じにする**＝ 変わる件数を1回たずねる（ほかの項目にも入っている指摘はそちらのページでも同じ状況になる）。逆向き（改善 → 項目）は連携しない
 - **書けるのは担当と管理者だけ（`_regOwnCanEdit()` の1箇所）**。ほかの人は見るだけ
 - タスクは **マイページのタスクボードと同じ `task_requests`**（`reg_task_no` で項目に結び付く）＝ 担当のマイページにも出る（`_riSyncMyBoard()` を共用）
