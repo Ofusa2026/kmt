@@ -4804,7 +4804,7 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
     | `ops_manual_quiz2` | 問題（章・kind・問題文・`choices`＝5つ・`a`＝1〜5・解説・節）。RLS有効・ポリシーなし＝ 公開キーから読めない。159問（1〜11章） |
     | `ops_manual_quiz2_attempts` | 受験1回＝1行（形は `ops_manual_quiz_attempts` と同じ） |
     | `yoryo_quiz2_rules()` | 1問 120秒／合格 80%／再試験まで10分／10問（画面の文字は `YORYO_LV2_SEC`） |
-    | `yoryo_quiz2_start` / `_submit` / `_review` / `_admin` / `_save` | ○✕と同じ作り。start は ○✕に合格していないと `NEED_LV1` |
+    | `yoryo_quiz2_start` / `_submit` / `_review` / `_admin` / `_save` | ○✕と同じ作り。start は ○✕に合格していないと `NEED_LV1`。**再試験では別の問題**＝ 直前の回の問題を最後に回し、その人にまだ出ていない問題を先に出す（足りなければ出たことのある問題で埋める） |
     - **期限は `YORYO_LV2_DEADLINE`（2026-12-25）の1箇所**。⚠️ **お知らせ（🔔・マイページ）には出さない**＝ 運用要領の章の中の枠（`_yoryoLv2BoxHtml()`）にだけ出す（そう頼まれた）
     - 画面は ○✕と同じ `_yoryoQuiz`（`lv:2`）。入口 `openYoryoQuiz2(no)`、1問の画面 `_yoryoLv2QHtml()`、答えと解説 `openYoryoReview2()`（`_yoryoLv2AnsHtml()` は管理者の控えと共用）。管理者は［🔐 管理者］の【レベルアップ（5択）】タブ
     - 合格は ［この章を確認しました］ には関係しない（○✕の合格だけで押せる）
