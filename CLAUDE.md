@@ -4816,6 +4816,16 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
     - 画面は ○✕と同じ `_yoryoQuiz`（`lv:2`）。入口 `openYoryoQuiz2(no)`、1問の画面 `_yoryoLv2QHtml()`、答えと解説 `openYoryoReview2()`（`_yoryoLv2AnsHtml()` は管理者の控えと共用）。管理者は［🔐 管理者］の【レベルアップ（5択）】タブ
     - 🧪 **レベルアップのデモ（5択）**＝ ［デモ試験（レベルアップ・5択）］（上のボタンの②。だれでも・記録なし）。問題は **`YORYO_DEMO_QS2` の1箇所**（10問・本番の問題は書かない）、入口 `openYoryoDemo2()`、結果 `_yoryoDemoResultHtml2()`（答えと解説は `_yoryoLv2AnsHtml()` を共用）
     - 合格は ［この章を確認しました］ には関係しない（○✕の合格だけで押せる）
+  - 🖥 **試験中の画面のきまり（○✕・5択・デモ共通）**＝ はじめる前の確認は **`_yoryoPreCheck()` の1箇所**（ほかのタブのKMT＝ `kmtCountOtherTabs()`〈BroadcastChannel `kmt_tabs`〉／全画面／「ほかのタブ・アプリを閉じました」の自分でのチェック／`screen.isExtended`）。
+    ⚠️ ブラウザの決まりで、KMT以外のタブ・アプリが開いているかは自動では分からない（だから自分でチェック）。
+    **「画面を離れた」に数えるのは `_yoryoAway(kind)` の1箇所だけ**＝ ウィンドウのフォーカスが外れた（もう1つの画面をクリック・別のアプリ）／タブが隠れた／全画面をやめた。マウスが外に出ただけは数えない（`env.mouse_out` に記録だけ）。離れたらその場で警告（`_yoryoAwayShow()`）。
+    画面の様子は `ops_manual_quiz(2)_attempts.env`（extended／fs／fs_exit／mouse_out／away_sec／kinds）＝ 採点の `p_env`。デモは［ダメな例］（ほかのKMTタブ＝ `yoryoPreFake()`／画面を離れたとき＝ `_yoryoAway('demo')`）
+  - ✅ **合格とみなすのは「画面移動のない合格」（`blur_count`＝0）だけ＝ `_yoryoCleanPass()` の1箇所**（`_yoryoPassed()` / `_yoryoPassed2()` もこれ）。画面移動ありの合格は記録に残し「要再試験」（`_yoryoBlurOnly()`）。
+    DB も同じ＝ ［この章を確認しました］のトリガー・レベルアップの開始（`NEED_LV1`）・答えと解説（`NOT_CLEAN`）は blur_count=0 の合格を見る
+  - ❌ **不合格のとき＝ 間違えた問題の文章と自分の答えだけ（正しい答え・解説は出さない）**＝ DB の `yoryo_quiz_wrong` / `yoryo_quiz2_wrong`、画面は `_yoryoWrongFill()`。
+    節ごとにまとめ、**本文のページは `_yoryoSecPagesOf()`（PDFの文字から節の見出しのページを探す・章ごとに1回）＋ `_yoryoSecRange()`**（見つからなければ章のページ）。［このページを開く］＝ `openYoryoPages()`。監査関連は 00 監査関連へ
+  - 📘 **合格したら、その章で受けた全部の回の問題を答えと解説つきで（同じ問題は1つ）**＝ DB の `yoryo_quiz_review_all` / `yoryo_quiz2_review_all`（`rounds`＝出た回／`oks`＝正解した回）、画面は `openYoryoReviewAll(no, lv)`
+  - 🔀 ○✕も5択と同じく、再試験では前の回の問題を後回し・まだ出ていない問題を先に出す（`yoryo_quiz_start`）
   - 不正の対策はこの組み合わせ＝ ランダム出題・1問60秒・結果は点数だけ・再試験まで10分・別画面の回数と秒数を管理者に見せる（同時実施はしない）。
     完全には止められないので「やりにくくする＋やったら分かる」
 
