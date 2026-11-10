@@ -1424,6 +1424,12 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
     あとから専用リンクで追記されたかは `_jalAddInfo()`（最初の送信の1分以上あと／`seen_at` より新しければ 📬）
   - ［📄 回答内容］＝ `openJobApplyAnswer(src_row)`。続きリンクの `answers` を求人票の定義（特定技能＝`JOB_SHEET_GROUPS`／
     一般・高度人材＝`jobSheetGroups(kind, true)`）の項目名つきで出す。［💼 案件を開く］＝ `jalOpenJob()`（モーダルを閉じてから `openJobProgressDetail`）
+- 🔗 **既存案件への統合**（同じ会社の求人がすでにあるとき）＝ 送信のときは今までどおり新しい案件で登録し、**自動では合併しない**（同じ会社でも職種・就業場所のちがう求人が並ぶため）
+  - 同じ会社の案件を探すのは **`_jalDupsOf(r)` の1箇所だけ**（`_jaCoNorm()`＝ `_drCoNorm` ＋ 末尾の様・御中を落とす。ひも付いた所属機関の名前も見る）。出す場所は 回答状況／回答の案件の画面（`_jaDupBannerHtml`）／求人アラートの applyRaw
+  - 統合は **`openJobApplyMerge(srcRow)` → `jaPickTarget()` → `runJobApplyMerge()` の1組だけ**。既定は 既存が空なら回答を入れる／両方にあれば既存を残す（上書きは選んだ項目だけ）。求人票の種類がちがう案件にはまとめない
+  - 統合すると ① 統合先の `sheet_meta[k].ext` に `src:'apply'`（欄の下が「📣 求人登録リンクの回答（統合）」）② 統合先の **`job_progress.apply_merges`**（jsonb・1件＝ だれの回答を・いつ・項目ごとの act）＝ 案件の画面の枠 `_jaMergedBoxHtml()`／詳細 `openJobApplyMergeDetail()`
+    ③ 回答の案件は論理削除＋ **`merged_into` / `merged_at` / `merged_by`**（回答状況には「🔗 統合済み」で残す＝ `loadJobApplyLinks` が別に読む）④ 専用リンクの `job_src_row` を統合先に付け替え、**`job_sheet_links.merged_from`**＝元の番号、下書きは統合先のいまの値（`_jalKidOf` は merged_from を先に見る）
+  - やり方の説明は **`JOB_APPLY_MERGE_GUIDE` の1箇所**＝ ［求人票・求人登録リンク ▾］の4番目（`openJobApplyMergeGuide()`。いま統合を待っている回答の一覧＝ `_jalMergeWaiting()` も出す）
 - 🏢 **外部の記入フォーム（求人登録リンク・案件ごとの記入リンクの両方）に出さない項目は `_jobFormHideField(f)` の1箇所だけ**＝
   一般・高度人材は `agent:true`（Ⅰ．受付情報＝紹介事業者が記入）、特定技能は `JOB_FORM_INTERNAL_COLS`（受付年月日・有効期間）。
   番号は**フォームに出している項目だけで1から振り直す**（社内の画面・書類の番号とは別）
