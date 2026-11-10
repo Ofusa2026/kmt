@@ -4818,7 +4818,7 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
     - 合格は ［この章を確認しました］ には関係しない（○✕の合格だけで押せる）
   - 🖥 **試験中の画面のきまり（○✕・5択・デモ共通）**＝ **閉じてもらうのは同じブラウザのほかのタブだけ。ほかのアプリは開いたままでよい**（そう決めた）。はじめる前の確認は **`_yoryoPreCheck()` の1箇所**（ほかのタブのKMT＝ `kmtCountOtherTabs()`〈BroadcastChannel `kmt_tabs`〉／「このブラウザのほかのタブを閉じました」の自分でのチェック／`screen.isExtended`）。全画面にはしない。
     ⚠️ ブラウザの決まりで、KMT以外のタブが開いているかは自動では分からない（だから自分でチェック）。
-    **「画面を離れた」に数えるのは `_yoryoAway(kind)` の1箇所だけ**＝ 試験の画面の外をクリックした（window の blur＝ もう1つの画面・ほかのアプリ）／ほかのタブに移った（`visibilitychange` で隠れた）。マウスが外に出ただけは数えない（`env.mouse_out` に記録だけ）。離れたらその場で警告（`_yoryoAwayShow()`）。
+    **「画面を離れた」に数えるのは `_yoryoAway(kind)` の1箇所だけ**＝ 試験の画面の外をクリックした（window の blur＝ もう1つの画面・ほかのアプリ）／ほかのタブに移った（`visibilitychange` で隠れた）／**マウスを試験の画面の外に `YORYO_MOUSE_OUT_SEC`(3)秒以上出した**（Windows はクリックせずにもう1つの画面のPDFをホイールで読めるため＝ それをふさぐ）。それより短く出ただけは数えない（`env.mouse_out` に回数を記録だけ）。離れたらその場で警告（`_yoryoAwayShow()`）。
     画面の様子は `ops_manual_quiz(2)_attempts.env`（extended／mouse_out／away_sec／kinds）＝ 採点の `p_env`。デモは［ダメな例］（ほかのKMTタブ＝ `yoryoPreFake()`／画面を離れたとき＝ `_yoryoAway('demo')`）
   - ✅ **合格とみなすのは「画面移動のない合格」（`blur_count`＝0）だけ＝ `_yoryoCleanPass()` の1箇所**（`_yoryoPassed()` / `_yoryoPassed2()` もこれ）。画面移動ありの合格は記録に残し「要再試験」（`_yoryoBlurOnly()`）。
     DB も同じ＝ ［この章を確認しました］のトリガー・レベルアップの開始（`NEED_LV1`）・答えと解説（`NOT_CLEAN`）は blur_count=0 の合格を見る

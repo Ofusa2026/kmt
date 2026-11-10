@@ -64506,7 +64506,7 @@ async function openYoryoQuiz(no){
     + '<li>○か✕で答えます。<b>1問 ' + YORYO_QUIZ_SEC + '秒</b>。時間が切れると次の問題に進みます（答えなしは不正解）</li>'
     + '<li>問題は章の長さに合わせて <b>10〜15問</b>、毎回ランダムに出ます。合格は <b>' + Math.round(YORYO_QUIZ_PASS_RATE * 100) + '%以上</b>。不合格のときは<b>間違えた問題（答えは出しません）と本文のページ</b>が出ます。合格すると<b>これまで受けた全部の回の答えと解説</b>を見られます</li>'
     + '<li>不合格のときは <b>10分</b> あけてから再試験できます</li>'
-    + '<li>⚠️ このブラウザの<b>ほかのタブ</b>は閉じてから受けます（ほかのアプリは開いたままでかまいません）。試験中に<b>試験の画面の外をクリック</b>したり、ほかのタブへ移ったりすると<b>「画面を離れた」</b>に数え、その場で警告が出ます。<b>1回でも離れると合格しても再試験</b>です</li>'
+    + '<li>⚠️ このブラウザの<b>ほかのタブ</b>は閉じてから受けます（ほかのアプリは開いたままでかまいません）。試験中に<b>試験の画面の外をクリック</b>したり、<b>マウスを ' + YORYO_MOUSE_OUT_SEC + '秒以上外に出し</b>たり、ほかのタブへ移ったりすると<b>「画面を離れた」</b>に数え、その場で警告が出ます。<b>1回でも離れると合格しても再試験</b>です</li>'
     + '</ul>', { demo:false });
   if (ok !== 'go') return;
   showLoading(true);
@@ -64559,7 +64559,7 @@ async function openYoryoQuiz2(no){
     + '<li>国家試験と同じ<b>5つの選択肢</b>から、問題ごとに<b>「正しいもの」または「誤っているもの」</b>を1つ選びます。どちらを選ぶ問題かは問題文の上に出ます</li>'
     + '<li><b>1問 ' + YORYO_LV2_SEC + '秒</b>・<b>10問</b>（問題は毎回ランダム。再試験では前の回と別の問題が出ます）。時間が切れると次の問題に進みます（答えなしは不正解）。合格は <b>' + Math.round(YORYO_QUIZ_PASS_RATE * 100) + '%以上</b></li>'
     + '<li>不合格のときは間違えた問題（答えは出しません）と本文のページが出ます。合格すると全部の回の答えと解説を見られます。<b>10分</b> あけてから再試験できます</li>'
-    + '<li>⚠️ このブラウザの<b>ほかのタブ</b>は閉じてから受けます（ほかのアプリは開いたままでかまいません）。試験中に<b>試験の画面の外をクリック</b>したり、ほかのタブへ移ったりすると<b>「画面を離れた」</b>に数え、その場で警告が出ます。<b>1回でも離れると合格しても再試験</b>です</li>'
+    + '<li>⚠️ このブラウザの<b>ほかのタブ</b>は閉じてから受けます（ほかのアプリは開いたままでかまいません）。試験中に<b>試験の画面の外をクリック</b>したり、<b>マウスを ' + YORYO_MOUSE_OUT_SEC + '秒以上外に出し</b>たり、ほかのタブへ移ったりすると<b>「画面を離れた」</b>に数え、その場で警告が出ます。<b>1回でも離れると合格しても再試験</b>です</li>'
     + (YORYO_LV2_DEADLINE ? '<li>期限は <b>' + YORYO_LV2_DEADLINE.replace(/-/g, '/') + '</b> です</li>' : '')
     + '</ul>', { demo:false });
   if (ok !== 'go') return;
@@ -64767,11 +64767,13 @@ function _auditPracResultHtml(z){
    ・はじめる前の確認は `_yoryoPreCheck()` の1箇所＝ ① KMTのシステムがほかのタブで開いていないか（`kmtCountOtherTabs()`＝ BroadcastChannel で聞く）
      ②「このブラウザのほかのタブを閉じました」の自分でのチェック ③ 画面が2つつながっているか（`screen.isExtended`）
      ⚠️ ブラウザの決まりで、KMT以外のタブが開いているかは自動では分からない（だから②は自分でチェック）。ほかのアプリは開いたままでよい（そう決めた）
-   ・「画面を離れた」に数えるのは `_yoryoAway(kind)` の1箇所だけ＝ **試験の画面の外をクリックした（blur＝ もう1つの画面・ほかのアプリ）／ほかのタブに移った（hidden）**。1秒の中は1回。
-     マウスが画面の外に出ただけは数えない（`env.mouse_out` に記録だけ）
+   ・「画面を離れた」に数えるのは `_yoryoAway(kind)` の1箇所だけ＝ **試験の画面の外をクリックした（blur＝ もう1つの画面・ほかのアプリ）／ほかのタブに移った（hidden）／
+     マウスを試験の画面の外に `YORYO_MOUSE_OUT_SEC` 秒以上出した（mouse＝ クリックせずにもう1つの画面の資料をホイールで読むのをふさぐ）**。1秒の中は1回。
+     それより短くマウスが出ただけは数えない（`env.mouse_out` に回数を記録だけ）
    ・離れたらその場で警告（`_yoryoAwayShow()`）。画面の様子は `z.env`（extended／fs／fs_exit／mouse_out／away_sec／other_tabs）＝ 採点のときに p_env でDBへ
    ・合格しても画面移動が1回でもあれば「画面移動ありの合格」＝ 記録はそのまま残し、再試験（`_yoryoCleanPass()` の1箇所で見る）
    =========================================================================== */
+const YORYO_MOUSE_OUT_SEC = 3;   // マウスが試験の画面の外にこの秒数以上いたら「画面を離れた」
 const KMT_TAB_ID = Math.random().toString(36).slice(2);
 let _kmtTabBc = null, _kmtTabPongs = new Set();
 try {
@@ -64821,8 +64823,8 @@ function _yoryoPreRender(){
        : tabs ? row('✕', '#b91c1c', '<b>KMT のシステムがほかのタブでも開いています（' + tabs + 'つ）。</b>閉じてから［もう一度確かめる］を押してください', '<button class="btn btn-sm" onclick="yoryoPreRecheck()">もう一度確かめる</button>')
        : row('✓', '#15803d', 'ほかのタブで KMT のシステムは開いていません', '<button class="btn btn-sm" onclick="yoryoPreRecheck()">もう一度確かめる</button>'))
     + row(p.self ? '✓' : '□', p.self ? '#15803d' : '#b91c1c', '<label style="cursor:pointer;"><input type="checkbox"' + (p.self ? ' checked' : '') + ' onchange="yoryoPreSelf(this.checked)" style="margin-right:6px;">このブラウザの<b>ほかのタブを閉じました</b>（運用要領のPDFのタブなども）</label>'
-      + '<div style="font-size:11px;color:var(--gray-500);">ほかのアプリは開いたままでかまいません（試験中にクリックすると数えます）。ブラウザの決まりで、KMT 以外のタブが開いているかは自動では分からないので、自分でチェックしてください</div>')
-    + (ext ? row('!', '#b45309', '<b>画面が2つつながっています。</b>もう1つの画面にアプリが開いていてもかまいませんが、試験中に<b>試験の画面の外をクリックすると「画面を離れた」</b>に数えます（マウスが出ただけは数えません）') : '')
+      + '<div style="font-size:11px;color:var(--gray-500);">ほかのアプリは開いたままでかまいません（試験中にクリックしたり、マウスを ' + YORYO_MOUSE_OUT_SEC + '秒以上そちらに置いたりすると数えます）。ブラウザの決まりで、KMT 以外のタブが開いているかは自動では分からないので、自分でチェックしてください</div>')
+    + (ext ? row('!', '#b45309', '<b>画面が2つつながっています。</b>もう1つの画面にアプリが開いていてもかまいませんが、試験中に<b>試験の画面の外をクリックしたり、マウスを ' + YORYO_MOUSE_OUT_SEC + '秒以上外に出したりすると「画面を離れた」</b>に数えます（一瞬出ただけは数えません）') : '')
     + '<div style="font-size:12px;color:#b91c1c;margin-top:6px;">画面を1回でも離れると、合格しても<b>「画面移動ありの合格」</b>になり、再試験をお願いします（記録はそのまま残ります）。</div>'
     + (p.demo ? '<div style="margin-top:8px;padding:8px 10px;border:1px dashed #f59e0b;border-radius:8px;background:#fffbeb;font-size:12px;">'
         + '<b>ダメな例を見る（デモだけ）</b>　'
@@ -64868,7 +64870,7 @@ function _yoryoAwayShow(){
   d.style.cssText = 'position:fixed;inset:0;z-index:2147483000;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;padding:16px;';
   d.innerHTML = '<div style="max-width:520px;background:#fff;border:2px solid #f87171;border-radius:12px;padding:16px 18px;box-shadow:0 10px 30px rgba(0,0,0,.3);font-size:13px;line-height:1.8;color:#1e3a5f;">'
     + '<div style="font-size:15px;font-weight:800;color:#b91c1c;">⚠️ 試験の画面を離れました（' + z.blur + '回目）' + (z.demo ? '<span style="font-size:12px;color:#b45309;">　※デモ（記録しません）</span>' : '') + '</div>'
-    + '<div style="margin:6px 0;"><b>試験の画面の外をクリックした（もう1つの画面・ほかのアプリ）</b>、または<b>ほかのタブに移った</b>ことを記録しました。<br>'
+    + '<div style="margin:6px 0;"><b>試験の画面の外をクリックした（もう1つの画面・ほかのアプリ）</b>、<b>マウスを ' + YORYO_MOUSE_OUT_SEC + '秒以上外に出した</b>、または<b>ほかのタブに移った</b>ことを記録しました。<br>'
     + '画面を離れた回が1回でもあると、<b>合格しても「画面移動ありの合格」</b>になり、再試験をお願いします。</div>'
     + '<div style="font-size:11.5px;color:var(--gray-600);">離れていた時間（合計）：<span id="yqAwaySec">' + ((z.env && z.env.away_sec) || 0) + '</span>秒　※時間は止まりません</div>'
     + '<div style="margin-top:10px;text-align:right;"><button class="btn btn-primary" onclick="yoryoAwayBack()">試験にもどる</button></div></div>';
@@ -64888,7 +64890,17 @@ function _yoryoQuizBindBlur(on){
     document.addEventListener('visibilitychange', () => { if (document.hidden) _yoryoAway('hidden'); else _yoryoBack(); });
     window.addEventListener('blur', () => _yoryoAway('blur'));
     window.addEventListener('focus', () => _yoryoBack());
-    document.documentElement.addEventListener('mouseleave', () => { const z = _yoryoQuiz; if (z && !z.done && z.env) z.env.mouse_out++; });
+    // マウスが試験の画面の外に YORYO_MOUSE_OUT_SEC 秒以上いたら数える（一瞬出ただけは回数を記録だけ）
+    document.documentElement.addEventListener('mouseleave', () => {
+      const z = _yoryoQuiz; if (!z || z.done || z.practice || !z.env) return;
+      z.env.mouse_out++;
+      clearTimeout(window._yoryoMouseT);
+      window._yoryoMouseT = setTimeout(() => { if (_yoryoQuiz === z && !z.done) { _yoryoAway('mouse'); z.mouseAway = true; } }, YORYO_MOUSE_OUT_SEC * 1000);
+    });
+    document.documentElement.addEventListener('mouseenter', () => {
+      clearTimeout(window._yoryoMouseT);
+      const z = _yoryoQuiz; if (z && z.mouseAway) { z.mouseAway = false; _yoryoBack(); }
+    });
   }
 }
 /* ---- 合格の見方。画面移動のない合格（blur_count が 0）だけを「合格」とみなすのは `_yoryoCleanPass()` の1箇所 ---- */
@@ -65050,7 +65062,7 @@ function _yoryoQuizRender(){
 }
 // 問題の下の1行（デモだけ「ダメな例：画面を離れたとき」を押せる）
 function _yoryoQuizFootHtml(z){
-  return '<div style="font-size:11px;color:var(--gray-500);text-align:center;">試験の画面の外をクリックした・ほかのタブへ移った回数と、1問ごとの秒数は記録されます'
+  return '<div style="font-size:11px;color:var(--gray-500);text-align:center;">試験の画面の外をクリックした・マウスを ' + YORYO_MOUSE_OUT_SEC + '秒以上外に出した・ほかのタブへ移った回数と、1問ごとの秒数は記録されます'
     + (z.blur ? '<span style="color:#b91c1c;font-weight:700;">　いま ' + z.blur + '回</span>' : '') + '</div>'
     + (z.demo ? '<div style="text-align:center;margin-top:6px;"><button class="btn btn-sm" style="border-color:#f59e0b;" onclick="_yoryoAway(\'demo\')">ダメな例：画面を離れたとき（デモ）</button></div>' : '');
 }
@@ -74784,7 +74796,7 @@ const WHATS_NEW = [
   '運用要領の試験で不合格のとき、間違えた問題（文章と自分の答え）と、読み直す本文のページ（［このページを開く］）が出るようにしました。正しい答えと解説は出しません。',
   '○✕の試験も、再試験では前の回の問題を後回しにして、まだ出ていない問題から先に出るようにしました。',
   '合格したら、その章でこれまで受けた全部の回の問題を、答えと解説つきで見られます（同じ問題は1つにまとめ、どの回に出てどの回に正解したかも出ます）。',
-  '試験の前に、このブラウザのほかのタブを閉じます（KMTのシステムがほかのタブで開いていないかを自動で確かめ、「ほかのタブを閉じました」にチェックしてから始めます）。ほかのアプリは開いたままでかまいません。試験中に試験の画面の外（もう1つの画面・ほかのアプリ）をクリックしたり、ほかのタブへ移ったりすると、その場で警告が出ます。',
+  '試験の前に、このブラウザのほかのタブを閉じます（KMTのシステムがほかのタブで開いていないかを自動で確かめ、「ほかのタブを閉じました」にチェックしてから始めます）。ほかのアプリは開いたままでかまいません。試験中に試験の画面の外（もう1つの画面・ほかのアプリ）をクリックしたり、マウスを3秒以上外に出したり、ほかのタブへ移ったりすると、その場で警告が出ます。',
   '画面を1回でも離れた合格は「画面移動ありの合格」として記録に残し、画面移動のない合格が出るまで再試験をお願いします（［この章を確認しました］・答えと解説も、画面移動のない合格のあとで使えます）。',
   'デモ試験で、ほかのKMTタブが開いているときと、画面を離れたときの出かた（ダメな例）を見られます。',
 ]},
