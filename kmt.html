@@ -64506,7 +64506,7 @@ async function openYoryoQuiz(no){
     + '<li>○か✕で答えます。<b>1問 ' + YORYO_QUIZ_SEC + '秒</b>。時間が切れると次の問題に進みます（答えなしは不正解）</li>'
     + '<li>問題は章の長さに合わせて <b>10〜15問</b>、毎回ランダムに出ます。合格は <b>' + Math.round(YORYO_QUIZ_PASS_RATE * 100) + '%以上</b>。不合格のときは<b>間違えた問題（答えは出しません）と本文のページ</b>が出ます。合格すると<b>これまで受けた全部の回の答えと解説</b>を見られます</li>'
     + '<li>不合格のときは <b>10分</b> あけてから再試験できます</li>'
-    + '<li>⚠️ このブラウザの<b>ほかのタブ</b>は閉じてから受けます（ほかのアプリはかまいません）。試験中にほかのタブへ移ると<b>「画面を離れた」</b>に数え、その場で警告が出ます。<b>1回でも離れると合格しても再試験</b>です</li>'
+    + '<li>⚠️ このブラウザの<b>ほかのタブ</b>は閉じてから受けます（ほかのアプリは開いたままでかまいません）。試験中に<b>試験の画面の外をクリック</b>したり、ほかのタブへ移ったりすると<b>「画面を離れた」</b>に数え、その場で警告が出ます。<b>1回でも離れると合格しても再試験</b>です</li>'
     + '</ul>', { demo:false });
   if (ok !== 'go') return;
   showLoading(true);
@@ -64559,7 +64559,7 @@ async function openYoryoQuiz2(no){
     + '<li>国家試験と同じ<b>5つの選択肢</b>から、問題ごとに<b>「正しいもの」または「誤っているもの」</b>を1つ選びます。どちらを選ぶ問題かは問題文の上に出ます</li>'
     + '<li><b>1問 ' + YORYO_LV2_SEC + '秒</b>・<b>10問</b>（問題は毎回ランダム。再試験では前の回と別の問題が出ます）。時間が切れると次の問題に進みます（答えなしは不正解）。合格は <b>' + Math.round(YORYO_QUIZ_PASS_RATE * 100) + '%以上</b></li>'
     + '<li>不合格のときは間違えた問題（答えは出しません）と本文のページが出ます。合格すると全部の回の答えと解説を見られます。<b>10分</b> あけてから再試験できます</li>'
-    + '<li>⚠️ このブラウザの<b>ほかのタブ</b>は閉じてから受けます（ほかのアプリはかまいません）。試験中にほかのタブへ移ると<b>「画面を離れた」</b>に数え、その場で警告が出ます。<b>1回でも離れると合格しても再試験</b>です</li>'
+    + '<li>⚠️ このブラウザの<b>ほかのタブ</b>は閉じてから受けます（ほかのアプリは開いたままでかまいません）。試験中に<b>試験の画面の外をクリック</b>したり、ほかのタブへ移ったりすると<b>「画面を離れた」</b>に数え、その場で警告が出ます。<b>1回でも離れると合格しても再試験</b>です</li>'
     + (YORYO_LV2_DEADLINE ? '<li>期限は <b>' + YORYO_LV2_DEADLINE.replace(/-/g, '/') + '</b> です</li>' : '')
     + '</ul>', { demo:false });
   if (ok !== 'go') return;
@@ -64627,7 +64627,7 @@ async function openYoryoDemo(){
     + '<li>○か✕で答えます。<b>1問 ' + YORYO_QUIZ_SEC + '秒</b>。時間が切れると次の問題に進みます（答えなしは不正解）</li>'
     + '<li>' + YORYO_DEMO_QS.length + '問・合格は <b>' + Math.round(YORYO_QUIZ_PASS_RATE * 100) + '%以上</b>（本番は章の長さに合わせて10〜15問・問題は毎回ランダム）</li>'
     + '<li>本番では、不合格のとき間違えた問題（答えなし）と本文のページ、合格したとき全部の回の答えと解説が出ます。デモでは<b>いつも答えと解説</b>が出ます</li>'
-    + '<li>本番と同じく、ほかのタブへ移ると警告が出ます（デモでは数えるだけで残しません）。下の［ダメな例］で、ほかのKMTタブが開いているときと画面を離れたときの出かたを見られます</li>'
+    + '<li>本番と同じく、試験の画面の外をクリックしたりほかのタブへ移ったりすると警告が出ます（デモでは数えるだけで残しません）。下の［ダメな例］で、ほかのKMTタブが開いているときと画面を離れたときの出かたを見られます</li>'
     + '</ul>', { demo:true });
   if (ok !== 'go') return;
   const n = YORYO_DEMO_QS.length;
@@ -64646,7 +64646,7 @@ async function openYoryoDemo2(){
     + '<li>5つの選択肢から<b>正しいもの（または誤っているもの）を1つ</b>選びます。<b>1問 ' + YORYO_LV2_SEC + '秒</b>。時間が切れると次の問題に進みます（答えなしは不正解）</li>'
     + '<li>' + YORYO_DEMO_QS2.length + '問・合格は <b>' + Math.round(YORYO_QUIZ_PASS_RATE * 100) + '%以上</b>（本番は10問・問題は毎回ランダム・再試験では別の問題）</li>'
     + '<li>本番では、不合格のとき間違えた問題（答えなし）と本文のページ、合格したとき全部の回の答えと解説が出ます。デモでは<b>いつも答えと解説</b>が出ます</li>'
-    + '<li>本番と同じく、ほかのタブへ移ると警告が出ます（デモでは記録しません）。下の［ダメな例］も見られます</li>'
+    + '<li>本番と同じく、試験の画面の外をクリックしたりほかのタブへ移ったりすると警告が出ます（デモでは記録しません）。下の［ダメな例］も見られます</li>'
     + '</ul>', { demo:true });
   if (ok !== 'go') return;
   const n = YORYO_DEMO_QS2.length;
@@ -64766,9 +64766,9 @@ function _auditPracResultHtml(z){
    ---------------------------------------------------------------------------
    ・はじめる前の確認は `_yoryoPreCheck()` の1箇所＝ ① KMTのシステムがほかのタブで開いていないか（`kmtCountOtherTabs()`＝ BroadcastChannel で聞く）
      ②「このブラウザのほかのタブを閉じました」の自分でのチェック ③ 画面が2つつながっているか（`screen.isExtended`）
-     ⚠️ ブラウザの決まりで、KMT以外のタブが開いているかは自動では分からない（だから②は自分でチェック）。ほかのアプリは使ってよい（そう決めた）
-   ・「画面を離れた」に数えるのは `_yoryoAway(kind)` の1箇所だけ＝ **このブラウザのほかのタブに移った（タブが隠れた）ときだけ**。1秒の中は1回。
-     ほかのアプリ・もう1つの画面をクリックしたとき（`env.app_blur`）とマウスが画面の外に出たとき（`env.mouse_out`）は記録だけで数えない
+     ⚠️ ブラウザの決まりで、KMT以外のタブが開いているかは自動では分からない（だから②は自分でチェック）。ほかのアプリは開いたままでよい（そう決めた）
+   ・「画面を離れた」に数えるのは `_yoryoAway(kind)` の1箇所だけ＝ **試験の画面の外をクリックした（blur＝ もう1つの画面・ほかのアプリ）／ほかのタブに移った（hidden）**。1秒の中は1回。
+     マウスが画面の外に出ただけは数えない（`env.mouse_out` に記録だけ）
    ・離れたらその場で警告（`_yoryoAwayShow()`）。画面の様子は `z.env`（extended／fs／fs_exit／mouse_out／away_sec／other_tabs）＝ 採点のときに p_env でDBへ
    ・合格しても画面移動が1回でもあれば「画面移動ありの合格」＝ 記録はそのまま残し、再試験（`_yoryoCleanPass()` の1箇所で見る）
    =========================================================================== */
@@ -64821,8 +64821,8 @@ function _yoryoPreRender(){
        : tabs ? row('✕', '#b91c1c', '<b>KMT のシステムがほかのタブでも開いています（' + tabs + 'つ）。</b>閉じてから［もう一度確かめる］を押してください', '<button class="btn btn-sm" onclick="yoryoPreRecheck()">もう一度確かめる</button>')
        : row('✓', '#15803d', 'ほかのタブで KMT のシステムは開いていません', '<button class="btn btn-sm" onclick="yoryoPreRecheck()">もう一度確かめる</button>'))
     + row(p.self ? '✓' : '□', p.self ? '#15803d' : '#b91c1c', '<label style="cursor:pointer;"><input type="checkbox"' + (p.self ? ' checked' : '') + ' onchange="yoryoPreSelf(this.checked)" style="margin-right:6px;">このブラウザの<b>ほかのタブを閉じました</b>（運用要領のPDFのタブなども）</label>'
-      + '<div style="font-size:11px;color:var(--gray-500);">ほかのアプリは開いていてかまいません。ブラウザの決まりで、KMT 以外のタブが開いているかは自動では分からないので、自分でチェックしてください。<br>※ ブラウザを最小化したり、同じ画面でほかのアプリを全画面にしてブラウザを完全に隠したりすると、ほかのタブに移ったのと同じに数えることがあります</div>')
-    + (ext ? row('!', '#b45309', '<b>画面が2つつながっています。</b>もう1つの画面のアプリを使ってもかまいませんが、<b>このブラウザのほかのタブに移ると「画面を離れた」</b>に数えます') : '')
+      + '<div style="font-size:11px;color:var(--gray-500);">ほかのアプリは開いたままでかまいません（試験中にクリックすると数えます）。ブラウザの決まりで、KMT 以外のタブが開いているかは自動では分からないので、自分でチェックしてください</div>')
+    + (ext ? row('!', '#b45309', '<b>画面が2つつながっています。</b>もう1つの画面にアプリが開いていてもかまいませんが、試験中に<b>試験の画面の外をクリックすると「画面を離れた」</b>に数えます（マウスが出ただけは数えません）') : '')
     + '<div style="font-size:12px;color:#b91c1c;margin-top:6px;">画面を1回でも離れると、合格しても<b>「画面移動ありの合格」</b>になり、再試験をお願いします（記録はそのまま残ります）。</div>'
     + (p.demo ? '<div style="margin-top:8px;padding:8px 10px;border:1px dashed #f59e0b;border-radius:8px;background:#fffbeb;font-size:12px;">'
         + '<b>ダメな例を見る（デモだけ）</b>　'
@@ -64841,11 +64841,10 @@ function yoryoPreDone(go){
 }
 // 試験をはじめたときの画面の様子
 function _yoryoEnvStart(z){
-  z.env = { extended: !!(window.screen && window.screen.isExtended), app_blur:0, mouse_out:0, away_sec:0, kinds:{} };
+  z.env = { extended: !!(window.screen && window.screen.isExtended), mouse_out:0, away_sec:0, kinds:{} };
   z.awayAt = 0;
 }
-// 画面を離れた（kind＝ hidden＝ほかのタブ／demo）。数えるのはここだけ（ほかのアプリ＝ blur は _yoryoAppBlur で記録だけ）
-function _yoryoAppBlur(){ const z = _yoryoQuiz; if (z && !z.done && !z.practice && z.env) z.env.app_blur++; }
+// 画面を離れた（kind＝ blur＝試験の画面の外をクリック／hidden＝ほかのタブ／demo）。数えるのはここだけ
 function _yoryoAway(kind){
   const z = _yoryoQuiz; if (!z || z.done || z.practice) return;
   const now = Date.now();
@@ -64869,7 +64868,7 @@ function _yoryoAwayShow(){
   d.style.cssText = 'position:fixed;inset:0;z-index:2147483000;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;padding:16px;';
   d.innerHTML = '<div style="max-width:520px;background:#fff;border:2px solid #f87171;border-radius:12px;padding:16px 18px;box-shadow:0 10px 30px rgba(0,0,0,.3);font-size:13px;line-height:1.8;color:#1e3a5f;">'
     + '<div style="font-size:15px;font-weight:800;color:#b91c1c;">⚠️ 試験の画面を離れました（' + z.blur + '回目）' + (z.demo ? '<span style="font-size:12px;color:#b45309;">　※デモ（記録しません）</span>' : '') + '</div>'
-    + '<div style="margin:6px 0;">このブラウザの<b>ほかのタブに移った</b>ことを記録しました（ほかのアプリは数えません）。<br>'
+    + '<div style="margin:6px 0;"><b>試験の画面の外をクリックした（もう1つの画面・ほかのアプリ）</b>、または<b>ほかのタブに移った</b>ことを記録しました。<br>'
     + '画面を離れた回が1回でもあると、<b>合格しても「画面移動ありの合格」</b>になり、再試験をお願いします。</div>'
     + '<div style="font-size:11.5px;color:var(--gray-600);">離れていた時間（合計）：<span id="yqAwaySec">' + ((z.env && z.env.away_sec) || 0) + '</span>秒　※時間は止まりません</div>'
     + '<div style="margin-top:10px;text-align:right;"><button class="btn btn-primary" onclick="yoryoAwayBack()">試験にもどる</button></div></div>';
@@ -64887,7 +64886,8 @@ function _yoryoQuizBindBlur(on){
   if (on && !window._yoryoBlurBound) {
     window._yoryoBlurBound = true;
     document.addEventListener('visibilitychange', () => { if (document.hidden) _yoryoAway('hidden'); else _yoryoBack(); });
-    window.addEventListener('blur', () => _yoryoAppBlur());
+    window.addEventListener('blur', () => _yoryoAway('blur'));
+    window.addEventListener('focus', () => _yoryoBack());
     document.documentElement.addEventListener('mouseleave', () => { const z = _yoryoQuiz; if (z && !z.done && z.env) z.env.mouse_out++; });
   }
 }
@@ -65050,7 +65050,7 @@ function _yoryoQuizRender(){
 }
 // 問題の下の1行（デモだけ「ダメな例：画面を離れたとき」を押せる）
 function _yoryoQuizFootHtml(z){
-  return '<div style="font-size:11px;color:var(--gray-500);text-align:center;">このブラウザのほかのタブへ移った回数と、1問ごとの秒数は記録されます（ほかのアプリは数えません）'
+  return '<div style="font-size:11px;color:var(--gray-500);text-align:center;">試験の画面の外をクリックした・ほかのタブへ移った回数と、1問ごとの秒数は記録されます'
     + (z.blur ? '<span style="color:#b91c1c;font-weight:700;">　いま ' + z.blur + '回</span>' : '') + '</div>'
     + (z.demo ? '<div style="text-align:center;margin-top:6px;"><button class="btn btn-sm" style="border-color:#f59e0b;" onclick="_yoryoAway(\'demo\')">ダメな例：画面を離れたとき（デモ）</button></div>' : '');
 }
@@ -74784,9 +74784,9 @@ const WHATS_NEW = [
   '運用要領の試験で不合格のとき、間違えた問題（文章と自分の答え）と、読み直す本文のページ（［このページを開く］）が出るようにしました。正しい答えと解説は出しません。',
   '○✕の試験も、再試験では前の回の問題を後回しにして、まだ出ていない問題から先に出るようにしました。',
   '合格したら、その章でこれまで受けた全部の回の問題を、答えと解説つきで見られます（同じ問題は1つにまとめ、どの回に出てどの回に正解したかも出ます）。',
-  '試験の前に、このブラウザのほかのタブを閉じます（KMTのシステムがほかのタブで開いていないかを自動で確かめ、「ほかのタブを閉じました」にチェックしてから始めます）。ほかのアプリは使ってかまいません。試験中にこのブラウザのほかのタブへ移ると、その場で警告が出ます。',
+  '試験の前に、このブラウザのほかのタブを閉じます（KMTのシステムがほかのタブで開いていないかを自動で確かめ、「ほかのタブを閉じました」にチェックしてから始めます）。ほかのアプリは開いたままでかまいません。試験中に試験の画面の外（もう1つの画面・ほかのアプリ）をクリックしたり、ほかのタブへ移ったりすると、その場で警告が出ます。',
   '画面を1回でも離れた合格は「画面移動ありの合格」として記録に残し、画面移動のない合格が出るまで再試験をお願いします（［この章を確認しました］・答えと解説も、画面移動のない合格のあとで使えます）。',
-  'デモ試験で、ほかのKMTタブが開いているときと、ほかのタブへ移ったときの出かた（ダメな例）を見られます。',
+  'デモ試験で、ほかのKMTタブが開いているときと、画面を離れたときの出かた（ダメな例）を見られます。',
 ]},
 { version:'ver.20261110.2', date:'2026-11-10', notify:true, screens:['jobs','job_alerts'], items:['求人登録リンクから届いた求人の会社に、求人管理ですでに案件があるとき、［既存案件に統合］で1つにまとめられるようにしました。項目ごとに「既存の値」と「リンクの回答」を並べて、既存が空の項目は回答を入れ、両方にあるときは既存を残すか上書きするかを選べます。統合先には「求人登録リンクから統合」の枠が出て、どの項目を入れたかを後から確認できます。やり方は［求人票・求人登録リンク ▾］の 4.「既存案件との統合（やり方）」にあります。'] },
 { version:'ver.20261110.1', date:'2026-11-10', notify:true, screens:['reg_task_1','reg_task_2','reg_task_3','reg_task_4','reg_task_5','reg_task_6','reg_task_7','reg_task_8','reg_task_9','reg_task_10','reg_task_11','reg_task_12','reg_task_13','reg_task_14','reg_task_15','reg_task_16','reg_owners'], items:['登録支援機関業務の管理ページの「その項目の概要」を、管理者だけでなく項目の担当も書けるようにしました（「（管理者が記入）」の表示は外しました）。概要も ①〜④ と同じ記入必須の項目になり、記入の数は 5項目中のいくつかで出ます（項目ページの見出しと【担当者リスト】）。未記入があると、記入済みの数が赤く出ます。'] },
