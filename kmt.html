@@ -64501,12 +64501,11 @@ async function openYoryoQuiz(no){
   const c = YORYO_CHAPTERS.find(x => x.no === no);
   const again = _yoryoPassed(no);
   const ok = await _yoryoPreCheck('📝 ' + _yoryoChName(no) + ' ' + esc(c.title) + ' の試験' + (again ? '（受け直し）' : ''),
-    (again ? '<div style="margin-bottom:6px;">この章はもう<b>合格しています</b>。受け直しは任意で、<b>結果が下がっても合格の記録は取り消されません</b>。</div>' : '')
+    (again ? '<div style="margin-bottom:6px;">合格ずみ（受け直しは任意・合格の記録は消えません）</div>' : '')
     + '<ul style="margin:0;padding-left:20px;">'
-    + '<li>○か✕で答えます。<b>1問 ' + YORYO_QUIZ_SEC + '秒</b>。時間が切れると次の問題に進みます（答えなしは不正解）</li>'
-    + '<li>問題は章の長さに合わせて <b>10〜15問</b>、毎回ランダムに出ます。合格は <b>' + Math.round(YORYO_QUIZ_PASS_RATE * 100) + '%以上</b>。不合格のときは<b>間違えた問題（答えは出しません）と本文のページ</b>が出ます。合格すると<b>これまで受けた全部の回の答えと解説</b>を見られます</li>'
-    + '<li>不合格のときは <b>10分</b> あけてから再試験できます</li>'
-    + '<li>⚠️ このブラウザの<b>ほかのタブ</b>は閉じてから受けます（ほかのアプリは開いたままでかまいません）。試験中に<b>試験の画面の外をクリック</b>したり、<b>マウスを ' + YORYO_MOUSE_OUT_SEC + '秒以上外に出し</b>たり、ほかのタブへ移ったりすると<b>「画面を離れた」</b>に数え、その場で警告が出ます。<b>1回でも離れると合格しても再試験</b>です</li>'
+    + '<li>○✕・<b>1問 ' + YORYO_QUIZ_SEC + '秒</b>・10〜15問・合格 <b>' + Math.round(YORYO_QUIZ_PASS_RATE * 100) + '%以上</b></li>'
+    + '<li>不合格 → 間違えた問題と本文のページ（<b>10分</b>後に再試験）／合格 → 答えと解説</li>'
+    + '<li>⚠️ 画面の外をクリック・マウスを外へ・ほかのタブ＝<b>「画面を離れた」</b>。1回でも離れたら合格しても再試験</li>'
     + '</ul>', { demo:false });
   if (ok !== 'go') return;
   showLoading(true);
@@ -64554,13 +64553,12 @@ async function openYoryoQuiz2(no){
   const c = YORYO_CHAPTERS.find(x => x.no === no);
   const again = _yoryoPassed2(no);
   const ok = await _yoryoPreCheck('🎓 ' + _yoryoChName(no) + ' ' + esc(c.title) + ' のレベルアップ試験' + (again ? '（受け直し）' : ''),
-    (again ? '<div style="margin-bottom:6px;">この章はもう<b>合格しています</b>。受け直しは任意で、結果が下がっても合格の記録は取り消されません。</div>' : '')
+    (again ? '<div style="margin-bottom:6px;">合格ずみ（受け直しは任意・合格の記録は消えません）</div>' : '')
     + '<ul style="margin:0;padding-left:20px;">'
-    + '<li>国家試験と同じ<b>5つの選択肢</b>から、問題ごとに<b>「正しいもの」または「誤っているもの」</b>を1つ選びます。どちらを選ぶ問題かは問題文の上に出ます</li>'
-    + '<li><b>1問 ' + YORYO_LV2_SEC + '秒</b>・<b>10問</b>（問題は毎回ランダム。再試験では前の回と別の問題が出ます）。時間が切れると次の問題に進みます（答えなしは不正解）。合格は <b>' + Math.round(YORYO_QUIZ_PASS_RATE * 100) + '%以上</b></li>'
-    + '<li>不合格のときは間違えた問題（答えは出しません）と本文のページが出ます。合格すると全部の回の答えと解説を見られます。<b>10分</b> あけてから再試験できます</li>'
-    + '<li>⚠️ このブラウザの<b>ほかのタブ</b>は閉じてから受けます（ほかのアプリは開いたままでかまいません）。試験中に<b>試験の画面の外をクリック</b>したり、<b>マウスを ' + YORYO_MOUSE_OUT_SEC + '秒以上外に出し</b>たり、ほかのタブへ移ったりすると<b>「画面を離れた」</b>に数え、その場で警告が出ます。<b>1回でも離れると合格しても再試験</b>です</li>'
-    + (YORYO_LV2_DEADLINE ? '<li>期限は <b>' + YORYO_LV2_DEADLINE.replace(/-/g, '/') + '</b> です</li>' : '')
+    + '<li>5択で「正しいもの／誤っているもの」を1つ・<b>1問 ' + YORYO_LV2_SEC + '秒</b>・10問・合格 <b>' + Math.round(YORYO_QUIZ_PASS_RATE * 100) + '%以上</b></li>'
+    + '<li>不合格 → 間違えた問題と本文のページ（<b>10分</b>後に再試験）／合格 → 答えと解説</li>'
+    + '<li>⚠️ 画面の外をクリック・マウスを外へ・ほかのタブ＝<b>「画面を離れた」</b>。1回でも離れたら合格しても再試験</li>'
+    + (YORYO_LV2_DEADLINE ? '<li>期限 <b>' + YORYO_LV2_DEADLINE.replace(/-/g, '/') + '</b></li>' : '')
     + '</ul>', { demo:false });
   if (ok !== 'go') return;
   showLoading(true);
@@ -64622,12 +64620,10 @@ async function yoryoQuiz2ToggleActive(id, on){
 async function openYoryoDemo(){
   if (_yoryoQuiz && !_yoryoQuiz.done) { showToast('試験が途中です。先にそちらを終えてください', 'error'); _yoryoQuizShow(); return; }
   const ok = await _yoryoPreCheck('🧪 デモ試験（練習）',
-    '<div style="margin-bottom:6px;">本番の試験と同じ動きを、<b>だれでも・何回でも</b>試せます。<b>結果はどこにも記録されません</b>。</div>'
+    '<div style="margin-bottom:6px;">だれでも何回でも・<b>記録なし</b>。答えと解説がいつも出ます。</div>'
     + '<ul style="margin:0;padding-left:20px;">'
-    + '<li>○か✕で答えます。<b>1問 ' + YORYO_QUIZ_SEC + '秒</b>。時間が切れると次の問題に進みます（答えなしは不正解）</li>'
-    + '<li>' + YORYO_DEMO_QS.length + '問・合格は <b>' + Math.round(YORYO_QUIZ_PASS_RATE * 100) + '%以上</b>（本番は章の長さに合わせて10〜15問・問題は毎回ランダム）</li>'
-    + '<li>本番では、不合格のとき間違えた問題（答えなし）と本文のページ、合格したとき全部の回の答えと解説が出ます。デモでは<b>いつも答えと解説</b>が出ます</li>'
-    + '<li>本番と同じく、試験の画面の外をクリックしたりほかのタブへ移ったりすると警告が出ます（デモでは数えるだけで残しません）。下の［ダメな例］で、ほかのKMTタブが開いているときと画面を離れたときの出かたを見られます</li>'
+    + '<li>○✕・<b>1問 ' + YORYO_QUIZ_SEC + '秒</b>・' + YORYO_DEMO_QS.length + '問・合格 <b>' + Math.round(YORYO_QUIZ_PASS_RATE * 100) + '%以上</b></li>'
+    + '<li>⚠️ 画面の外をクリック・マウスを外へ・ほかのタブ＝<b>「画面を離れた」</b>。1回でも離れたら合格しても再試験</li>'
     + '</ul>', { demo:true });
   if (ok !== 'go') return;
   const n = YORYO_DEMO_QS.length;
@@ -64641,12 +64637,10 @@ async function openYoryoDemo(){
 async function openYoryoDemo2(){
   if (_yoryoQuiz && !_yoryoQuiz.done) { showToast('試験が途中です。先にそちらを終えてください', 'error'); _yoryoQuizShow(); return; }
   const ok = await _yoryoPreCheck('🧪 デモ試験（レベルアップ・5択）',
-    '<div style="margin-bottom:6px;">本番のレベルアップ試験と同じ動きを、<b>だれでも・何回でも</b>試せます。<b>結果はどこにも記録されません</b>。</div>'
+    '<div style="margin-bottom:6px;">だれでも何回でも・<b>記録なし</b>。答えと解説がいつも出ます。</div>'
     + '<ul style="margin:0;padding-left:20px;">'
-    + '<li>5つの選択肢から<b>正しいもの（または誤っているもの）を1つ</b>選びます。<b>1問 ' + YORYO_LV2_SEC + '秒</b>。時間が切れると次の問題に進みます（答えなしは不正解）</li>'
-    + '<li>' + YORYO_DEMO_QS2.length + '問・合格は <b>' + Math.round(YORYO_QUIZ_PASS_RATE * 100) + '%以上</b>（本番は10問・問題は毎回ランダム・再試験では別の問題）</li>'
-    + '<li>本番では、不合格のとき間違えた問題（答えなし）と本文のページ、合格したとき全部の回の答えと解説が出ます。デモでは<b>いつも答えと解説</b>が出ます</li>'
-    + '<li>本番と同じく、試験の画面の外をクリックしたりほかのタブへ移ったりすると警告が出ます（デモでは記録しません）。下の［ダメな例］も見られます</li>'
+    + '<li>5択・<b>1問 ' + YORYO_LV2_SEC + '秒</b>・' + YORYO_DEMO_QS2.length + '問・合格 <b>' + Math.round(YORYO_QUIZ_PASS_RATE * 100) + '%以上</b></li>'
+    + '<li>⚠️ 画面の外をクリック・マウスを外へ・ほかのタブ＝<b>「画面を離れた」</b>。1回でも離れたら合格しても再試験</li>'
     + '</ul>', { demo:true });
   if (ok !== 'go') return;
   const n = YORYO_DEMO_QS2.length;
@@ -64839,22 +64833,17 @@ function _yoryoPreRender(){
     + '<b style="color:' + color + ';min-width:16px;">' + mark + '</b><span style="flex:1;">' + body + '</span>' + (right || '') + '</div>';
   el.innerHTML = '<div style="font-size:12.5px;font-weight:800;margin-bottom:2px;">はじめる前の確認</div>'
     + (tabs == null ? row('…', '#64748b', 'ほかのタブで KMT のシステムが開いていないか確かめています…')
-       : tabs ? row('✕', '#b91c1c', '<b>KMT のシステムがほかのタブでも開いています（' + tabs + 'つ）。</b>閉じてから［もう一度確かめる］を押してください', '<button class="btn btn-sm" onclick="yoryoPreRecheck()">もう一度確かめる</button>')
+       : tabs ? row('✕', '#b91c1c', '<b>ほかのタブで KMT が開いています（' + tabs + 'つ）</b>。閉じてください', '<button class="btn btn-sm" onclick="yoryoPreRecheck()">もう一度確かめる</button>')
        : row('✓', '#15803d', 'ほかのタブで KMT のシステムは開いていません', '<button class="btn btn-sm" onclick="yoryoPreRecheck()">もう一度確かめる</button>'))
-    + row(p.self ? '✓' : '□', p.self ? '#15803d' : '#b91c1c', '<label style="cursor:pointer;"><input type="checkbox"' + (p.self ? ' checked' : '') + ' onchange="yoryoPreSelf(this.checked)" style="margin-right:6px;">このブラウザの<b>ほかのタブを閉じました</b>（運用要領のPDFのタブなども）</label>'
-      + '<div style="font-size:11px;color:var(--gray-500);">ほかのアプリは開いたままでかまいません（試験中にクリックしたり、マウスを ' + YORYO_MOUSE_OUT_SEC + '秒以上そちらに置いたりすると数えます）。ブラウザの決まりで、KMT 以外のタブが開いているかは自動では分からないので、自分でチェックしてください</div>')
-    + row(full ? '✓' : '✕', full ? '#15803d' : '#b91c1c', full ? 'ブラウザが画面いっぱいになっています（試験中に小さくすると「画面を離れた」に数えます）'
-        : '<b>ブラウザを画面いっぱい（最大化）にしてください。</b>ウィンドウを小さくして横に資料を並べられないようにするためです（最大化すると自動でチェックが付きます）')
+    + row(p.self ? '✓' : '□', p.self ? '#15803d' : '#b91c1c', '<label style="cursor:pointer;"><input type="checkbox"' + (p.self ? ' checked' : '') + ' onchange="yoryoPreSelf(this.checked)" style="margin-right:6px;">このブラウザの<b>ほかのタブを閉じました</b>（ほかのアプリはOK）</label>')
+    + row(full ? '✓' : '✕', full ? '#15803d' : '#b91c1c', full ? 'ブラウザが画面いっぱいです' : '<b>ブラウザを画面いっぱい（最大化）にしてください</b>')
     + (ext ? row(p.self2 ? '✓' : '□', p.self2 ? '#15803d' : '#b91c1c', '<label style="cursor:pointer;"><input type="checkbox"' + (p.self2 ? ' checked' : '') + ' onchange="yoryoPreSelf2(this.checked)" style="margin-right:6px;">'
-        + '<b>もう1つの画面がある場合</b>、そこに<b>運用要領のPDF・メモなど試験の参考になるものを出していません</b></label>'
-        + '<div style="font-size:11px;color:var(--gray-500);">もう1つの画面にほかの仕事のアプリが開いているのはかまいません。試験中に<b>そちらをクリック</b>したり、<b>マウスを ' + YORYO_MOUSE_OUT_SEC + '秒以上（細切れでも合計 ' + YORYO_MOUSE_SUM_SEC + '秒）そちらに出し</b>たりすると「画面を離れた」に数えます。'
-        + 'マウスを使わずに目で見るだけは機械では分からないので、ここで約束してもらいます（1問ごとの秒数は記録され、管理者が見られます）</div>') : '')
-    + '<div style="font-size:12px;color:#b91c1c;margin-top:6px;">画面を1回でも離れると、合格しても<b>「画面移動ありの合格」</b>になり、再試験をお願いします（記録はそのまま残ります）。</div>'
-    + (p.demo ? '<div style="margin-top:8px;padding:8px 10px;border:1px dashed #f59e0b;border-radius:8px;background:#fffbeb;font-size:12px;">'
-        + '<b>ダメな例を見る（デモだけ）</b>　'
-        + '<button class="btn btn-sm" onclick="yoryoPreFake(' + (p.fake ? 0 : 2) + ')">' + (p.fake ? 'もとに戻す' : 'ほかのKMTタブが開いているとき') + '</button> '
-        + '<button class="btn btn-sm" onclick="yoryoPreFakeSize()">' + (p.fakeSize ? 'もとに戻す' : 'ブラウザが画面いっぱいでないとき') + '</button>'
-        + '<span style="color:var(--gray-600);margin-left:6px;">試験中の「画面を離れたとき」の警告は、問題の下の［ダメな例：画面を離れたとき］で見られます</span></div>' : '')
+        + 'もう1つの画面に<b>試験の参考になるもの（PDF・メモ）を出していません</b></label>') : '')
+        + (p.demo ? '<div style="margin-top:8px;padding:8px 10px;border:1px dashed #f59e0b;border-radius:8px;background:#fffbeb;font-size:12px;">'
+        + '<b>ダメな例</b>　'
+        + '<button class="btn btn-sm" onclick="yoryoPreFake(' + (p.fake ? 0 : 2) + ')">' + (p.fake ? 'もとに戻す' : 'ほかのKMTタブがある') + '</button> '
+        + '<button class="btn btn-sm" onclick="yoryoPreFakeSize()">' + (p.fakeSize ? 'もとに戻す' : '最大化していない') + '</button>'
+        + '</div>' : '')
     + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;padding-top:12px;border-top:1px solid var(--gray-200);">'
     + '<button class="btn btn-outline" onclick="yoryoPreDone(false)">やめる</button>'
     + '<button class="btn btn-primary"' + (ok ? '' : ' disabled style="opacity:.5;cursor:not-allowed;"') + ' onclick="yoryoPreDone(true)">'
@@ -64896,10 +64885,9 @@ function _yoryoAwayShow(){
   d.style.cssText = 'position:fixed;inset:0;z-index:2147483000;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;padding:16px;';
   d.innerHTML = '<div style="max-width:520px;background:#fff;border:2px solid #f87171;border-radius:12px;padding:16px 18px;box-shadow:0 10px 30px rgba(0,0,0,.3);font-size:13px;line-height:1.8;color:#1e3a5f;">'
     + '<div style="font-size:15px;font-weight:800;color:#b91c1c;">⚠️ 試験の画面を離れました（' + z.blur + '回目）' + (z.demo ? '<span style="font-size:12px;color:#b45309;">　※デモ（記録しません）</span>' : '') + '</div>'
-    + '<div style="margin:6px 0;"><b>' + esc(YORYO_AWAY_KINDS[z.lastKind] || '画面を離れた') + '</b>ことを記録しました（これまで：' + esc(_yoryoKindsText(z.env)) + '）。<br>'
-    + (z.lastKind === 'size' ? 'ブラウザを<b>画面いっぱい（最大化）</b>に戻してください。<br>' : '')
-    + '画面を離れた回が1回でもあると、<b>合格しても「画面移動ありの合格」</b>になり、再試験をお願いします。</div>'
-    + '<div style="font-size:11.5px;color:var(--gray-600);">離れていた時間（合計）：<span id="yqAwaySec">' + ((z.env && z.env.away_sec) || 0) + '</span>秒　※時間は止まりません</div>'
+    + '<div style="margin:6px 0;">理由：<b>' + esc(YORYO_AWAY_KINDS[z.lastKind] || '画面を離れた') + '</b>'
+    + (z.lastKind === 'size' ? '（最大化に戻してください）' : '') + '<br>合格しても<b>再試験</b>になります。</div>'
+    + '<div style="font-size:11.5px;color:var(--gray-600);">離れた時間 <span id="yqAwaySec">' + ((z.env && z.env.away_sec) || 0) + '</span>秒（時間は止まりません）</div>'
     + '<div style="margin-top:10px;text-align:right;"><button class="btn btn-primary" onclick="yoryoAwayBack()">試験にもどる</button></div></div>';
   document.body.appendChild(d);
 }
@@ -65101,9 +65089,9 @@ function _yoryoQuizRender(){
 }
 // 問題の下の1行（デモだけ「ダメな例：画面を離れたとき」を押せる）
 function _yoryoQuizFootHtml(z){
-  return '<div style="font-size:11px;color:var(--gray-500);text-align:center;">画面の外をクリック・マウスを外へ（' + YORYO_MOUSE_OUT_SEC + '秒以上／細切れでも合計' + YORYO_MOUSE_SUM_SEC + '秒）・ほかのタブ・ウィンドウを小さくする と「画面を離れた」に数えます'
+  return '<div style="font-size:11px;color:var(--gray-500);text-align:center;">画面の外をクリック・マウスを外へ・ほかのタブ＝「画面を離れた」'
     + (z.blur ? '<span style="color:#b91c1c;font-weight:700;">　いま ' + z.blur + '回</span>' : '') + '</div>'
-    + (z.demo ? '<div style="text-align:center;margin-top:6px;"><button class="btn btn-sm" style="border-color:#f59e0b;" onclick="_yoryoAway(\'demo\')">ダメな例：画面を離れたとき（デモ）</button></div>' : '');
+    + (z.demo ? '<div style="text-align:center;margin-top:6px;"><button class="btn btn-sm" style="border-color:#f59e0b;" onclick="_yoryoAway(\'demo\')">ダメな例：画面を離れる</button></div>' : '');
 }
 function _yoryoQuizTick(){
   const z = _yoryoQuiz; if (!z || z.done) return;
