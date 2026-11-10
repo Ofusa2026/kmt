@@ -4872,12 +4872,12 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 
 - 各項目のページのいちばん上（🛠 改善の上）の【項目担当】＝ `regOwnBoxHtml()` / `renderRegOwnBox()`（`loadRegTaskRecords()` の先頭で `loadRegOwnBox()`）。監査の指摘（`reg_improvements`）とは別もの
 - 🗂 **各項目のページは2つのタブ＝ ① 管理リスト（項目名・今までの一覧）／ ② 管理ページ**（`regPageTabsHtml()`。切り替えは **`setRegPageTab(no, k)` の1箇所**、状態は `_regPageTab`＝既定は ①）。
-  ② の中は上から 項目担当（`renderRegOwnHead()`）→ **その項目の概要（`summary_html`。管理者だけが書ける）** → **監査の改善（`regImpBox_<no>`＝指摘があるときだけ出る）** → ①〜④ → ［保存］→ タスクボード（`renderRegOwnBoard()`）
+  ② の中は上から 項目担当（`renderRegOwnHead()`）→ **その項目の概要（`summary_html`。担当と管理者が書ける）** → **監査の改善（`regImpBox_<no>`＝指摘があるときだけ出る）** → ①〜④ → ［保存］→ タスクボード（`renderRegOwnBoard()`）
   - 全体を作るのは `renderRegOwnBox()`。⚠️ **あとからの描き直しは見出し・ボードだけ**（`_regOwnAfterChange()`）＝ 書きかけの欄を消さない
   - 欄は**押してそのまま書ける**（`_regOwnPaneHtml()`＝ contenteditable `rto_<番号>_<列>`）。保存は **`saveRegOwnInline(no)` の1箇所**（①〜④は担当と管理者／概要は管理者だけを書く）。
     未保存は `_regOwnDirty`＝ 画面を移る・閉じるときにたずねる（`regOwnHasUnsaved()`）。`arExec()` は `rto_` の欄なら管理ページの未保存にする
   - 監査の改善へ飛ぶ（`regImpGoTask`）・担当一覧から開く（`regOwnGoTask`）ときは ② を開く
-- 1項目＝1行（`task_no` が主キー）。`owners`（名前の配列・複数可）＋ 概要（`summary_html`）＋ 4つの欄。**欄の定義は `REG_OWN_SECS` の1箇所だけ**（① あるべき姿 `ideal_html` ／ ② いまのKMTの対応 `current_html` ／ ③ 改善の計画 `improve_html` ／ ④ 具体的な動き `action_html`）
+- 1項目＝1行（`task_no` が主キー）。`owners`（名前の配列・複数可）＋ 概要（`summary_html`）＋ 4つの欄。**記入は概要＋①〜④の5つが必須＝ 数えるのは `_regOwnFilledN(no)` / 表示は `_regOwnFillHtml(no)` の1箇所（足りないとき記入済みの数が赤。項目ページの見出しと【担当者リスト】の［記入］の列）**。**欄の定義は `REG_OWN_SECS` の1箇所だけ**（① あるべき姿 `ideal_html` ／ ② いまのKMTの対応 `current_html` ／ ③ 改善の計画 `improve_html` ／ ④ 具体的な動き `action_html`）
 - **担当を決めるのはだれでも。すでに担当がいる項目を変えるのは管理者の承認のあと**（判定は `_regOwnNeedApprove()` の1箇所。管理者は直接変えられる）
   - 申請は `reg_task_owner_requests`（`from_owners` / `to_owners` / `reason` 必須 / `status`＝pending・approved・rejected）。1項目に申請中は1件だけ（申請中はボタンを出さない）
   - 承認・却下は `decideRegOwnReq()`（`requireAdmin()`）。**担当を書くのは `_regOwnWrite()` の1箇所だけ**
