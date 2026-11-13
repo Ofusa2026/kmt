@@ -38844,7 +38844,7 @@ function _expStatusOptsHtml(cur){
   const can = _expCanDone();
   return EXPENSE_STATUSES.map(s => '<option' + (cur === s ? ' selected' : '')
     + (s === EXP_DONE_STATUS && !can && cur !== s ? ' disabled' : '') + '>' + esc(s)
-    + (s === EXP_DONE_STATUS && !can ? '（' + EXP_DONE_USERS.join('・') + 'のみ）' : '') + '</option>').join('');
+    + '</option>').join('');
 }
 const EXPENSE_BILL_TO      = ['人材','企業','登録支援機関'];
 const EXPENSE_ITEMS        = ['航空券代','宿泊代','試験代（2号試験）','試験代（ビジネスキャリア検定）','JITCO保険','セントラルインシュランス保険'];
@@ -41830,13 +41830,15 @@ function _acctCellHtml(table, e){
   const tip = on && (e.acct_checked_by || e.acct_checked_at)
     ? esc([e.acct_checked_by || '', e.acct_checked_at ? _fmtUpdatedAt(e.acct_checked_at) : ''].filter(Boolean).join(' / '))
     : '経理担当者の確認欄';
-  return '<label title="' + tip + '" onclick="event.stopPropagation();" style="display:flex;align-items:center;justify-content:center;gap:4px;cursor:pointer;">' +
-    '<input type="checkbox"' + (on ? ' checked' : '') + ' onchange="event.stopPropagation();toggleAcctChecked(\'' + table + '\',\'' + e.id + '\',this.checked)">' +
-    (on && e.acct_checked_by ? '<span style="font-size:9.5px;color:var(--gray-400);white-space:nowrap;">' + esc(e.acct_checked_by) + '</span>' : '') +
+  // ✅ 経理チェックを付け外しできるのは白井だけ（`_expCanDone()` ＝ 立替の【完了】と同じ人）。名前は出さない（だれがいつかは title に出る）
+  const can = _expCanDone();
+  return '<label title="' + tip + '" onclick="event.stopPropagation();" style="display:flex;align-items:center;justify-content:center;gap:4px;cursor:' + (can ? 'pointer' : 'default') + ';">' +
+    '<input type="checkbox"' + (on ? ' checked' : '') + (can ? '' : ' disabled') + ' onchange="event.stopPropagation();toggleAcctChecked(\'' + table + '\',\'' + e.id + '\',this.checked)">' +
     '</label>';
 }
 /* 押したその場で保存する。**書き込むのはこの1箇所だけ**（立替もカード決済も同じ列名） */
 async function toggleAcctChecked(table, id, on){
+  if (!_expCanDone()) { showToast('経理チェックを付けられるのは ' + EXP_DONE_USERS.join('・') + ' だけです', 'error'); if (table === 'expenses') renderExpenseTableDirect(); else renderCardPaymentTable(); return; }
   const patch = on
     ? { acct_checked:true, acct_checked_at:new Date().toISOString(), acct_checked_by:_curUserName() }
     : { acct_checked:false, acct_checked_at:null, acct_checked_by:null };
@@ -75185,8 +75187,9 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
-  { version:'ver.20261113.2', date:'2026-11-13', notify:true, screens:['expenses'], items:[
-    '【立替管理】のステータスに【完了】を足しました（未請求 → 請求済 → 入金済 → 完了）。完了にできるのは白井さんだけです（完了から戻すのも白井さんだけ）。だれがいつ完了にしたかが一覧に出ます。',
+  { version:'ver.20261113.2', date:'2026-11-13', notify:true, screens:['expenses','card_payments'], items:[
+    '【立替管理】のステータスに【完了】を足しました（未請求 → 請求済 → 入金済 → 完了）。完了にできるのは白井さんだけです（完了から戻すのも白井さんだけ）。',
+    '【立替管理】【カード決済報告】の［経理チェック］を付け外しできるのは白井さんだけにしました。チェック欄の横の名前は出さないようにしました（マウスを乗せると、だれがいつ付けたかが出ます）。',
   ]},
   { version:'ver.20261112.2', date:'2026-11-12', notify:true, screens:['reg_task_4','reg_task_7'], items:[
     '事前ガイダンス・生活オリエンテーションの電子署名に「署名の書き方：自分の名前をローマ字（アルファベット）で書いてください 例）TURNER ELIZABETH」の案内を入れました。管理リストの上にも、ご本人にそう案内するようお知らせを出しています。',
