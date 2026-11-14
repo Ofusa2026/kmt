@@ -28071,9 +28071,9 @@ const WORKER_REQUIRED_FIELDS = [
   { id:'wf_gender',            col:'gender',            label:'性別' },
   { id:'wf_birthdate',         col:'birthdate',         label:'生年月日' },
   { id:'wf_last_year_address', col:'last_year_address', label:'前年1月1日の住所' },
-  /* 🛂 パスポート番号・パスポート期限・在留カード番号は大事な項目なので **`REQ_ALWAYS_IDS`** に入れてある＝
-     定期報告対象外の人材でも未記入アラートに数える（退職済の人材は今までどおり数えない） */
-  { id:'wf_passport',          col:'passport',          label:'パスポート番号' },
+  /* 🛂 パスポート期限・在留カード番号は大事な項目なので **`REQ_ALWAYS_IDS`** に入れてある＝
+     定期報告対象外の人材でも未記入アラートに数える（退職済の人材は今までどおり数えない）。
+     🚫 パスポート番号（`passport`）はアラートに入れない（そう頼まれた） */
   { id:'wf_passport_expiry',   col:'passport_expiry',   label:'パスポート期限' },
   { id:'wf_expected_leave_date',     col:'expected_leave_date',     label:'退職予定日',     cond:_reqLeavePlanDate },
   { id:'wf_left_date',               col:'left_date',               label:'退職日',         cond:_reqLeftDate },
@@ -28112,7 +28112,7 @@ const WORKER_REQUIRED_FIELDS = [
 /* 🗂 定期報告対象が【対象外】の人材は、**6. 人材情報〜9. 連絡先の項目を未記入アラートの件数に数えない**
    （欄の薄赤はそのまま出す）。対象は `wf_name_kana`（6. の先頭）から後ろ全部＝ 並びで切るので、項目を足しても追従する。
    ⚠️ 1〜4（申請・在留・更新・ドライブ）と 10. 通算期間は今までどおり数える */
-const REQ_ALWAYS_IDS = new Set(['wf_passport', 'wf_passport_expiry', 'wf_residence_card']);
+const REQ_ALWAYS_IDS = new Set(['wf_passport_expiry', 'wf_residence_card']);
 const PERIODIC_OUT_SKIP_IDS = new Set(WORKER_REQUIRED_FIELDS.slice(WORKER_REQUIRED_FIELDS.findIndex(f => f.id === 'wf_name_kana')).map(f => f.id).filter(id => !REQ_ALWAYS_IDS.has(id)));
 const WORKER_REQUIRED_BY_ID = new Map(WORKER_REQUIRED_FIELDS.map(f => [f.id, f]));
 
@@ -32326,7 +32326,7 @@ function buildWorkerModalBody(w) {
       <input class="form-input" id="wf_visa_expiry_6" type="date" value="${w.visa_expiry||''}"
         oninput="syncVisaExpiry('wf_visa_expiry_6')" style="max-width:180px;">
       <div style="font-size:11px;color:var(--gray-400);margin-top:3px;">「2. 在留情報」の在留期限と同じ項目です。どちらに入れても両方に反映されます</div></div>
-    <div class="form-group"><label class="form-label">パスポート番号 <span style="color:#ef4444;">*</span></label>
+    <div class="form-group"><label class="form-label">パスポート番号</label>
       <input class="form-input" id="wf_passport" value="${esc(w.passport||'')}"></div>
     <div class="form-group"><label class="form-label">パスポート期限
       <span id="wf_passport_expiry_req" style="color:#ef4444;">*</span></label>
@@ -75706,7 +75706,7 @@ function _doForceReloadNow() {
 const WHATS_NEW = [
   { version:'ver.20261114.14', date:'2026-11-14', notify:true, screens:['workers'], items:[
     '外国人材の未記入アラートから【配属日】を外しました（配属前でまだ日付が決まっていなくても出続けないように）。',
-    '【パスポート番号】【パスポート期限】【在留カード番号】は大事な項目なので、未記入だとアラートが出るようにしました（定期報告対象外の人材も対象です。在留カード番号は、認定で入国前などまだカードが無いあいだは出ません）。',
+    '【パスポート期限】【在留カード番号】は大事な項目なので、未記入だとアラートが出るようにしました（定期報告対象外の人材も対象です。在留カード番号は、認定で入国前などまだカードが無いあいだは出ません）。',
   ]},
   { version:'ver.20261112.2', date:'2026-11-12', notify:true, screens:['reg_task_4','reg_task_7'], items:[
     '事前ガイダンス・生活オリエンテーションの電子署名に「署名の書き方：自分の名前をローマ字（アルファベット）で書いてください 例）TURNER ELIZABETH」の案内を入れました。管理リストの上にも、ご本人にそう案内するようお知らせを出しています。',
