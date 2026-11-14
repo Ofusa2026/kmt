@@ -3478,6 +3478,8 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   欄の下の案内は `_wfMnoHint()`（id は `wfMnoHint`。⚠️ `wf_` で始めない）
 
 ### 📋 外国人材の申請ステータス（選択肢）
+- 💳 **支払い待ち**＝ 審査完了と発行待ちのあいだ（申請記録の `VA_STATUSES`・`APPLY_DONE_STATUSES` にも同じ並びで入れてある）
+- 🔗 **②在留情報の「指定書発行日／在留カード発行日」（`workers.visa_issue_date`。項目名は `_visaIssueLabel()`＝認定・変更／更新で変わる）**＝ 入れると `_syncIssueToTokutei()` が 10. 通算期間の行（1号・特定活動＝A.／2号＝B.）に入れ、保存で `_saveIssueToApplication()` がいちばん新しい申請記録に `issue_date`・`new_visa_expiry`・`new_residence_card_no` を残す（申請記録の列「発行日→新期限」）。発行完了の欄（`panel_new_issue_date`）からも入る
 
 - **選択肢と並びは `APPLY_STATUSES` の1箇所だけ**（人材詳細の選択欄 `wf_apply_status` と一覧の絞り込み `wFilterApplyStatus` が同時に追従する）。
   色は `APPLY_STATUS_STYLE`（アラートのバッジ）と一覧のバッジの class 表の2つに足す
