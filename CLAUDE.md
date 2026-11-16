@@ -5652,6 +5652,9 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
     **状況の選択肢・色は `S117_STATUSES` の1箇所だけ**（未着手〈既定〉／対応中／完了／要確認）、書くのは `s117SetStatus()`（選んだその場で保存・`status_at` / `status_by`）。
     ［＋ 新規登録］＝ `openS117New()` → `saveS117New()`（所属機関 → 人材を何人でも。1人＝1行・`source`＝`manual`・すでにリストにいる人は選べない）／［削除］＝ `s117DelRow()`（論理削除・2回たずねる）
     ［この企業で作る］＝ `s117MakeFor()`（その企業とリストの人材だけを選んだ状態で【書類を作る】へ）。論理削除＝ `SB_SOFT_DELETE_TABLES` と `TRASH_TABLES` の両方に入れてある
+- ✉️ **6. ご案内書（支援委託契約書の取り交わし）＝ `SC_DOCS.annai`**（委任契約書と同じ部品＝ 欄・［文面を直す］・Word／印刷・作成履歴 `simple_contract_docs`）。
+  企業を選ぶと 宛先の企業名・担当者（所属機関のメイン担当）・部署が入る。**部署を決めるのは `_annaiDeptOf()` の1箇所**（`ANNAI_SOUMU`＝アヒュ・ニサ・白井 → 総務部、ほか → 営業部）。
+  担当者を直すと部署も合わせる（部署はあとから手で直せる）。日付の既定は今日（欄の `defFn`）
 - 📜 **1-25・1-17別紙の作成履歴は `simple_contract_docs`（kind＝`s125`／`s117`）**＝ 出力した書類の html をそのまま残す（出し直しは html から）。書くのは `_s1xSaveHist()`、一覧は `openS1xHistory(mode)`、出力は `_s1xOutput()` の1箇所
 - 📜 **［全書類の作成履歴］（左の一覧のいちばん下・`openDocGenAllHistory()`）**＝ `label_print_log`・`simple_contract_docs`・`intro_contract_docs` をまとめて新しい順に出すだけ（`_dgAllRows()`）。行を押すとその書類の履歴が開く。⚠️ **新しい書類に履歴を足したら `_dgAllRows()` にも足すこと**
 - 📜 **6. 職業紹介の契約書**（職業紹介に係る業務提携個別契約書）
