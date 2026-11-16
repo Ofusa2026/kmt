@@ -833,6 +833,13 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   読むのは `drCaseKindValue()`、送信の入口3つ（`sendKmtDecisionAll` / `sendIntroDecisionAll` / `sendDecisionFormToOfusa`）が
   **`drCaseKindRequire()` で止める**。最初は空＝👤 候補者から自動入力したときだけ紐付いた求人の区分を入れる（`pickDrCandidate`）
   - KMT案件フォームは「**1.** 案件区分」＝ もともと空いていた番号。**2〜28 は変えない**（依頼スプレッドシートの項目番号とそろえてある）
+  - ⚠️ **ver.20261116.7 で 14. 現在の在留期間 を入れたので、もとの 14〜20 は 15〜21、支援委託費は 22 にずらした**（25〜28 はそのまま）
+- 🪪 **【現在の在留期間】は3フォームとも必須**（KMT案件＝14・他社支援／企業単独＝在留期限の次）。選択肢は `CUR_STAY_OPTS`（3ヶ月〜5年／確認中／なし（認定・在留なし））、
+  欄は `curStayFieldHtml()`、止めるのは KMT＝`DR_KMT_REQUIRED`／他社支援・企業単独＝`drCurStayRequire()`（`sendIntroDecisionAll` / `sendDecisionFormToOfusa`）。
+  スプレッドシート・大房に列が無いので、コメント（KMT＝`comment`／大房＝`other_support_note`）にも入れる
+- ☑ **確認事項のチェックは `DR_FLAG_ITEMS` の1箇所だけ**（国保・国民年金加入者／2017年以前の技能実習修了者 且つ 監理団体アイムジャパン）。
+  欄は `drFlagsHtml(prefix)`（KMT＝案件・人材情報の最後／他社支援＝■人材名の最後／企業単独＝■本人ステータスの最後）、
+  入れるときだけ `drFlagConfirm()` が1回たずねる。チェックしたものだけ `drFlagLines(prefix)` が【 】でテキストとコメントに出す
   - 文面は見出しのすぐ下に「案件区分：◯◯」（`drCaseKindLine()`）。KMT案件はスプレッドシートのコメント欄にも1行入る。
     大房の `intake_requests` には列が無いので送らない
   - 控え（`_saveDecisionReportLog`）に `case_kind` を残す。同じ控えがすでにあって区分が空なら足す
