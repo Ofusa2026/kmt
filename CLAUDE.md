@@ -3263,6 +3263,14 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - **手順の文章と図は `REN_GUIDE_STEPS` / `_renGuideSvg()` の1箇所だけ**（`openRenewalGuide`）。
   図は SVG を直に書く（ライブラリを増やさない）。仕組みを変えたらここも直すこと
 
+### 👥 社員管理（⚙️ 設定の⑦・管理者だけ ／ 画面キー `STAFF_MGMT_KEY`＝`staff_mgmt`）
+
+- **各ユーザーの期限超過をまとめる画面**（あとで評価に使う）。左メニューの項目 `#navStaffMgmt` は `_refreshTrashNav()` が管理者だけに出す
+- **記録の実体は `staff_overdue_log`**（1行＝1人×1つの期限。`src`＋`ref`＋`user_name` で一意）。期限後に終わったら `done_at` が入るだけで**記録は消さない**。論理削除（`SB_SOFT_DELETE_TABLES` と `TRASH_TABLES` の両方）
+- **自動で記録するのは `_staffOverdueSync()` の1箇所だけ**＝ `REG_SCHEDULE` の `check` 付きで期限を過ぎたもの（`REG_SCHED_CHECKS` の結果）。【担当者リスト】・社員管理を開いたときに走る。ほかの期限も `REG_SCHED_CHECKS` に足せば記録される
+- 手で足すのは［＋ 期限超過を記録］（`src`＝`manual`）。何日遅れかは `_staffOverDays()` の1箇所
+- アップデート履歴（`WHATS_NEW`）には出さない（管理者向け）
+
 ### 🎯 アラートの担当マーク（だれが処理するのか）
 
 - アラートの**絵文字は使わない**。代わりに「丸いマークの中に担当の文字が入ったバッジ」を出す
@@ -4914,6 +4922,7 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   - 承認・却下は `decideRegOwnReq()`（`requireAdmin()`）。**担当を書くのは `_regOwnWrite()` の1箇所だけ**
   - 管理者には上の🔔に承認待ちの件数（`#regOwnerAlerts` ＝ `updateRegOwnerAlerts()`。読み込みは起動時・マイページの `loadRegOwners()`）
 - 📊 **項目全体の状況（未着手／対応中／完了）＝ `reg_task_owners.status`（＋ `status_at` / `status_by`）**。見出しの行（項目担当・［担当一覧］の左）の選択欄（ドロップダウン）＝ `_regOwnStatusBtnsHtml(no)`。**まだ決めていない項目（DBが空）は【未着手】としてあつかう＝ 読むのは `_regOwnStatus(no)` の1箇所だけ**。【担当者リスト】の［状況］の列（**同じ選択欄 `_regOwnStatusSelectHtml(no)` を表の中にも出す＝ そこからも変えられる**。やめた・失敗したときは `_regOwnStatusRedraw(no)` で元に戻す）といちばん上の集計（未着手／対応中／完了の項目数＝ `renderRegOwnerList`）も同じものを見る、**書くのは `regOwnSetStatus(no, v)` の1箇所だけ**（担当と管理者）。選択肢・色は監査の改善と同じ `REG_IMP_STATUSES`
+  - 🕘 【担当者リスト】の［最終更新］は **記入（`updated_at`）と状況の変更（`status_at`）の新しいほう＝ `_regOwnLastUpd(r)` の1箇所**
   - 🔗 **変えると、その項目に入っている監査の改善（`reg_improvements.task_nos` にその番号がある行）の状況も同じにする**＝ 変わる件数を1回たずねる（ほかの項目にも入っている指摘はそちらのページでも同じ状況になる）。逆向き（改善 → 項目）は連携しない
 - **書けるのは担当と管理者だけ（`_regOwnCanEdit()` の1箇所）**。ほかの人は見るだけ
 - タスクは **マイページのタスクボードと同じ `task_requests`**（`reg_task_no` で項目に結び付く）＝ 担当のマイページにも出る（`_riSyncMyBoard()` を共用）
