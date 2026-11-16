@@ -5650,6 +5650,7 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   - 📋 **【作成リスト】タブ（`_s117View`＝`doc`／`list`）＝ `s117_targets`**（1行＝1人材：企業番号・企業名・届出方法・企業担当・人材＋状況）。
     2026/11/16 にスプレッドシート「5-10作成企業リスト＋支援機関変更」の A〜D・I 列から36件を取り込み済み（`source`＝`sheet_import`。人材は氏名・管理番号で `worker_id` に結び付けた）。
     **状況の選択肢・色は `S117_STATUSES` の1箇所だけ**（未着手〈既定〉／対応中／完了／要確認）、書くのは `s117SetStatus()`（選んだその場で保存・`status_at` / `status_by`）。
+    ［＋ 新規登録］＝ `openS117New()` → `saveS117New()`（所属機関 → 人材を何人でも。1人＝1行・`source`＝`manual`・すでにリストにいる人は選べない）／［削除］＝ `s117DelRow()`（論理削除・2回たずねる）
     ［この企業で作る］＝ `s117MakeFor()`（その企業とリストの人材だけを選んだ状態で【書類を作る】へ）。論理削除＝ `SB_SOFT_DELETE_TABLES` と `TRASH_TABLES` の両方に入れてある
 - 📜 **1-25・1-17別紙の作成履歴は `simple_contract_docs`（kind＝`s125`／`s117`）**＝ 出力した書類の html をそのまま残す（出し直しは html から）。書くのは `_s1xSaveHist()`、一覧は `openS1xHistory(mode)`、出力は `_s1xOutput()` の1箇所
 - 📜 **［全書類の作成履歴］（左の一覧のいちばん下・`openDocGenAllHistory()`）**＝ `label_print_log`・`simple_contract_docs`・`intro_contract_docs` をまとめて新しい順に出すだけ（`_dgAllRows()`）。行を押すとその書類の履歴が開く。⚠️ **新しい書類に履歴を足したら `_dgAllRows()` にも足すこと**
