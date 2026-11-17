@@ -5178,6 +5178,8 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   一覧の列は `listCols` の `priority`（印は `_regPriHtml()`）、見出しで並べると `_regPriRank()` の順（急ぎが先・未設定は最後）、上の選択欄（`regPri_<no>`＝ `ui.pri`）でしぼる
 - 金額入力済み＝ **`_reg510AmtDone(rec)` の1箇所だけ**（別紙の中身のある行が1つ以上で、その全部に金額がある）。一覧の月額の左に緑の○（`REG_AMT_OK_MARK`）、上の選択欄（`regAmt_<no>`＝ `ui.amt`）でしぼる
 - どちらも様式の定義の `priority:true` / `amtCheck:<関数>` で出す（いまは no.2 だけ）。ほかの様式に付けるときはそこに書くだけ
+- 🤝 **支援区分・🛂 在留資格の列としぼり込み＝ 様式の定義の `wkFilter:true`**（いまは no.2 だけ）。列は `listCols` の `_bk` / `_visa`（人材情報からそのまま＝ `cell()` の中）、
+  支援区分は `workerBucket()` の値（言い方は `REG_BK_LABEL`）、上の選択欄は `regBk_<no>` / `regVisa_<no>`（＝ `ui.bk` / `ui.visa`。在留資格の選択肢はいる人材の値から作る）。読む列は `REG_WORKER_SELECT_COLS` の `kmt_support` / `visa_status`
 
 #### 📄 参考様式第５－１０号（支援委託契約書）の書類
 
