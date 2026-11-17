@@ -4856,6 +4856,16 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
     節ごとにまとめ、**本文のページは `_yoryoSecPagesOf()`（PDFの文字から節の見出しのページを探す・章ごとに1回）＋ `_yoryoSecRange()`**（見つからなければ章のページ）。［このページを開く］＝ `openYoryoPages()`。監査関連は 00 監査関連へ
   - 📘 **合格したら、その章で受けた全部の回の問題を答えと解説つきで（同じ問題は1つ）**＝ DB の `yoryo_quiz_review_all` / `yoryo_quiz2_review_all`（`rounds`＝出た回／`oks`＝正解した回）、画面は `openYoryoReviewAll(no, lv)`
   - 🔀 ○✕も5択と同じく、再試験では前の回の問題を後回し・まだ出ていない問題を先に出す（`yoryo_quiz_start`）
+  - 🌐 **外部用リンク（`#yoryoext=<token>`・ログインなし）＝ 社外の人も試験を受けられる**。発行・止める・消すは管理者だけ（上のボタン［外部用リンク（管理者）］＝ `openYoryoExtLinks()`）
+    | 実体 | 中身 |
+    |---|---|
+    | `yoryo_ext_links` | 1本＝1行（token・label・status open/closed）。論理削除（`SB_SOFT_DELETE_TABLES` と `TRASH_TABLES` の両方） |
+    | `yoryo_ext_takers` | 受験者（名前・会社名・メールアドレスが必須・どのリンクから来たか） |
+    | `yoryo_user_ok(p_user_id)` | 試験を始めてよい人か＝ 有効な社内ユーザー ／ `ext:<受験者のid>` でリンクが受付中。**`yoryo_quiz_start` / `yoryo_quiz2_start` はこれだけを見る** |
+    - 外部ページは `openYoryoExtByToken()` → 登録（`_yoryoExtRegForm` / `yoryoExtRegister`。この端末には `kmt_yoryo_ext_<token>` に受験者のidを覚える）→ `_yoryoExtStart()`
+    - ⚠️ **試験の部品は社内と同じものを使う**＝ `currentUser` を `{id:'ext:<id>'}` にメモリだけで入れる（**`kmt_current_user` には書かない**）。外部かは **`_yoryoExt` の1つ**で見る
+      （`_yoryoCanCheck` は true ／ 受験の記録は自分のぶんだけ読む＝ `_yoryoExtOnly()` ／ 00 監査関連・［この章を確認しました］・確認の人数・期限の帯は出さない ／ 合格した章は要約と重要キーワードが出る）
+    - 外部の受験者と結果（章ごとの ○✕・5択の 合／否と受験回数）は管理者の同じ画面の下（`_yoryoExtAdmRender()`）
   - 不正の対策はこの組み合わせ＝ ランダム出題・1問60秒・結果は点数だけ・再試験まで10分・別画面の回数と秒数を管理者に見せる（同時実施はしない）。
     完全には止められないので「やりにくくする＋やったら分かる」
 
