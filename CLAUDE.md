@@ -932,7 +932,10 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
     - **項目名の改行位置は `JS_HSP_LABEL_BR` の1箇所だけ**（`|` で改行。行ごとに nowrap＝言葉の途中で切らない。印 ◎○△ は最後の行のうしろ）。記入欄は `txtWrap()` ＋ `TXT_WRAP_CSS`
     - 色は関数の中の1かたまり（`LINE`＝黒の罫線／`LAB_BG`・`LAB_FG`＝項目名／`SEC_BG`・`SEC_FG`＝見出しの帯）。1行のいちばん低い高さは `JS_HSP_ROW_PX`
     - 行の高さは中身に合わせて自然にのびる。A4を超えたページは印刷の直前に `_jobSheetFitFirstPage()` が縮める（`data-fit` のページは全部＝ `_jobSheetFitPage()`）
-    - 📊 **Excel出力は `_jobSheetHspExcelXml(j)` の1箇所だけ**＝ `_flyerExcelHtml()` を通さず、**Excel 2003 の XML 形式（SpreadsheetML）**で書く（HTML の .xls ではシートを分けられないため）。
+    - 📊 **Excel出力は `_jobSheetHspXlsx(j)` の1箇所だけ（.xlsx を JSZip で組み立てる）**＝ `_flyerExcelHtml()` を通さない。
+      🛡️ **KMTのロゴの透かし**＝ 画面はシートの背景（`<picture>`）・印刷はヘッダーの画像（`&G`）。画像は `_jsXlWatermarkPng()`（濃さ `JS_XL_WM_ALPHA`）。
+      **シート保護＋ブックの構成の保護**（パスワードは毎回の乱数で、どこにも残さない＝ `_jsXlProtectHash()`）。記入欄（vl／vy）だけロックを外す。⚠️ Excel の保護は専用ソフトで外せるので、絶対に消せないわけではない（確実なのは PDF）。
+      色は 2026/11/18 にユーザーが Excel で直したもの（項目名＝黒／見出し・タイトル＝#003366／凡例は ◎赤・○緑・△青）
       **シートは2枚＝【記入欄】（その案件の内容）／【記入例】（項目の ph）**。1シートの中身（行・セル・結合・行の高さpt）は **`_jobSheetHspExcelRows(j, ex)` の1箇所**（列の幅は `JS_HSP_XL_COLS`）。
       どの案件の書類かは、ページの `data-hsp`（＝ `_jsHspDocs` の番号）で `exportJobFlyerExcel()` が引く
     - ⚠️ 項目を使うようにしたら（off を外したら）`JS_HSP_LAYOUT` にも足すこと（足さないと最後のページの右下の「その他」に出る）
@@ -5989,6 +5992,13 @@ GLTの月報Excel（国別チーム月報・年度まとめ・3か月ごと目�
   **日付の文字を作るのは `_saleDateSpanHtml()`、直すのは `editSaleDate()` の1組だけ**（チェックの付け外しは今までどおり `toggleSaleDate()`）
   - ⚠️ 保存は **Enter か欄から離れたとき**（Esc でやめる）＝ Chrome は年を1けた打つたびに change を出すので change では書かない。年が 2000〜2100 の外なら保存しない
   - 💸 立替費用の行は、つながっている立替の日付もそろえる（状態は変えない）
+
+### 🙈 売上管理の［金額を隠す］（ほかの部署・外部の方に画面を見せるとき）
+
+- 入口は上の帯の［金額を隠す］／［金額を表示する］の1つだけ（`toggleSaleAmtHidden()`。btnMap の `sales`）。状態は **`_saleAmtHidden` の1つ**＝ 覚えない（読み直すと表示に戻る）
+- **金額とみなす文字は `SALE_AMT_RE` の1箇所だけ**（「◯◯円」「¥◯◯」「税抜／税込／内申請 ◯◯」）。人数・件数は隠さない
+- 隠し方＝ 画面の文字を `.amt-mask` の箱で包み（**`_saleAmtMask()` の1箇所**）、CSS の `body.sale-amt-hidden .amt-mask` で灰色の帯にする。描き直しは MutationObserver（`_saleAmtWatch()`）が包み直す。売上管理の画面のあいだだけ包む
+- ⚠️ 入力欄（モーダル）の中の金額は隠さない
 
 ### 🔁 毎月の定期請求（売上管理の［🔁 毎月の定期請求］／ `sales_recurring`）
 
