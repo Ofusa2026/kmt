@@ -932,6 +932,9 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
     - **項目名の改行位置は `JS_HSP_LABEL_BR` の1箇所だけ**（`|` で改行。行ごとに nowrap＝言葉の途中で切らない。印 ◎○△ は最後の行のうしろ）。記入欄は `txtWrap()` ＋ `TXT_WRAP_CSS`
     - 色は関数の中の1かたまり（`LINE`＝黒の罫線／`LAB_BG`・`LAB_FG`＝項目名／`SEC_BG`・`SEC_FG`＝見出しの帯）。1行のいちばん低い高さは `JS_HSP_ROW_PX`
     - 行の高さは中身に合わせて自然にのびる。A4を超えたページは印刷の直前に `_jobSheetFitFirstPage()` が縮める（`data-fit` のページは全部＝ `_jobSheetFitPage()`）
+    - 📊 **Excel出力は `_jobSheetHspExcelXml(j)` の1箇所だけ**＝ `_flyerExcelHtml()` を通さず、**Excel 2003 の XML 形式（SpreadsheetML）**で書く（HTML の .xls ではシートを分けられないため）。
+      **シートは2枚＝【記入欄】（その案件の内容）／【記入例】（項目の ph）**。1シートの中身（行・セル・結合・行の高さpt）は **`_jobSheetHspExcelRows(j, ex)` の1箇所**（列の幅は `JS_HSP_XL_COLS`）。
+      どの案件の書類かは、ページの `data-hsp`（＝ `_jsHspDocs` の番号）で `exportJobFlyerExcel()` が引く
     - ⚠️ 項目を使うようにしたら（off を外したら）`JS_HSP_LAYOUT` にも足すこと（足さないと最後のページの右下の「その他」に出る）
     - 以下の「1ページ2列」の説明は 📋 一般（と参考用）のもの
   - 🎓📋 **高度人材・一般は特定技能の求人票と同じ「1ページ2列」**（`JS_COL_W` / `JS_COL_GAP` の1箇所）。
