@@ -3757,6 +3757,7 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - 各タブの役割・手入力と自動反映・データのつながりの図・正常／エラーの見分け方。**文章は `WK_GUIDE_TABS` / `WK_GUIDE_AUTO` / `WK_GUIDE_OK` / `WK_GUIDE_NG`、図は `_wkGuideSvg()`、描くのは `renderWorkersGuide()` の1箇所だけ**。
   ⚠️ 人材情報 ⇄ 申請記録の反映のきまり・自動で【申請予定なし】に戻る月数（`APPLY_RESET_MIN_MONTHS`＝8）を変えたらここも直すこと
 - 外国人材のタブの一覧は **`WS_TABS` の1箇所**（`switchWorkersScreenTab`）
+- 🔘 **タブはボタンの形（売上見込みと同じ白地＋水色の枠・線のアイコン）。見た目は CSS の `#wsTabsBar .ws-tab` の1かたまりだけ**、開いているタブは `.on`（薄い水色の地）を `switchWorkersScreenTab` が付け外しするだけ
 - ⚠️ **【使い方】は①〜⑤とは別枠**＝ 番号を付けず（CSS の `#wsTabsBar > button.ws-guide-tab::before{content:none}`）、`margin-left:auto` で右端に離して置く（そう頼まれた）
 - 「3. 自動で反映されるもの」の流れ図（A. 人材情報で変えたとき／B. 申請記録で直したとき）は **`_wkGuideSyncSvg()` の1箇所**。`_vaSyncToWorker` / `_saveWorkerStatusToApplication` / `_vaWorkerGuard` のきまりを変えたらここも直すこと
 
