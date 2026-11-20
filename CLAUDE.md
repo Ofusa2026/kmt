@@ -4162,6 +4162,19 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   KMT案件はスプレッドシート送信なので `getDecisionData().stay_period` に入れ、
   **コメント欄にも「希望在留期間: 〇〇」を足す**（シート側に列が無くても届くように）
 
+### 📥 決定報告の必須の欄（大房 O-Link の新規案件依頼と同じきまり／ver.20261120.1）
+
+- **どの条件で必須かは `_drIsChgUpd()`（変更・更新か）／`_drIsSsw()`（特定技能か）／`_drNeedSendOrg()`（認定＋受入経験 無）／`_drFeeOk()`（支援委託費が数字か。カンマ・円は許す）の4つだけ**
+  - すべて＝ 申請内容・企業名・人材名・国籍・希望在留資格・希望在留期間・受入経験・交付方法・支援委託費（無い場合は 0）
+  - 特定技能＝ 申請分野 ／ 変更・更新＝ 在留期限・現在の在留資格・現在の在留期間（⚠️ 認定は要らない＝ `drCurStayRequire()` も認定では止めない）
+  - 認定＋受入経験なし＝ 送り出し機関
+- KMT案件＝ `DR_KMT_REQUIRED`（`when` / `ok` 付き）→ `drKmtRequire()`。支援委託費は欄が出ているときだけ（申請費用のとき＝支援なしは `getDecisionData()` が `'0'` で送る）
+- 他社支援・企業単独＝［📥 大房側へ依頼］の入口で `drOfusaRequire(kind)`（［📋 決定報告を作成］は今までどおり止めない）
+- 赤く囲んで知らせるのは `drRequireRun(list)` の1箇所（ラベルの印は `DR_REQ_ALL` / `DR_REQ_CHG` / `DR_REQ_SSW`）
+- 🌏 **送り出し機関の欄は `sendOrgFieldHtml(prefix)`、読むのは `sendOrgValue(prefix)` の1箇所**（`{name,country,address,tel}`／使わない＝ `{not_used:true}`／空＝ null）。
+  他社支援・企業単独は大房の `intake_requests.senddashi_org` に、KMT案件はスプレッドシートに列が無いのでコメントに入れる（`sendOrgText()`）
+- 他社支援・企業単独は `intake_requests.current_stay_period` にも現在の在留期間を入れる（2026/11/20 に大房DBで列の実在を確かめた）
+
 ### 📥 大房の「＋新規案件依頼」に必要な項目
 
 他社支援・企業単独の送信セクション（**`ofusaSendSectionHtml` / `ofusaSectionValues` の1箇所**）に、
