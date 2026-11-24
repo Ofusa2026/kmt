@@ -3403,6 +3403,12 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 **`computeGlobalWorkerAlerts(list)` が唯一の算出元。判定ロジックをここ以外に書かない。**
 
 - 対象は 🚨申請忘れ警告 / 📋更新リマインド / 🪪在留期限の更新待ち / 🏗️建設業就労管理システム報告 の4種
+- 🏗️ **建設業の人材かは `_wkIsConstruction(w)` の1箇所だけ**（就労管理システム報告＝配属・退職・2号変更）＝ 人材の【分野】が入っていればそれ（`KENSETSU_FIELD_RE`＝建設・土木・建築・とび）、
+  **分野が空なら所属機関の業種**（アラート用の SELECT に `kco:companies(industries,industry)` を付けてある／無ければ `allCompanies`）。
+  > ⚠️ 以前は分野だけを見ていたので、分野が空の人材は退職しても退職報告のアラートに出なかった（177-007 若芝。2026/11 に実際に漏れた）
+  - 🗓 **退職報告に出すのは今年退職した人だけ＝ `_retiredThisYear(left_date)` の1箇所**（退職日が空の人は出ない）
+  - 🧾 **【分野】が空なら「必須項目の未記入」に数える＝ 出す人は `_reqFieldTarget(s)` の1箇所だけ**（在職中〈一時帰国中も・支援なしは除く〉／今年退職した人＝ `_retiredThisYear()`。配属前などは出さない）。
+    定期報告対象外・退職済でも数えるよう `REQ_ALWAYS_IDS` と `REQ_GONE_COLS`（退職済でも数える列）に `applicant_field` を入れてある。条件の材料の退職日は `_wCondState` / `_wfCondState` の `leftDate`
 - 🪪在留期限の更新待ち: apply_status が APPLY_DONE_STATUSES（審査完了以降）になってから
   VISA_UPDATE_WAIT_DAYS(30)日以上たっても、visa_expiry が空欄 or VISA_UPDATE_SOON_DAYS(120)日以内のまま。
   経過日数の起点は workers.apply_status_changed_at（saveWorker がステータス変更時に記録）→ apply_date → request_date
