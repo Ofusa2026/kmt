@@ -3021,6 +3021,14 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   **2つの違いは `CO_FEE_LOGS` の1箇所だけ**（履歴の入れ物・金額の欄の id）＝ 関数は `renderCoFeeLog(kind)` / `addCoFeeRow(kind)` /
   `onCoFeeChange(kind)` / `getCoFeeLog(kind)`（kind＝`init`／`pp`）、開いたときの金額は `_coFeeBefore[kind]`
 
+### 🗂 所属機関の画面のタブ（① 一覧 ／ ② 収入印紙代の支払い）
+
+- タブは **`CO_SCREEN_TABS` の1箇所だけ**、切り替えは `setCoScreenTab(k)`（状態は `_coScreenTab`。画面を開くたびに ① に戻す）。② のときは上の数字（`statsRow`）と一覧の絞り込み（`.filters-section`）を隠す
+- ② は **所属機関の【💴 入管申請費用】（`visa_fee_pattern` / `visa_fee_note`）を読むだけ**＝ 直すのは行を押して所属機関の詳細で（押した欄まで開く＝ `_feAttr`）
+  - 描くのは `buildCoFeeArea()`（絞り込みの欄）／`renderCoFeeList()`（中身だけ。⚠️ 検索欄は作り直さない）。`renderTable()` の先頭からも呼ぶので保存後も描き直る
+  - 絞り込みは `_coFee` の1つ（企業名・企業番号／人材名＝ `allWorkers` の名前／備考／ステータス〈既定は支援中〉／担当・負担パターン＝複数選択）。担当はメインと「A, B」のサブを区切った名前（`_coFeeStaffList()`）
+  - ⚠️ 負担パターンの選択肢は `_coFeePatOpts()`（関数）＝ `VISA_FEE_PATTERNS` はもっと下で定義するので、上で const にすると読み込みの時点で落ちる（実際に落ちた）
+
 ### 🔁 所属機関の担当の変更履歴（引継ぎの記録）
 
 - 場所は **所属機関の詳細【基本情報】タブ → 🏢 KMT担当 → 社内メモの上**
