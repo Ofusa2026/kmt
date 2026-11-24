@@ -3581,6 +3581,7 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - 📋 **［📧 メール未記入・要確認］の一覧＝ 出す様式は `REG_EMAIL_TASKS`（9・11）の1箇所**、開くのは `openEmailFixList()`（🤝 支援人材＝ `workerBucket()`・定期報告対象外とテストは除く）。
   欄で直すと **`saveEmailFix()` の1箇所**が `workers.email` に書き、手元の人材リストにも入れる。氏名＝ `emailFixOpenWorker()`（人材情報のメール欄を開く）
 - 🔔 **外国人材の画面のアラート（GLT）に【メール未記入・要確認】**＝ 数えるのは一覧と同じ **`_emailFixTarget(w)` の1箇所だけ**（`ALERT_OWNER_OF.emailFix`＝glt）。押すと `openEmailFixList()`。一覧で保存すると `renderWorkerAlerts()` を呼んで数え直す。上の🔔アラートにも出す（`#emailFixAlerts` ＝ `updateEmailFixAlerts()`。`updateSidebarAlerts()` から呼ぶ・全体の人数）
+- 👤 一覧は**所属機関のメイン・サブ・チーム内担当でしぼれる**＝ 役割は `EMAIL_FIX_ROLES` の1箇所、担当を引くのは `_emailFixStaffOf(w, role)`、しぼるのは `_emailFixList()`（残りの人数もこれを数える）
 
 ### 🗂 外国人材【8. 支援情報】の「定期報告対象」（`workers.periodic_report`）
 
