@@ -3595,6 +3595,11 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
     `.form-input` にすると `markEmptyField()` が薄赤を勝手に外す
   - 未記入の薄赤は `swPickSet()` が `field-empty` を付け外しする（`cfg.req` のときだけ）
 
+### 📌 人材詳細のタブと［保存］の行は貼り付ける
+
+- 項目をスクロールしても、上のタブ（`#wModalTabs`）と下の［💾 保存／チャット開始／閉じる／削除］の行（`.wm-foot`）は見えたまま。
+  **CSS の1かたまりだけ**（`.modal-body{…}` のすぐ下）＝ `position:sticky` で、`.modal-body` の余白 20px ぶんを top／bottom の負の値と margin で埋める。⚠️ 透けないよう必ず背景を付ける
+
 ### 📁 人材詳細の見出しの「📁 KMTドライブ」
 
 - 人材詳細（`#workerModal`）の**見出しの右**に、その人材のKMTドライブを開くボタンを出す
