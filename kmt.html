@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT業務管理システム</title>
-<!-- KMT_VERSION ver.20261124.19 -->
+<!-- KMT_VERSION ver.20261124.20 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -828,6 +828,28 @@ input[type="date"].form-input{min-width:112px;padding-left:6px;padding-right:6px
   border:1.5px solid var(--gray-200);background:white;cursor:pointer;font-size:12px;font-weight:700;
   color:var(--navy);flex:0 0 auto;white-space:nowrap;}
 .nav-back-btn:hover{background:var(--gray-100);border-color:#b9d4ee;}
+/* 📱 社内ノートをスマホで1画面ずつ（gnSetPane の data-gnpane を見る） */
+.gn-mob-bar{display:none;}
+@media(max-width:768px){
+  #gnWrap{height:auto !important;min-height:60vh;overflow:visible !important;flex-direction:column;}
+  #gnWrap .gn-p-folders{width:100% !important;border-right:none !important;}
+  #gnWrap .gn-p-main{width:100%;}
+  #gnWrap .gn-p-body{flex-direction:column;}
+  #gnWrap .gn-p-notes{width:100% !important;border-right:none !important;}
+  #gnWrap #gnFolderList,#gnWrap #gnNoteItems{overflow:visible !important;}
+  #gnWrap .gn-p-editor{padding:10px 8px !important;overflow:visible !important;}
+  #gnWrap[data-gnpane="folders"] .gn-p-main{display:none !important;}
+  #gnWrap:not([data-gnpane="folders"]) .gn-p-folders{display:none !important;}
+  #gnWrap[data-gnpane="notes"] .gn-p-editor{display:none !important;}
+  #gnWrap[data-gnpane="note"] .gn-p-notes,#gnWrap[data-gnpane="note"] .gn-p-head{display:none !important;}
+  #gnWrap .gn-head-row{flex-wrap:wrap;padding:10px !important;gap:8px !important;}
+  #gnWrap .gn-head-name{flex:1 1 calc(100% - 60px) !important;}
+  #gnWrap .gn-head-row .btn{font-size:11.5px !important;padding:5px 10px !important;}
+  #gnWrap .gn-mob-bar{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid #e0e0e0;background:#f8fafc;position:sticky;top:0;z-index:5;}
+  #gnWrap .gn-mob-bar:empty{display:none;}
+  #gnWrap .gn-mob-bar button{font-size:13px;padding:6px 12px;border:1px solid #cbd5e1;border-radius:16px;background:#fff;color:var(--txt);white-space:nowrap;cursor:pointer;}
+  #gnWrap .gn-mob-bar span{font-size:13px;font-weight:700;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+}
 @media(max-width:640px){ .nav-back-btn{padding:0;width:30px;height:30px;justify-content:center;}
   .nav-back-btn .nav-back-txt{display:none;}
   /* ⚠️ ← のぶん狭くなるので、画面の名前は**折り返さず**あふれたら … にする
@@ -53296,7 +53318,7 @@ const NOTE_SCOPES = {
     table:'group_notes', fk:'folder_id', box:'gnEditor',
     get:() => _gnNotes, set:v => { _gnNotes = v; }, parent:() => (_gnFolder && _gnFolder.id) || null,
     hint:'', render:() => renderGnMain(), drive:() => _gnDriveDest(), soft:true, links:true, conflict:true, manual:true,
-    onAdd:row => { _gnNoteId = row && row.id; }, onDelete:id => { if (_gnNoteId === id) _gnNoteId = null; },
+    onAdd:row => { _gnNoteId = row && row.id; setTimeout(() => gnSetPane('note'), 0); }, onDelete:id => { if (_gnNoteId === id) _gnNoteId = null; },
     afterSave:() => { renderGnNoteList(); _gnTouchFolder(); },
   },
 };
@@ -78518,6 +78540,9 @@ function _doForceReloadNow() {
 // 新しい変更をリリースしたら、配列の先頭に {version,date,notify,items:[...]} を追加。
 // notify:false は履歴のみ表示(右上トースト通知を出さない)
 const WHATS_NEW = [
+  { version:'ver.20261124.20', date:'2026-11-24', notify:true, screens:['group_notes','my_account'], items:[
+    'スマホで社内ノートを開くと、チャットと同じように1画面ずつ切り替わるようにしました（入れ物の一覧 → ノートの一覧 → ノートの中身）。上の［← 入れ物の一覧］［← ノートの一覧］で戻れます。パソコンの画面は今までどおりです',
+  ]},
   { version:'ver.20261124.19', date:'2026-11-24', notify:true, screens:['workers','decision_report'], items:[
     '決定報告（KMT案件・申請種別【更新】）を送ると、その人材の【3. 更新状況】の更新状況ステータスが自動で「申請依頼済み」になるようにしました（すでに「申請依頼済み」「完了」のときは変えません）',
     'ステータスの下に【決定報告による自動変更】と、変わった日時・変更前 → 変更後・送った人・依頼受領日が出ます。変更の記録にも残ります',
@@ -83563,6 +83588,7 @@ async function loadGroupNotes() {
     else { _gnFolder = null; _gnNotes = []; _gnNoteId = null; renderGnMain(); }
     const pn = _gnPendingNoteId, pnew = _gnPendingNew, padd = _gnPendingAddNote;
     _gnPendingNoteId = null; _gnPendingNew = false; _gnPendingAddNote = false;
+    gnSetPane(want && _gnFolder && (pn || padd) ? 'notes' : 'folders');   // 📱 スマホは入れ物の一覧から（ノートを指定して開いたときはそのノート）
     if (pn && _gnNotes.some(n => n.id === pn)) await gnOpenNote(pn);
     if (padd && _gnFolder) await addNote('group');
     if (pnew) gnOpenFolderEditor(null);   // 新しく作るときの既定は 👤 個人
@@ -83597,6 +83623,7 @@ async function gnOpenFolder(fid, keepNote) {
   if (!(keepNote && same && _gnNotes.some(n => n.id === _gnNoteId))) _gnNoteId = (_gnSortedNotes()[0] || {}).id || null;
   renderGnFolderList();
   renderGnMain();
+  if (!keepNote) gnSetPane('notes');
 }
 /* 保存したあと、左の一覧の件数・並びも合わせる */
 function _gnTouchFolder() {
@@ -83665,8 +83692,8 @@ function openGnGuide() {
 // 🖥️ 画面
 // ==============================
 function buildGroupNotesScreen() {
-  return '<div id="gnWrap" style="display:flex;height:calc(100vh - 110px);overflow:hidden;background:#fff;">'
-    + '<div style="width:250px;flex-shrink:0;border-right:1px solid #e0e0e0;display:flex;flex-direction:column;background:#fafafa;">'
+  return '<div id="gnWrap" data-gnpane="folders" style="display:flex;height:calc(100vh - 110px);overflow:hidden;background:#fff;">'
+    + '<div class="gn-p-folders" style="width:250px;flex-shrink:0;border-right:1px solid #e0e0e0;display:flex;flex-direction:column;background:#fafafa;">'
       + '<div style="padding:10px 12px;border-bottom:1px solid #e0e0e0;">'
         + '<button class="btn btn-primary" style="width:100%;font-size:12px;padding:8px 6px;" onclick="gnOpenFolderEditor()">＋ 新しく作る（個人／グループ）</button>'
         + '<input id="gnFolderSearch" placeholder="🔍 名前で検索" oninput="_gnFQ=this.value.trim();renderGnFolderList()" '
@@ -83674,14 +83701,32 @@ function buildGroupNotesScreen() {
       + '</div>'
       + '<div id="gnFolderList" style="flex:1;overflow-y:auto;"></div>'
     + '</div>'
-    + '<div style="flex:1;min-width:0;display:flex;flex-direction:column;">'
-      + '<div id="gnHead" style="border-bottom:1px solid #e0e0e0;"></div>'
-      + '<div style="flex:1;min-height:0;display:flex;">'
-        + '<div id="gnNoteCol" style="width:300px;flex-shrink:0;border-right:1px solid #e0e0e0;display:flex;flex-direction:column;"></div>'
-        + '<div id="gnEditor" style="flex:1;min-width:0;overflow-y:auto;padding:14px 18px;background:#f8fafc;"></div>'
+    + '<div class="gn-p-main" style="flex:1;min-width:0;display:flex;flex-direction:column;">'
+      + '<div id="gnMobBar" class="gn-mob-bar"></div>'
+      + '<div id="gnHead" class="gn-p-head" style="border-bottom:1px solid #e0e0e0;"></div>'
+      + '<div class="gn-p-body" style="flex:1;min-height:0;display:flex;">'
+        + '<div id="gnNoteCol" class="gn-p-notes" style="width:300px;flex-shrink:0;border-right:1px solid #e0e0e0;display:flex;flex-direction:column;"></div>'
+        + '<div id="gnEditor" class="gn-p-editor" style="flex:1;min-width:0;overflow-y:auto;padding:14px 18px;background:#f8fafc;"></div>'
       + '</div>'
     + '</div>'
   + '</div>';
+}
+/* 📱 スマホでは3列をならべず、1画面ずつ切り替える（チャットと同じ考え方）。
+   **どの画面を出すかは #gnWrap の data-gnpane（folders＝入れ物の一覧／notes＝ノートの一覧／note＝ノートの中身）の1つだけ**、
+   切り替えは gnSetPane() の1箇所、見た目は CSS の @media(max-width:768px) の .gn-* の1かたまり。パソコンでは今までどおり3列 */
+const GN_MOBILE_MAX = 768;
+function _gnIsMobile(){ return window.innerWidth <= GN_MOBILE_MAX; }
+function gnSetPane(p){
+  const w = document.getElementById('gnWrap'); if (!w) return;
+  w.dataset.gnpane = p;
+  const bar = document.getElementById('gnMobBar');
+  if (bar) {
+    const f = _gnFolder;
+    bar.innerHTML = p === 'note'
+      ? '<button type="button" onclick="gnSetPane(\'notes\')">← ノートの一覧</button><span>' + esc((f && f.name) || '') + '</span>'
+      : p === 'notes' ? '<button type="button" onclick="gnSetPane(\'folders\')">← 入れ物の一覧</button><span>' + esc((f && f.name) || '') + '</span>' : '';
+  }
+  if (_gnIsMobile()) try { window.scrollTo(0, 0); (document.querySelector('.content-wrap') || {}).scrollTop = 0; } catch(e) {}
 }
 function renderGnFolderList() {
   const box = document.getElementById('gnFolderList');
@@ -83802,9 +83847,9 @@ function renderGnHead() {
   const memBtn = solo
     ? '<button class="btn btn-secondary" style="' + st + '" onclick="gnOpenFolderEditor(\'' + f.id + '\')" title="自分だけが見られます（管理者も開けます）。グループに変えるときは⚙️ 設定から">👤 個人</button>'
     : '<button class="btn btn-secondary" style="' + st + '" onclick="gnOpenFolderEditor(\'' + f.id + '\')" title="メンバーを見る・変える">👥 ' + _gnMembers(f.id).length + '人</button>';
-  box.innerHTML = banner + '<div style="display:flex;gap:12px;align-items:center;padding:12px 16px;">'
+  box.innerHTML = banner + '<div class="gn-head-row" style="display:flex;gap:12px;align-items:center;padding:12px 16px;">'
     + _gnIconHtml(f, 42)
-    + '<div style="flex:1;min-width:0;">'
+    + '<div class="gn-head-name" style="flex:1;min-width:0;">'
       + '<div style="font-size:16px;font-weight:800;color:#1e293b;">' + esc(f.name || '') + '</div>'
       + (f.topic ? '<div style="font-size:12px;color:#64748b;margin-top:2px;white-space:pre-wrap;">' + esc(f.topic) + '</div>' : '')
     + '</div>'
@@ -83875,11 +83920,12 @@ function _renderGnNoteItems() {
   }).join('') || '<div style="padding:18px;text-align:center;font-size:12px;color:#94a3b8;">見つかりません</div>';
 }
 async function gnOpenNote(id) {
-  if (id === _gnNoteId) return;
+  if (id === _gnNoteId) { gnSetPane('note'); return; }
   if (!(await noteManualUnsavedOk())) return;
   _gnNoteId = id;
   _renderGnNoteItems();
   renderGnEditor();
+  gnSetPane('note');
 }
 function renderGnEditor() {
   const box = document.getElementById('gnEditor');

@@ -603,6 +603,8 @@ STOCK のような「メンバーだけが見られるノートの入れ物」�
 | `group_note_members` | だれがメンバーか（`folder_id` ＋ `user_id` で一意） |
 | `group_notes` | ノート（`title` / `content_html` / `attachments`）。論理削除 |
 
+- 📱 **スマホ（`GN_MOBILE_MAX`＝768px 以下）では3列をならべず1画面ずつ**＝ どれを出すかは `#gnWrap` の `data-gnpane`（folders／notes／note）の1つだけ、
+  切り替えは **`gnSetPane()` の1箇所**（`gnOpenFolder`＝notes／`gnOpenNote`・新規ノート＝note／読み込み直後＝folders）。戻るのは上の帯 `#gnMobBar`。見た目は CSS の `@media(max-width:768px)` の `#gnWrap` の1かたまり（パソコンは今までどおり3列）
 - **見られるのはメンバーだけ**（公開のグループは作らない）。判定は **`_gnIsMember(f)` の1箇所だけ**で、
   一覧に出すグループもここを通す。グループは**だれでも作れる**、設定・メンバーは**メンバーならだれでも**直せる
 - **メンバーの足し引きを書くのは `gnSaveFolder()` の1箇所だけ**（いまのメンバーとの差分で POST / DELETE）。
