@@ -3998,6 +3998,21 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   チャット画面の初期化完了後に自動で `openChatRoom()` される
   （`showScreen` → `openChatRoom` を直接続けて呼ぶと初期化に上書きされるので注意）
 
+### 📱 スマホでの見え方（全体 ／ CSS の「📱 スマホ全体の見やすさ」の1かたまり）
+
+- **全画面に効くスマホ用の見た目は `@media(max-width:768px)` の1かたまり（`.tc-mob-back{display:none;}` のすぐ下）だけ**。
+  前からある `/* ===== MOBILE ===== */`（サイドバーを隠す・モーダルを全幅・💬 チャットの1画面ずつ）と、社内ノートの `#gnWrap` のかたまりはそのまま
+  - 上の帯＝ 1段目に「☰ ← 画面名」（画面名は … で切る）、2段目にアイコンと画面のボタン。⛶ 全画面（`#kmtFullBtn`）は出さない
+  - 🪟 **モーダル**＝ 外枠の余白0（`.modal-overlay`）／タブ（`.modal-tabs` / `#wModalTabs`）は1行で横スクロール／
+    **左右2列の inline grid（`1fr 1fr`・`repeat(2,1fr)`・`repeat(3,1fr)`）は1列に倒す**（写真の `minmax(...)` は対象外）／
+    `flex-wrap:nowrap` の行は折り返す／下のボタン行（`.wm-foot` / `.modal-footer`）は折り返して文字は1行。
+    ⚠️ `.modal-body` の余白を 14px 12px にしたので、**貼り付けのタブと下のボタン行の負の margin・top/bottom もここで同じ値にそろえてある**（片方だけ変えるとずれる）
+  - 入力欄は 16px（iPhone がタップしたときに勝手に拡大しないため）
+  - **左右に分かれた画面は根っこの div に `class="split-stack"` を付けるだけで縦に積む**（いまは 求人票作成・履歴書作成）
+  - 🏠 社内チャット＝ `#tcWrap` に `.tc-room-open`（`renderTcPane` が部屋の有無で付け外し）。一覧の列は `.tc-list-col`、
+    部屋の見出しの［←］は `tcMobileBack()`（編集中なら `_tcEditLeaveOk()` を通してから部屋を閉じる）
+  - 確かめるときは Playwright の `devices['iPhone 13']` で全画面（`Object.keys(SCREENS)`）を開き、`document.documentElement.scrollWidth` が 390 を超えないことを見る
+
 ### ⬅️ 前の画面に戻る（← 戻る ／ ブラウザ・スマホの戻る）
 
 - **通った画面を覚えるのは `_navStack` の1箇所だけ**（画面キーの配列。新しいものが末尾）。
