@@ -3584,6 +3584,7 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - 👤 一覧は**所属機関のメイン・サブ・チーム内担当でしぼれる**＝ 役割は `EMAIL_FIX_ROLES` の1箇所、担当を引くのは `_emailFixStaffOf(w, role)`、しぼるのは `_emailFixList()`（残りの人数もこれを数える）
 - 🔁 **ほかの人材と同じメールも要確認**＝ 種類（未記入／形式が正しくない／重複）は `EMAIL_FIX_KINDS`、決めるのは `_emailFixKind(w, dup)` の1箇所（`dup`＝`_emailDupMap(全人材)`。退職者もくらべる・大文字小文字と前後の空白は無視）。一覧で同じメールを保存しようとすると1回たずねる
 - ⏳ **期限は `EMAIL_FIX_DUE`（2026-11-26）の1箇所**＝ 一覧のいちばん上（`_emailFixDueHtml()`）・🔔のチップ・外国人材のアラートに出す。過ぎたら赤く点滅。空にすると期限の表示だけ消える
+- ⛶ 一覧は見出しの［⛶ 全画面］（`toggleModalMax('emailFixModal')`）で広げられる。全画面のときは一覧を画面の下まで伸ばす（CSS の `#emailFixModal .modal-box-max #emailFixBody` の1箇所）
 
 ### 🗂 外国人材【8. 支援情報】の「定期報告対象」（`workers.periodic_report`）
 

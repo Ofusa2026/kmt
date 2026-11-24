@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KMT業務管理システム</title>
-<!-- KMT_VERSION ver.20261124.13 -->
+<!-- KMT_VERSION ver.20261124.14 -->
 <style>
 :root {
   --navy:#0f2040; --blue:#2563eb; --blue-light:#eff6ff;
@@ -525,6 +525,7 @@ mark.chat-search-hit.active{background:#f59e0b;color:#1e293b;box-shadow:0 0 0 2p
 #feeHScrollThumb.drag,.hs-thumb.drag{cursor:grabbing;}
 /* ⛶ 全画面（setKmtFull。どの画面も同じ）。サイドバー・アップデートの帯・上の数字を隠して、中身を画面いっぱいに出す */
 body.kmt-full .sidebar,body.kmt-full #sidebarToggleBtn,body.kmt-full #screenUpdateBar,body.kmt-full #statsRow,
+#emailFixModal .modal-box-max #emailFixBody{max-height:calc(100vh - 290px) !important;}
 body.kmt-full #workerAlertBanner,body.kmt-full #navBackBtn,body.kmt-full [data-full-hide]{display:none !important;}
 body.kmt-full .main-wrap{margin-left:0 !important;}
 body.kmt-full .topbar{padding-top:8px;padding-bottom:8px;}
@@ -73154,6 +73155,9 @@ async function openEmailFixList(){
     + '<select class="form-input" id="emailFixStaff" style="max-width:170px;" onchange="_emailFix.staff=this.value;_renderEmailFix()">' + _emailFixStaffOptsHtml() + '</select>'
     + '<span id="emailFixCount" style="font-size:12px;"></span></div>'
     + '<div id="emailFixBody" style="max-height:62vh;overflow:auto;"></div>');
+  /* ⛶ 全画面（ヘッダーの ⛶ と同じ toggleModalMax）。全画面のときは一覧を画面の下まで伸ばす（CSS の #emailFixModal .modal-box-max の1箇所） */
+  const _ex = document.getElementById('emailFixModalHeadExtra');
+  if (_ex) _ex.innerHTML = '<button class="btn btn-secondary btn-sm" style="font-size:12px;" onclick="toggleModalMax(\'emailFixModal\');this.textContent=_modalMaxState.emailFixModal?\'❐ 元の大きさ\':\'⛶ 全画面\'">' + (_modalMaxState.emailFixModal ? '❐ 元の大きさ' : '⛶ 全画面') + '</button>';
   _renderEmailFix();
 }
 function _emailFixCoName(w){ const c = (allCompanies || []).find(x => x.id === w.company_id) || coOfRow(w); return (c && c.name) || ''; }
@@ -73163,17 +73167,17 @@ function _renderEmailFix(){
   _renderEmailFixCount();
   if (!list.length) { box.innerHTML = '<div style="padding:20px;text-align:center;color:var(--gray-500);">' + (_emailFix.rows.length ? '当てはまる人材はいません' : '✅ メールが未記入・要確認の人材はいません') + '</div>'; return; }
   box.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="background:var(--bar-grad-v);color:#fff;">'
-    + '<th style="padding:6px;text-align:left;">管理番号</th><th style="padding:6px;text-align:left;">氏名</th><th style="padding:6px;text-align:left;">所属機関</th><th style="padding:6px;text-align:left;">担当</th><th style="padding:6px;text-align:left;">状況</th><th style="padding:6px;text-align:left;min-width:280px;">メール</th></tr></thead><tbody>'
+    + '<th style="padding:6px;text-align:left;">管理番号</th><th style="padding:6px;text-align:left;">氏名</th><th style="padding:6px;text-align:left;">所属機関</th><th style="padding:6px;text-align:left;">担当</th><th style="padding:6px;text-align:left;">状況</th><th style="padding:6px;text-align:left;min-width:240px;">メール</th></tr></thead><tbody>'
     + list.map(w => {
       const st = w._ok ? '<span style="color:#16a34a;font-weight:700;">✓ 保存済み</span>'
-        : '<span style="color:#dc2626;">' + esc(EMAIL_FIX_KINDS[w._kind] || '') + '</span>'
+        : '<span style="color:#dc2626;white-space:nowrap;">' + esc(EMAIL_FIX_KINDS[w._kind] || '') + '</span>'
           + (w._kind === 'dup' && w._dupWith ? '<div style="font-size:10.5px;color:var(--gray-600);">同じ: ' + esc(w._dupWith) + '</div>' : '');
       return '<tr style="border-bottom:1px solid var(--gray-200);">'
         + '<td style="padding:5px 6px;white-space:nowrap;">' + esc(w.management_no || '') + '</td>'
         + '<td style="padding:5px 6px;"><a href="javascript:void(0)" onclick="emailFixOpenWorker(\'' + w.id + '\')" style="color:#1d4ed8;">' + esc(w.name || '') + '</a></td>'
         + '<td style="padding:5px 6px;">' + esc(_emailFixCoName(w)) + '</td>'
         + '<td style="padding:5px 6px;font-size:11px;line-height:1.4;white-space:nowrap;">' + EMAIL_FIX_ROLES.map(r => { const n = _emailFixStaffOf(w, r.v).join('、'); return n ? '<div><span style="color:var(--gray-500);">' + r.l.replace('担当', '') + '</span> ' + esc(n) + '</div>' : ''; }).join('') + '</td>'
-        + '<td style="padding:5px 6px;white-space:nowrap;" id="efSt_' + w.id + '">' + st + '</td>'
+        + '<td style="padding:5px 6px;width:1%;min-width:96px;max-width:200px;" id="efSt_' + w.id + '">' + st + '</td>'
         + '<td style="padding:5px 6px;"><input class="form-input" id="efIn_' + w.id + '" style="font-size:12px;padding:4px 6px;' + (_emailBad(w.email) ? 'border-color:#dc2626;background:#fef2f2;' : '') + '" value="' + esc(w.email || '') + '" placeholder="例: name@example.com"'
         + ' onkeydown="if(event.key===\'Enter\'){this.blur();}" onchange="saveEmailFix(\'' + w.id + '\', this)"></td></tr>';
     }).join('') + '</tbody></table>';
