@@ -4691,6 +4691,7 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   - `confirm` … 改善状況が「依頼者確認」→ 依頼者。［✅ 確認しました］（`confirmed_at`）で消える。
     ⚠️ 状況を「依頼者確認」に変えて保存するたびに `confirmed_at` を空に戻す（もう一度知らせる）
   - 担当への通知は 実装完了／`SR_QUIET_STATUSES`（依頼者確認・保留・システム内対応済み）で消える
+  - 🔕 **優先度つきの依頼（`pri`）だけは `SR_PRI_QUIET_STATUSES`（検討中）でも消える**（お願いだけ＝`ask` はそのまま）
   - `reply` … 依頼者からの返信（`requester_reply` / `reply_at` / `reply_by`）が届いた → **`_srReplyTo(r)` の1箇所**（依頼者確認にした人＝`status_by` → お願い先 → `SR_OWNER`）。
     相手が詳細を開くと `reply_seen_at` / `reply_seen_by` が入って消える（`_srMarkReplySeen()`。未読かは `_srReplyUnseen()`）。一覧の進み具合の下に「💬 返信あり」
   - ⚠️ 実装完了・不要（`r.done`）にしたものはどの通知も出さない（`_srAlertKinds` の先頭）＝【完了・不要】タブへ移る
