@@ -3091,6 +3091,9 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   ⚠️ 開くときは **`_pendingChatRoomId` に入れてから `showScreen('chat')`**
   （`showScreen` → `openChatRoom` を続けて呼ぶと初期化に上書きされる）
 - ⚠️ **所属機関を保存する前は使えない**（`editingCompanyId` が無いときはトーストで知らせる）
+- 🤖 **決定報告（KMT案件・申請種別【更新】）を送ると、更新状況を【申請依頼済み】にする＝ `_renAutoFromDecision()` の1箇所**（`saveDecisionAsWorker` の既存人材の更新・新規登録のあとに呼ぶ。⏸ 待機申請に入れたときは呼ばない）。
+  変える先と言い方は `REN_AUTO_DR_STATUS` / `REN_AUTO_DR_NOTE`、変えないのは `REN_AUTO_DR_SKIP`（申請依頼済み・完了）。`_renWriteStatus()` に `note` を渡して `renewal_status_log.note` に残す（承認は要らない）。
+  人材詳細の【3. 更新状況】のステータスの下に、いちばん新しい記録がこの自動変更なら【決定報告による自動変更】の枠（`renderWorkerRenLog`）、記録の行には印（`_renLogNoteHtml()`）
 - **`workers.renewal_status` を書くのは `_renWriteStatus()` の1箇所だけ。**
   入口は `applyRenewalStatus()` で、人材詳細の選択欄（`onRenewalStatusChange`）も
   チェックシートの決定（`decideRenewalFromCheck`）も必ずここを通る＝**履歴が必ず残る**
