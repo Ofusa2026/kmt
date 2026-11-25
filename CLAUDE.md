@@ -141,11 +141,36 @@ UI変更やロジック変更のときは実際に描画して確かめる。
 
 #### 🩺 システムの状態（管理者だけ ／ 上の🔔の `#sysHealthAlerts`）
 
-- 数字は DB の **`kmt_system_health(p_user_id)`**（管理者でなければ `ADMIN_NG`）＝ DBの大きさ・大きい表の上から12・操作ログの件数と在席／既読ぶん・チャットの件数・RLS が無効の表の数。読むのは `loadSysHealth()`（起動の8秒あと・管理者だけ）
-- **何を知らせるかは `SYS_HEALTH_RULES` の1箇所だけ**（`when` 出す条件／`sig` 状態の印＝これが変わるとまた知らせる／`lv`＝`sec` セキュリティ・`warn` 改善）。しきいは `SYS_HEALTH_*`
+- 数字は DB の **`kmt_system_health(p_user_id)`**（管理者でなければ `ADMIN_NG`）＝ DBの大きさ・容量（`cap_bytes` / `cap_warn_pct`）・大きい表の上から12・操作ログの件数・チャットの件数・RLS が無効の表の数。読むのは `loadSysHealth()`（起動の8秒あと・管理者だけ）
+  - ⚠️ **この関数の中で audit_log を数えない**（公開キーは1回の通信が3秒まで。全件を数えると落ちて、アラートそのものが出なくなる）
+- **何を知らせるかは `SYS_HEALTH_RULES` の1箇所だけ**（`when` 出す条件／`sig` 状態の印＝これが変わるとまた知らせる／`lv`＝`sec` セキュリティ・`warn` 改善／`act` カードのボタン）。しきいは `SYS_HEALTH_*`
 - ［確認しました］＝ `sysHealthAck()` → `app_settings.sys_health_ack`（`{キー:{sig, at, by}}`）＝ 同じ状態のあいだは🔔に出さない（`openSysHealth()` の画面には残る）
 - ⚠️ アップデート履歴（`WHATS_NEW`）には中身を書かない（管理者向け）
 - 🔓 **いちばん大きいセキュリティの注意＝ ほぼ全部の表で RLS が無効**（公開キーでだれでも読み書きできる。新テーブルもそう作るきまり）。本当に直すには Supabase Auth でのログイン＋RLS＝ 大きな作り替え（まだやっていない）
+
+#### 🗄 操作ログの控え（管理者だけ ／ `openAuditArchive()`）＝ **操作ログは消さない。消せるのは控えをドライブに入れた月だけ**
+
+- 2026/11/25 に頼まれた形＝ ①容量が近づいたら管理者の🔔に出る（`SYS_HEALTH_RULES` の `db_cap`）→ ②月ごとに出力（CSV・gzip）してドライブに保存 → ③控えが入った月だけ削除
+  - **容量（契約＝Proプランの 8GB）と知らせはじめる割合（80%）は DB の `kmt_db_cap_bytes()` / `kmt_db_cap_warn_pct()` の1箇所だけ**（プランを変えたらここを直す。画面は `kmt_system_health` / `audit_archive_plan` の返りを見るだけ）
+- 🛡 **守っているのは DB。画面のボタンの出し入れは見た目だけ**
+  - `audit_log` には削除・TRUNCATE を止めるトリガー（`trg_audit_log_guard_del` / `trg_audit_log_guard_trunc` → `_audit_log_guard()`）＝ **消せるのは `audit_archive_purge()` だけ**（MCP・SQL から直に DELETE しても `AUDIT_GUARD` で止まる）
+  - 記録は `audit_archive_months`（月＝id の範囲・状態 exporting → saved → purging → purged）と `audit_archive_files`（ドライブのファイル1つ＝1行）。
+    **どちらも RLS 有効・ポリシーなし＝公開キーから直接は読み書きできない**（控えの記録を外から書き足せないように）。読み書きは下の関数だけ（どれも管理者でなければ `ADMIN_NG`）
+  | 関数 | すること |
+  |---|---|
+  | `audit_archive_plan(p_user_id)` | 月ごとの状況（月の区切り＝その月のはじめの行の id ＝ `_kmt_audit_bid()`。件数は id の幅＝めやす）・容量・夜の VACUUM の結果 |
+  | `audit_archive_begin(p_user_id, p_ym)` | 出力をはじめる（今月は `MONTH_NG`。前の出力の記録は捨てて `run_id` を振り直す） |
+  | `audit_archive_rows(…, p_after, p_limit)` | 出力する行（id の順に少しずつ） |
+  | `audit_archive_add(…)` | ドライブに入れたファイル1つを記録。**DB が id の範囲の件数を数え直し、合わなければ `COUNT_NG`**／範囲がつながっていなければ `RANGE_NG`／ドライブのURLでなければ `URL_NG` |
+  | `audit_archive_finish(…)` | もれがあれば `COVER_NG`。通れば `saved` |
+  | `audit_archive_purge(…, p_limit)` | `saved` の月だけ（無ければ `NOT_SAVED`）・**容量が近づいているときだけ**（余裕があれば `CAP_OK`）・少しずつ消す。終わると夜 3:10（JST）の `VACUUM (FULL) public.audit_log` を pg_cron に1回だけ予約（`kmt_audit_vacuum`。うまくいったら次に `plan` を読んだとき予約を外す） |
+- 画面は `openAuditArchive()` / `loadAuditArchive()` / `renderAuditArchive()`（入口＝ `db_cap` のカードのボタンと、システムの状態の［操作ログの控え］）。状態は **`_aa` の1つ**、言い方は `AA_STATUS`、エラーの言い換えは `AA_ERR`
+  - ① `auditArchiveExport(ym)`＝ `AA_FETCH_ROWS` 件ずつ読む → `AA_PART_ROWS` 件（か `AA_PART_CHARS`）ごとに1ファイル（列は `AA_COLS`・`_aaCsvLine()`・gzip は `_aaFile()`）→
+    領収書と同じ `_uploadReceiptToDrive()` でドライブへ → `audit_archive_add`。**途中で落ちたらその月は「控えなし」のまま**（もう一度押す。ドライブに途中のファイルが残っても問題なし）
+  - ② `auditArchivePurge(ym)`＝ 2回たずねてから `AA_PURGE_ROWS` 件ずつ。途中で止まったら［削除のつづき］
+  - 保存先のフォルダーは `app_settings.audit_archive_drive_url`（この画面で決める。`RECEIPT_GAS_ACCOUNT` を編集者に・共有は［制限付き］）
+  - ⚠️ **公開キーは1回の通信が3秒まで**＝ 月ごとの件数を `count(*)` で数えない（140万件で5秒かかった）／行も削除も小分け（落ちたら件数を半分にして続ける）
+  - ⚠️ ドライブ連携（GAS）に gzip を入れるのは、こちらの環境からは試せていない（DB 側の流れは実データで試して取り消した・画面は GAS をまねて確かめた）
 
 ### 🗑 論理削除（`is_deleted`）も `sbFetch` が自動で除く
 
