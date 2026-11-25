@@ -139,6 +139,13 @@ UI変更やロジック変更のときは実際に描画して確かめる。
 - 🗂 2026/11/25 に足した index＝ `chat_messages(chat_room_id, created_at desc)` / `chat_messages(created_at)` / `reg_sign_links(task_no, created_at desc)` / `reg_sign_links(task_no, worker_id)` /
   `workers(company_id)` / `chat_rooms(worker_id)` / `company_meetings(company_id)` / `sales_forecast(company_id)`
 
+#### 🗄 データ管理（⚙️ 設定のいちばん下・管理者だけ ／ 画面キー `SYS_DATA_KEY`＝`sys_data`）
+
+- 下の2つ（🩺 システムの状態 ／ 🗄 操作ログの控え）を**1つの画面**にまとめたもの＝ `buildSysDataScreen()` / `loadSysData()`。左メニューの項目 `#navSysData` は `_refreshTrashNav()` が管理者だけに出す
+- **入れ物（`#sysHealthBody` / `#auditArchiveBody`）はこの画面の1組だけ**（モーダルは使わない）。🔔のチップ・カードのボタン（`openSysHealth()` / `openAuditArchive()`）は
+  **`_sysDataGo(sel)` の1箇所**を通ってこの画面へ移る（操作ログの控えは `#sysDataArchive` まで動かす）
+- アップデートの帯は出さない（`UPDATE_NO_BANNER_SCREENS`）。`WHATS_NEW` にも中身を書かない（管理者向け）
+
 #### 🩺 システムの状態（管理者だけ ／ 上の🔔の `#sysHealthAlerts`）
 
 - 数字は DB の **`kmt_system_health(p_user_id)`**（管理者でなければ `ADMIN_NG`）＝ DBの大きさ・容量（`cap_bytes` / `cap_warn_pct`）・大きい表の上から12・操作ログの件数・チャットの件数・RLS が無効の表の数。読むのは `loadSysHealth()`（起動の8秒あと・管理者だけ）
@@ -164,7 +171,7 @@ UI変更やロジック変更のときは実際に描画して確かめる。
   | `audit_archive_add(…)` | ドライブに入れたファイル1つを記録。**DB が id の範囲の件数を数え直し、合わなければ `COUNT_NG`**／範囲がつながっていなければ `RANGE_NG`／ドライブのURLでなければ `URL_NG` |
   | `audit_archive_finish(…)` | もれがあれば `COVER_NG`。通れば `saved` |
   | `audit_archive_purge(…, p_limit)` | `saved` の月だけ（無ければ `NOT_SAVED`）・**容量が近づいているときだけ**（余裕があれば `CAP_OK`）・少しずつ消す。終わると夜 3:10（JST）の `VACUUM (FULL) public.audit_log` を pg_cron に1回だけ予約（`kmt_audit_vacuum`。うまくいったら次に `plan` を読んだとき予約を外す） |
-- 画面は `openAuditArchive()` / `loadAuditArchive()` / `renderAuditArchive()`（入口＝ `db_cap` のカードのボタンと、システムの状態の［操作ログの控え］）。状態は **`_aa` の1つ**、言い方は `AA_STATUS`、エラーの言い換えは `AA_ERR`
+- 画面は ⚙️ 設定 → データ管理 の ②（`loadAuditArchive()` / `renderAuditArchive()`。`db_cap` のカードのボタン＝ `openAuditArchive()` もここへ移る）。出力・削除の途中でブラウザを閉じようとすると止める（beforeunload）。状態は **`_aa` の1つ**、言い方は `AA_STATUS`、エラーの言い換えは `AA_ERR`
   - ① `auditArchiveExport(ym)`＝ `AA_FETCH_ROWS` 件ずつ読む → `AA_PART_ROWS` 件（か `AA_PART_CHARS`）ごとに1ファイル（列は `AA_COLS`・`_aaCsvLine()`・gzip は `_aaFile()`）→
     領収書と同じ `_uploadReceiptToDrive()` でドライブへ → `audit_archive_add`。**途中で落ちたらその月は「控えなし」のまま**（もう一度押す。ドライブに途中のファイルが残っても問題なし）
   - ② `auditArchivePurge(ym)`＝ 2回たずねてから `AA_PURGE_ROWS` 件ずつ。途中で止まったら［削除のつづき］
