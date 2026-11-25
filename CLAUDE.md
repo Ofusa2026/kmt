@@ -4987,6 +4987,12 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
       ⚠️ DB でも止めてある＝ `yoryo_quiz*_submit` は `ext:` には合否だけを返し、`yoryo_quiz*_review` / `_review_all` / `_wrong` は `ext:` なら `EXT_NG`
     - 📄 **結果と解説は管理者だけ**＝ 受験者の行の［結果・解説（PDF）］（`openYoryoExtReport()`）。中身は DB の **`yoryo_ext_report(管理者のid, 受験者のid)`**（管理者でなければ `ADMIN_NG`）、
       表は `_yoryoExtReportHtml()` の1箇所（章ごとの合否の表＋各回の問題・回答・正解・解説。既定は章ごとに最後の回だけ）、［PDFで出力］＝ `yoryoExtReportPdf()`＝ そのPDFを外部に渡す
+  - ✍️ **読了の確認と署名（入管の質問票「支援担当者ごとにいつ・どの版を読んだかの記録」のため）＝ `ops_manual_signs`**（版 × 種類 × 人で1件・論理削除＝ `SB_SOFT_DELETE_TABLES` と `TRASH_TABLES` の両方）
+    - **○✕（`lv1`）とレベルアップ（`lv2`）は別々の書類・別々の署名。題名・言い方・確認の一文は `YORYO_SIGN_KINDS` の1箇所だけ**（lv1＝運用要領 読了確認書／lv2＝運用要領 理解度確認書）
+    - 署名できるのは **`_yoryoSignReady(kind)` の1箇所**＝ lv1 は全章で［この章を確認しました］まで／lv2 は全章で5択に「画面移動のない合格」。画面の上の枠は `_yoryoSignBoxHtml()`、押すと `yoryoSignStart()` → `openRegSignFull({title, ghost, onDecide})`（4. 事前ガイダンスと同じ署名の画面。opt を渡さなければ今までどおり）→ `_yoryoSignSave()`
+    - 署名した時点の章ごとの記録（確認日・合格のいちばん早い回の点数と日付）は `snapshot.rows` に固定する（`_yoryoSignRows()`）＝ あとで受け直しても書類は変わらない。1人1回だけ（取り消しは管理者＝ `cancelYoryoSign()`。取り消すと書き直せる）
+    - **支援責任者の確認欄はシステム承認で自動＝ `_yoryoSignApprover()` の1箇所**（署名した時点の 1. 支援実施体制管理簿 のいちばん新しい版の「責任者」の行＝ `_srsStaff`。確認日＝署名日・`approve_kind`＝system）。本人が入れるのは自分の署名だけ
+    - 書類は `_yoryoSignDocHtml()`（A4縦・`openYoryoSignDoc()`）、全員の一覧は `_yoryoSignListHtml(kind)`（A4横・上のボタン［確認署名リスト］＝ `openYoryoSignList()`。対象は確認状況と同じ営業・GLT＝ `_yoryoSignUsers()`。署名の画像を出すのは管理者だけ）。印刷は `_yoryoPrint()`（`printNoBrowserHead` を通す）
   - 不正の対策はこの組み合わせ＝ ランダム出題・1問60秒・結果は点数だけ・再試験まで10分・別画面の回数と秒数を管理者に見せる（同時実施はしない）。
     完全には止められないので「やりにくくする＋やったら分かる」
 
