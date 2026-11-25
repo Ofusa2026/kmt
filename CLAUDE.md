@@ -117,6 +117,36 @@ UI変更やロジック変更のときは実際に描画して確かめる。
     > 既読を付けるたびに行が書き替わるので、毎回ちがうチャットが抜けていた
   - **1000件を超えうる表を `order=` なしで読むときは、`SB_PAGE_ORDER` に一意の列を足すこと**
 
+### ⚡ 重くしないためのきまり（2026/11/25 に「全体が重い」を調べて直した）
+
+- > ⚠️ **過去の事故**: ①チャットの未読を数えるたびに全メッセージ（1万2千件・7MB・1000件ずつ13回の通信）を読んでいた（呼ぶ場所が13か所）
+  > ②署名リンク（`reg_sign_links?select=*`）で全員ぶんの署名の画像（様式4＝20MB・様式7＝16MB）を一覧のたび・リンク発行のたびに読んでいた
+  > ③操作ログ（`audit_log`）が1GB＝ 140万件のうち123万件が在席（`user_presence`）の60秒ごとの記録・10万件がチャットの既読（`chat_read_at`）だった
+  > ④要望リスト（0.6MB）を全員が2分ごとに全件読んでいた
+- 💬 **チャットの未読は DB の `chat_unread_summary(p_user_id, p_user_name, p_since)` の1回だけ**（読むのは `_chatUnreadFetch()` の1箇所）。
+  返り＝ `{now, counts:{ルームid:未読の数}, rows:[{r, f:自分あてのメンションか, t:本文の「@…」だけ, p:自分の投稿への返信か, n:件数}], recent:[直近10分に届いた未読＝通知用]}`
+  - ⚠️ **🔴🔵🟡 の分け方は今までどおり JS の未読集計の1箇所**（DB は材料を小さくして返すだけ）。名前の当たり方は DB の `_kmt_name_hit()`＝ `isMentionForMe()` と同じきまり（**片方を変えたら両方**）
+  - DB の関数が使えないときは `_chatUnreadLegacy()`（今までの全件読み）が同じ形を作る＝ 画面は止まらない
+  - `loadChatUnread()` は続けて何回呼ばれても読むのは1回ずつ（`_chatUnreadRun` / `_chatUnreadAgain`。中身は `_loadChatUnreadBody()`）
+  - `created_at` は送った人のパソコンの時計なので、通知用の `recent` は10分さかのぼって返す（二重に鳴らさないのは今までどおり `_notifSeen`）
+- ✍️ **署名リンクの一覧は画像なしで読む＝ `REG_SIGN_LIST_COLS` の1箇所**（`signature` を入れない）。署名ずみかは **`_regSigHas(l)`**（`signed_at`）で見る
+  - 画像は要るときだけ **`_regSigEnsure(ids)`**（40件ずつ・`_regSigCache`）。一覧の小さい画像は `_regSigImgHtml()` が置き場（`data-sigid`）だけ出し、画面に入ったぶんを `_regSigHydrate()`（IntersectionObserver）がまとめて読む
+  - 書類に載せるときは `_regSigForDoc(no, id)` を待ってから `_regDocData()`（`regDocPreview` / `openRegDocExport`）。⚠️ **`l.signature` を「署名ずみか」の判定に使わない**（一覧では入っていない）
+  - ⚠️ **画像・大きい jsonb を持つ表を `select=*` で一覧に読まない**（候補者のリンク発行履歴も `CAND_LINK_LOG_SELECT`＝ `answers` / `draft` なし）
+- 📝 **要望リストの2分ごとの読み直しは `_srPoll()`**＝ DB の `system_requests_sig()`（全行の印）が前回と同じなら読まない／タブを見ていないあいだ（`document.hidden`）は読まない
+- 🧾 **操作ログに在席・既読を残さない**＝ `trg_audit_user_presence` は**状態（status）が変わったときだけ**、`trg_audit_chat_read_at` は外した。
+  ⚠️ **60秒ごとに書く表・押すたびに書く表に `audit_trigger_func` を付けない**（月報の支援人数は `audit_log` の `workers` の行だけを見るので影響なし）
+- 🗂 2026/11/25 に足した index＝ `chat_messages(chat_room_id, created_at desc)` / `chat_messages(created_at)` / `reg_sign_links(task_no, created_at desc)` / `reg_sign_links(task_no, worker_id)` /
+  `workers(company_id)` / `chat_rooms(worker_id)` / `company_meetings(company_id)` / `sales_forecast(company_id)`
+
+#### 🩺 システムの状態（管理者だけ ／ 上の🔔の `#sysHealthAlerts`）
+
+- 数字は DB の **`kmt_system_health(p_user_id)`**（管理者でなければ `ADMIN_NG`）＝ DBの大きさ・大きい表の上から12・操作ログの件数と在席／既読ぶん・チャットの件数・RLS が無効の表の数。読むのは `loadSysHealth()`（起動の8秒あと・管理者だけ）
+- **何を知らせるかは `SYS_HEALTH_RULES` の1箇所だけ**（`when` 出す条件／`sig` 状態の印＝これが変わるとまた知らせる／`lv`＝`sec` セキュリティ・`warn` 改善）。しきいは `SYS_HEALTH_*`
+- ［確認しました］＝ `sysHealthAck()` → `app_settings.sys_health_ack`（`{キー:{sig, at, by}}`）＝ 同じ状態のあいだは🔔に出さない（`openSysHealth()` の画面には残る）
+- ⚠️ アップデート履歴（`WHATS_NEW`）には中身を書かない（管理者向け）
+- 🔓 **いちばん大きいセキュリティの注意＝ ほぼ全部の表で RLS が無効**（公開キーでだれでも読み書きできる。新テーブルもそう作るきまり）。本当に直すには Supabase Auth でのログイン＋RLS＝ 大きな作り替え（まだやっていない）
+
 ### 🗑 論理削除（`is_deleted`）も `sbFetch` が自動で除く
 
 - ⚠️ 取得口ごとに `is_deleted=not.eq.true` を書いて回っていたので、
