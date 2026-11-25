@@ -3468,7 +3468,11 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   判定に必要な列が無い場合は `_alertSourceWorkers()` が専用取得分（`_sidebarAlertData`）にフォールバックする
 - 在職ステータスが **辞退/キャンセル** と **支援機関変更済み** の人材は全アラートの対象外。判定は `isAlertExcludedWorker(w)` の1箇所だけ。
   表記ゆれを拾うため「辞退」「キャンセル」の部分一致で見ている
-  - 📦 **一覧でも【過去の人材】に入る**（`workerBucket()` が同じ `isAlertExcludedWorker()` を見る。下の節）
+  - 📦 **一覧でも【過去の人材】に入る**（`workerBucket()` は在職ステータスだけの `_isAlertExcludedStatus()` を見る。下の節）
+  - 🧪 **テスト用のデータはどのアラートにも出さない＝ 判定は `_isTestRow(o)` ＋ `TEST_ROW_RE` の1箇所だけ**（名前・企業名に「テスト」／「TEST1」「◯◯ test」／企業番号 DEMO）。
+    `isAlertExcludedWorker()` が人材とその所属機関を見るので外国人材のアラートは全部外れる。ほかに通すのは 面談記録の記入待ち（`loadMeetingTodos`）・電子サイン待ち（`loadSignTodos`）・
+    求人・候補者アラート（`computeJobAlerts` の求人・求人登録・候補者・発注書）・通算期間の精査（`computeHistoryVerifyStats`）。
+    ⚠️ **一覧には残す**＝ `workerBucket()` と更新状況リストは `_isAlertExcludedStatus()`（テストを見ない）。新しいアラートを足すときも `_isTestRow()` を通すこと
   - 呼ぶのは4か所＝ `computeGlobalWorkerAlerts` ／ `computeMyWorkerAlerts` ／
     `missingRequiredFields` ／ **`renderWorkerAlerts` の中の「一覧フィルターに追従するぶん」のループ**
   - ⚠️ **最後の1つを書き忘れていて、期限カード・脱退一時金・退職予定日超過・在留情報未入力の
