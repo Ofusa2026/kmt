@@ -4994,7 +4994,8 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   - ✍️ **読了の確認と署名（入管の質問票「支援担当者ごとにいつ・どの版を読んだかの記録」のため）＝ `ops_manual_signs`**（版 × 種類 × 人で1件・論理削除＝ `SB_SOFT_DELETE_TABLES` と `TRASH_TABLES` の両方）
     - **○✕（`lv1`）とレベルアップ（`lv2`）は別々の書類・別々の署名。題名・言い方・確認の一文は `YORYO_SIGN_KINDS` の1箇所だけ**（lv1＝運用要領 読了確認書／lv2＝運用要領 理解度確認書）
     - 署名できるのは **`_yoryoSignReady(kind)` の1箇所**＝ lv1 は全章で［この章を確認しました］まで／lv2 は全章で5択に「画面移動のない合格」。画面の上の枠は `_yoryoSignBoxHtml()`、押すと `yoryoSignStart()` → `openRegSignFull({title, ghost, onDecide})`（4. 事前ガイダンスと同じ署名の画面。opt を渡さなければ今までどおり）→ `_yoryoSignSave()`
-    - 署名した時点の章ごとの記録（確認日・合格のいちばん早い回の点数と日付）は `snapshot.rows` に固定する（`_yoryoSignRows()`）＝ あとで受け直しても書類は変わらない。1人1回だけ（取り消しは管理者＝ `cancelYoryoSign()`。取り消すと書き直せる）
+    - 署名した時点の章ごとの記録（確認日・合格のいちばん早い回の点数と日付・**何回目の受験で合格したか＝ `tries_n`**）は `snapshot.rows` に固定する（`_yoryoSignRows()`）。
+      受験回数を数えるのは **`_yoryoTriesUpTo()` の1箇所だけ**（合格した回までの受験の数）＝ 確認書に「受験◯回目で合格」。`tries_n` の無い前の署名は、表示のときにいまの受験の記録から数える＝ あとで受け直しても書類は変わらない。1人1回だけ（取り消しは管理者＝ `cancelYoryoSign()`。取り消すと書き直せる）
     - **支援責任者の確認欄はシステム承認で自動＝ `_yoryoSignApprover()` の1箇所**（確認者は **`YORYO_SIGN_APPROVER`（大房　明良）の1箇所**＝ `fullNameOf()` を通す。確認日＝署名日・`approve_kind`＝system）。本人が入れるのは自分の署名だけ
     - 書類は `_yoryoSignDocHtml()`（A4縦・`openYoryoSignDoc()`）、全員の一覧は `_yoryoSignListHtml(kind)`（A4横・上のボタン［確認署名リスト］＝ `openYoryoSignList()`。対象は確認状況と同じ営業・GLT＝ `_yoryoSignUsers()`。署名の画像を出すのは管理者だけ）。印刷は `_yoryoPrint()`（`printNoBrowserHead` を通す）
     - 📄 **確認署名リストの【書類】の列（印刷には出さない）から1人ずつ確認書を開ける**＝ 署名済みはその確認書、署名前は **`_yoryoSignDraft(kind, userId)`**（いまの記録で組んだ下書き・赤い注意つき・取り消しは出さない）。［確認書をまとめて印刷（署名済み）］＝ `printYoryoSignDocsAll()`（1人1枚）。
