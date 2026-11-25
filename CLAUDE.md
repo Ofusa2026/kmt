@@ -4923,7 +4923,11 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   - **取り込みは管理者だけ**＝［📥 PDFを取り込む（管理者）］（`openYoryoImport()` → `yoryoImportRun()`）。
     版は表紙の「令和◯年◯月」、章のはじまりは各ページの先頭の「第◯章」から `_yoryoFindChapters()` が見つける（見つからなければ `YORYO_PAGES_DEF`）
   - ⚠️ こちら（Claude）の環境からは Supabase に直接書けなかったので、PDF は画面から取り込む（随時届出の様式と同じ）
-- ✅ **確認完了は営業・GLTのメンバーだけ**（`YORYO_CHECK_TEAMS` ／ 判定は `_yoryoCanCheck()` の1箇所）。実体は **`ops_manual_checks`**（版 × 章 × 人で一意）＝
+- ✅ **確認完了は営業・GLTのメンバーだけ**（`YORYO_CHECK_TEAMS` ／ 判定は `_yoryoCanCheck()` の1箇所）。
+- 📋 **受験は【必須】と【任意】に分ける。任意の人は `YORYO_OPTIONAL_USERS` の1箇所だけ**（支援担当者ではない人＝ レシカ・シスカ・リアン・チュオン・アウン・新宅・高橋・えな。判定は `_yoryoIsOptional()`＝ `_renNameIn` で名字だけでも合う）。
+  それ以外の営業・GLTのメンバー＝必須（`_yoryoMeRequired()`）。任意の人はチームが営業・GLTでなくても受けられる（`_yoryoCanCheck()` に入れてある）。
+  期限のお知らせ（`loadYoryoAlert` / `updateYoryoAlerts`）と期限の帯は必須の人だけ（任意の人には「受験は任意です」の1行）。
+  一覧（確認状況・管理者の受験の状況／レベルアップ・確認署名リスト）は **`_yoryoTestUsers()`（必須 → 任意の順）＋ `_yoryoGroupRows()`（見出しの行をはさむ）の1組**を通す。確認署名リストの未署名の赤は必須の人だけ実体は **`ops_manual_checks`**（版 × 章 × 人で一意）＝
   版を差し替えると確認はやり直し。押すのは `toggleYoryoCheck()`、［👥 確認状況］（メンバー × 章）は `openYoryoStatus()`
 - 📝 **章ごとの確認は○✕の試験に合格してから**（ver.20261104.12〜）。**出題・採点・合否は DB の関数だけ**（画面に答えは届かない）
   | 実体 | 中身 |
