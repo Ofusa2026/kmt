@@ -6223,7 +6223,7 @@ GLTの月報Excel（国別チーム月報・年度まとめ・3か月ごと目�
 - 一覧の絞り込みに 返金／補填（**`REFUND_HD_FILTERS` の1箇所**。返金＝ `_refundIsRefund()`／補填＝ ③で補填）
 - 🔒 **返金先の口座＝ `sales_refund_accounts`（返金1件＝1行）。見られるのは入力した本人と経理担当（白井）だけ**
   - 表は RLS 有効・ポリシーなし＝ 公開キーから直接読めない。読み書きは DB の **`refund_account_get` / `refund_account_set` だけ**（見てよいかは DB の `_refund_acct_ok()`＝ 名前が「白井」で始まる人。⚠️ 画面の `FEE_LOCK_USERS` を変えたら DB も直す）
-  - 画面は `_rdfAcctLoad()` / `_rdfAcctRender()` / `_rdfAcctSave()`（［💾 保存］のとき・変えたときだけ）。欄は `REFUND_ACCT_FIELDS` の1箇所
+  - 画面は `_rdfAcctLoad()` / `_rdfAcctRender()` / `_rdfAcctSave()`（［💾 保存］のとき・変えたときだけ）。**入力は1つの枠（`#rdf_acct_text`）だけ＝ 項目ごとに分けない**（そう頼まれた）。保存先は `note` の1列、書いてほしい項目の案内は `REFUND_ACCT_HINT`（銀行名、支店名、口座種別、口座番号）。前の形の列（bank_name など）は `_rdfAcctText()` が1つの枠に寄せて出す
   - ⚠️ `sbFetch` を通さない（操作ログに口座番号を残さない）＝ `_refundRpc()` の1箇所。ほかの人には「🔒 入力済み（だれ・いつ）」だけ。一覧の印は `sales_refunds.has_account`（DB の関数が書く）
 - 論理削除＝ `SB_SOFT_DELETE_TABLES` と `TRASH_TABLES` の両方に入れてある
 
