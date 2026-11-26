@@ -6240,6 +6240,7 @@ GLTの月報Excel（国別チーム月報・年度まとめ・3か月ごと目�
   - 画面は `_rdfAcctLoad()` / `_rdfAcctRender()` / `_rdfAcctSave()`（［💾 保存］のとき・変えたときだけ）。**入力は1つの枠（`#rdf_acct_text`）だけ＝ 項目ごとに分けない**（そう頼まれた）。保存先は `note` の1列、書いてほしい項目の案内は `REFUND_ACCT_HINT`（銀行名、支店名、口座種別、口座番号）。前の形の列（bank_name など）は `_rdfAcctText()` が1つの枠に寄せて出す
   - ⚠️ `sbFetch` を通さない（操作ログに口座番号を残さない）＝ `_refundRpc()` の1箇所。ほかの人には「🔒 入力済み（だれ・いつ）」だけ。一覧の印は `sales_refunds.has_account`（DB の関数が書く）
 - 論理削除＝ `SB_SOFT_DELETE_TABLES` と `TRASH_TABLES` の両方に入れてある
+- 📖 **タブの上の［使い方］＝ `openRefundGuide()`。文章は `REFUND_GUIDE_SECS` の1箇所だけ**（どういった場合に入力するか・入口・種類ごとの入れ方・進み具合・売上の行・気をつけること）。仕組みを変えたらここも直すこと
 
 #### ✕ 売上管理の［×］（初期費用の行だけ）→ 返金・キャンセルに登録
 
