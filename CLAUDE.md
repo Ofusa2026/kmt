@@ -6250,6 +6250,11 @@ GLTの月報Excel（国別チーム月報・年度まとめ・3か月ごと目�
   「ー」「-」「.」「なし」など**請求なしとみなす文字は `_fmNoBillText()` の1箇所だけ**で、保存すると金額0にそろえる
   （2026/10/14 にDBの31件もそろえた）。**表示は右寄せの「ー」（`FEE_NOBILL_MARK`）**＝ 期間外のセルも同じ
   - 数字はマイナス（返金）も金額として入る（「-120000」「－120,000」）
+- ✏️ **ダブルクリック＝ 小窓（`#fmEditModal`）で 金額・📝 特記事項・✅ 確定 を直す。開くのは `fmCellEdit()`、書くのは `fmSaveOverride(mno, m, raw, opt)` の1組だけ**（その場の入力欄はやめた）
+  - 開いたときの金額の文字は `_fmEdit.init`＝ **金額の欄をさわっていなければ金額は書き替えない**（`opt.keepAmount`。特記事項だけ入れても計算値のまま）
+  - 📝 特記事項は **`worker_fee_overrides.note`**（＋ `note_at` / `note_by`）。**あるかの判定は `_fmNoteOf()` / `_fmHasNoteIn()` の1箇所だけ**＝ セルの黄色（`.fmx td.fmcell.hasnote`＝右上の三角・ほかの背景より優先）・
+    ツールチップ・上の［📝 特記事項あり］（`#feeNoteOnly`＝ `_fmVisibleWorkers()` でしぼる・件数は `#feeNoteOnlyLbl`）が同じものを見る
+  - ⚠️ 特記事項だけの行は「手入力」（`_fmOvHasValue()`）に数えない＝ 金額は計算値のまま。確定を外しても特記事項がある行は消さない（`fmToggleConfirm`）
 - **確定＝濃字だけ**（`.fmcell.fixed`）／**未確定＝淡字＋薄い赤の背景**（`.fmcell.unfixed`）。
   CSSはこの2つの1箇所。**確定に線や背景色は付けない**（表がうるさくなって見づらかった）
 - 実体は `worker_fee_overrides`（`management_no` ＋ `billing_month` で1行）。
