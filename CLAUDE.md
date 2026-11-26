@@ -6261,6 +6261,7 @@ GLTの月報Excel（国別チーム月報・年度まとめ・3か月ごと目�
   - 特記事項は **`worker_fee_overrides.note`**（＋ `note_at` / `note_by`）。**あるかの判定は `_fmNoteOf()` / `_fmHasNoteIn()` の1箇所だけ**＝ セルの黄色（`.fmx td.fmcell.hasnote`＝右上の三角・ほかの背景より優先）・
     ツールチップ・上の［特記事項あり］（`#feeNoteOnly`＝ `_fmVisibleWorkers()` でしぼる・件数は `#feeNoteOnlyLbl`）が同じものを見る
   - 返金あり＝ **`worker_fee_overrides.refund`**（＋ `refund_at` / `refund_by`）。小窓のチェック（`#fmEdRefund`）で付け外し、書くのは `fmSaveOverride` の `opt.refund`（変えたときだけ）。マスの左上に赤い「返金」（`.fmx td.fmcell.refund::before`）。金額は変えない
+    - ↩ **返金ありを新しく付けて保存したら `_fmRefundToPage()` の1箇所が「返金・キャンセルに追加しますか？」とたずねる**＝［追加する］で `openRefundModal(null, {fee})`（種類＝② 前払いの支援委託費・人材・月額・その月・特記事項をメモに入れて開く。あとは手動保存）
   - 🚫 特記事項の言い方に絵文字を付けない（そう頼まれた）
   - ⚠️ 特記事項だけの行は「手入力」（`_fmOvHasValue()`）に数えない＝ 金額は計算値のまま。確定を外しても特記事項がある行は消さない（`fmToggleConfirm`）
 - **確定＝濃字だけ**（`.fmcell.fixed`）／**未確定＝淡字＋薄い赤の背景**（`.fmcell.unfixed`）。
