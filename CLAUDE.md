@@ -6216,6 +6216,7 @@ GLTの月報Excel（国別チーム月報・年度まとめ・3か月ごと目�
 - もとの売上は、新規なら見つかった行をはじめから選ぶ（同じ費用の行 → いちばん新しい行。`_rdfLoadSales(cur, fresh)`）。「選択しない」も選べる
 - 入金日＝ `paid_date`（＋ `paid_date_at` / `paid_date_by`）＝ **もとの請求に対する入金の日**（ちゃんと入金されたかの確認。返金の日ではない）。もとの金額の隣・種類を問わず出す。**入れられるのは経理担当だけ＝ `_rdfCanPaid()`**（＝ `_saleCxCanDelete()`）。ほかの人の保存では送らない。選んだ売上の行の［入金］チェックの日を欄の下に出す（`_rdfPaidHint()`。自動では入れない）
 - 🔀 **返金か補填かを選ぶのは辞退・キャンセルと早期退職＝ `_refundHasHandling()`。選択肢は `_rdfHandlingOpts(kind, pay)` の1箇所だけ**（早期退職＝ 返金／補填〈空の古い記録は返金〉／辞退・キャンセル＝ 未入金・請求前は「返金・補填なし」だけ、入金済み・不明・空は 返金／補填／未定）。欄は `#rdf_handling_box`（`onRefundKindChange()` が種類・入金状況を変えるたびに作り直す）。一覧の上のまとめの最後のカードは「完了」
+- 💴 **支援委託費の返金は「支払済み期間 ◯年◯月～◯年◯月」（`prepaid_from` / `prepaid_to`）、返金額の右に「◯年◯月～◯年◯月分」＝ `_refundPeriodText(to, 未経過の月数)` の1箇所**（一覧の返金額の下も同じ）。画面の言い方は 元の売上／請求金額（`original_amount`）。税の選択はやめた（`refund_tax` は隠しで税込のまま）
 - 🔒 **売上管理の［未入金］を付け外し・日付を直せるのは経理担当だけ＝ `_saleUnpaidCanEdit()` の1箇所**（`toggleSaleDate` / `editSaleDate` の先頭）
 - 🧾 **入金状況（`pay_status`）は辞退・キャンセルならいつも出す**（必須は売上管理の［×］から開いた請求後のときだけ）。ほかの種類では保存しない
 - ③ だけ 区分（`REFUND_CANCEL_BY`＝人材の辞退／企業のキャンセル）＋ 理由（`cancel_reason`・任意）と 対応（`handling`＝ `refund` 返金／`replace` 補填／`none` 返金・補填なし／空＝未定。選択肢は `REFUND_HANDLINGS`）を持つ。返金で対応するかは **`_refundIsRefund(r)`**
