@@ -6204,6 +6204,9 @@ GLTの月報Excel（国別チーム月報・年度まとめ・3か月ごと目�
 
 ### ↩ 返金・キャンセル（売上管理の【配属後請求】の右のタブ `refund` ／ 実体 `sales_refunds`）
 
+- ⏱ **売上管理のタブを切り替えたら、前のタブの読み込みの結果で描き直さない＝ `_saleLoadSeq` ＋ `_saleLoadStale()` の1箇所**（`switchSaleTab` と `loadSales` が番号を進め、await のあとで見る）。
+  > ⚠️ 月の表は支援委託費の同期などで遅いので、月のタブを開いてすぐ【返金・キャンセル】を押すと、あとから届いた月の表で上書きされて一発で開かなかった
+
 - 1行＝1件（人材 × 返金・キャンセル）。**種類は `REFUND_KINDS` の1箇所だけ**＝ `early_leave` 早期退職による初期費用の返金／`prepaid` 退職による支援委託費の返金／`cancel` 決定後の辞退・キャンセル／`other` その他（内容は `kind_other`）。⚠️ 画面に①〜③の番号は付けない（言い方は `_refundKindText(r)` の1箇所）
 - 早期退職の返金率＝ `refund_rate`（%。選択肢は `REFUND_RATES`＝100／50／その他、既定 `REFUND_RATE_DEF`＝50。読むのは `_rdfRate()`）。返金額＝ もとの金額 × 返金率（`rdfRecalc()`）
 - 所属機関は打って選ぶ（`rdf_company_q` ＋ datalist、id は隠しの `rdf_company_id`。文字 → 所属機関は `_rdfCoByText()`、一覧に無い名前はそのまま `company_name`）
