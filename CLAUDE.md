@@ -6250,6 +6250,12 @@ GLTの月報Excel（国別チーム月報・年度まとめ・3か月ごと目�
   「ー」「-」「.」「なし」など**請求なしとみなす文字は `_fmNoBillText()` の1箇所だけ**で、保存すると金額0にそろえる
   （2026/10/14 にDBの31件もそろえた）。**表示は右寄せの「ー」（`FEE_NOBILL_MARK`）**＝ 期間外のセルも同じ
   - 数字はマイナス（返金）も金額として入る（「-120000」「－120,000」）
+- ⚡ **重くしないきまり**（2026/11/26。1,059名 × 37か月＝4万マスで、1回描くのに0.3秒・HTML 5.7MB・1クリックごとに表ぜんぶを描き直していた）
+  - **1行を作るのは `_fmRowHtml(w, ctx)` の1箇所だけ**（`ctx`＝ `_fmCtx()`。見出しは `_fmHeadHtml()`、合計の行は `_fmTotCells()`）。行は `<tr data-wid>`、行ごとの金額は `_fmRowVals`（人材id → 月ごとの値）・表に出した人は `_fmLastWs`
+  - **1マスを直したら `_fmRefreshAfterCell(mno)`＝ その人の行・見出し・合計・件数だけ差し替える**（`fmToggleConfirm` / `fmSaveOverride`）。⚠️ 未確定・特記事項の絞り込み中は行が出入りするので全体を描き直す
+  - 描くときは はじめ `FM_FIRST_ROWS` 行だけ出し、残りは `FM_CHUNK_ROWS` 行ずつあとから足す（重なったら古いほうは `_fmRenderSeq` で止める）
+  - ⚠️ **マスに title・data-val を書かない**＝ title はマウスを乗せたときに `fmCellHover()` → `_fmCellTip()` が作る。ダブルクリックの金額は `_fmRowVals` から引く
+  - 見出しの未確定の件数は表に出した人（`_fmLastWs`）を渡して数える（`_fmUnfixedCount(m, list)`＝ 37か月ぶん絞り込みをやり直さない）。検索欄は `fmSearchSoon()`（250ms 待つ）
 - ✏️ **ダブルクリック＝ 小窓（`#fmEditModal`）で 金額・📝 特記事項・✅ 確定 を直す。開くのは `fmCellEdit()`、書くのは `fmSaveOverride(mno, m, raw, opt)` の1組だけ**（その場の入力欄はやめた）
   - 開いたときの金額の文字は `_fmEdit.init`＝ **金額の欄をさわっていなければ金額は書き替えない**（`opt.keepAmount`。特記事項だけ入れても計算値のまま）
   - 📝 特記事項は **`worker_fee_overrides.note`**（＋ `note_at` / `note_by`）。**あるかの判定は `_fmNoteOf()` / `_fmHasNoteIn()` の1箇所だけ**＝ セルの黄色（`.fmx td.fmcell.hasnote`＝右上の三角・ほかの背景より優先）・
