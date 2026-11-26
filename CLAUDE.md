@@ -6209,11 +6209,16 @@ GLTの月報Excel（国別チーム月報・年度まとめ・3か月ごと目�
   ⚠️ 支援委託費の売上の行は企業ごとで人材名を持たないので、【もとの売上】の候補には出ない
 - もとの売上は、新規なら見つかった行をはじめから選ぶ（同じ費用の行 → いちばん新しい行。`_rdfLoadSales(cur, fresh)`）。「選択しない」も選べる
 - 入金日＝ `paid_date`（＋ `paid_date_at` / `paid_date_by`）＝ **もとの請求に対する入金の日**（ちゃんと入金されたかの確認。返金の日ではない）。もとの金額の隣・種類を問わず出す。**入れられるのは経理担当だけ＝ `_rdfCanPaid()`**（＝ `_saleCxCanDelete()`）。ほかの人の保存では送らない。選んだ売上の行の［入金］チェックの日を欄の下に出す（`_rdfPaidHint()`。自動では入れない）
-- ③ だけ 区分（`REFUND_CANCEL_BY`＝人材の辞退／企業のキャンセル）と 対応（`handling`＝ `refund` 返金／`replace` 補填／`none` 返金・補填なし／空＝未定。選択肢は `REFUND_HANDLINGS`）を持つ。返金で対応するかは **`_refundIsRefund(r)`**
-- 進み具合＝ 返金は `REFUND_STATUSES`（口座確認中 → 返金済み）／補填は `REPLACE_STATUSES`（補填人材探し中 → 補填完了 ＋ 補填の人材）。**全体の状態（対応未定／口座確認中／補填人材探し中／返金済み／補填完了／記録のみ）は `_refundStateOf(r)` の1箇所だけ**（一覧の上のまとめ・未完了の絞り込み・タブの数字が同じものを見る）
+- ③ だけ 区分（`REFUND_CANCEL_BY`＝人材の辞退／企業のキャンセル）＋ 理由（`cancel_reason`・任意）と 対応（`handling`＝ `refund` 返金／`replace` 補填／`none` 返金・補填なし／空＝未定。選択肢は `REFUND_HANDLINGS`）を持つ。返金で対応するかは **`_refundIsRefund(r)`**
+- 進み具合＝ 返金は `REFUND_STATUSES`（口座確認中 → 口座確認済み → 返金済み）／補填は `REPLACE_STATUSES`（補填人材探し中 → 補填完了 ＋ 補填の人材）。**全体の状態（対応未定／口座確認中／補填人材探し中／返金済み／補填完了／記録のみ）は `_refundStateOf(r)` の1箇所だけ**（一覧の上のまとめ・未完了の絞り込み・タブの数字が同じものを見る）
 - 返金額の自動計算は **`rdfRecalc()` の1箇所だけ**＝ ① もとの金額 ÷ 2 ／ ② 月額（`fmUnitOf()` から）× 未経過の月数（退職した月の次の月〜前払いのおわりの月）／③ もとの金額。あとから手で直せる
 - もとの金額は売上の行（`sales_forecast`。人材名・備考に名前がある行）から選べる（`sale_id` で結び付く）
 - 一覧の進み具合はその場で切り替え（`refundQuickSet()`。返金済み／補填完了にすると日付・名前も入る）。モーダルは手動保存（`_manualSave.refundModal` ／ 接頭辞 `rdf_` ／ `sm_refund`）、保存できたら閉じる
+- 一覧の絞り込みに 返金／補填（**`REFUND_HD_FILTERS` の1箇所**。返金＝ `_refundIsRefund()`／補填＝ ③で補填）
+- 🔒 **返金先の口座＝ `sales_refund_accounts`（返金1件＝1行）。見られるのは入力した本人と経理担当（白井）だけ**
+  - 表は RLS 有効・ポリシーなし＝ 公開キーから直接読めない。読み書きは DB の **`refund_account_get` / `refund_account_set` だけ**（見てよいかは DB の `_refund_acct_ok()`＝ 名前が「白井」で始まる人。⚠️ 画面の `FEE_LOCK_USERS` を変えたら DB も直す）
+  - 画面は `_rdfAcctLoad()` / `_rdfAcctRender()` / `_rdfAcctSave()`（［💾 保存］のとき・変えたときだけ）。欄は `REFUND_ACCT_FIELDS` の1箇所
+  - ⚠️ `sbFetch` を通さない（操作ログに口座番号を残さない）＝ `_refundRpc()` の1箇所。ほかの人には「🔒 入力済み（だれ・いつ）」だけ。一覧の印は `sales_refunds.has_account`（DB の関数が書く）
 - 論理削除＝ `SB_SOFT_DELETE_TABLES` と `TRASH_TABLES` の両方に入れてある
 
 #### ✕ 売上管理の［×］（初期費用の行だけ）→ 返金・キャンセルに登録
