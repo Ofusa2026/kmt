@@ -6230,6 +6230,7 @@ GLTの月報Excel（国別チーム月報・年度まとめ・3か月ごと目�
   - 🔁 **他の請求と相殺＝ `REFUND_OFFSET`**（進捗の4つめ・状態は「相殺済み」＝完了）。選ぶと口座の欄は出さず【相殺する請求】（`sales_refunds.offset_note`）を出し、日付の欄は「相殺日」。口座の保存（`_rdfAcctSave`）もしない
   - 💳 辞退・キャンセルの**入金状況は必須**（`saveRefund`）。**未入金なら入金日の欄（`#rdf_paid_box`）は出さない**（`onRefundKindChange` の1箇所）
   - 画面の言い方＝ 対象となる売上（データがあれば表示されます）／対象となる売上金額
+- 👤 **補填の人材はその所属機関の人材から選ぶ＝ 選択肢は `_rdfReplaceOptions(会社, id, 名前)` の1箇所だけ**（`#rdf_replace_worker_id`。所属機関を変えると作り直す＝ `onRefundCoChange()`）。保存は `replace_worker_id` と `replace_worker_name` の両方。前の手入力の名前は「（いまの値）」で残す
 - 返金額の自動計算は **`rdfRecalc()` の1箇所だけ**＝ ① もとの金額 ÷ 2 ／ ② 月額（`fmUnitOf()` から）× 未経過の月数（退職した月の次の月〜前払いのおわりの月）／③ もとの金額。あとから手で直せる
 - もとの金額は売上の行（`sales_forecast`。人材名・備考に名前がある行）から選べる（`sale_id` で結び付く）
 - 一覧の進み具合はその場で切り替え（`refundQuickSet()`。返金済み／補填完了にすると日付・名前も入る）。モーダルは手動保存（`_manualSave.refundModal` ／ 接頭辞 `rdf_` ／ `sm_refund`）、保存できたら閉じる
