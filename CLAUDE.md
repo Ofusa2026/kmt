@@ -6201,7 +6201,11 @@ GLTの月報Excel（国別チーム月報・年度まとめ・3か月ごと目�
 
 ### ↩ 返金・キャンセル（売上管理の【配属後請求】の右のタブ `refund` ／ 実体 `sales_refunds`）
 
-- 1行＝1件（人材 × 返金・キャンセル）。**種類は `REFUND_KINDS` の1箇所だけ**＝ ① `early_leave` 早期退職（初期費用の半額を返金）／② `prepaid` 前払いの支援委託費の未経過分を返金／③ `cancel` 決定後の辞退・キャンセル
+- 1行＝1件（人材 × 返金・キャンセル）。**種類は `REFUND_KINDS` の1箇所だけ**＝ `early_leave` 早期退職による初期費用の返金／`prepaid` 退職による支援委託費の返金／`cancel` 決定後の辞退・キャンセル／`other` その他（内容は `kind_other`）。⚠️ 画面に①〜③の番号は付けない（言い方は `_refundKindText(r)` の1箇所）
+- 早期退職の返金率＝ `refund_rate`（%。選択肢は `REFUND_RATES`＝100／50／その他、既定 `REFUND_RATE_DEF`＝50。読むのは `_rdfRate()`）。返金額＝ もとの金額 × 返金率（`rdfRecalc()`）
+- 所属機関は打って選ぶ（`rdf_company_q` ＋ datalist、id は隠しの `rdf_company_id`。文字 → 所属機関は `_rdfCoByText()`、一覧に無い名前はそのまま `company_name`）
+- もとの売上は、新規なら見つかった行をはじめから選ぶ（同じ費用の行 → いちばん新しい行。`_rdfLoadSales(cur, fresh)`）。「選択しない」も選べる
+- 入金日＝ `paid_date`（＋ `paid_date_at` / `paid_date_by`）＝ **もとの請求に対する入金の日**（ちゃんと入金されたかの確認。返金の日ではない）。もとの金額の隣・種類を問わず出す。**入れられるのは経理担当だけ＝ `_rdfCanPaid()`**（＝ `_saleCxCanDelete()`）。ほかの人の保存では送らない。選んだ売上の行の［入金］チェックの日を欄の下に出す（`_rdfPaidHint()`。自動では入れない）
 - ③ だけ 区分（`REFUND_CANCEL_BY`＝人材の辞退／企業のキャンセル）と 対応（`handling`＝ `refund` 返金／`replace` 補填／`none` 返金・補填なし／空＝未定。選択肢は `REFUND_HANDLINGS`）を持つ。返金で対応するかは **`_refundIsRefund(r)`**
 - 進み具合＝ 返金は `REFUND_STATUSES`（口座確認中 → 返金済み）／補填は `REPLACE_STATUSES`（補填人材探し中 → 補填完了 ＋ 補填の人材）。**全体の状態（対応未定／口座確認中／補填人材探し中／返金済み／補填完了／記録のみ）は `_refundStateOf(r)` の1箇所だけ**（一覧の上のまとめ・未完了の絞り込み・タブの数字が同じものを見る）
 - 返金額の自動計算は **`rdfRecalc()` の1箇所だけ**＝ ① もとの金額 ÷ 2 ／ ② 月額（`fmUnitOf()` から）× 未経過の月数（退職した月の次の月〜前払いのおわりの月）／③ もとの金額。あとから手で直せる
