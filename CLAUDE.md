@@ -6227,13 +6227,15 @@ GLTの月報Excel（国別チーム月報・年度まとめ・3か月ごと目�
 - 押す（`saleCancelRow()`）→「返金・キャンセルページに追加しますか？」→ ［はい］＝ 【返金・キャンセル】のタブへ移って `openRefundModal(null, {sale})` ／［いいえ］＝ 記録せずに今までどおり削除（入れ間違いのとき）
   - 元の売上の行は **`_rdfFrom`（{sale, billed}）の1箇所**。種類は ③ に固定、所属機関・人材・費用・もとの金額（1名ぶんの税込）は売上の行から入れる
   - **請求前**（`billed_date` が空）＝ 対応は「返金・補填なし」に固定。区分（人材の辞退／企業のキャンセル）は必須。保存すると売上の行は **取り消し済み**
-  - **請求後**＝ **入金状況（`REFUND_PAY_STATUSES`＝未入金・入金済み・不明）が必須**（`sales_refunds.pay_status`）。保存すると売上の行は **経理の削除待ち**
+  - **請求後**＝ **入金状況（`REFUND_PAY_STATUSES`＝未入金・入金済み・不明）が必須**（`sales_refunds.pay_status`）。保存すると売上の行は **経理の削除待ち**。⚠️ **ただし入金済みなら売上の行は残す**（実際に入ったお金なので削除待ちにしない＝ 合計にも入れたまま・「返金あり」の印だけ）
   - 控え＝ `sales_refunds.sale_billed`（登録したとき請求済みだったか）／`sale_month`
 - 売上の行の状態は **`sales_forecast.cancel_state` の1つ**（空＝ふつう／`pending`＝経理の削除待ち／`done`＝取り消し済み）＋ `cancel_at/by`・`cancel_done_at/by`・`refund_id`。**書くのは `_saleCancelMark()` の1箇所だけ**
   - 取り消し済み（`_saleCanceled()`）＝ 行は取り消し線・薄いグレー（CSS の `tr.sale-cx-done`）で残し、**合計・件数・売上内訳・新規決定数に入れない**（`renderSaleMonthTable` の `base` / `rowsLive`）。
     ほかに外すところ＝ 全体目標の実績・請求書CSV（支援委託費以外・申請費用）・手数料管理簿・送り状の自動の✓・決定報告からの初期費用／紹介料の二重チェック
   - 経理の削除待ち（`_saleCxPending()`）＝ 合計には入れたまま（請求済みのため）。**削除（＝取り消し済みにする）は経理担当だけ＝ `_saleCxCanDelete()`（`FEE_LOCK_USERS`）の1箇所**、押すのは `saleCancelDone()`（請求書・売掛金を消したあと）。
     ⚠️ 管理者でも経理担当でなければ消せない（そう頼まれた）。🗑（`deleteSaleRow`）・詳細の削除（`deleteSale`）も同じ守り
+- ↩ **売上の行の「返金あり」の印＝ `sales_forecast.refund_id`（`cancel_state` が空のとき）。書くのは `_saleRefundLink()` の1箇所だけ**＝ 返金で対応する（`_refundIsRefund()`）登録で【もとの売上】を選ぶと付く（返金・キャンセルのページから直接登録したものも）。
+  売上を選び直した・返金でなくなった・削除したら外す。印は `_saleCxBadge()`、押すと `saleOpenRefund()`（返金・キャンセルのタブでその登録を開く）
 - 返金・キャンセルの一覧には 請求前／請求後・入金状況と、売上の行の状態（`_refundSaleNote()`＝ 経理の削除待ち／取り消し済み。`loadRefunds()` が `_refundSaleState` に読む）を出す
 
 ### 🙈 売上管理の［金額を隠す］（ほかの部署・外部の方に画面を見せるとき）
