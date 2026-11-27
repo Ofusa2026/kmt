@@ -5428,6 +5428,11 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - 🤝 **支援区分・🛂 在留資格の列としぼり込み＝ 様式の定義の `wkFilter:true`**（いまは no.2 だけ）。列は `listCols` の `_bk` / `_visa`（人材情報からそのまま＝ `cell()` の中）、
   支援区分は `workerBucket()` の値（言い方は `REG_BK_LABEL`）、上の選択欄は `regBk_<no>` / `regVisa_<no>`（＝ `ui.bk` / `ui.visa`。在留資格の選択肢はいる人材の値から作る）。読む列は `REG_WORKER_SELECT_COLS` の `kmt_support` / `visa_status`
 
+#### 👤 4・7 の一覧の【担当者】【国籍】のしぼり込み
+
+- **様式の定義に `staffNatFilter:<担当者の列のキー>` を書くだけ**（いまは 4・7＝ `explainer`）。担当者は一覧に出ている値（`cell()`）そのまま＝ 未記入の行も人材情報から入る名前でしぼれる、国籍は人材の `nationality`
+- 選択欄は `regStaff_<no>` / `regNat_<no>`（＝ `ui.staff` / `ui.nat`）。選択肢はしぼる前の行から作る（`renderRegTaskList` の中の1箇所）
+
 #### 📄 参考様式第５－１０号（支援委託契約書）の書類
 
 - **条文は `REG_5_10_TASKS`（第１条の１〜11号）＋ `REG_5_10_SUB4`（４の（１）〜（６））の1箇所だけ**。
