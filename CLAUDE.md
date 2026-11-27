@@ -3708,6 +3708,13 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
   ⚠️ embed で人材を読むところは `periodic_report` を select に入れること（入れないと外れない）
 - ⚠️ 読む列は `REG_WORKER_SELECT_COLS` と `WORKER_ALERT_SELECT_COLS` に入れてある
 
+### 🚪 外国人材の退職理由（`workers.leave_reason` ＋ `leave_reason_detail`）
+
+- 7. 所属機関・受け入れ情報の退職日の隣（`leaveReasonFieldHtml()`）。上＝理由（`LEAVE_REASONS`＝転職／本帰国／その他）、下＝詳細（担当が書く）
+- **在職ステータス → 理由の自動反映は `LEAVE_REASON_BY_STATUS` の1箇所だけ**（退職済(転職)＝転職／退職済(帰国)＝本帰国。`onWorkerStatusChange()` が入れる）。
+  詳細はステータスを変えたときのお願い（`WORKER_STATUS_GUIDE` の退職済の2つ）に出す
+- 登録支援機関業務 3. 支援対象者管理簿の【終了理由】は **`leaveReasonText(w)` の1箇所**（「転職（詳細）」。理由が空なら在職ステータスから）。読む列は `REG_WORKER_SELECT_COLS` に入れてある
+
 ### 📦 外国人材の3区分（🤝 支援人材 ／ ➖ 支援外人材 ／ 📦 過去の人材）
 
 - **どの枠かを決めるのは `workerBucket(w)` の1箇所だけ**（タブの人数も一覧の絞り込みも同じものを見る）
