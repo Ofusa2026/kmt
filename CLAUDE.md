@@ -3401,6 +3401,8 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - **各ユーザーの期限超過をまとめる画面**（あとで評価に使う）。左メニューの項目 `#navStaffMgmt` は `_refreshTrashNav()` が管理者だけに出す
 - **記録の実体は `staff_overdue_log`**（1行＝1人×1つの期限。`src`＋`ref`＋`user_name` で一意）。期限後に終わったら `done_at` が入るだけで**記録は消さない**。論理削除（`SB_SOFT_DELETE_TABLES` と `TRASH_TABLES` の両方）
 - **自動で記録するのは `_staffOverdueSync()` の1箇所だけ**＝ `REG_SCHEDULE` の `check` 付きで期限を過ぎたもの（`REG_SCHED_CHECKS` の結果）。【担当者リスト】・社員管理を開いたときに走る。ほかの期限も `REG_SCHED_CHECKS` に足せば記録される
+- 📕 **運用要領の試験（○✕）も記録する＝ `_staffOverdueSyncYoryo()`**（src＝`yoryo`・ref＝版:章・1人×1章で1行）。だれのどの章かは **`_yoryoOverdueList(checks)` の1箇所だけ**（受験必須の人で［この章を確認しました］まで済んでいない章）。
+  書くのは期限（`YORYO_DEADLINE`）の次の日から＝ 社員管理を開いたとき・運用要領の画面をだれかが開いたとき。期限の前は社員管理に「記録予定」（`_yoryoOverPreviewHtml()`）、確認状況の表に【期限超過】の列を出す。書き込みは `_staffOverWrite()` の1箇所（管理ページの記録期限と共用）
 - 手で足すのは［＋ 期限超過を記録］（`src`＝`manual`）。何日遅れかは `_staffOverDays()` の1箇所
 - アップデート履歴（`WHATS_NEW`）には出さない（管理者向け）
 
