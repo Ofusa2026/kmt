@@ -5428,6 +5428,13 @@ KMT → 大房の「📥 受信トレイ」に案件依頼を直接入れる仕�
 - 🤝 **支援区分・🛂 在留資格の列としぼり込み＝ 様式の定義の `wkFilter:true`**（いまは no.2 だけ）。列は `listCols` の `_bk` / `_visa`（人材情報からそのまま＝ `cell()` の中）、
   支援区分は `workerBucket()` の値（言い方は `REG_BK_LABEL`）、上の選択欄は `regBk_<no>` / `regVisa_<no>`（＝ `ui.bk` / `ui.visa`。在留資格の選択肢はいる人材の値から作る）。読む列は `REG_WORKER_SELECT_COLS` の `kmt_support` / `visa_status`
 
+#### 📘 9. 日本語学習支援記録簿の KMT の支援（`data.kmt9`）
+
+- KMT の日本語学習支援＝ ① 毎年 `REG_9_GUIDE_MONTHS`（3月・8月。`REG_9_GUIDE_FROM_YEAR`＝2026 から・その月の最初の平日）に日本語能力試験の日程と無料教材（日本語の森）を案内／依頼があれば試験の申込 ② 定期面談で日本語学習の進捗確認。文言は `REG_9_*` の一かたまりだけ
+- 日付つきの行は記録の `rows`（実施日・実施内容・実施方法・実施担当者）。**行を作るのは `_reg9RowsOf(w, co, meetings, scheds)` の1箇所だけ**＝ 案内は支援期間（`_reg9InSupport()`＝配属日→就労開始日→入国日 〜 退職日）の中の月だけ／定期面談は `company_meetings`（kind＝定期面談）＋ 記録のない `support_schedules`（periodic_meeting）の今年の12月まで。実施担当者＝ `_regGltStaffOf()`（面談は記録の対応者を先に）
+- KMT のぶんの記録は `data.kmt9`（実施団体＝ `REG_9_PROVIDER`）で見分ける＝ UNJ などほかの団体の記録には触らない。一斉記録は一覧の上の［📥 KMTの日本語学習支援を一斉記録］＝ `reg9BulkFill()`（無い行だけ足す・`_reg9Merge()`）、記入フォームは `reg9FillRows()`
+- 2026/11/27 に DB から 651名ぶん入れた（`updated_by`＝システム取込。案内 1,095行・定期面談 683行）。GLT の担当がいない企業（有限会社大一など6名）は実施担当者が空
+
 #### 👤 4・7 の一覧の【担当者】【国籍】のしぼり込み
 
 - **様式の定義に `staffNatFilter:<担当者の列のキー>` を書くだけ**（いまは 4・7＝ `explainer`）。担当者は一覧に出ている値（`cell()`）そのまま＝ 未記入の行も人材情報から入る名前でしぼれる、国籍は人材の `nationality`
